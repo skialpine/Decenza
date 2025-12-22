@@ -1,0 +1,7 @@
+module DE1App
+
+# Design-time type information
+typeinfo plugins.qmltypes
+
+# Singleton for theme
+singleton Theme 1.0 ../Theme.qml
