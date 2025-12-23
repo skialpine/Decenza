@@ -31,7 +31,7 @@ public:
     Q_INVOKABLE QString getScaleType(const QString& address) const;
 
     void setScaleDevice(ScaleDevice* scale);
-    void setAutoScanForScale(bool enabled);
+    Q_INVOKABLE void setAutoScanForScale(bool enabled);
 
     // Direct connect to wake sleeping scales
     void setSavedScaleAddress(const QString& address, const QString& type);
