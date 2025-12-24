@@ -204,8 +204,12 @@ Page {
             DE1Device.wakeUp()
         }
 
-        // Try to reconnect to saved scale
-        BLEManager.tryDirectConnectToScale()
+        // Wake the scale (enable LCD) or try to reconnect
+        if (ScaleDevice && ScaleDevice.connected) {
+            ScaleDevice.wake()
+        } else {
+            BLEManager.tryDirectConnectToScale()
+        }
 
         // Navigate back to idle
         root.goToIdle()
@@ -219,6 +223,12 @@ Page {
             var state = DE1Device.stateString
             if (state !== "Sleep" && state !== "GoingToSleep") {
                 mediaPlayer.stop()
+                // Wake the scale (enable LCD) or try to reconnect
+                if (ScaleDevice && ScaleDevice.connected) {
+                    ScaleDevice.wake()
+                } else {
+                    BLEManager.tryDirectConnectToScale()
+                }
                 root.goToIdle()
             }
         }

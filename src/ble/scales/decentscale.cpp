@@ -149,6 +149,11 @@ void DecentScale::sleep() {
     sendCommand(QByteArray::fromHex("0A0200"));
 }
 
+void DecentScale::wake() {
+    // Command 0A 01 01 enables LCD
+    sendCommand(QByteArray::fromHex("0A0101"));
+}
+
 void DecentScale::setLed(int r, int g, int b) {
     QByteArray cmd(5, 0);
     cmd[0] = 0x0A;

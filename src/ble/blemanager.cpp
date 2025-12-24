@@ -351,19 +351,18 @@ void BLEManager::tryDirectConnectToScale() {
         return;
     }
 
-    qDebug() << "Trying direct connect to wake scale:" << m_savedScaleAddress;
+    qDebug() << "Trying to reconnect to scale:" << m_savedScaleAddress;
 
-    // Start timeout timer
+    // Set flag to look for our saved scale during scan
+    m_scanningForScales = true;
     m_scaleConnectionTimer->start();
 
-    // Create a QBluetoothDeviceInfo with proper BLE configuration
-    // This tells Windows it's a BLE device, avoiding classic Bluetooth lookups
-    QBluetoothAddress addr(m_savedScaleAddress);
-    QBluetoothDeviceInfo deviceInfo(addr, "Saved Scale", 0);
-    deviceInfo.setCoreConfigurations(QBluetoothDeviceInfo::LowEnergyCoreConfiguration);
-
-    // Emit as if we discovered it - the handler in main.cpp will create and connect
-    emit scaleDiscovered(deviceInfo, m_savedScaleType);
+    // Start a scan - when we find our saved scale address, we'll connect to it
+    // This is more reliable than trying to create a QBluetoothDeviceInfo from just the address,
+    // since Qt's BLE stack on Android needs proper device metadata from a scan
+    if (!m_scanning) {
+        startScan();
+    }
 }
 
 void BLEManager::openLocationSettings()

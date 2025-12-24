@@ -172,12 +172,24 @@ Page {
                     // Put scale to sleep and disconnect (if connected)
                     if (ScaleDevice && ScaleDevice.connected) {
                         ScaleDevice.sleep()
-                        ScaleDevice.disconnectFromScale()
+                        // Wait 300ms for command to be sent before disconnecting
+                        scaleDisconnectTimer.start()
                     }
                     // Put DE1 to sleep
                     DE1Device.goToSleep()
                     // Show screensaver
                     root.goToScreensaver()
+                }
+
+                Timer {
+                    id: scaleDisconnectTimer
+                    interval: 300
+                    repeat: false
+                    onTriggered: {
+                        if (ScaleDevice) {
+                            ScaleDevice.disconnectFromScale()
+                        }
+                    }
                 }
                 background: Rectangle {
                     implicitWidth: Theme.scaled(120)
