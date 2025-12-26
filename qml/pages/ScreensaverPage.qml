@@ -13,6 +13,7 @@ Page {
     property bool isCurrentItemImage: false
     property string lastFailedSource: ""
     property string currentImageSource: ""
+    property bool useFirstImage: true  // Toggle for cross-fade between two images
 
     Component.onCompleted: {
         playNextMedia()
@@ -48,15 +49,25 @@ Page {
             console.log("[Screensaver] Playing " + (isCurrentItemImage ? "image" : "video") + ":", source)
 
             if (isCurrentItemImage) {
-                // Display image with fade transition
+                // Display image with cross-fade transition
                 mediaPlayer.stop()
-                currentImageSource = source
                 mediaPlaying = true
-                imageDisplayTimer.restart()
+
+                // Load into the inactive image, then cross-fade
+                if (useFirstImage) {
+                    imageDisplay1.source = source
+                } else {
+                    imageDisplay2.source = source
+                }
+                currentImageSource = source
+                // Cross-fade will be triggered when image loads (onStatusChanged)
             } else {
-                // Play video
+                // Play video - reset image state
                 imageDisplayTimer.stop()
                 currentImageSource = ""
+                useFirstImage = true
+                imageDisplay1.source = ""
+                imageDisplay2.source = ""
                 mediaPlaying = true
                 mediaPlayer.source = source
                 mediaPlayer.play()
@@ -102,6 +113,8 @@ Page {
             }
             videoFailCount = 0
             lastFailedSource = ""
+            // Toggle to other image for cross-fade effect
+            useFirstImage = !useFirstImage
             playNextMedia()
         }
     }
@@ -150,17 +163,23 @@ Page {
         anchors.fill: parent
         visible: mediaPlaying && isCurrentItemImage
 
-        // Two images for cross-fade effect
+        // Two images for cross-fade effect (2 second dissolve)
         Image {
             id: imageDisplay1
             anchors.fill: parent
             fillMode: Image.PreserveAspectCrop
-            source: currentImageSource
-            opacity: 1.0
             asynchronous: true
+            opacity: useFirstImage ? 1.0 : 0.0
 
             Behavior on opacity {
-                NumberAnimation { duration: 1000; easing.type: Easing.InOutQuad }
+                NumberAnimation { duration: 2000; easing.type: Easing.InOutQuad }
+            }
+
+            onStatusChanged: {
+                if (status === Image.Ready && useFirstImage && source.toString().length > 0) {
+                    // Image loaded, start display timer
+                    imageDisplayTimer.restart()
+                }
             }
         }
 
@@ -168,12 +187,18 @@ Page {
             id: imageDisplay2
             anchors.fill: parent
             fillMode: Image.PreserveAspectCrop
-            source: ""
-            opacity: 0.0
             asynchronous: true
+            opacity: useFirstImage ? 0.0 : 1.0
 
             Behavior on opacity {
-                NumberAnimation { duration: 1000; easing.type: Easing.InOutQuad }
+                NumberAnimation { duration: 2000; easing.type: Easing.InOutQuad }
+            }
+
+            onStatusChanged: {
+                if (status === Image.Ready && !useFirstImage && source.toString().length > 0) {
+                    // Image loaded, start display timer
+                    imageDisplayTimer.restart()
+                }
             }
         }
     }
@@ -310,11 +335,14 @@ Page {
     Keys.onPressed: wake()
 
     function wake() {
-        // Stop media playback
+        // Stop media playback and reset state
         mediaPlayer.stop()
         imageDisplayTimer.stop()
         mediaPlaying = false
         isCurrentItemImage = false
+        useFirstImage = true
+        imageDisplay1.source = ""
+        imageDisplay2.source = ""
 
         // Wake up the DE1
         if (DE1Device.connected) {
@@ -342,6 +370,9 @@ Page {
                 imageDisplayTimer.stop()
                 mediaPlaying = false
                 isCurrentItemImage = false
+                useFirstImage = true
+                imageDisplay1.source = ""
+                imageDisplay2.source = ""
                 if (ScaleDevice && ScaleDevice.connected) {
                     ScaleDevice.wake()
                 } else {
