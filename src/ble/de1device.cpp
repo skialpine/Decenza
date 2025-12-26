@@ -11,6 +11,36 @@ DE1Device::DE1Device(QObject* parent)
     m_commandTimer.setInterval(50);  // Process queue every 50ms
     m_commandTimer.setSingleShot(true);
     connect(&m_commandTimer, &QTimer::timeout, this, &DE1Device::processCommandQueue);
+
+    // Retry timer for failed service discovery
+    m_retryTimer.setSingleShot(true);
+    m_retryTimer.setInterval(RETRY_DELAY_MS);
+    connect(&m_retryTimer, &QTimer::timeout, this, [this]() {
+        if (m_pendingDevice.isValid()) {
+            qDebug() << "DE1Device: Retry" << m_retryCount << "of" << MAX_RETRIES;
+            // Clean up before retry
+            if (m_controller) {
+                m_controller->disconnectFromDevice();
+                delete m_controller;
+                m_controller = nullptr;
+            }
+            // Reconnect
+            m_connecting = true;
+            emit connectingChanged();
+            m_controller = QLowEnergyController::createCentral(m_pendingDevice, this);
+            connect(m_controller, &QLowEnergyController::connected,
+                    this, &DE1Device::onControllerConnected);
+            connect(m_controller, &QLowEnergyController::disconnected,
+                    this, &DE1Device::onControllerDisconnected);
+            connect(m_controller, &QLowEnergyController::errorOccurred,
+                    this, &DE1Device::onControllerError);
+            connect(m_controller, &QLowEnergyController::serviceDiscovered,
+                    this, &DE1Device::onServiceDiscovered);
+            connect(m_controller, &QLowEnergyController::discoveryFinished,
+                    this, &DE1Device::onServiceDiscoveryFinished);
+            m_controller->connectToDevice();
+        }
+    });
 }
 
 DE1Device::~DE1Device() {
@@ -82,6 +112,11 @@ void DE1Device::connectToDevice(const QBluetoothDeviceInfo& device) {
         disconnect();
     }
 
+    // Store device for potential retries and reset counter
+    m_pendingDevice = device;
+    m_retryCount = 0;
+    m_retryTimer.stop();
+
     m_connecting = true;
     emit connectingChanged();
 
@@ -105,6 +140,11 @@ void DE1Device::connectToDevice(const QBluetoothDeviceInfo& device) {
 void DE1Device::disconnect() {
     m_commandQueue.clear();
     m_writePending = false;
+
+    // Stop any pending retries
+    m_retryTimer.stop();
+    m_pendingDevice = QBluetoothDeviceInfo();
+    m_retryCount = 0;
 
     if (m_service) {
         delete m_service;
@@ -210,8 +250,26 @@ void DE1Device::onServiceDiscoveryFinished() {
     qDebug() << "DE1Device: Service discovery finished, service found:" << (m_service != nullptr);
     if (!m_service) {
         qDebug() << "DE1Device: DE1 service NOT found!";
-        emit errorOccurred("DE1 service not found");
-        disconnect();
+
+        // Retry logic - Android sometimes returns wrong/cached services
+        m_retryCount++;
+        if (m_retryCount <= MAX_RETRIES && m_pendingDevice.isValid()) {
+            qDebug() << "DE1Device: Will retry connection in" << RETRY_DELAY_MS << "ms (attempt" << m_retryCount << "of" << MAX_RETRIES << ")";
+            // Disconnect but don't emit error yet
+            if (m_controller) {
+                m_controller->disconnectFromDevice();
+            }
+            m_retryTimer.start();
+        } else {
+            qDebug() << "DE1Device: Max retries exceeded, giving up";
+            emit errorOccurred("DE1 service not found after " + QString::number(MAX_RETRIES) + " retries. Try toggling Bluetooth off/on.");
+            m_pendingDevice = QBluetoothDeviceInfo();  // Clear pending device
+            disconnect();
+        }
+    } else {
+        // Success - clear pending device
+        m_pendingDevice = QBluetoothDeviceInfo();
+        m_retryCount = 0;
     }
 }
 

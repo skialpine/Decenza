@@ -152,4 +152,11 @@ private:
     bool m_writePending = false;
     bool m_connecting = false;
     bool m_simulationMode = false;
+
+    // Retry logic for service discovery failures
+    QBluetoothDeviceInfo m_pendingDevice;
+    QTimer m_retryTimer;
+    int m_retryCount = 0;
+    static constexpr int MAX_RETRIES = 3;
+    static constexpr int RETRY_DELAY_MS = 2000;
 };
