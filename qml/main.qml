@@ -236,7 +236,7 @@ ApplicationWindow {
             width: 400
 
             Label {
-                text: "Before we begin, please make sure your Bluetooth scale is powered on and ready to pair.\n\nThe app will search for your DE1 espresso machine and compatible scales."
+                text: "Before we begin:\n\n• Turn on your DE1 by holding the middle stop button for a few seconds\n• Power on your Bluetooth scale\n\nThe app will search for your DE1 espresso machine and compatible scales."
                 wrapMode: Text.Wrap
                 width: parent.width
                 font.pixelSize: 16
