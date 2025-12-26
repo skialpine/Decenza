@@ -8,7 +8,8 @@ Page {
     objectName: "idlePage"
     background: Rectangle { color: Theme.backgroundColor }
 
-    Component.onCompleted: root.currentPageTitle = ""
+    Component.onCompleted: root.currentPageTitle = "Idle"
+    StackView.onActivated: root.currentPageTitle = "Idle"
 
     // Track which function's presets are showing
     property string activePresetFunction: ""  // "", "steam", "espresso" (future)
@@ -93,12 +94,12 @@ Page {
                 visible: activePresetFunction === "steam"
                 opacity: visible ? 1.0 : 0.0
 
-                presets: Settings.steamCupPresets
-                selectedIndex: Settings.selectedSteamCup
+                presets: Settings.steamPitcherPresets
+                selectedIndex: Settings.selectedSteamPitcher
 
                 onPresetSelected: function(index) {
-                    Settings.selectedSteamCup = index
-                    var preset = Settings.getSteamCupPreset(index)
+                    Settings.selectedSteamPitcher = index
+                    var preset = Settings.getSteamPitcherPreset(index)
                     if (preset) {
                         Settings.steamTimeout = preset.duration
                         Settings.steamFlow = preset.flow !== undefined ? preset.flow : 150
@@ -159,12 +160,12 @@ Page {
                 visible: activePresetFunction === "hotwater"
                 opacity: visible ? 1.0 : 0.0
 
-                presets: Settings.waterCupPresets
-                selectedIndex: Settings.selectedWaterCup
+                presets: Settings.waterVesselPresets
+                selectedIndex: Settings.selectedWaterVessel
 
                 onPresetSelected: function(index) {
-                    Settings.selectedWaterCup = index
-                    var preset = Settings.getWaterCupPreset(index)
+                    Settings.selectedWaterVessel = index
+                    var preset = Settings.getWaterVesselPreset(index)
                     if (preset) {
                         Settings.hotWaterVolume = preset.volume
                     }

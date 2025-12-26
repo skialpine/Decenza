@@ -13,6 +13,7 @@ Page {
     property real currentWeight: 0.0
 
     Component.onCompleted: root.currentPageTitle = MainController.currentProfileName
+    StackView.onActivated: root.currentPageTitle = MainController.currentProfileName
 
     // Force immediate weight update on signal (bypasses lazy binding evaluation)
     Connections {

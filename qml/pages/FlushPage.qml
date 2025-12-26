@@ -12,6 +12,7 @@ Page {
         root.currentPageTitle = "Flush"
         MainController.applyFlushSettings()
     }
+    StackView.onActivated: root.currentPageTitle = "Flush"
 
     property bool isFlushing: MachineState.phase === MachineStateType.Phase.Flushing
     property int editingPresetIndex: -1

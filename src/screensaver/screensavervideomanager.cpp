@@ -841,6 +841,15 @@ void ScreensaverVideoManager::processDownloadQueue()
     }
 
     m_currentDownloadIndex = m_downloadQueue.takeFirst();
+
+    // Validate index is still valid (catalog may have been refreshed during download)
+    if (m_currentDownloadIndex < 0 || m_currentDownloadIndex >= m_catalog.size()) {
+        qDebug() << "[Screensaver] Skipping invalid index" << m_currentDownloadIndex
+                 << "(catalog size:" << m_catalog.size() << ")";
+        QTimer::singleShot(0, this, &ScreensaverVideoManager::processDownloadQueue);
+        return;
+    }
+
     const VideoItem& item = m_catalog[m_currentDownloadIndex];
 
     qDebug() << "[Screensaver] Downloading video" << item.id << ":" << item.author;
@@ -908,6 +917,17 @@ void ScreensaverVideoManager::onDownloadFinished()
 
         // Try next video
         QTimer::singleShot(1000, this, &ScreensaverVideoManager::processDownloadQueue);
+        return;
+    }
+
+    // Validate index is still valid (catalog may have been refreshed during async download)
+    if (m_currentDownloadIndex < 0 || m_currentDownloadIndex >= m_catalog.size()) {
+        qWarning() << "[Screensaver] Download completed but index" << m_currentDownloadIndex
+                   << "is now invalid (catalog size:" << m_catalog.size() << "), discarding";
+        m_downloadFile->remove();
+        delete m_downloadFile;
+        m_downloadFile = nullptr;
+        QTimer::singleShot(100, this, &ScreensaverVideoManager::processDownloadQueue);
         return;
     }
 

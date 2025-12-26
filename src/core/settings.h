@@ -24,9 +24,9 @@ class Settings : public QObject {
     Q_PROPERTY(int steamTimeout READ steamTimeout WRITE setSteamTimeout NOTIFY steamTimeoutChanged)
     Q_PROPERTY(int steamFlow READ steamFlow WRITE setSteamFlow NOTIFY steamFlowChanged)
 
-    // Steam cup presets
-    Q_PROPERTY(QVariantList steamCupPresets READ steamCupPresets NOTIFY steamCupPresetsChanged)
-    Q_PROPERTY(int selectedSteamCup READ selectedSteamCup WRITE setSelectedSteamCup NOTIFY selectedSteamCupChanged)
+    // Steam pitcher presets
+    Q_PROPERTY(QVariantList steamPitcherPresets READ steamPitcherPresets NOTIFY steamPitcherPresetsChanged)
+    Q_PROPERTY(int selectedSteamPitcher READ selectedSteamPitcher WRITE setSelectedSteamCup NOTIFY selectedSteamPitcherChanged)
 
     // Profile favorites
     Q_PROPERTY(QVariantList favoriteProfiles READ favoriteProfiles NOTIFY favoriteProfilesChanged)
@@ -36,9 +36,9 @@ class Settings : public QObject {
     Q_PROPERTY(double waterTemperature READ waterTemperature WRITE setWaterTemperature NOTIFY waterTemperatureChanged)
     Q_PROPERTY(int waterVolume READ waterVolume WRITE setWaterVolume NOTIFY waterVolumeChanged)
 
-    // Hot water cup presets
-    Q_PROPERTY(QVariantList waterCupPresets READ waterCupPresets NOTIFY waterCupPresetsChanged)
-    Q_PROPERTY(int selectedWaterCup READ selectedWaterCup WRITE setSelectedWaterCup NOTIFY selectedWaterCupChanged)
+    // Hot water vessel presets
+    Q_PROPERTY(QVariantList waterVesselPresets READ waterVesselPresets NOTIFY waterVesselPresetsChanged)
+    Q_PROPERTY(int selectedWaterVessel READ selectedWaterVessel WRITE setSelectedWaterCup NOTIFY selectedWaterVesselChanged)
 
     // Flush presets
     Q_PROPERTY(QVariantList flushPresets READ flushPresets NOTIFY flushPresetsChanged)
@@ -81,16 +81,16 @@ public:
     int steamFlow() const;
     void setSteamFlow(int flow);
 
-    // Steam cup presets
-    QVariantList steamCupPresets() const;
-    int selectedSteamCup() const;
+    // Steam pitcher presets
+    QVariantList steamPitcherPresets() const;
+    int selectedSteamPitcher() const;
     void setSelectedSteamCup(int index);
 
-    Q_INVOKABLE void addSteamCupPreset(const QString& name, int duration, int flow);
-    Q_INVOKABLE void updateSteamCupPreset(int index, const QString& name, int duration, int flow);
-    Q_INVOKABLE void removeSteamCupPreset(int index);
-    Q_INVOKABLE void moveSteamCupPreset(int from, int to);
-    Q_INVOKABLE QVariantMap getSteamCupPreset(int index) const;
+    Q_INVOKABLE void addSteamPitcherPreset(const QString& name, int duration, int flow);
+    Q_INVOKABLE void updateSteamPitcherPreset(int index, const QString& name, int duration, int flow);
+    Q_INVOKABLE void removeSteamPitcherPreset(int index);
+    Q_INVOKABLE void moveSteamPitcherPreset(int from, int to);
+    Q_INVOKABLE QVariantMap getSteamPitcherPreset(int index) const;
 
     // Profile favorites (max 5)
     QVariantList favoriteProfiles() const;
@@ -110,16 +110,16 @@ public:
     int waterVolume() const;
     void setWaterVolume(int volume);
 
-    // Hot water cup presets
-    QVariantList waterCupPresets() const;
-    int selectedWaterCup() const;
+    // Hot water vessel presets
+    QVariantList waterVesselPresets() const;
+    int selectedWaterVessel() const;
     void setSelectedWaterCup(int index);
 
-    Q_INVOKABLE void addWaterCupPreset(const QString& name, int volume);
-    Q_INVOKABLE void updateWaterCupPreset(int index, const QString& name, int volume);
-    Q_INVOKABLE void removeWaterCupPreset(int index);
-    Q_INVOKABLE void moveWaterCupPreset(int from, int to);
-    Q_INVOKABLE QVariantMap getWaterCupPreset(int index) const;
+    Q_INVOKABLE void addWaterVesselPreset(const QString& name, int volume);
+    Q_INVOKABLE void updateWaterVesselPreset(int index, const QString& name, int volume);
+    Q_INVOKABLE void removeWaterVesselPreset(int index);
+    Q_INVOKABLE void moveWaterVesselPreset(int from, int to);
+    Q_INVOKABLE QVariantMap getWaterVesselPreset(int index) const;
 
     // Flush presets
     QVariantList flushPresets() const;
@@ -159,14 +159,14 @@ signals:
     void steamTemperatureChanged();
     void steamTimeoutChanged();
     void steamFlowChanged();
-    void steamCupPresetsChanged();
-    void selectedSteamCupChanged();
+    void steamPitcherPresetsChanged();
+    void selectedSteamPitcherChanged();
     void favoriteProfilesChanged();
     void selectedFavoriteProfileChanged();
     void waterTemperatureChanged();
     void waterVolumeChanged();
-    void waterCupPresetsChanged();
-    void selectedWaterCupChanged();
+    void waterVesselPresetsChanged();
+    void selectedWaterVesselChanged();
     void flushPresetsChanged();
     void selectedFlushPresetChanged();
     void flushFlowChanged();

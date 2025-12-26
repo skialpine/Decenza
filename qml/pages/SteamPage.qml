@@ -9,9 +9,10 @@ Page {
     background: Rectangle { color: Theme.backgroundColor }
 
     Component.onCompleted: root.currentPageTitle = "Steam"
+    StackView.onActivated: root.currentPageTitle = "Steam"
 
     property bool isSteaming: MachineState.phase === MachineState.Phase.Steaming
-    property int editingCupIndex: -1  // For the edit popup
+    property int editingPitcherIndex: -1  // For the edit popup
 
     // Helper to format flow as readable value (handles undefined/NaN)
     // Steam flow is stored as 0.01 ml/s units (e.g., 150 = 1.5 ml/s)
@@ -22,27 +23,27 @@ Page {
         return (flow / 100).toFixed(1)
     }
 
-    // Get current cup's values with defaults
-    function getCurrentCupDuration() {
-        var preset = Settings.getSteamCupPreset(Settings.selectedSteamCup)
+    // Get current pitcher's values with defaults
+    function getCurrentPitcherDuration() {
+        var preset = Settings.getSteamPitcherPreset(Settings.selectedSteamPitcher)
         return preset ? preset.duration : 30
     }
 
-    function getCurrentCupFlow() {
-        var preset = Settings.getSteamCupPreset(Settings.selectedSteamCup)
+    function getCurrentPitcherFlow() {
+        var preset = Settings.getSteamPitcherPreset(Settings.selectedSteamPitcher)
         return (preset && preset.flow !== undefined) ? preset.flow : 150
     }
 
-    function getCurrentCupName() {
-        var preset = Settings.getSteamCupPreset(Settings.selectedSteamCup)
+    function getCurrentPitcherName() {
+        var preset = Settings.getSteamPitcherPreset(Settings.selectedSteamPitcher)
         return preset ? preset.name : ""
     }
 
-    // Save current cup with new values
-    function saveCurrentCup(duration, flow) {
-        var name = getCurrentCupName()
+    // Save current pitcher with new values
+    function saveCurrentPitcher(duration, flow) {
+        var name = getCurrentPitcherName()
         if (name) {
-            Settings.updateSteamCupPreset(Settings.selectedSteamCup, name, duration, flow)
+            Settings.updateSteamPitcherPreset(Settings.selectedSteamPitcher, name, duration, flow)
         }
     }
 
@@ -142,7 +143,7 @@ Page {
             Layout.fillHeight: true
             spacing: 12
 
-            // Cup Presets Section
+            // Pitcher Presets Section
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 90
@@ -157,7 +158,7 @@ Page {
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
-                            text: "Cup Preset"
+                            text: "Pitcher Preset"
                             color: Theme.textColor
                             font.pixelSize: Theme.bodyFont.pixelSize
                             font.bold: true
@@ -170,58 +171,58 @@ Page {
                         }
                     }
 
-                    // Cup preset buttons with drag-and-drop
+                    // Pitcher preset buttons with drag-and-drop
                     Row {
-                        id: cupPresetsRow
+                        id: pitcherPresetsRow
                         Layout.fillWidth: true
                         spacing: 8
 
                         property int draggedIndex: -1
 
                         Repeater {
-                            id: cupRepeater
-                            model: Settings.steamCupPresets
+                            id: pitcherRepeater
+                            model: Settings.steamPitcherPresets
 
                             Item {
-                                id: cupDelegate
-                                width: cupPill.width
+                                id: pitcherDelegate
+                                width: pitcherPill.width
                                 height: 36
 
-                                property int cupIndex: index
+                                property int pitcherIndex: index
 
                                 Rectangle {
-                                    id: cupPill
-                                    width: cupText.implicitWidth + 24
+                                    id: pitcherPill
+                                    width: pitcherText.implicitWidth + 24
                                     height: 36
                                     radius: 18
-                                    color: cupDelegate.cupIndex === Settings.selectedSteamCup ? Theme.primaryColor : Theme.backgroundColor
-                                    border.color: cupDelegate.cupIndex === Settings.selectedSteamCup ? Theme.primaryColor : Theme.textSecondaryColor
+                                    color: pitcherDelegate.pitcherIndex === Settings.selectedSteamPitcher ? Theme.primaryColor : Theme.backgroundColor
+                                    border.color: pitcherDelegate.pitcherIndex === Settings.selectedSteamPitcher ? Theme.primaryColor : Theme.textSecondaryColor
                                     border.width: 1
                                     opacity: dragArea.drag.active ? 0.8 : 1.0
 
                                     Drag.active: dragArea.drag.active
-                                    Drag.source: cupDelegate
+                                    Drag.source: pitcherDelegate
                                     Drag.hotSpot.x: width / 2
                                     Drag.hotSpot.y: height / 2
 
                                     states: State {
                                         when: dragArea.drag.active
-                                        ParentChange { target: cupPill; parent: cupPresetsRow }
-                                        AnchorChanges { target: cupPill; anchors.verticalCenter: undefined }
+                                        ParentChange { target: pitcherPill; parent: pitcherPresetsRow }
+                                        AnchorChanges { target: pitcherPill; anchors.verticalCenter: undefined }
                                     }
 
                                     Text {
-                                        id: cupText
+                                        id: pitcherText
                                         anchors.centerIn: parent
                                         text: modelData.name
-                                        color: cupDelegate.cupIndex === Settings.selectedSteamCup ? "white" : Theme.textColor
+                                        color: pitcherDelegate.pitcherIndex === Settings.selectedSteamPitcher ? "white" : Theme.textColor
                                         font: Theme.bodyFont
                                     }
 
                                     MouseArea {
                                         id: dragArea
                                         anchors.fill: parent
-                                        drag.target: cupPill
+                                        drag.target: pitcherPill
                                         drag.axis: Drag.XAxis
 
                                         property bool held: false
@@ -236,8 +237,8 @@ Page {
                                         onReleased: {
                                             holdTimer.stop()
                                             if (!moved && !held) {
-                                                // Simple click - select the cup
-                                                Settings.selectedSteamCup = cupDelegate.cupIndex
+                                                // Simple click - select the pitcher
+                                                Settings.selectedSteamPitcher = pitcherDelegate.pitcherIndex
                                                 var flow = modelData.flow !== undefined ? modelData.flow : 150
                                                 durationSlider.value = modelData.duration
                                                 flowSlider.value = flow
@@ -245,14 +246,14 @@ Page {
                                                 Settings.steamFlow = flow
                                                 MainController.applySteamSettings()
                                             }
-                                            cupPill.Drag.drop()
-                                            cupPresetsRow.draggedIndex = -1
+                                            pitcherPill.Drag.drop()
+                                            pitcherPresetsRow.draggedIndex = -1
                                         }
 
                                         onPositionChanged: {
                                             if (drag.active) {
                                                 moved = true
-                                                cupPresetsRow.draggedIndex = cupDelegate.cupIndex
+                                                pitcherPresetsRow.draggedIndex = pitcherDelegate.pitcherIndex
                                             }
                                         }
 
@@ -262,9 +263,9 @@ Page {
                                             onTriggered: {
                                                 if (!dragArea.moved) {
                                                     dragArea.held = true
-                                                    editingCupIndex = cupDelegate.cupIndex
-                                                    editCupNameInput.text = modelData.name
-                                                    editCupPopup.open()
+                                                    editingPitcherIndex = pitcherDelegate.pitcherIndex
+                                                    editPitcherNameInput.text = modelData.name
+                                                    editPitcherPopup.open()
                                                 }
                                             }
                                         }
@@ -274,10 +275,10 @@ Page {
                                 DropArea {
                                     anchors.fill: parent
                                     onEntered: function(drag) {
-                                        var fromIndex = drag.source.cupIndex
-                                        var toIndex = cupDelegate.cupIndex
+                                        var fromIndex = drag.source.pitcherIndex
+                                        var toIndex = pitcherDelegate.pitcherIndex
                                         if (fromIndex !== toIndex) {
-                                            Settings.moveSteamCupPreset(fromIndex, toIndex)
+                                            Settings.moveSteamPitcherPreset(fromIndex, toIndex)
                                         }
                                     }
                                 }
@@ -302,14 +303,14 @@ Page {
 
                             MouseArea {
                                 anchors.fill: parent
-                                onClicked: addCupDialog.open()
+                                onClicked: addPitcherDialog.open()
                             }
                         }
                     }
                 }
             }
 
-            // Duration (per-cup, auto-saves)
+            // Duration (per-pitcher, auto-saves)
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 100
@@ -336,18 +337,18 @@ Page {
                         stepSize: 1
                         decimals: 0
                         suffix: " s"
-                        value: getCurrentCupDuration()
+                        value: getCurrentPitcherDuration()
                         valueColor: Theme.primaryColor
                         onValueModified: function(newValue) {
                             durationSlider.value = newValue
                             Settings.steamTimeout = newValue
-                            saveCurrentCup(newValue, flowSlider.value)
+                            saveCurrentPitcher(newValue, flowSlider.value)
                         }
                     }
                 }
             }
 
-            // Steam Flow (per-cup, auto-saves)
+            // Steam Flow (per-pitcher, auto-saves)
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 100
@@ -380,13 +381,13 @@ Page {
                         to: 250
                         stepSize: 5
                         decimals: 0
-                        value: getCurrentCupFlow()
+                        value: getCurrentPitcherFlow()
                         displayText: flowToDisplay(value)
                         valueColor: Theme.primaryColor
                         onValueModified: function(newValue) {
                             flowSlider.value = newValue
                             MainController.setSteamFlowImmediate(newValue)
-                            saveCurrentCup(durationSlider.value, newValue)
+                            saveCurrentPitcher(durationSlider.value, newValue)
                         }
                     }
                 }
@@ -475,9 +476,9 @@ Page {
                 }
             }
 
-            // Cup name
+            // Pitcher name
             Text {
-                text: getCurrentCupName() || "No cup"
+                text: getCurrentPitcherName() || "No pitcher"
                 color: "white"
                 font.pixelSize: 20
                 font.bold: true
@@ -523,9 +524,9 @@ Page {
         }
     }
 
-    // Edit Cup Popup (rename/delete)
+    // Edit Pitcher Popup (rename/delete)
     Popup {
-        id: editCupPopup
+        id: editPitcherPopup
         anchors.centerIn: parent
         width: 300
         height: 200
@@ -545,7 +546,7 @@ Page {
             spacing: 15
 
             Text {
-                text: "Edit Cup"
+                text: "Edit Pitcher"
                 color: Theme.textColor
                 font.pixelSize: 18
                 font.bold: true
@@ -561,7 +562,7 @@ Page {
                 radius: 4
 
                 TextInput {
-                    id: editCupNameInput
+                    id: editPitcherNameInput
                     anchors.fill: parent
                     anchors.margins: 10
                     color: Theme.textColor
@@ -591,8 +592,8 @@ Page {
                     MouseArea {
                         anchors.fill: parent
                         onClicked: {
-                            Settings.removeSteamCupPreset(editingCupIndex)
-                            editCupPopup.close()
+                            Settings.removeSteamPitcherPreset(editingPitcherIndex)
+                            editPitcherPopup.close()
                         }
                     }
                 }
@@ -615,7 +616,7 @@ Page {
 
                     MouseArea {
                         anchors.fill: parent
-                        onClicked: editCupPopup.close()
+                        onClicked: editPitcherPopup.close()
                     }
                 }
 
@@ -635,13 +636,13 @@ Page {
                     MouseArea {
                         anchors.fill: parent
                         onClicked: {
-                            if (editCupNameInput.text.trim() !== "") {
-                                var preset = Settings.getSteamCupPreset(editingCupIndex)
+                            if (editPitcherNameInput.text.trim() !== "") {
+                                var preset = Settings.getSteamPitcherPreset(editingPitcherIndex)
                                 var duration = preset ? preset.duration : 30
                                 var flow = (preset && preset.flow !== undefined) ? preset.flow : 150
-                                Settings.updateSteamCupPreset(editingCupIndex, editCupNameInput.text.trim(), duration, flow)
+                                Settings.updateSteamPitcherPreset(editingPitcherIndex, editPitcherNameInput.text.trim(), duration, flow)
                             }
-                            editCupPopup.close()
+                            editPitcherPopup.close()
                         }
                     }
                 }
@@ -649,9 +650,9 @@ Page {
         }
     }
 
-    // Add Cup Dialog
+    // Add Pitcher Dialog
     Popup {
-        id: addCupDialog
+        id: addPitcherDialog
         anchors.centerIn: parent
         width: 300
         height: 180
@@ -671,7 +672,7 @@ Page {
             spacing: 15
 
             Text {
-                text: "Add Cup Preset"
+                text: "Add Pitcher Preset"
                 color: Theme.textColor
                 font.pixelSize: 18
                 font.bold: true
@@ -687,7 +688,7 @@ Page {
                 radius: 4
 
                 TextInput {
-                    id: newCupName
+                    id: newPitcherName
                     anchors.fill: parent
                     anchors.margins: 10
                     color: Theme.textColor
@@ -697,7 +698,7 @@ Page {
                     Text {
                         anchors.fill: parent
                         verticalAlignment: Text.AlignVCenter
-                        text: "Cup name (e.g. Ikea Small)"
+                        text: "Pitcher name (e.g. Ikea Small)"
                         color: Theme.textSecondaryColor
                         visible: !parent.text && !parent.activeFocus
                     }
@@ -726,7 +727,7 @@ Page {
 
                     MouseArea {
                         anchors.fill: parent
-                        onClicked: addCupDialog.close()
+                        onClicked: addPitcherDialog.close()
                     }
                 }
 
@@ -745,12 +746,12 @@ Page {
                     MouseArea {
                         anchors.fill: parent
                         onClicked: {
-                            if (newCupName.text.trim() !== "") {
-                                var presetCount = Settings.steamCupPresets.length
-                                Settings.addSteamCupPreset(newCupName.text.trim(), 30, 150)
-                                Settings.selectedSteamCup = presetCount  // Select the new cup
-                                newCupName.text = ""
-                                addCupDialog.close()
+                            if (newPitcherName.text.trim() !== "") {
+                                var presetCount = Settings.steamPitcherPresets.length
+                                Settings.addSteamPitcherPreset(newPitcherName.text.trim(), 30, 150)
+                                Settings.selectedSteamPitcher = presetCount  // Select the new pitcher
+                                newPitcherName.text = ""
+                                addPitcherDialog.close()
                             }
                         }
                     }
@@ -759,16 +760,16 @@ Page {
         }
     }
 
-    // Update sliders when selected cup changes
+    // Update sliders when selected pitcher changes
     Connections {
         target: Settings
         function onSelectedSteamCupChanged() {
-            durationSlider.value = getCurrentCupDuration()
-            flowSlider.value = getCurrentCupFlow()
+            durationSlider.value = getCurrentPitcherDuration()
+            flowSlider.value = getCurrentPitcherFlow()
         }
-        function onSteamCupPresetsChanged() {
-            durationSlider.value = getCurrentCupDuration()
-            flowSlider.value = getCurrentCupFlow()
+        function onSteamPitcherPresetsChanged() {
+            durationSlider.value = getCurrentPitcherDuration()
+            flowSlider.value = getCurrentPitcherFlow()
         }
     }
 }

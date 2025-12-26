@@ -10,6 +10,7 @@ Page {
     background: Rectangle { color: Theme.backgroundColor }
 
     Component.onCompleted: root.currentPageTitle = "Profiles"
+    StackView.onActivated: root.currentPageTitle = "Profiles"
 
     RowLayout {
         anchors.fill: parent
@@ -295,7 +296,7 @@ Page {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: Theme.scaled(70)
+        height: 70
         color: Theme.primaryColor
 
         RowLayout {

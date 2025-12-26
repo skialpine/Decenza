@@ -7,8 +7,8 @@ Settings::Settings(QObject* parent)
     : QObject(parent)
     , m_settings("DecentEspresso", "DE1Qt")
 {
-    // Initialize default cup presets if none exist
-    if (!m_settings.contains("steam/cupPresets")) {
+    // Initialize default pitcher presets if none exist
+    if (!m_settings.contains("steam/pitcherPresets")) {
         QJsonArray defaultPresets;
         QJsonObject small;
         small["name"] = "Small";
@@ -22,7 +22,7 @@ Settings::Settings(QObject* parent)
         large["flow"] = 150;  // 1.5 ml/s
         defaultPresets.append(large);
 
-        m_settings.setValue("steam/cupPresets", QJsonDocument(defaultPresets).toJson());
+        m_settings.setValue("steam/pitcherPresets", QJsonDocument(defaultPresets).toJson());
     }
 
     // Initialize default favorite profiles if none exist
@@ -42,21 +42,21 @@ Settings::Settings(QObject* parent)
         m_settings.setValue("profile/favorites", QJsonDocument(defaultFavorites).toJson());
     }
 
-    // Initialize default water cup presets if none exist
-    if (!m_settings.contains("water/cupPresets")) {
+    // Initialize default water vessel presets if none exist
+    if (!m_settings.contains("water/vesselPresets")) {
         QJsonArray defaultPresets;
 
-        QJsonObject cup;
-        cup["name"] = "Cup";
-        cup["volume"] = 200;
-        defaultPresets.append(cup);
+        QJsonObject vessel;
+        vessel["name"] = "Cup";
+        vessel["volume"] = 200;
+        defaultPresets.append(vessel);
 
         QJsonObject mug;
         mug["name"] = "Mug";
         mug["volume"] = 350;
         defaultPresets.append(mug);
 
-        m_settings.setValue("water/cupPresets", QJsonDocument(defaultPresets).toJson());
+        m_settings.setValue("water/vesselPresets", QJsonDocument(defaultPresets).toJson());
     }
 
     // Initialize default flush presets if none exist
@@ -176,9 +176,9 @@ void Settings::setSteamFlow(int flow) {
     }
 }
 
-// Steam cup presets
-QVariantList Settings::steamCupPresets() const {
-    QByteArray data = m_settings.value("steam/cupPresets").toByteArray();
+// Steam pitcher presets
+QVariantList Settings::steamPitcherPresets() const {
+    QByteArray data = m_settings.value("steam/pitcherPresets").toByteArray();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     QJsonArray arr = doc.array();
 
@@ -189,19 +189,19 @@ QVariantList Settings::steamCupPresets() const {
     return result;
 }
 
-int Settings::selectedSteamCup() const {
-    return m_settings.value("steam/selectedCup", 0).toInt();
+int Settings::selectedSteamPitcher() const {
+    return m_settings.value("steam/selectedPitcher", 0).toInt();
 }
 
 void Settings::setSelectedSteamCup(int index) {
-    if (selectedSteamCup() != index) {
-        m_settings.setValue("steam/selectedCup", index);
-        emit selectedSteamCupChanged();
+    if (selectedSteamPitcher() != index) {
+        m_settings.setValue("steam/selectedPitcher", index);
+        emit selectedSteamPitcherChanged();
     }
 }
 
-void Settings::addSteamCupPreset(const QString& name, int duration, int flow) {
-    QByteArray data = m_settings.value("steam/cupPresets").toByteArray();
+void Settings::addSteamPitcherPreset(const QString& name, int duration, int flow) {
+    QByteArray data = m_settings.value("steam/pitcherPresets").toByteArray();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     QJsonArray arr = doc.array();
 
@@ -211,12 +211,12 @@ void Settings::addSteamCupPreset(const QString& name, int duration, int flow) {
     preset["flow"] = flow;
     arr.append(preset);
 
-    m_settings.setValue("steam/cupPresets", QJsonDocument(arr).toJson());
-    emit steamCupPresetsChanged();
+    m_settings.setValue("steam/pitcherPresets", QJsonDocument(arr).toJson());
+    emit steamPitcherPresetsChanged();
 }
 
-void Settings::updateSteamCupPreset(int index, const QString& name, int duration, int flow) {
-    QByteArray data = m_settings.value("steam/cupPresets").toByteArray();
+void Settings::updateSteamPitcherPreset(int index, const QString& name, int duration, int flow) {
+    QByteArray data = m_settings.value("steam/pitcherPresets").toByteArray();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     QJsonArray arr = doc.array();
 
@@ -227,32 +227,32 @@ void Settings::updateSteamCupPreset(int index, const QString& name, int duration
         preset["flow"] = flow;
         arr[index] = preset;
 
-        m_settings.setValue("steam/cupPresets", QJsonDocument(arr).toJson());
-        emit steamCupPresetsChanged();
+        m_settings.setValue("steam/pitcherPresets", QJsonDocument(arr).toJson());
+        emit steamPitcherPresetsChanged();
     }
 }
 
-void Settings::removeSteamCupPreset(int index) {
-    QByteArray data = m_settings.value("steam/cupPresets").toByteArray();
+void Settings::removeSteamPitcherPreset(int index) {
+    QByteArray data = m_settings.value("steam/pitcherPresets").toByteArray();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     QJsonArray arr = doc.array();
 
     if (index >= 0 && index < arr.size()) {
         arr.removeAt(index);
-        m_settings.setValue("steam/cupPresets", QJsonDocument(arr).toJson());
+        m_settings.setValue("steam/pitcherPresets", QJsonDocument(arr).toJson());
 
-        // Adjust selected cup if needed
-        int selected = selectedSteamCup();
+        // Adjust selected preset if needed
+        int selected = selectedSteamPitcher();
         if (selected >= arr.size() && arr.size() > 0) {
             setSelectedSteamCup(arr.size() - 1);
         }
 
-        emit steamCupPresetsChanged();
+        emit steamPitcherPresetsChanged();
     }
 }
 
-void Settings::moveSteamCupPreset(int from, int to) {
-    QByteArray data = m_settings.value("steam/cupPresets").toByteArray();
+void Settings::moveSteamPitcherPreset(int from, int to) {
+    QByteArray data = m_settings.value("steam/pitcherPresets").toByteArray();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     QJsonArray arr = doc.array();
 
@@ -260,10 +260,10 @@ void Settings::moveSteamCupPreset(int from, int to) {
         QJsonValue item = arr[from];
         arr.removeAt(from);
         arr.insert(to, item);
-        m_settings.setValue("steam/cupPresets", QJsonDocument(arr).toJson());
+        m_settings.setValue("steam/pitcherPresets", QJsonDocument(arr).toJson());
 
-        // Update selected cup to follow the moved item if it was selected
-        int selected = selectedSteamCup();
+        // Update selected preset to follow the moved item if it was selected
+        int selected = selectedSteamPitcher();
         if (selected == from) {
             setSelectedSteamCup(to);
         } else if (from < selected && to >= selected) {
@@ -272,12 +272,12 @@ void Settings::moveSteamCupPreset(int from, int to) {
             setSelectedSteamCup(selected + 1);
         }
 
-        emit steamCupPresetsChanged();
+        emit steamPitcherPresetsChanged();
     }
 }
 
-QVariantMap Settings::getSteamCupPreset(int index) const {
-    QByteArray data = m_settings.value("steam/cupPresets").toByteArray();
+QVariantMap Settings::getSteamPitcherPreset(int index) const {
+    QByteArray data = m_settings.value("steam/pitcherPresets").toByteArray();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     QJsonArray arr = doc.array();
 
@@ -430,9 +430,9 @@ void Settings::setWaterVolume(int volume) {
     }
 }
 
-// Hot water cup presets
-QVariantList Settings::waterCupPresets() const {
-    QByteArray data = m_settings.value("water/cupPresets").toByteArray();
+// Hot water vessel presets
+QVariantList Settings::waterVesselPresets() const {
+    QByteArray data = m_settings.value("water/vesselPresets").toByteArray();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     QJsonArray arr = doc.array();
 
@@ -443,19 +443,19 @@ QVariantList Settings::waterCupPresets() const {
     return result;
 }
 
-int Settings::selectedWaterCup() const {
-    return m_settings.value("water/selectedCup", 0).toInt();
+int Settings::selectedWaterVessel() const {
+    return m_settings.value("water/selectedVessel", 0).toInt();
 }
 
 void Settings::setSelectedWaterCup(int index) {
-    if (selectedWaterCup() != index) {
-        m_settings.setValue("water/selectedCup", index);
-        emit selectedWaterCupChanged();
+    if (selectedWaterVessel() != index) {
+        m_settings.setValue("water/selectedVessel", index);
+        emit selectedWaterVesselChanged();
     }
 }
 
-void Settings::addWaterCupPreset(const QString& name, int volume) {
-    QByteArray data = m_settings.value("water/cupPresets").toByteArray();
+void Settings::addWaterVesselPreset(const QString& name, int volume) {
+    QByteArray data = m_settings.value("water/vesselPresets").toByteArray();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     QJsonArray arr = doc.array();
 
@@ -464,12 +464,12 @@ void Settings::addWaterCupPreset(const QString& name, int volume) {
     preset["volume"] = volume;
     arr.append(preset);
 
-    m_settings.setValue("water/cupPresets", QJsonDocument(arr).toJson());
-    emit waterCupPresetsChanged();
+    m_settings.setValue("water/vesselPresets", QJsonDocument(arr).toJson());
+    emit waterVesselPresetsChanged();
 }
 
-void Settings::updateWaterCupPreset(int index, const QString& name, int volume) {
-    QByteArray data = m_settings.value("water/cupPresets").toByteArray();
+void Settings::updateWaterVesselPreset(int index, const QString& name, int volume) {
+    QByteArray data = m_settings.value("water/vesselPresets").toByteArray();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     QJsonArray arr = doc.array();
 
@@ -479,32 +479,32 @@ void Settings::updateWaterCupPreset(int index, const QString& name, int volume) 
         preset["volume"] = volume;
         arr[index] = preset;
 
-        m_settings.setValue("water/cupPresets", QJsonDocument(arr).toJson());
-        emit waterCupPresetsChanged();
+        m_settings.setValue("water/vesselPresets", QJsonDocument(arr).toJson());
+        emit waterVesselPresetsChanged();
     }
 }
 
-void Settings::removeWaterCupPreset(int index) {
-    QByteArray data = m_settings.value("water/cupPresets").toByteArray();
+void Settings::removeWaterVesselPreset(int index) {
+    QByteArray data = m_settings.value("water/vesselPresets").toByteArray();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     QJsonArray arr = doc.array();
 
     if (index >= 0 && index < arr.size()) {
         arr.removeAt(index);
-        m_settings.setValue("water/cupPresets", QJsonDocument(arr).toJson());
+        m_settings.setValue("water/vesselPresets", QJsonDocument(arr).toJson());
 
-        // Adjust selected cup if needed
-        int selected = selectedWaterCup();
+        // Adjust selected preset if needed
+        int selected = selectedWaterVessel();
         if (selected >= arr.size() && arr.size() > 0) {
             setSelectedWaterCup(arr.size() - 1);
         }
 
-        emit waterCupPresetsChanged();
+        emit waterVesselPresetsChanged();
     }
 }
 
-void Settings::moveWaterCupPreset(int from, int to) {
-    QByteArray data = m_settings.value("water/cupPresets").toByteArray();
+void Settings::moveWaterVesselPreset(int from, int to) {
+    QByteArray data = m_settings.value("water/vesselPresets").toByteArray();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     QJsonArray arr = doc.array();
 
@@ -512,10 +512,10 @@ void Settings::moveWaterCupPreset(int from, int to) {
         QJsonValue item = arr[from];
         arr.removeAt(from);
         arr.insert(to, item);
-        m_settings.setValue("water/cupPresets", QJsonDocument(arr).toJson());
+        m_settings.setValue("water/vesselPresets", QJsonDocument(arr).toJson());
 
-        // Update selected cup to follow the moved item if it was selected
-        int selected = selectedWaterCup();
+        // Update selected preset to follow the moved item if it was selected
+        int selected = selectedWaterVessel();
         if (selected == from) {
             setSelectedWaterCup(to);
         } else if (from < selected && to >= selected) {
@@ -524,12 +524,12 @@ void Settings::moveWaterCupPreset(int from, int to) {
             setSelectedWaterCup(selected + 1);
         }
 
-        emit waterCupPresetsChanged();
+        emit waterVesselPresetsChanged();
     }
 }
 
-QVariantMap Settings::getWaterCupPreset(int index) const {
-    QByteArray data = m_settings.value("water/cupPresets").toByteArray();
+QVariantMap Settings::getWaterVesselPreset(int index) const {
+    QByteArray data = m_settings.value("water/vesselPresets").toByteArray();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     QJsonArray arr = doc.array();
 

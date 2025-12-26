@@ -87,17 +87,17 @@ QtObject {
         property int steamTimeout: 30
         property int steamFlow: 150
         property int steamTemperature: 160
-        property int selectedSteamCup: 0
-        property var steamCupPresets: [
+        property int selectedSteamPitcher: 0
+        property var steamPitcherPresets: [
             { name: "Small", duration: 20, flow: 100 },
             { name: "Medium", duration: 30, flow: 150 },
             { name: "Large", duration: 45, flow: 200 }
         ]
-        function getSteamCupPreset(idx) { return steamCupPresets[idx] }
-        function updateSteamCupPreset(idx, name, dur, flow) {}
-        function addSteamCupPreset(name, dur, flow) {}
-        function removeSteamCupPreset(idx) {}
-        function moveSteamCupPreset(from, to) {}
+        function getSteamPitcherPreset(idx) { return steamPitcherPresets[idx] }
+        function updateSteamPitcherPreset(idx, name, dur, flow) {}
+        function addSteamPitcherPreset(name, dur, flow) {}
+        function removeSteamPitcherPreset(idx) {}
+        function moveSteamPitcherPreset(from, to) {}
     }
 
     // ShotDataModel stub

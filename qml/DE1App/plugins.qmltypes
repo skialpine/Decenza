@@ -124,8 +124,8 @@ Module {
         Property { name: "steamTimeout"; type: "int" }
         Property { name: "steamFlow"; type: "int" }
         Property { name: "steamTemperature"; type: "int" }
-        Property { name: "selectedSteamCup"; type: "int" }
-        Property { name: "steamCupPresets"; type: "QVariantList" }
+        Property { name: "selectedSteamPitcher"; type: "int" }
+        Property { name: "steamPitcherPresets"; type: "QVariantList" }
     }
 
     Component {

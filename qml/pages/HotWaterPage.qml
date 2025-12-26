@@ -12,26 +12,27 @@ Page {
         root.currentPageTitle = "Hot Water"
         MainController.applyHotWaterSettings()
     }
+    StackView.onActivated: root.currentPageTitle = "Hot Water"
 
     property bool isDispensing: MachineState.phase === MachineStateType.Phase.HotWater
-    property int editingCupIndex: -1
+    property int editingVesselIndex: -1
 
-    // Get current cup's volume
-    function getCurrentCupVolume() {
-        var preset = Settings.getWaterCupPreset(Settings.selectedWaterCup)
+    // Get current vessel's volume
+    function getCurrentVesselVolume() {
+        var preset = Settings.getWaterVesselPreset(Settings.selectedWaterVessel)
         return preset ? preset.volume : 200
     }
 
-    function getCurrentCupName() {
-        var preset = Settings.getWaterCupPreset(Settings.selectedWaterCup)
+    function getCurrentVesselName() {
+        var preset = Settings.getWaterVesselPreset(Settings.selectedWaterVessel)
         return preset ? preset.name : ""
     }
 
-    // Save current cup with new volume
-    function saveCurrentCup(volume) {
-        var name = getCurrentCupName()
+    // Save current vessel with new volume
+    function saveCurrentVessel(volume) {
+        var name = getCurrentVesselName()
         if (name) {
-            Settings.updateWaterCupPreset(Settings.selectedWaterCup, name, volume)
+            Settings.updateWaterVesselPreset(Settings.selectedWaterVessel, name, volume)
         }
     }
 
@@ -93,7 +94,7 @@ Page {
             Layout.fillHeight: true
             spacing: 12
 
-            // Cup Presets Section
+            // Vessel Presets Section
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 90
@@ -108,7 +109,7 @@ Page {
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
-                            text: "Cup Preset"
+                            text: "Vessel Preset"
                             color: Theme.textColor
                             font.pixelSize: Theme.bodyFont.pixelSize
                             font.bold: true
@@ -121,58 +122,58 @@ Page {
                         }
                     }
 
-                    // Cup preset buttons with drag-and-drop
+                    // Vessel preset buttons with drag-and-drop
                     Row {
-                        id: cupPresetsRow
+                        id: vesselPresetsRow
                         Layout.fillWidth: true
                         spacing: 8
 
                         property int draggedIndex: -1
 
                         Repeater {
-                            id: cupRepeater
-                            model: Settings.waterCupPresets
+                            id: vesselRepeater
+                            model: Settings.waterVesselPresets
 
                             Item {
-                                id: cupDelegate
-                                width: cupPill.width
+                                id: vesselDelegate
+                                width: vesselPill.width
                                 height: 36
 
-                                property int cupIndex: index
+                                property int vesselIndex: index
 
                                 Rectangle {
-                                    id: cupPill
-                                    width: cupText.implicitWidth + 24
+                                    id: vesselPill
+                                    width: vesselText.implicitWidth + 24
                                     height: 36
                                     radius: 18
-                                    color: cupDelegate.cupIndex === Settings.selectedWaterCup ? Theme.primaryColor : Theme.backgroundColor
-                                    border.color: cupDelegate.cupIndex === Settings.selectedWaterCup ? Theme.primaryColor : Theme.textSecondaryColor
+                                    color: vesselDelegate.vesselIndex === Settings.selectedWaterVessel ? Theme.primaryColor : Theme.backgroundColor
+                                    border.color: vesselDelegate.vesselIndex === Settings.selectedWaterVessel ? Theme.primaryColor : Theme.textSecondaryColor
                                     border.width: 1
                                     opacity: dragArea.drag.active ? 0.8 : 1.0
 
                                     Drag.active: dragArea.drag.active
-                                    Drag.source: cupDelegate
+                                    Drag.source: vesselDelegate
                                     Drag.hotSpot.x: width / 2
                                     Drag.hotSpot.y: height / 2
 
                                     states: State {
                                         when: dragArea.drag.active
-                                        ParentChange { target: cupPill; parent: cupPresetsRow }
-                                        AnchorChanges { target: cupPill; anchors.verticalCenter: undefined }
+                                        ParentChange { target: vesselPill; parent: vesselPresetsRow }
+                                        AnchorChanges { target: vesselPill; anchors.verticalCenter: undefined }
                                     }
 
                                     Text {
-                                        id: cupText
+                                        id: vesselText
                                         anchors.centerIn: parent
                                         text: modelData.name
-                                        color: cupDelegate.cupIndex === Settings.selectedWaterCup ? "white" : Theme.textColor
+                                        color: vesselDelegate.vesselIndex === Settings.selectedWaterVessel ? "white" : Theme.textColor
                                         font: Theme.bodyFont
                                     }
 
                                     MouseArea {
                                         id: dragArea
                                         anchors.fill: parent
-                                        drag.target: cupPill
+                                        drag.target: vesselPill
                                         drag.axis: Drag.XAxis
 
                                         property bool held: false
@@ -187,20 +188,20 @@ Page {
                                         onReleased: {
                                             holdTimer.stop()
                                             if (!moved && !held) {
-                                                // Simple click - select the cup
-                                                Settings.selectedWaterCup = cupDelegate.cupIndex
+                                                // Simple click - select the vessel
+                                                Settings.selectedWaterVessel = vesselDelegate.vesselIndex
                                                 volumeInput.value = modelData.volume
                                                 Settings.waterVolume = modelData.volume
                                                 MainController.applyHotWaterSettings()
                                             }
-                                            cupPill.Drag.drop()
-                                            cupPresetsRow.draggedIndex = -1
+                                            vesselPill.Drag.drop()
+                                            vesselPresetsRow.draggedIndex = -1
                                         }
 
                                         onPositionChanged: {
                                             if (drag.active) {
                                                 moved = true
-                                                cupPresetsRow.draggedIndex = cupDelegate.cupIndex
+                                                vesselPresetsRow.draggedIndex = vesselDelegate.vesselIndex
                                             }
                                         }
 
@@ -210,9 +211,9 @@ Page {
                                             onTriggered: {
                                                 if (!dragArea.moved) {
                                                     dragArea.held = true
-                                                    editingCupIndex = cupDelegate.cupIndex
-                                                    editCupNameInput.text = modelData.name
-                                                    editCupPopup.open()
+                                                    editingVesselIndex = vesselDelegate.vesselIndex
+                                                    editVesselNameInput.text = modelData.name
+                                                    editVesselPopup.open()
                                                 }
                                             }
                                         }
@@ -222,10 +223,10 @@ Page {
                                 DropArea {
                                     anchors.fill: parent
                                     onEntered: function(drag) {
-                                        var fromIndex = drag.source.cupIndex
-                                        var toIndex = cupDelegate.cupIndex
+                                        var fromIndex = drag.source.vesselIndex
+                                        var toIndex = vesselDelegate.vesselIndex
                                         if (fromIndex !== toIndex) {
-                                            Settings.moveWaterCupPreset(fromIndex, toIndex)
+                                            Settings.moveWaterVesselPreset(fromIndex, toIndex)
                                         }
                                     }
                                 }
@@ -250,14 +251,14 @@ Page {
 
                             MouseArea {
                                 anchors.fill: parent
-                                onClicked: addCupDialog.open()
+                                onClicked: addVesselDialog.open()
                             }
                         }
                     }
                 }
             }
 
-            // Volume (per-cup, auto-saves)
+            // Volume (per-vessel, auto-saves)
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 100
@@ -279,7 +280,7 @@ Page {
 
                     ValueInput {
                         id: volumeInput
-                        value: getCurrentCupVolume()
+                        value: getCurrentVesselVolume()
                         from: 50
                         to: 500
                         stepSize: 10
@@ -289,7 +290,7 @@ Page {
                         onValueModified: function(newValue) {
                             volumeInput.value = newValue
                             Settings.waterVolume = newValue
-                            saveCurrentCup(newValue)
+                            saveCurrentVessel(newValue)
                             MainController.applyHotWaterSettings()
                         }
                     }
@@ -382,7 +383,7 @@ Page {
             }
 
             Text {
-                text: getCurrentCupName() || "No cup"
+                text: getCurrentVesselName() || "No vessel"
                 color: "white"
                 font.pixelSize: 20
                 font.bold: true
@@ -417,9 +418,9 @@ Page {
         }
     }
 
-    // Edit cup preset popup
+    // Edit vessel preset popup
     Popup {
-        id: editCupPopup
+        id: editVesselPopup
         anchors.centerIn: parent
         width: 300
         height: 180
@@ -437,15 +438,15 @@ Page {
             spacing: 12
 
             Text {
-                text: "Edit Cup Preset"
+                text: "Edit Vessel Preset"
                 color: Theme.textColor
                 font: Theme.subtitleFont
             }
 
             TextField {
-                id: editCupNameInput
+                id: editVesselNameInput
                 Layout.fillWidth: true
-                placeholderText: "Cup name"
+                placeholderText: "Vessel name"
                 font: Theme.bodyFont
             }
 
@@ -456,8 +457,8 @@ Page {
                 Button {
                     text: "Delete"
                     onClicked: {
-                        Settings.removeWaterCupPreset(editingCupIndex)
-                        editCupPopup.close()
+                        Settings.removeWaterVesselPreset(editingVesselIndex)
+                        editVesselPopup.close()
                     }
                     background: Rectangle {
                         implicitWidth: 80
@@ -478,7 +479,7 @@ Page {
 
                 Button {
                     text: "Cancel"
-                    onClicked: editCupPopup.close()
+                    onClicked: editVesselPopup.close()
                     background: Rectangle {
                         implicitWidth: 70
                         implicitHeight: 36
@@ -497,9 +498,9 @@ Page {
                 Button {
                     text: "Save"
                     onClicked: {
-                        var preset = Settings.getWaterCupPreset(editingCupIndex)
-                        Settings.updateWaterCupPreset(editingCupIndex, editCupNameInput.text, preset.volume)
-                        editCupPopup.close()
+                        var preset = Settings.getWaterVesselPreset(editingVesselIndex)
+                        Settings.updateWaterVesselPreset(editingVesselIndex, editVesselNameInput.text, preset.volume)
+                        editVesselPopup.close()
                     }
                     background: Rectangle {
                         implicitWidth: 70
@@ -519,10 +520,10 @@ Page {
         }
     }
 
-    // Add cup dialog
+    // Add vessel dialog
     Dialog {
-        id: addCupDialog
-        title: "Add Cup Preset"
+        id: addVesselDialog
+        title: "Add Vessel Preset"
         anchors.centerIn: parent
         modal: true
         standardButtons: Dialog.Ok | Dialog.Cancel
@@ -531,23 +532,23 @@ Page {
             spacing: 12
 
             TextField {
-                id: newCupNameInput
+                id: newVesselNameInput
                 Layout.preferredWidth: 200
-                placeholderText: "Cup name"
+                placeholderText: "Vessel name"
                 font: Theme.bodyFont
             }
         }
 
         onAccepted: {
-            if (newCupNameInput.text.length > 0) {
-                Settings.addWaterCupPreset(newCupNameInput.text, 200)
-                newCupNameInput.text = ""
+            if (newVesselNameInput.text.length > 0) {
+                Settings.addWaterVesselPreset(newVesselNameInput.text, 200)
+                newVesselNameInput.text = ""
             }
         }
 
         onOpened: {
-            newCupNameInput.text = ""
-            newCupNameInput.forceActiveFocus()
+            newVesselNameInput.text = ""
+            newVesselNameInput.forceActiveFocus()
         }
     }
 }

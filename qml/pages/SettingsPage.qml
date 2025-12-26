@@ -9,6 +9,7 @@ Page {
     background: Rectangle { color: Theme.backgroundColor }
 
     Component.onCompleted: root.currentPageTitle = "Settings"
+    StackView.onActivated: root.currentPageTitle = "Settings"
 
     // Tap 5x anywhere for simulation mode
     property int simTapCount: 0
@@ -454,108 +455,120 @@ Page {
 
         // ============ PREFERENCES TAB ============
         Item {
+            id: preferencesTab
+            // Local property to track auto-sleep value
+            property int autoSleepMinutes: Settings.value("autoSleepMinutes", 0)
+
             RowLayout {
                 anchors.fill: parent
                 spacing: 15
 
-                // Auto-sleep settings
-                Rectangle {
+                // Left column: Auto-sleep and About stacked
+                ColumnLayout {
                     Layout.preferredWidth: 300
                     Layout.fillHeight: true
-                    color: Theme.surfaceColor
-                    radius: Theme.cardRadius
+                    spacing: 15
 
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 15
-                        spacing: 10
+                    // Auto-sleep settings
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 160
+                        color: Theme.surfaceColor
+                        radius: Theme.cardRadius
 
-                        Text {
-                            text: "Auto-Sleep"
-                            color: Theme.textColor
-                            font.pixelSize: 16
-                            font.bold: true
-                        }
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 15
+                            spacing: 10
 
-                        Text {
-                            text: "Put the machine to sleep after inactivity"
-                            color: Theme.textSecondaryColor
-                            font.pixelSize: 12
-                        }
-
-                        Item { Layout.fillHeight: true }
-
-                        ValueInput {
-                            id: sleepInput
-                            Layout.fillWidth: true
-                            from: 0
-                            to: 240
-                            stepSize: 1
-                            decimals: 0
-                            value: Settings.value("autoSleepMinutes", 0)
-                            displayText: value === 0 ? "Never" : (value + " min")
-
-                            onValueModified: function(newValue) {
-                                Settings.setValue("autoSleepMinutes", newValue)
+                            Text {
+                                text: "Auto-Sleep"
+                                color: Theme.textColor
+                                font.pixelSize: 16
+                                font.bold: true
                             }
-                        }
 
-                        Item { Layout.fillHeight: true }
+                            Text {
+                                text: "Put the machine to sleep after inactivity"
+                                color: Theme.textSecondaryColor
+                                font.pixelSize: 12
+                            }
+
+                            Item { Layout.fillHeight: true }
+
+                            ValueInput {
+                                id: sleepInput
+                                Layout.fillWidth: true
+                                from: 0
+                                to: 240
+                                stepSize: 5
+                                decimals: 0
+                                value: preferencesTab.autoSleepMinutes
+                                displayText: value === 0 ? "Never" : (value + " min")
+
+                                onValueModified: function(newValue) {
+                                    preferencesTab.autoSleepMinutes = newValue
+                                    Settings.setValue("autoSleepMinutes", newValue)
+                                }
+                            }
+
+                            Item { Layout.fillHeight: true }
+                        }
+                    }
+
+                    // About box
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        color: Theme.surfaceColor
+                        radius: Theme.cardRadius
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 15
+                            spacing: 8
+
+                            Text {
+                                text: "About"
+                                color: Theme.textColor
+                                font.pixelSize: 16
+                                font.bold: true
+                            }
+
+                            Item { Layout.fillHeight: true }
+
+                            Text {
+                                text: "DE1 Controller"
+                                color: Theme.textColor
+                                font.pixelSize: 14
+                            }
+
+                            Text {
+                                text: "Version 1.0.0"
+                                color: DE1Device.simulationMode ? Theme.primaryColor : Theme.textSecondaryColor
+                                font.pixelSize: 12
+                            }
+
+                            Text {
+                                text: "Build #" + BuildNumber
+                                color: Theme.accentColor
+                                font.pixelSize: 18
+                                font.bold: true
+                            }
+
+                            Text {
+                                text: DE1Device.simulationMode ? "SIMULATION MODE" : "Built with Qt 6"
+                                color: DE1Device.simulationMode ? Theme.primaryColor : Theme.textSecondaryColor
+                                font.pixelSize: 12
+                                font.bold: DE1Device.simulationMode
+                            }
+
+                            Item { Layout.fillHeight: true }
+                        }
                     }
                 }
 
-                // About box
-                Rectangle {
-                    Layout.preferredWidth: 200
-                    Layout.fillHeight: true
-                    color: Theme.surfaceColor
-                    radius: Theme.cardRadius
-
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 15
-                        spacing: 8
-
-                        Text {
-                            text: "About"
-                            color: Theme.textColor
-                            font.pixelSize: 16
-                            font.bold: true
-                        }
-
-                        Item { Layout.fillHeight: true }
-
-                        Text {
-                            text: "DE1 Controller"
-                            color: Theme.textColor
-                            font.pixelSize: 14
-                        }
-
-                        Text {
-                            text: "Version 1.0.0"
-                            color: DE1Device.simulationMode ? Theme.primaryColor : Theme.textSecondaryColor
-                            font.pixelSize: 12
-                        }
-
-                        Text {
-                            text: "Build #" + BuildNumber
-                            color: Theme.accentColor
-                            font.pixelSize: 18
-                            font.bold: true
-                        }
-
-                        Text {
-                            text: DE1Device.simulationMode ? "SIMULATION MODE" : "Built with Qt 6"
-                            color: DE1Device.simulationMode ? Theme.primaryColor : Theme.textSecondaryColor
-                            font.pixelSize: 12
-                            font.bold: DE1Device.simulationMode
-                        }
-
-                        Item { Layout.fillHeight: true }
-                    }
-                }
-
-                // Spacer
+                // Spacer (future: color scheme editor)
                 Item { Layout.fillWidth: true }
             }
         }

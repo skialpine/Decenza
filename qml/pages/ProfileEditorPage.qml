@@ -208,14 +208,14 @@ Page {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: Theme.scaled(70)
+        height: 70
         color: Theme.primaryColor
 
         RowLayout {
             anchors.fill: parent
-            anchors.leftMargin: Theme.scaled(10)
-            anchors.rightMargin: Theme.scaled(20)
-            spacing: Theme.scaled(15)
+            anchors.leftMargin: 10
+            anchors.rightMargin: 20
+            spacing: 15
 
             // Back button (large hitbox, icon aligned left)
             RoundButton {
@@ -1058,4 +1058,5 @@ Page {
     Component.onCompleted: {
         loadCurrentProfile()
     }
+    StackView.onActivated: updatePageTitle()
 }
