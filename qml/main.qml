@@ -224,9 +224,12 @@ ApplicationWindow {
         function onFlowScaleFallback() {
             flowScaleDialog.open()
         }
+        function onScaleDisconnected() {
+            scaleDisconnectedDialog.open()
+        }
     }
 
-    // FlowScale fallback dialog
+    // FlowScale fallback dialog (no scale found at startup)
     Dialog {
         id: flowScaleDialog
         title: "No Scale Found"
@@ -248,6 +251,32 @@ ApplicationWindow {
                 text: "OK"
                 anchors.horizontalCenter: parent.horizontalCenter
                 onClicked: flowScaleDialog.close()
+            }
+        }
+    }
+
+    // Scale disconnected dialog
+    Dialog {
+        id: scaleDisconnectedDialog
+        title: "Scale Disconnected"
+        modal: true
+        anchors.centerIn: parent
+
+        Column {
+            spacing: 16
+            width: 380
+
+            Label {
+                text: "Your Bluetooth scale has disconnected.\n\nUsing estimated weight from DE1 flow measurement until the scale reconnects.\n\nCheck that your scale is powered on and in range."
+                wrapMode: Text.Wrap
+                width: parent.width
+                font.pixelSize: 15
+            }
+
+            Button {
+                text: "OK"
+                anchors.horizontalCenter: parent.horizontalCenter
+                onClicked: scaleDisconnectedDialog.close()
             }
         }
     }

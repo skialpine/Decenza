@@ -57,6 +57,7 @@ signals:
     void de1LogMessage(const QString& message);
     void scaleLogMessage(const QString& message);
     void flowScaleFallback();  // Emitted when no physical scale found, using FlowScale
+    void scaleDisconnected();  // Emitted when physical scale disconnects
 
 private slots:
     void onDeviceDiscovered(const QBluetoothDeviceInfo& device);

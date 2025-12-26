@@ -157,10 +157,14 @@ int main(int argc, char *argv[])
 
         // When physical scale disconnects, fall back to FlowScale
         QObject::connect(physicalScale.get(), &ScaleDevice::connectedChanged,
-                         [&physicalScale, &flowScale, &machineState]() {
+                         [&physicalScale, &flowScale, &machineState, &engine, &bleManager]() {
             if (physicalScale && !physicalScale->isConnected()) {
                 qDebug() << "Physical scale disconnected, falling back to FlowScale";
                 machineState.setScale(&flowScale);
+                // Update QML context to use FlowScale
+                engine.rootContext()->setContextProperty("ScaleDevice", &flowScale);
+                // Show warning popup
+                emit bleManager.scaleDisconnected();
             }
         });
 
