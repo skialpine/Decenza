@@ -1,6 +1,14 @@
 #include "batterydrainer.h"
 #include <QDebug>
+#include <QGuiApplication>
+#include <QScreen>
 #include <cmath>
+
+#ifdef Q_OS_ANDROID
+#include <QJniObject>
+#include <QJniEnvironment>
+#include <QCoreApplication>
+#endif
 
 // CPU worker - does heavy math to drain battery
 void CpuWorker::run() {
@@ -72,6 +80,8 @@ void BatteryDrainer::start() {
     emit runningChanged();
 
     startCpuWorkers();
+    setMaxBrightness();
+    enableFlashlight(true);
 
     m_cpuLoad = 100.0;
     emit cpuLoadChanged();
@@ -85,6 +95,8 @@ void BatteryDrainer::stop() {
     emit runningChanged();
 
     stopCpuWorkers();
+    enableFlashlight(false);
+    restoreBrightness();
 
     m_cpuLoad = 0.0;
     emit cpuLoadChanged();
@@ -129,4 +141,125 @@ void BatteryDrainer::stopCpuWorkers() {
     }
 
     m_workers.clear();
+}
+
+void BatteryDrainer::setMaxBrightness() {
+#ifdef Q_OS_ANDROID
+    qDebug() << "BatteryDrainer: Setting max brightness";
+
+    QJniObject activity = QNativeInterface::QAndroidApplication::context();
+    if (!activity.isValid()) return;
+
+    // Get window
+    QJniObject window = activity.callObjectMethod(
+        "getWindow", "()Landroid/view/Window;");
+    if (!window.isValid()) return;
+
+    // Get layout params
+    QJniObject params = window.callObjectMethod(
+        "getAttributes", "()Landroid/view/WindowManager$LayoutParams;");
+    if (!params.isValid()) return;
+
+    // Save current brightness
+    m_savedBrightness = params.getField<jfloat>("screenBrightness") * 255;
+
+    // Set to max (1.0f)
+    params.setField<jfloat>("screenBrightness", 1.0f);
+
+    // Apply
+    window.callMethod<void>("setAttributes",
+        "(Landroid/view/WindowManager$LayoutParams;)V",
+        params.object());
+
+    qDebug() << "BatteryDrainer: Brightness set to max (saved:" << m_savedBrightness << ")";
+#else
+    qDebug() << "BatteryDrainer: Brightness control not available on this platform";
+#endif
+}
+
+void BatteryDrainer::restoreBrightness() {
+#ifdef Q_OS_ANDROID
+    if (m_savedBrightness < 0) return;
+
+    qDebug() << "BatteryDrainer: Restoring brightness to" << m_savedBrightness;
+
+    QJniObject activity = QNativeInterface::QAndroidApplication::context();
+    if (!activity.isValid()) return;
+
+    QJniObject window = activity.callObjectMethod(
+        "getWindow", "()Landroid/view/Window;");
+    if (!window.isValid()) return;
+
+    QJniObject params = window.callObjectMethod(
+        "getAttributes", "()Landroid/view/WindowManager$LayoutParams;");
+    if (!params.isValid()) return;
+
+    // Restore (-1 means system default)
+    float brightness = (m_savedBrightness > 0) ? (m_savedBrightness / 255.0f) : -1.0f;
+    params.setField<jfloat>("screenBrightness", brightness);
+
+    window.callMethod<void>("setAttributes",
+        "(Landroid/view/WindowManager$LayoutParams;)V",
+        params.object());
+
+    m_savedBrightness = -1;
+#endif
+}
+
+void BatteryDrainer::enableFlashlight(bool on) {
+#ifdef Q_OS_ANDROID
+    qDebug() << "BatteryDrainer: Flashlight" << (on ? "ON" : "OFF");
+
+    QJniObject activity = QNativeInterface::QAndroidApplication::context();
+    if (!activity.isValid()) return;
+
+    // Get CameraManager
+    QJniObject cameraServiceName = QJniObject::fromString("camera");
+    QJniObject cameraManager = activity.callObjectMethod(
+        "getSystemService",
+        "(Ljava/lang/String;)Ljava/lang/Object;",
+        cameraServiceName.object<jstring>());
+
+    if (!cameraManager.isValid()) {
+        qDebug() << "BatteryDrainer: Failed to get CameraManager";
+        return;
+    }
+
+    // Get camera ID list
+    QJniObject cameraIdList = cameraManager.callObjectMethod(
+        "getCameraIdList", "()[Ljava/lang/String;");
+
+    if (!cameraIdList.isValid()) {
+        qDebug() << "BatteryDrainer: Failed to get camera list";
+        return;
+    }
+
+    // Get first camera (usually rear with flash)
+    QJniEnvironment env;
+    jobjectArray cameraArray = cameraIdList.object<jobjectArray>();
+    int cameraCount = env->GetArrayLength(cameraArray);
+
+    if (cameraCount == 0) {
+        qDebug() << "BatteryDrainer: No cameras found";
+        return;
+    }
+
+    jstring cameraId = (jstring)env->GetObjectArrayElement(cameraArray, 0);
+    QJniObject cameraIdObj(cameraId);
+
+    // Set torch mode
+    cameraManager.callMethod<void>(
+        "setTorchMode",
+        "(Ljava/lang/String;Z)V",
+        cameraIdObj.object<jstring>(),
+        (jboolean)on);
+
+    m_flashlightOn = on;
+    emit flashlightOnChanged();
+
+    qDebug() << "BatteryDrainer: Flashlight set to" << on;
+#else
+    Q_UNUSED(on);
+    qDebug() << "BatteryDrainer: Flashlight not available on this platform";
+#endif
 }

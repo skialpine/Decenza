@@ -176,15 +176,29 @@ Page {
 
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "CPU: " + QThread.idealThreadCount + " cores @ 100%"
+                text: "CPU: All cores @ 100%"
                 color: "#ff6666"
                 font.pixelSize: 24
             }
 
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "GPU: Heavy animations active"
+                text: "GPU: Heavy animations"
                 color: "#66ff66"
+                font.pixelSize: 24
+            }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "Flashlight: " + (BatteryDrainer.flashlightOn ? "ON" : "OFF")
+                color: BatteryDrainer.flashlightOn ? "#ffff66" : "#666666"
+                font.pixelSize: 24
+            }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "Screen: MAX brightness"
+                color: "#ffaa66"
                 font.pixelSize: 24
             }
 
