@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QThread>
+#include <QTimer>
 #include <QVector>
 #include <atomic>
 
@@ -22,16 +23,18 @@ class BatteryDrainer : public QObject {
     Q_OBJECT
 
     Q_PROPERTY(bool running READ running NOTIFY runningChanged)
-    Q_PROPERTY(double cpuLoad READ cpuLoad NOTIFY cpuLoadChanged)
-    Q_PROPERTY(bool flashlightOn READ flashlightOn NOTIFY flashlightOnChanged)
+    Q_PROPERTY(double cpuUsage READ cpuUsage NOTIFY cpuUsageChanged)
+    Q_PROPERTY(double gpuUsage READ gpuUsage NOTIFY gpuUsageChanged)
+    Q_PROPERTY(int cpuCores READ cpuCores CONSTANT)
 
 public:
     explicit BatteryDrainer(QObject* parent = nullptr);
     ~BatteryDrainer();
 
     bool running() const { return m_running; }
-    double cpuLoad() const { return m_cpuLoad; }
-    bool flashlightOn() const { return m_flashlightOn; }
+    double cpuUsage() const { return m_cpuUsage; }
+    double gpuUsage() const { return m_gpuUsage; }
+    int cpuCores() const { return QThread::idealThreadCount(); }
 
 public slots:
     void start();
@@ -40,19 +43,28 @@ public slots:
 
 signals:
     void runningChanged();
-    void cpuLoadChanged();
-    void flashlightOnChanged();
+    void cpuUsageChanged();
+    void gpuUsageChanged();
+
+private slots:
+    void updateUsageStats();
 
 private:
     void startCpuWorkers();
     void stopCpuWorkers();
     void setMaxBrightness();
     void restoreBrightness();
-    void enableFlashlight(bool on);
+    double readCpuUsage();
+    double readGpuUsage();
 
     bool m_running = false;
-    double m_cpuLoad = 0.0;
-    bool m_flashlightOn = false;
+    double m_cpuUsage = 0.0;
+    double m_gpuUsage = 0.0;
     int m_savedBrightness = -1;
     QVector<CpuWorker*> m_workers;
+    QTimer m_statsTimer;
+
+    // For CPU usage calculation
+    uint64_t m_prevIdleTime = 0;
+    uint64_t m_prevTotalTime = 0;
 };

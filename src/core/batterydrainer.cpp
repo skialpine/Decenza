@@ -2,6 +2,10 @@
 #include <QDebug>
 #include <QGuiApplication>
 #include <QScreen>
+#include <QFile>
+#include <QTextStream>
+#include <QDir>
+#include <QRegularExpression>
 #include <cmath>
 
 #ifdef Q_OS_ANDROID
@@ -66,6 +70,9 @@ void CpuWorker::run() {
 BatteryDrainer::BatteryDrainer(QObject* parent)
     : QObject(parent)
 {
+    // Set up stats timer to update CPU/GPU usage every 500ms
+    connect(&m_statsTimer, &QTimer::timeout, this, &BatteryDrainer::updateUsageStats);
+    m_statsTimer.setInterval(500);
 }
 
 BatteryDrainer::~BatteryDrainer() {
@@ -81,10 +88,10 @@ void BatteryDrainer::start() {
 
     startCpuWorkers();
     setMaxBrightness();
-    enableFlashlight(true);
 
-    m_cpuLoad = 100.0;
-    emit cpuLoadChanged();
+    // Start monitoring stats
+    m_statsTimer.start();
+    updateUsageStats();
 }
 
 void BatteryDrainer::stop() {
@@ -94,12 +101,14 @@ void BatteryDrainer::stop() {
     m_running = false;
     emit runningChanged();
 
+    m_statsTimer.stop();
     stopCpuWorkers();
-    enableFlashlight(false);
     restoreBrightness();
 
-    m_cpuLoad = 0.0;
-    emit cpuLoadChanged();
+    m_cpuUsage = 0.0;
+    m_gpuUsage = 0.0;
+    emit cpuUsageChanged();
+    emit gpuUsageChanged();
 }
 
 void BatteryDrainer::toggle() {
@@ -206,60 +215,113 @@ void BatteryDrainer::restoreBrightness() {
 #endif
 }
 
-void BatteryDrainer::enableFlashlight(bool on) {
-#ifdef Q_OS_ANDROID
-    qDebug() << "BatteryDrainer: Flashlight" << (on ? "ON" : "OFF");
+void BatteryDrainer::updateUsageStats() {
+    double cpu = readCpuUsage();
+    double gpu = readGpuUsage();
 
-    QJniObject activity = QNativeInterface::QAndroidApplication::context();
-    if (!activity.isValid()) return;
-
-    // Get CameraManager
-    QJniObject cameraServiceName = QJniObject::fromString("camera");
-    QJniObject cameraManager = activity.callObjectMethod(
-        "getSystemService",
-        "(Ljava/lang/String;)Ljava/lang/Object;",
-        cameraServiceName.object<jstring>());
-
-    if (!cameraManager.isValid()) {
-        qDebug() << "BatteryDrainer: Failed to get CameraManager";
-        return;
+    if (cpu != m_cpuUsage) {
+        m_cpuUsage = cpu;
+        emit cpuUsageChanged();
     }
 
-    // Get camera ID list
-    QJniObject cameraIdList = cameraManager.callObjectMethod(
-        "getCameraIdList", "()[Ljava/lang/String;");
+    if (gpu != m_gpuUsage) {
+        m_gpuUsage = gpu;
+        emit gpuUsageChanged();
+    }
+}
 
-    if (!cameraIdList.isValid()) {
-        qDebug() << "BatteryDrainer: Failed to get camera list";
-        return;
+double BatteryDrainer::readCpuUsage() {
+#if defined(Q_OS_ANDROID) || defined(Q_OS_LINUX)
+    // Read /proc/stat to get CPU usage
+    QFile file("/proc/stat");
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return 0.0;
     }
 
-    // Get first camera (usually rear with flash)
-    QJniEnvironment env;
-    jobjectArray cameraArray = cameraIdList.object<jobjectArray>();
-    int cameraCount = env->GetArrayLength(cameraArray);
+    QString line = file.readLine();
+    file.close();
 
-    if (cameraCount == 0) {
-        qDebug() << "BatteryDrainer: No cameras found";
-        return;
+    // Parse: cpu  user nice system idle iowait irq softirq steal guest guest_nice
+    QStringList parts = line.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+    if (parts.size() < 5 || parts[0] != "cpu") {
+        return 0.0;
     }
 
-    jstring cameraId = (jstring)env->GetObjectArrayElement(cameraArray, 0);
-    QJniObject cameraIdObj(cameraId);
+    uint64_t user = parts[1].toULongLong();
+    uint64_t nice = parts[2].toULongLong();
+    uint64_t system = parts[3].toULongLong();
+    uint64_t idle = parts[4].toULongLong();
+    uint64_t iowait = (parts.size() > 5) ? parts[5].toULongLong() : 0;
+    uint64_t irq = (parts.size() > 6) ? parts[6].toULongLong() : 0;
+    uint64_t softirq = (parts.size() > 7) ? parts[7].toULongLong() : 0;
 
-    // Set torch mode
-    cameraManager.callMethod<void>(
-        "setTorchMode",
-        "(Ljava/lang/String;Z)V",
-        cameraIdObj.object<jstring>(),
-        (jboolean)on);
+    uint64_t idleTime = idle + iowait;
+    uint64_t totalTime = user + nice + system + idle + iowait + irq + softirq;
 
-    m_flashlightOn = on;
-    emit flashlightOnChanged();
+    // Calculate delta since last read
+    uint64_t idleDelta = idleTime - m_prevIdleTime;
+    uint64_t totalDelta = totalTime - m_prevTotalTime;
 
-    qDebug() << "BatteryDrainer: Flashlight set to" << on;
+    m_prevIdleTime = idleTime;
+    m_prevTotalTime = totalTime;
+
+    if (totalDelta == 0) {
+        return 0.0;
+    }
+
+    double usage = 100.0 * (1.0 - (double)idleDelta / (double)totalDelta);
+    return qBound(0.0, usage, 100.0);
 #else
-    Q_UNUSED(on);
-    qDebug() << "BatteryDrainer: Flashlight not available on this platform";
+    // No /proc/stat on Windows/macOS - estimate based on workers
+    return m_running ? 95.0 : 0.0;
+#endif
+}
+
+double BatteryDrainer::readGpuUsage() {
+#ifdef Q_OS_ANDROID
+    // Try various GPU sysfs paths (device-specific)
+    static const QStringList gpuPaths = {
+        // Qualcomm Adreno
+        "/sys/class/kgsl/kgsl-3d0/gpu_busy_percentage",
+        "/sys/class/kgsl/kgsl-3d0/gpubusy",
+        // Mali
+        "/sys/devices/platform/mali.0/utilization",
+        "/sys/kernel/gpu/gpu_busy",
+        // Generic
+        "/sys/class/devfreq/gpufreq/load",
+    };
+
+    for (const QString& path : gpuPaths) {
+        QFile file(path);
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QString content = file.readAll().trimmed();
+            file.close();
+
+            // Try to parse percentage
+            bool ok;
+            double value = content.toDouble(&ok);
+            if (ok && value >= 0 && value <= 100) {
+                return value;
+            }
+
+            // Handle "X Y" format (busy total) from some drivers
+            QStringList parts = content.split(' ');
+            if (parts.size() >= 2) {
+                double busy = parts[0].toDouble(&ok);
+                if (ok) {
+                    double total = parts[1].toDouble();
+                    if (total > 0) {
+                        return 100.0 * busy / total;
+                    }
+                }
+            }
+        }
+    }
+
+    // Can't read GPU - estimate based on running state
+    return m_running ? 80.0 : 0.0;
+#else
+    // No GPU stats on desktop platforms
+    return m_running ? 80.0 : 0.0;
 #endif
 }

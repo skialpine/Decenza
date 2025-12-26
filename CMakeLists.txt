@@ -234,6 +234,15 @@ if(ANDROID)
     )
     # Add OpenSSL libraries for HTTPS support
     add_android_openssl_libraries(Decenza_DE1)
+
+    # Custom target to copy AAB with versioned filename
+    add_custom_target(aab_versioned
+        COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_BINARY_DIR}/android-build/build/outputs/bundle/release/android-build-release.aab"
+            "${CMAKE_BINARY_DIR}/Decenza_DE1-1.0.${NEXT_BUILD_NUMBER}.aab"
+        COMMENT "Creating versioned AAB: Decenza_DE1-1.0.${NEXT_BUILD_NUMBER}.aab"
+        VERBATIM
+    )
 endif()
 
 # iOS deployment

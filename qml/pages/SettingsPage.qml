@@ -188,14 +188,14 @@ Page {
                         anchors.horizontalCenter: parent.horizontalCenter
                     }
                     Text {
-                        text: BatteryDrainer.cpuLoad.toFixed(0) + "%"
+                        text: BatteryDrainer.cpuUsage.toFixed(0) + "%"
                         color: "#ff6666"
                         font.pixelSize: 36
                         font.bold: true
                         anchors.horizontalCenter: parent.horizontalCenter
                     }
                     Text {
-                        text: "All cores maxed"
+                        text: BatteryDrainer.cpuCores + " cores active"
                         color: "#ff9999"
                         font.pixelSize: 14
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -212,26 +212,19 @@ Page {
                         anchors.horizontalCenter: parent.horizontalCenter
                     }
                     Text {
-                        text: "100%"
+                        text: BatteryDrainer.gpuUsage.toFixed(0) + "%"
                         color: "#66ff66"
                         font.pixelSize: 36
                         font.bold: true
                         anchors.horizontalCenter: parent.horizontalCenter
                     }
                     Text {
-                        text: "58 animations"
+                        text: "Animations active"
                         color: "#99ff99"
                         font.pixelSize: 14
                         anchors.horizontalCenter: parent.horizontalCenter
                     }
                 }
-            }
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: "Flashlight: " + (BatteryDrainer.flashlightOn ? "ON" : "OFF")
-                color: BatteryDrainer.flashlightOn ? "#ffff66" : "#666666"
-                font.pixelSize: 24
             }
 
             Text {
