@@ -1,0 +1,93 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.10.1'
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+apply plugin: qtGradlePluginType
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
+    implementation 'androidx.core:core:1.16.0'
+}
+
+android {
+    namespace = androidPackageName
+    compileSdkVersion androidCompileSdkVersion
+    buildToolsVersion androidBuildToolsVersion
+    ndkVersion = androidNdkVersion
+
+    sourceSets {
+        main {
+            manifest.srcFile 'AndroidManifest.xml'
+            java.srcDirs = [qtAndroidDir + '/src', 'src', 'java']
+            aidl.srcDirs = [qtAndroidDir + '/src', 'src', 'aidl']
+            res.srcDirs = [qtAndroidDir + '/res', 'res']
+            resources.srcDirs = ['resources']
+            renderscript.srcDirs = ['src']
+            assets.srcDirs = ['assets']
+            jniLibs.srcDirs = ['libs']
+       }
+    }
+
+    tasks.withType(JavaCompile) {
+        options.incremental = true
+        options.compilerArgs += ['-Xlint:all']
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    lintOptions {
+        abortOnError = false
+    }
+
+    aaptOptions {
+        noCompress 'rcc'
+    }
+
+    defaultConfig {
+        resConfig "en"
+        minSdkVersion qtMinSdkVersion
+        targetSdkVersion qtTargetSdkVersion
+        ndk.abiFilters = qtTargetAbiList.split(",")
+    }
+}
+
+// Copy AAB with versioned filename after bundle completes
+tasks.whenTaskAdded { task ->
+    if (task.name == 'bundleRelease') {
+        task.doLast {
+            // Read versionName from AndroidManifest.xml (Qt sets it there, not in defaultConfig)
+            def manifestFile = file("${projectDir}/AndroidManifest.xml")
+            def versionName = "1.0.0"
+            if (manifestFile.exists()) {
+                def match = manifestFile.text =~ /android:versionName="([^"]+)"/
+                if (match.find()) {
+                    versionName = match.group(1)
+                }
+            }
+
+            def bundleDir = file("${buildDir}/outputs/bundle/release")
+            bundleDir.listFiles()?.each { f ->
+                if (f.name.endsWith('-release.aab')) {
+                    def dest = new File(bundleDir, "Decenza_DE1-${versionName}.aab")
+                    dest.bytes = f.bytes
+                    println "\n==========================================\nVERSIONED AAB: ${dest.absolutePath}\n==========================================\n"
+                }
+            }
+        }
+    }
+}
