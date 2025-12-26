@@ -221,6 +221,35 @@ ApplicationWindow {
             }
             bleErrorDialog.open()
         }
+        function onFlowScaleFallback() {
+            flowScaleDialog.open()
+        }
+    }
+
+    // FlowScale fallback dialog
+    Dialog {
+        id: flowScaleDialog
+        title: "No Scale Found"
+        modal: true
+        anchors.centerIn: parent
+
+        Column {
+            spacing: 16
+            width: 380
+
+            Label {
+                text: "No Bluetooth scale was detected.\n\nUsing estimated weight from DE1 flow measurement instead.\n\nYou can search for your scale in Settings → Bluetooth."
+                wrapMode: Text.Wrap
+                width: parent.width
+                font.pixelSize: 15
+            }
+
+            Button {
+                text: "OK"
+                anchors.horizontalCenter: parent.horizontalCenter
+                onClicked: flowScaleDialog.close()
+            }
+        }
     }
 
     // First-run welcome dialog

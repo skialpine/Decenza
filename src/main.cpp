@@ -83,10 +83,11 @@ int main(int argc, char *argv[])
     flowScaleFallbackTimer.setSingleShot(true);
     flowScaleFallbackTimer.setInterval(30000);  // 30 seconds
     QObject::connect(&flowScaleFallbackTimer, &QTimer::timeout,
-                     [&machineState, &physicalScale, &flowScale]() {
+                     [&machineState, &physicalScale, &flowScale, &bleManager]() {
         if (!physicalScale || !physicalScale->isConnected()) {
             qDebug() << "No physical scale found after 30 seconds, falling back to FlowScale";
             machineState.setScale(&flowScale);
+            emit bleManager.flowScaleFallback();
         }
     });
     flowScaleFallbackTimer.start();
