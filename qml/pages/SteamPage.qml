@@ -11,7 +11,7 @@ Page {
     Component.onCompleted: root.currentPageTitle = "Steam"
     StackView.onActivated: root.currentPageTitle = "Steam"
 
-    property bool isSteaming: MachineState.phase === MachineState.Phase.Steaming
+    property bool isSteaming: MachineState.phase === MachineStateType.Phase.Steaming
     property int editingPitcherIndex: -1  // For the edit popup
 
     // Helper to format flow as readable value (handles undefined/NaN)
@@ -149,31 +149,20 @@ Page {
                 color: Theme.surfaceColor
                 radius: Theme.cardRadius
 
-                ColumnLayout {
+                RowLayout {
                     anchors.fill: parent
                     anchors.margins: 12
-                    spacing: 8
+                    spacing: Theme.scaled(20)
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text {
-                            text: "Pitcher Preset"
-                            color: Theme.textColor
-                            font.pixelSize: Theme.bodyFont.pixelSize
-                            font.bold: true
-                        }
-                        Item { Layout.fillWidth: true }
-                        Text {
-                            text: "Drag to reorder, hold to rename"
-                            color: Theme.textSecondaryColor
-                            font: Theme.labelFont
-                        }
+                    Text {
+                        text: "Pitcher Preset"
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(24)
                     }
 
                     // Pitcher preset buttons with drag-and-drop
                     Row {
                         id: pitcherPresetsRow
-                        Layout.fillWidth: true
                         spacing: 8
 
                         property int draggedIndex: -1
@@ -306,137 +295,142 @@ Page {
                             }
                         }
                     }
-                }
-            }
 
-            // Duration (per-pitcher, auto-saves)
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: Theme.scaled(100)
-                color: Theme.surfaceColor
-                radius: Theme.cardRadius
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.margins: 16
-                    spacing: 16
+                    Item { Layout.fillWidth: true }
 
                     Text {
-                        text: "Duration"
-                        color: Theme.textColor
-                        font: Theme.bodyFont
-                    }
-
-                    Item { Layout.fillWidth: true }
-
-                    ValueInput {
-                        id: durationSlider
-                        from: 1
-                        to: 120
-                        stepSize: 1
-                        decimals: 0
-                        suffix: " s"
-                        value: getCurrentPitcherDuration()
-                        valueColor: Theme.primaryColor
-                        onValueModified: function(newValue) {
-                            durationSlider.value = newValue
-                            Settings.steamTimeout = newValue
-                            saveCurrentPitcher(newValue, flowSlider.value)
-                        }
+                        text: "Drag to reorder, hold to rename"
+                        color: Theme.textSecondaryColor
+                        font: Theme.labelFont
                     }
                 }
             }
 
-            // Steam Flow (per-pitcher, auto-saves)
+            // Settings frame
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: Theme.scaled(100)
+                Layout.fillHeight: true
                 color: Theme.surfaceColor
                 radius: Theme.cardRadius
 
-                RowLayout {
+                ColumnLayout {
                     anchors.fill: parent
-                    anchors.margins: 16
-                    spacing: 16
+                    anchors.margins: Theme.scaled(16)
+                    spacing: Theme.scaled(8)
 
-                    Column {
+                    // Duration (per-pitcher, auto-saves)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 16
+
                         Text {
-                            text: "Steam Flow"
+                            text: "Duration"
                             color: Theme.textColor
-                            font: Theme.bodyFont
+                            font.pixelSize: Theme.scaled(24)
                         }
-                        Text {
-                            text: "Low = flat, High = foamy"
-                            color: Theme.textSecondaryColor
-                            font: Theme.labelFont
+
+                        Item { Layout.fillWidth: true }
+
+                        ValueInput {
+                            id: durationSlider
+                            Layout.preferredWidth: Theme.scaled(180)
+                            from: 1
+                            to: 120
+                            stepSize: 1
+                            decimals: 0
+                            suffix: " s"
+                            value: getCurrentPitcherDuration()
+                            valueColor: Theme.primaryColor
+                            onValueModified: function(newValue) {
+                                durationSlider.value = newValue
+                                Settings.steamTimeout = newValue
+                                saveCurrentPitcher(newValue, flowSlider.value)
+                            }
                         }
                     }
 
-                    Item { Layout.fillWidth: true }
+                    Rectangle { Layout.fillWidth: true; height: 1; color: Theme.textSecondaryColor; opacity: 0.3 }
 
-                    ValueInput {
-                        id: flowSlider
-                        from: 40
-                        to: 250
-                        stepSize: 5
-                        decimals: 0
-                        value: getCurrentPitcherFlow()
-                        displayText: flowToDisplay(value)
-                        valueColor: Theme.primaryColor
-                        onValueModified: function(newValue) {
-                            flowSlider.value = newValue
-                            MainController.setSteamFlowImmediate(newValue)
-                            saveCurrentPitcher(durationSlider.value, newValue)
+                    // Steam Flow (per-pitcher, auto-saves)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 16
+
+                        Column {
+                            Text {
+                                text: "Steam Flow"
+                                color: Theme.textColor
+                                font.pixelSize: Theme.scaled(24)
+                            }
+                            Text {
+                                text: "Low = flat, High = foamy"
+                                color: Theme.textSecondaryColor
+                                font: Theme.labelFont
+                            }
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        ValueInput {
+                            id: flowSlider
+                            Layout.preferredWidth: Theme.scaled(180)
+                            from: 40
+                            to: 250
+                            stepSize: 5
+                            decimals: 0
+                            value: getCurrentPitcherFlow()
+                            displayText: flowToDisplay(value)
+                            valueColor: Theme.primaryColor
+                            onValueModified: function(newValue) {
+                                flowSlider.value = newValue
+                                MainController.setSteamFlowImmediate(newValue)
+                                saveCurrentPitcher(durationSlider.value, newValue)
+                            }
                         }
                     }
+
+                    Rectangle { Layout.fillWidth: true; height: 1; color: Theme.textSecondaryColor; opacity: 0.3 }
+
+                    // Temperature (global setting)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 16
+
+                        Column {
+                            Text {
+                                text: "Temperature"
+                                color: Theme.textColor
+                                font.pixelSize: Theme.scaled(24)
+                            }
+                            Text {
+                                text: "Higher = drier steam"
+                                color: Theme.textSecondaryColor
+                                font: Theme.labelFont
+                            }
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        ValueInput {
+                            id: steamTempSlider
+                            Layout.preferredWidth: Theme.scaled(180)
+                            from: 120
+                            to: 170
+                            stepSize: 1
+                            decimals: 0
+                            suffix: "°C"
+                            value: Settings.steamTemperature
+                            valueColor: Theme.temperatureColor
+                            onValueModified: function(newValue) {
+                                steamTempSlider.value = newValue
+                                MainController.setSteamTemperatureImmediate(newValue)
+                            }
+                        }
+                    }
+
+                    Item { Layout.fillHeight: true }
                 }
             }
-
-            // Temperature (global setting)
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: Theme.scaled(100)
-                color: Theme.surfaceColor
-                radius: Theme.cardRadius
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.margins: 16
-                    spacing: 16
-
-                    Column {
-                        Text {
-                            text: "Temperature"
-                            color: Theme.textColor
-                            font: Theme.bodyFont
-                        }
-                        Text {
-                            text: "Higher = drier steam"
-                            color: Theme.textSecondaryColor
-                            font: Theme.labelFont
-                        }
-                    }
-
-                    Item { Layout.fillWidth: true }
-
-                    ValueInput {
-                        id: steamTempSlider
-                        from: 120
-                        to: 170
-                        stepSize: 1
-                        decimals: 0
-                        suffix: "°C"
-                        value: Settings.steamTemperature
-                        valueColor: Theme.temperatureColor
-                        onValueModified: function(newValue) {
-                            steamTempSlider.value = newValue
-                            MainController.setSteamTemperatureImmediate(newValue)
-                        }
-                    }
-                }
-            }
-
-            Item { Layout.fillHeight: true }
         }
 
         Item { Layout.fillHeight: true; visible: isSteaming }
@@ -484,11 +478,28 @@ Page {
     // Edit Pitcher Popup (rename/delete)
     Popup {
         id: editPitcherPopup
-        anchors.centerIn: parent
-        width: 300
-        height: 200
+        x: (parent.width - width) / 2
+        y: editPitcherPopupAtTop ? Theme.scaled(40) : (parent.height - height) / 2
+        padding: 20
         modal: true
+        focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        property bool editPitcherPopupAtTop: false
+        onOpened: {
+            editPitcherPopupAtTop = false
+            editPitcherNameInput.forceActiveFocus()
+        }
+        onClosed: editPitcherPopupAtTop = false
+
+        Connections {
+            target: Qt.inputMethod
+            function onVisibleChanged() {
+                if (Qt.inputMethod.visible && editPitcherPopup.opened) {
+                    editPitcherPopup.editPitcherPopupAtTop = true
+                }
+            }
+        }
 
         background: Rectangle {
             color: Theme.surfaceColor
@@ -497,22 +508,18 @@ Page {
             border.width: 1
         }
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 20
+        contentItem: ColumnLayout {
             spacing: 15
 
             Text {
                 text: "Edit Pitcher"
                 color: Theme.textColor
-                font.pixelSize: 18
-                font.bold: true
+                font: Theme.subtitleFont
             }
 
-            // Name input
             Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 40
+                Layout.preferredWidth: 280
+                Layout.preferredHeight: 44
                 color: Theme.backgroundColor
                 border.color: Theme.textSecondaryColor
                 border.width: 1
@@ -524,83 +531,83 @@ Page {
                     anchors.margins: 10
                     color: Theme.textColor
                     font: Theme.bodyFont
-                    verticalAlignment: Text.AlignVCenter
+                    verticalAlignment: TextInput.AlignVCenter
+                    inputMethodHints: Qt.ImhNoPredictiveText
+
+                    Text {
+                        anchors.fill: parent
+                        verticalAlignment: Text.AlignVCenter
+                        text: "Pitcher name"
+                        color: Theme.textSecondaryColor
+                        font: parent.font
+                        visible: !parent.text && !parent.activeFocus
+                    }
                 }
             }
 
-            // Buttons
             RowLayout {
-                Layout.fillWidth: true
                 spacing: 10
 
-                // Delete button
-                Rectangle {
-                    Layout.preferredWidth: 70
-                    Layout.preferredHeight: 36
-                    color: Theme.accentColor
-                    radius: 4
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Delete"
-                        color: "white"
+                Button {
+                    text: "Delete"
+                    onClicked: {
+                        Settings.removeSteamPitcherPreset(editingPitcherIndex)
+                        editPitcherPopup.close()
                     }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            Settings.removeSteamPitcherPreset(editingPitcherIndex)
-                            editPitcherPopup.close()
-                        }
+                    background: Rectangle {
+                        implicitWidth: 80
+                        implicitHeight: 36
+                        radius: 6
+                        color: Theme.errorColor
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        color: "white"
+                        font: Theme.bodyFont
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
                     }
                 }
 
                 Item { Layout.fillWidth: true }
 
-                // Cancel button
-                Rectangle {
-                    Layout.preferredWidth: 70
-                    Layout.preferredHeight: 36
-                    color: "transparent"
-                    border.color: Theme.textSecondaryColor
-                    radius: 4
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Cancel"
-                        color: Theme.textColor
+                Button {
+                    text: "Cancel"
+                    onClicked: editPitcherPopup.close()
+                    background: Rectangle {
+                        implicitWidth: 70
+                        implicitHeight: 36
+                        radius: 6
+                        color: Theme.backgroundColor
                     }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: editPitcherPopup.close()
+                    contentItem: Text {
+                        text: parent.text
+                        color: Theme.textColor
+                        font: Theme.bodyFont
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
                     }
                 }
 
-                // Save button
-                Rectangle {
-                    Layout.preferredWidth: 70
-                    Layout.preferredHeight: 36
-                    color: Theme.primaryColor
-                    radius: 4
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Save"
-                        color: "white"
+                Button {
+                    text: "Save"
+                    onClicked: {
+                        var preset = Settings.getSteamPitcherPreset(editingPitcherIndex)
+                        Settings.updateSteamPitcherPreset(editingPitcherIndex, editPitcherNameInput.text, preset.duration, preset.flow)
+                        editPitcherPopup.close()
                     }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            if (editPitcherNameInput.text.trim() !== "") {
-                                var preset = Settings.getSteamPitcherPreset(editingPitcherIndex)
-                                var duration = preset ? preset.duration : 30
-                                var flow = (preset && preset.flow !== undefined) ? preset.flow : 150
-                                Settings.updateSteamPitcherPreset(editingPitcherIndex, editPitcherNameInput.text.trim(), duration, flow)
-                            }
-                            editPitcherPopup.close()
-                        }
+                    background: Rectangle {
+                        implicitWidth: 70
+                        implicitHeight: 36
+                        radius: 6
+                        color: Theme.primaryColor
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        color: "white"
+                        font: Theme.bodyFont
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
                     }
                 }
             }
@@ -610,11 +617,29 @@ Page {
     // Add Pitcher Dialog
     Popup {
         id: addPitcherDialog
-        anchors.centerIn: parent
-        width: 300
-        height: 180
+        x: (parent.width - width) / 2
+        y: addPitcherDialogAtTop ? Theme.scaled(40) : (parent.height - height) / 2
+        padding: 20
         modal: true
+        focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        property bool addPitcherDialogAtTop: false
+        onOpened: {
+            addPitcherDialogAtTop = false
+            newPitcherName.text = ""
+            newPitcherName.forceActiveFocus()
+        }
+        onClosed: addPitcherDialogAtTop = false
+
+        Connections {
+            target: Qt.inputMethod
+            function onVisibleChanged() {
+                if (Qt.inputMethod.visible && addPitcherDialog.opened) {
+                    addPitcherDialog.addPitcherDialogAtTop = true
+                }
+            }
+        }
 
         background: Rectangle {
             color: Theme.surfaceColor
@@ -623,22 +648,18 @@ Page {
             border.width: 1
         }
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 20
+        contentItem: ColumnLayout {
             spacing: 15
 
             Text {
                 text: "Add Pitcher Preset"
                 color: Theme.textColor
-                font.pixelSize: 18
-                font.bold: true
+                font: Theme.subtitleFont
             }
 
-            // Name input
             Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 40
+                Layout.preferredWidth: 280
+                Layout.preferredHeight: 44
                 color: Theme.backgroundColor
                 border.color: Theme.textSecondaryColor
                 border.width: 1
@@ -650,67 +671,66 @@ Page {
                     anchors.margins: 10
                     color: Theme.textColor
                     font: Theme.bodyFont
-                    verticalAlignment: Text.AlignVCenter
+                    verticalAlignment: TextInput.AlignVCenter
+                    inputMethodHints: Qt.ImhNoPredictiveText
 
                     Text {
                         anchors.fill: parent
                         verticalAlignment: Text.AlignVCenter
-                        text: "Pitcher name (e.g. Ikea Small)"
+                        text: "Pitcher name"
                         color: Theme.textSecondaryColor
+                        font: parent.font
                         visible: !parent.text && !parent.activeFocus
                     }
                 }
             }
 
-            // Buttons
             RowLayout {
-                Layout.fillWidth: true
                 spacing: 10
 
                 Item { Layout.fillWidth: true }
 
-                Rectangle {
-                    Layout.preferredWidth: 80
-                    Layout.preferredHeight: 36
-                    color: "transparent"
-                    border.color: Theme.textSecondaryColor
-                    radius: 4
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Cancel"
-                        color: Theme.textColor
+                Button {
+                    text: "Cancel"
+                    onClicked: addPitcherDialog.close()
+                    background: Rectangle {
+                        implicitWidth: 70
+                        implicitHeight: 36
+                        radius: 6
+                        color: Theme.backgroundColor
                     }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: addPitcherDialog.close()
+                    contentItem: Text {
+                        text: parent.text
+                        color: Theme.textColor
+                        font: Theme.bodyFont
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
                     }
                 }
 
-                Rectangle {
-                    Layout.preferredWidth: 80
-                    Layout.preferredHeight: 36
-                    color: Theme.primaryColor
-                    radius: 4
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Add"
-                        color: "white"
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            if (newPitcherName.text.trim() !== "") {
-                                var presetCount = Settings.steamPitcherPresets.length
-                                Settings.addSteamPitcherPreset(newPitcherName.text.trim(), 30, 150)
-                                Settings.selectedSteamPitcher = presetCount  // Select the new pitcher
-                                newPitcherName.text = ""
-                                addPitcherDialog.close()
-                            }
+                Button {
+                    text: "Add"
+                    onClicked: {
+                        if (newPitcherName.text.trim() !== "") {
+                            var presetCount = Settings.steamPitcherPresets.length
+                            Settings.addSteamPitcherPreset(newPitcherName.text.trim(), 30, 150)
+                            Settings.selectedSteamPitcher = presetCount
+                            newPitcherName.text = ""
+                            addPitcherDialog.close()
                         }
+                    }
+                    background: Rectangle {
+                        implicitWidth: 70
+                        implicitHeight: 36
+                        radius: 6
+                        color: Theme.primaryColor
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        color: "white"
+                        font: Theme.bodyFont
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
                     }
                 }
             }
@@ -720,7 +740,7 @@ Page {
     // Update sliders when selected pitcher changes
     Connections {
         target: Settings
-        function onSelectedSteamCupChanged() {
+        function onSelectedSteamPitcherChanged() {
             durationSlider.value = getCurrentPitcherDuration()
             flowSlider.value = getCurrentPitcherFlow()
         }

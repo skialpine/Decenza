@@ -18,6 +18,9 @@ Item {
     readonly property real pillSpacing: Theme.scaled(12)
     readonly property real pillPadding: Theme.scaled(40)  // Horizontal padding inside pill
 
+    // Cached rows model to avoid binding loops
+    property var rowsModel: calculateRows()
+
     // Hidden TextMetrics for measuring pill text widths
     TextMetrics {
         id: textMetrics
@@ -29,6 +32,10 @@ Item {
         textMetrics.text = text
         return textMetrics.width
     }
+
+    // Recalculate when presets change
+    onPresetsChanged: rowsModel = calculateRows()
+    onMaxWidthChanged: rowsModel = calculateRows()
 
     // Group presets into rows, distributing evenly for aesthetics (3/2 instead of 4/1)
     function calculateRows() {
@@ -96,7 +103,7 @@ Item {
         spacing: Theme.scaled(8)
 
         Repeater {
-            model: root.calculateRows()
+            model: root.rowsModel
 
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter

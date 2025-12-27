@@ -101,31 +101,20 @@ Page {
                 color: Theme.surfaceColor
                 radius: Theme.cardRadius
 
-                ColumnLayout {
+                RowLayout {
                     anchors.fill: parent
                     anchors.margins: 12
-                    spacing: 8
+                    spacing: Theme.scaled(20)
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text {
-                            text: "Flush Preset"
-                            color: Theme.textColor
-                            font.pixelSize: Theme.bodyFont.pixelSize
-                            font.bold: true
-                        }
-                        Item { Layout.fillWidth: true }
-                        Text {
-                            text: "Drag to reorder, hold to rename"
-                            color: Theme.textSecondaryColor
-                            font: Theme.labelFont
-                        }
+                    Text {
+                        text: "Flush Preset"
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(24)
                     }
 
                     // Preset buttons with drag-and-drop
                     Row {
                         id: presetsRow
-                        Layout.fillWidth: true
                         spacing: 8
 
                         property int draggedIndex: -1
@@ -257,88 +246,98 @@ Page {
                             }
                         }
                     }
-                }
-            }
-
-            // Duration (per-preset, auto-saves)
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: Theme.scaled(100)
-                color: Theme.surfaceColor
-                radius: Theme.cardRadius
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.margins: 16
-                    spacing: 16
-
-                    Text {
-                        text: "Duration"
-                        color: Theme.textColor
-                        font: Theme.bodyFont
-                    }
 
                     Item { Layout.fillWidth: true }
 
-                    ValueInput {
-                        id: secondsInput
-                        value: getCurrentPresetSeconds()
-                        from: 1
-                        to: 30
-                        stepSize: 0.5
-                        suffix: " s"
-                        valueColor: Theme.primaryColor
-
-                        onValueModified: function(newValue) {
-                            secondsInput.value = newValue
-                            Settings.flushSeconds = newValue
-                            saveCurrentPreset(flowInput.value, newValue)
-                            MainController.applyFlushSettings()
-                        }
+                    Text {
+                        text: "Drag to reorder, hold to rename"
+                        color: Theme.textSecondaryColor
+                        font: Theme.labelFont
                     }
                 }
             }
 
-            // Flow Rate (per-preset, auto-saves)
+            // Settings frame
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: Theme.scaled(100)
+                Layout.fillHeight: true
                 color: Theme.surfaceColor
                 radius: Theme.cardRadius
 
-                RowLayout {
+                ColumnLayout {
                     anchors.fill: parent
-                    anchors.margins: 16
-                    spacing: 16
+                    anchors.margins: Theme.scaled(16)
+                    spacing: Theme.scaled(8)
 
-                    Text {
-                        text: "Flow Rate"
-                        color: Theme.textColor
-                        font: Theme.bodyFont
-                    }
+                    // Duration (per-preset, auto-saves)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 16
 
-                    Item { Layout.fillWidth: true }
+                        Text {
+                            text: "Duration"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(24)
+                        }
 
-                    ValueInput {
-                        id: flowInput
-                        value: getCurrentPresetFlow()
-                        from: 2
-                        to: 10
-                        stepSize: 0.5
-                        suffix: " mL/s"
-                        valueColor: Theme.flowColor
+                        Item { Layout.fillWidth: true }
 
-                        onValueModified: function(newValue) {
-                            flowInput.value = newValue
-                            Settings.flushFlow = newValue
-                            saveCurrentPreset(newValue, secondsInput.value)
-                            MainController.applyFlushSettings()
+                        ValueInput {
+                            id: secondsInput
+                            Layout.preferredWidth: Theme.scaled(180)
+                            value: getCurrentPresetSeconds()
+                            from: 1
+                            to: 30
+                            stepSize: 0.5
+                            suffix: " s"
+                            valueColor: Theme.primaryColor
+
+                            onValueModified: function(newValue) {
+                                secondsInput.value = newValue
+                                Settings.flushSeconds = newValue
+                                saveCurrentPreset(flowInput.value, newValue)
+                                MainController.applyFlushSettings()
+                            }
                         }
                     }
+
+                    Rectangle { Layout.fillWidth: true; height: 1; color: Theme.textSecondaryColor; opacity: 0.3 }
+
+                    // Flow Rate (per-preset, auto-saves)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 16
+
+                        Text {
+                            text: "Flow Rate"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(24)
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        ValueInput {
+                            id: flowInput
+                            Layout.preferredWidth: Theme.scaled(180)
+                            value: getCurrentPresetFlow()
+                            from: 2
+                            to: 10
+                            stepSize: 0.5
+                            suffix: " mL/s"
+                            valueColor: Theme.flowColor
+
+                            onValueModified: function(newValue) {
+                                flowInput.value = newValue
+                                Settings.flushFlow = newValue
+                                saveCurrentPreset(newValue, secondsInput.value)
+                                MainController.applyFlushSettings()
+                            }
+                        }
+                    }
+
+                    Item { Layout.fillHeight: true }
                 }
             }
-
-            Item { Layout.fillHeight: true }
         }
     }
 
@@ -378,21 +377,37 @@ Page {
     // Edit preset popup
     Popup {
         id: editPresetPopup
-        anchors.centerIn: parent
-        width: 300
-        height: 180
+        x: (parent.width - width) / 2
+        y: editPresetPopupAtTop ? Theme.scaled(40) : (parent.height - height) / 2
+        padding: 20
         modal: true
         focus: true
+
+        property bool editPresetPopupAtTop: false
+        onOpened: {
+            editPresetPopupAtTop = false
+            editPresetNameInput.forceActiveFocus()
+        }
+        onClosed: editPresetPopupAtTop = false
+
+        Connections {
+            target: Qt.inputMethod
+            function onVisibleChanged() {
+                if (Qt.inputMethod.visible && editPresetPopup.opened) {
+                    editPresetPopup.editPresetPopupAtTop = true
+                }
+            }
+        }
 
         background: Rectangle {
             color: Theme.surfaceColor
             radius: Theme.cardRadius
+            border.color: Theme.textSecondaryColor
+            border.width: 1
         }
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 16
-            spacing: 12
+        contentItem: ColumnLayout {
+            spacing: 15
 
             Text {
                 text: "Edit Flush Preset"
@@ -400,15 +415,35 @@ Page {
                 font: Theme.subtitleFont
             }
 
-            TextField {
-                id: editPresetNameInput
-                Layout.fillWidth: true
-                placeholderText: "Preset name"
-                font: Theme.bodyFont
+            Rectangle {
+                Layout.preferredWidth: 280
+                Layout.preferredHeight: 44
+                color: Theme.backgroundColor
+                border.color: Theme.textSecondaryColor
+                border.width: 1
+                radius: 4
+
+                TextInput {
+                    id: editPresetNameInput
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    color: Theme.textColor
+                    font: Theme.bodyFont
+                    verticalAlignment: TextInput.AlignVCenter
+                    inputMethodHints: Qt.ImhNoPredictiveText
+
+                    Text {
+                        anchors.fill: parent
+                        verticalAlignment: Text.AlignVCenter
+                        text: "Preset name"
+                        color: Theme.textSecondaryColor
+                        font: parent.font
+                        visible: !parent.text && !parent.activeFocus
+                    }
+                }
             }
 
             RowLayout {
-                Layout.fillWidth: true
                 spacing: 10
 
                 Button {
@@ -478,34 +513,122 @@ Page {
     }
 
     // Add preset dialog
-    Dialog {
+    Popup {
         id: addPresetDialog
-        title: "Add Flush Preset"
-        anchors.centerIn: parent
+        x: (parent.width - width) / 2
+        y: addPresetDialogAtTop ? Theme.scaled(40) : (parent.height - height) / 2
+        padding: 20
         modal: true
-        standardButtons: Dialog.Ok | Dialog.Cancel
+        focus: true
 
-        ColumnLayout {
-            spacing: 12
-
-            TextField {
-                id: newPresetNameInput
-                Layout.preferredWidth: 200
-                placeholderText: "Preset name"
-                font: Theme.bodyFont
-            }
-        }
-
-        onAccepted: {
-            if (newPresetNameInput.text.length > 0) {
-                Settings.addFlushPreset(newPresetNameInput.text, 6.0, 5.0)
-                newPresetNameInput.text = ""
-            }
-        }
-
+        property bool addPresetDialogAtTop: false
         onOpened: {
+            addPresetDialogAtTop = false
             newPresetNameInput.text = ""
             newPresetNameInput.forceActiveFocus()
+        }
+        onClosed: addPresetDialogAtTop = false
+
+        Connections {
+            target: Qt.inputMethod
+            function onVisibleChanged() {
+                if (Qt.inputMethod.visible && addPresetDialog.opened) {
+                    addPresetDialog.addPresetDialogAtTop = true
+                }
+            }
+        }
+
+        background: Rectangle {
+            color: Theme.surfaceColor
+            radius: Theme.cardRadius
+            border.color: Theme.textSecondaryColor
+            border.width: 1
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 15
+
+            Text {
+                text: "Add Flush Preset"
+                color: Theme.textColor
+                font: Theme.subtitleFont
+            }
+
+            Rectangle {
+                Layout.preferredWidth: 280
+                Layout.preferredHeight: 44
+                color: Theme.backgroundColor
+                border.color: Theme.textSecondaryColor
+                border.width: 1
+                radius: 4
+
+                TextInput {
+                    id: newPresetNameInput
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    color: Theme.textColor
+                    font: Theme.bodyFont
+                    verticalAlignment: TextInput.AlignVCenter
+                    inputMethodHints: Qt.ImhNoPredictiveText
+
+                    Text {
+                        anchors.fill: parent
+                        verticalAlignment: Text.AlignVCenter
+                        text: "Preset name"
+                        color: Theme.textSecondaryColor
+                        font: parent.font
+                        visible: !parent.text && !parent.activeFocus
+                    }
+                }
+            }
+
+            RowLayout {
+                spacing: 10
+
+                Item { Layout.fillWidth: true }
+
+                Button {
+                    text: "Cancel"
+                    onClicked: addPresetDialog.close()
+                    background: Rectangle {
+                        implicitWidth: 70
+                        implicitHeight: 36
+                        radius: 6
+                        color: Theme.backgroundColor
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        color: Theme.textColor
+                        font: Theme.bodyFont
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                Button {
+                    text: "Add"
+                    onClicked: {
+                        if (newPresetNameInput.text.length > 0) {
+                            Settings.addFlushPreset(newPresetNameInput.text, 6.0, 5.0)
+                            newPresetNameInput.text = ""
+                            addPresetDialog.close()
+                        }
+                    }
+                    background: Rectangle {
+                        implicitWidth: 70
+                        implicitHeight: 36
+                        radius: 6
+                        color: Theme.primaryColor
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        color: "white"
+                        font: Theme.bodyFont
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+            }
         }
     }
 }

@@ -21,24 +21,9 @@ Rectangle {
             elide: Text.ElideRight
         }
 
-        // Separator after title (if title exists)
-        Rectangle {
-            width: 1
-            height: Theme.scaled(30)
-            color: Theme.textSecondaryColor
-            opacity: 0.3
-            visible: root.currentPageTitle !== ""
-        }
-
-        // Machine state
+        // Sub state (when actively flowing)
         Text {
-            text: DE1Device.stateString
-            color: Theme.textColor
-            font: Theme.bodyFont
-        }
-
-        Text {
-            text: " - " + DE1Device.subStateString
+            text: "- " + DE1Device.subStateString
             color: Theme.textSecondaryColor
             font: Theme.bodyFont
             visible: MachineState.isFlowing

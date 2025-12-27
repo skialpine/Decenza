@@ -101,31 +101,20 @@ Page {
                 color: Theme.surfaceColor
                 radius: Theme.cardRadius
 
-                ColumnLayout {
+                RowLayout {
                     anchors.fill: parent
                     anchors.margins: 12
-                    spacing: 8
+                    spacing: Theme.scaled(20)
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text {
-                            text: "Vessel Preset"
-                            color: Theme.textColor
-                            font.pixelSize: Theme.bodyFont.pixelSize
-                            font.bold: true
-                        }
-                        Item { Layout.fillWidth: true }
-                        Text {
-                            text: "Drag to reorder, hold to rename"
-                            color: Theme.textSecondaryColor
-                            font: Theme.labelFont
-                        }
+                    Text {
+                        text: "Vessel Preset"
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(24)
                     }
 
                     // Vessel preset buttons with drag-and-drop
                     Row {
                         id: vesselPresetsRow
-                        Layout.fillWidth: true
                         spacing: 8
 
                         property int draggedIndex: -1
@@ -255,87 +244,97 @@ Page {
                             }
                         }
                     }
-                }
-            }
-
-            // Volume (per-vessel, auto-saves)
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: Theme.scaled(100)
-                color: Theme.surfaceColor
-                radius: Theme.cardRadius
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.margins: 16
-                    spacing: 16
-
-                    Text {
-                        text: "Volume"
-                        color: Theme.textColor
-                        font: Theme.bodyFont
-                    }
 
                     Item { Layout.fillWidth: true }
 
-                    ValueInput {
-                        id: volumeInput
-                        value: getCurrentVesselVolume()
-                        from: 50
-                        to: 500
-                        stepSize: 10
-                        suffix: " ml"
-                        valueColor: Theme.primaryColor
-
-                        onValueModified: function(newValue) {
-                            volumeInput.value = newValue
-                            Settings.waterVolume = newValue
-                            saveCurrentVessel(newValue)
-                            MainController.applyHotWaterSettings()
-                        }
+                    Text {
+                        text: "Drag to reorder, hold to rename"
+                        color: Theme.textSecondaryColor
+                        font: Theme.labelFont
                     }
                 }
             }
 
-            // Temperature (global setting)
+            // Settings frame
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: Theme.scaled(100)
+                Layout.fillHeight: true
                 color: Theme.surfaceColor
                 radius: Theme.cardRadius
 
-                RowLayout {
+                ColumnLayout {
                     anchors.fill: parent
-                    anchors.margins: 16
-                    spacing: 16
+                    anchors.margins: Theme.scaled(16)
+                    spacing: Theme.scaled(8)
 
-                    Text {
-                        text: "Temperature"
-                        color: Theme.textColor
-                        font: Theme.bodyFont
-                    }
+                    // Volume (per-vessel, auto-saves)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 16
 
-                    Item { Layout.fillWidth: true }
+                        Text {
+                            text: "Volume"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(24)
+                        }
 
-                    ValueInput {
-                        id: temperatureInput
-                        value: Settings.waterTemperature
-                        from: 40
-                        to: 100
-                        stepSize: 1
-                        suffix: "°C"
-                        valueColor: Theme.temperatureColor
+                        Item { Layout.fillWidth: true }
 
-                        onValueModified: function(newValue) {
-                            temperatureInput.value = newValue
-                            Settings.waterTemperature = newValue
-                            MainController.applyHotWaterSettings()
+                        ValueInput {
+                            id: volumeInput
+                            Layout.preferredWidth: Theme.scaled(180)
+                            value: getCurrentVesselVolume()
+                            from: 50
+                            to: 500
+                            stepSize: 10
+                            suffix: " ml"
+                            valueColor: Theme.primaryColor
+
+                            onValueModified: function(newValue) {
+                                volumeInput.value = newValue
+                                Settings.waterVolume = newValue
+                                saveCurrentVessel(newValue)
+                                MainController.applyHotWaterSettings()
+                            }
                         }
                     }
+
+                    Rectangle { Layout.fillWidth: true; height: 1; color: Theme.textSecondaryColor; opacity: 0.3 }
+
+                    // Temperature (global setting)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 16
+
+                        Text {
+                            text: "Temperature"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(24)
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        ValueInput {
+                            id: temperatureInput
+                            Layout.preferredWidth: Theme.scaled(180)
+                            value: Settings.waterTemperature
+                            from: 40
+                            to: 100
+                            stepSize: 1
+                            suffix: "°C"
+                            valueColor: Theme.temperatureColor
+
+                            onValueModified: function(newValue) {
+                                temperatureInput.value = newValue
+                                Settings.waterTemperature = newValue
+                                MainController.applyHotWaterSettings()
+                            }
+                        }
+                    }
+
+                    Item { Layout.fillHeight: true }
                 }
             }
-
-            Item { Layout.fillHeight: true }
         }
     }
 
@@ -375,21 +374,37 @@ Page {
     // Edit vessel preset popup
     Popup {
         id: editVesselPopup
-        anchors.centerIn: parent
-        width: 300
-        height: 180
+        x: (parent.width - width) / 2
+        y: editVesselPopupAtTop ? Theme.scaled(40) : (parent.height - height) / 2
+        padding: 20
         modal: true
         focus: true
+
+        property bool editVesselPopupAtTop: false
+        onOpened: {
+            editVesselPopupAtTop = false
+            editVesselNameInput.forceActiveFocus()
+        }
+        onClosed: editVesselPopupAtTop = false
+
+        Connections {
+            target: Qt.inputMethod
+            function onVisibleChanged() {
+                if (Qt.inputMethod.visible && editVesselPopup.opened) {
+                    editVesselPopup.editVesselPopupAtTop = true
+                }
+            }
+        }
 
         background: Rectangle {
             color: Theme.surfaceColor
             radius: Theme.cardRadius
+            border.color: Theme.textSecondaryColor
+            border.width: 1
         }
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 16
-            spacing: 12
+        contentItem: ColumnLayout {
+            spacing: 15
 
             Text {
                 text: "Edit Vessel Preset"
@@ -397,15 +412,35 @@ Page {
                 font: Theme.subtitleFont
             }
 
-            TextField {
-                id: editVesselNameInput
-                Layout.fillWidth: true
-                placeholderText: "Vessel name"
-                font: Theme.bodyFont
+            Rectangle {
+                Layout.preferredWidth: 280
+                Layout.preferredHeight: 44
+                color: Theme.backgroundColor
+                border.color: Theme.textSecondaryColor
+                border.width: 1
+                radius: 4
+
+                TextInput {
+                    id: editVesselNameInput
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    color: Theme.textColor
+                    font: Theme.bodyFont
+                    verticalAlignment: TextInput.AlignVCenter
+                    inputMethodHints: Qt.ImhNoPredictiveText
+
+                    Text {
+                        anchors.fill: parent
+                        verticalAlignment: Text.AlignVCenter
+                        text: "Vessel name"
+                        color: Theme.textSecondaryColor
+                        font: parent.font
+                        visible: !parent.text && !parent.activeFocus
+                    }
+                }
             }
 
             RowLayout {
-                Layout.fillWidth: true
                 spacing: 10
 
                 Button {
@@ -475,34 +510,122 @@ Page {
     }
 
     // Add vessel dialog
-    Dialog {
+    Popup {
         id: addVesselDialog
-        title: "Add Vessel Preset"
-        anchors.centerIn: parent
+        x: (parent.width - width) / 2
+        y: addVesselDialogAtTop ? Theme.scaled(40) : (parent.height - height) / 2
+        padding: 20
         modal: true
-        standardButtons: Dialog.Ok | Dialog.Cancel
+        focus: true
 
-        ColumnLayout {
-            spacing: 12
-
-            TextField {
-                id: newVesselNameInput
-                Layout.preferredWidth: 200
-                placeholderText: "Vessel name"
-                font: Theme.bodyFont
-            }
-        }
-
-        onAccepted: {
-            if (newVesselNameInput.text.length > 0) {
-                Settings.addWaterVesselPreset(newVesselNameInput.text, 200)
-                newVesselNameInput.text = ""
-            }
-        }
-
+        property bool addVesselDialogAtTop: false
         onOpened: {
+            addVesselDialogAtTop = false
             newVesselNameInput.text = ""
             newVesselNameInput.forceActiveFocus()
+        }
+        onClosed: addVesselDialogAtTop = false
+
+        Connections {
+            target: Qt.inputMethod
+            function onVisibleChanged() {
+                if (Qt.inputMethod.visible && addVesselDialog.opened) {
+                    addVesselDialog.addVesselDialogAtTop = true
+                }
+            }
+        }
+
+        background: Rectangle {
+            color: Theme.surfaceColor
+            radius: Theme.cardRadius
+            border.color: Theme.textSecondaryColor
+            border.width: 1
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 15
+
+            Text {
+                text: "Add Vessel Preset"
+                color: Theme.textColor
+                font: Theme.subtitleFont
+            }
+
+            Rectangle {
+                Layout.preferredWidth: 280
+                Layout.preferredHeight: 44
+                color: Theme.backgroundColor
+                border.color: Theme.textSecondaryColor
+                border.width: 1
+                radius: 4
+
+                TextInput {
+                    id: newVesselNameInput
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    color: Theme.textColor
+                    font: Theme.bodyFont
+                    verticalAlignment: TextInput.AlignVCenter
+                    inputMethodHints: Qt.ImhNoPredictiveText
+
+                    Text {
+                        anchors.fill: parent
+                        verticalAlignment: Text.AlignVCenter
+                        text: "Vessel name"
+                        color: Theme.textSecondaryColor
+                        font: parent.font
+                        visible: !parent.text && !parent.activeFocus
+                    }
+                }
+            }
+
+            RowLayout {
+                spacing: 10
+
+                Item { Layout.fillWidth: true }
+
+                Button {
+                    text: "Cancel"
+                    onClicked: addVesselDialog.close()
+                    background: Rectangle {
+                        implicitWidth: 70
+                        implicitHeight: 36
+                        radius: 6
+                        color: Theme.backgroundColor
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        color: Theme.textColor
+                        font: Theme.bodyFont
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                Button {
+                    text: "Add"
+                    onClicked: {
+                        if (newVesselNameInput.text.length > 0) {
+                            Settings.addWaterVesselPreset(newVesselNameInput.text, 200)
+                            newVesselNameInput.text = ""
+                            addVesselDialog.close()
+                        }
+                    }
+                    background: Rectangle {
+                        implicitWidth: 70
+                        implicitHeight: 36
+                        radius: 6
+                        color: Theme.primaryColor
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        color: "white"
+                        font: Theme.bodyFont
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+            }
         }
     }
 }
