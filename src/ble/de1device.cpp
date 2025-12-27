@@ -96,15 +96,8 @@ void DE1Device::connectToDevice(const QString& address) {
 }
 
 void DE1Device::connectToDevice(const QBluetoothDeviceInfo& device) {
-    qDebug() << "DE1Device::connectToDevice" << device.name() << device.address();
-
     // Don't reconnect if already connected or connecting
-    if (isConnected()) {
-        qDebug() << "DE1Device: Already connected, ignoring";
-        return;
-    }
-    if (m_connecting) {
-        qDebug() << "DE1Device: Already connecting, ignoring";
+    if (isConnected() || m_connecting) {
         return;
     }
 
@@ -133,7 +126,6 @@ void DE1Device::connectToDevice(const QBluetoothDeviceInfo& device) {
     connect(m_controller, &QLowEnergyController::discoveryFinished,
             this, &DE1Device::onServiceDiscoveryFinished);
 
-    qDebug() << "DE1Device: Initiating connection...";
     m_controller->connectToDevice();
 }
 
@@ -164,12 +156,10 @@ void DE1Device::disconnect() {
 }
 
 void DE1Device::onControllerConnected() {
-    qDebug() << "DE1Device: Controller connected, discovering services...";
     m_controller->discoverServices();
 }
 
 void DE1Device::onControllerDisconnected() {
-    qDebug() << "DE1Device: Controller disconnected";
     m_connecting = false;
     emit connectingChanged();
     emit connectedChanged();
@@ -206,17 +196,14 @@ void DE1Device::onControllerError(QLowEnergyController::Error error) {
             errorMsg = "Bluetooth error";
             break;
     }
-    qDebug() << "DE1Device: Controller error:" << errorMsg << "(code:" << error << ")";
+    qWarning() << "DE1Device: Controller error:" << errorMsg;
     emit errorOccurred(errorMsg);
     m_connecting = false;
     emit connectingChanged();
 }
 
 void DE1Device::onServiceDiscovered(const QBluetoothUuid& uuid) {
-    qDebug() << "DE1Device: Service discovered:" << uuid.toString();
-
     if (uuid == DE1::SERVICE_UUID) {
-        qDebug() << "DE1Device: Found DE1 service, creating service object...";
         m_service = m_controller->createServiceObject(uuid, this);
         if (m_service) {
             connect(m_service, &QLowEnergyService::stateChanged,
@@ -229,41 +216,34 @@ void DE1Device::onServiceDiscovered(const QBluetoothUuid& uuid) {
                     this, &DE1Device::onCharacteristicWritten);
             connect(m_service, &QLowEnergyService::errorOccurred,
                     this, [this](QLowEnergyService::ServiceError error) {
-                qDebug() << "DE1Device: Service error:" << error;
                 // Log but don't fail on descriptor errors - common on Windows
-                if (error == QLowEnergyService::DescriptorReadError ||
-                    error == QLowEnergyService::DescriptorWriteError) {
-                    qWarning() << "Descriptor error (often benign on Windows):" << error;
-                } else {
+                if (error != QLowEnergyService::DescriptorReadError &&
+                    error != QLowEnergyService::DescriptorWriteError) {
+                    qWarning() << "DE1Device: Service error:" << error;
                     emit errorOccurred(QString("Service error: %1").arg(error));
                 }
             });
-            qDebug() << "DE1Device: Discovering service details...";
             m_service->discoverDetails();
         } else {
-            qDebug() << "DE1Device: Failed to create service object!";
+            qWarning() << "DE1Device: Failed to create service object";
         }
     }
 }
 
 void DE1Device::onServiceDiscoveryFinished() {
-    qDebug() << "DE1Device: Service discovery finished, service found:" << (m_service != nullptr);
     if (!m_service) {
-        qDebug() << "DE1Device: DE1 service NOT found!";
-
         // Retry logic - Android sometimes returns wrong/cached services
         m_retryCount++;
         if (m_retryCount <= MAX_RETRIES && m_pendingDevice.isValid()) {
-            qDebug() << "DE1Device: Will retry connection in" << RETRY_DELAY_MS << "ms (attempt" << m_retryCount << "of" << MAX_RETRIES << ")";
-            // Disconnect but don't emit error yet
+            qWarning() << "DE1Device: Service not found, retry" << m_retryCount << "of" << MAX_RETRIES;
             if (m_controller) {
                 m_controller->disconnectFromDevice();
             }
             m_retryTimer.start();
         } else {
-            qDebug() << "DE1Device: Max retries exceeded, giving up";
+            qWarning() << "DE1Device: Max retries exceeded";
             emit errorOccurred("DE1 service not found after " + QString::number(MAX_RETRIES) + " retries. Try toggling Bluetooth off/on.");
-            m_pendingDevice = QBluetoothDeviceInfo();  // Clear pending device
+            m_pendingDevice = QBluetoothDeviceInfo();
             disconnect();
         }
     } else {
@@ -274,17 +254,11 @@ void DE1Device::onServiceDiscoveryFinished() {
 }
 
 void DE1Device::onServiceStateChanged(QLowEnergyService::ServiceState state) {
-    qDebug() << "DE1Device: Service state changed:" << state;
     if (state == QLowEnergyService::RemoteServiceDiscovered) {
-        qDebug() << "DE1Device: Service details discovered, setting up...";
         setupService();
         subscribeToNotifications();
         m_connecting = false;
-        qDebug() << "DE1Device: Connection complete!";
-        qDebug() << "  - m_controller:" << (m_controller != nullptr);
-        qDebug() << "  - controller state:" << (m_controller ? m_controller->state() : -1);
-        qDebug() << "  - m_service:" << (m_service != nullptr);
-        qDebug() << "  - isConnected:" << isConnected();
+        qDebug() << "DE1Device: Connected";
         emit connectingChanged();
         emit connectedChanged();
     }
@@ -295,9 +269,7 @@ void DE1Device::setupService() {
 
     // Cache all characteristics
     const QList<QLowEnergyCharacteristic> chars = m_service->characteristics();
-    qDebug() << "DE1Device: Found" << chars.size() << "characteristics";
     for (const auto& c : chars) {
-        qDebug() << "  -" << c.uuid().toString();
         m_characteristics[c.uuid()] = c;
     }
 }
@@ -305,115 +277,41 @@ void DE1Device::setupService() {
 void DE1Device::subscribeToNotifications() {
     if (!m_service) return;
 
-    qDebug() << "DE1Device: Subscribing to notifications...";
-
-    // Subscribe to StateInfo notifications
-    if (m_characteristics.contains(DE1::Characteristic::STATE_INFO)) {
-        qDebug() << "DE1Device: Subscribing to StateInfo";
-        QLowEnergyCharacteristic c = m_characteristics[DE1::Characteristic::STATE_INFO];
-        QLowEnergyDescriptor notification = c.descriptor(
-            QBluetoothUuid::DescriptorType::ClientCharacteristicConfiguration);
-        if (notification.isValid()) {
-            m_service->writeDescriptor(notification, QByteArray::fromHex("0100"));
-        } else {
-            qDebug() << "DE1Device: StateInfo CCCD not valid";
+    // Helper to subscribe to a characteristic's notifications
+    auto subscribe = [this](const QBluetoothUuid& uuid) {
+        if (m_characteristics.contains(uuid)) {
+            QLowEnergyCharacteristic c = m_characteristics[uuid];
+            QLowEnergyDescriptor notification = c.descriptor(
+                QBluetoothUuid::DescriptorType::ClientCharacteristicConfiguration);
+            if (notification.isValid()) {
+                m_service->writeDescriptor(notification, QByteArray::fromHex("0100"));
+            }
         }
-    } else {
-        qDebug() << "DE1Device: StateInfo characteristic NOT FOUND";
-    }
+    };
 
-    // Subscribe to ShotSample notifications
-    if (m_characteristics.contains(DE1::Characteristic::SHOT_SAMPLE)) {
-        qDebug() << "DE1Device: Subscribing to ShotSample";
-        QLowEnergyCharacteristic c = m_characteristics[DE1::Characteristic::SHOT_SAMPLE];
-        QLowEnergyDescriptor notification = c.descriptor(
-            QBluetoothUuid::DescriptorType::ClientCharacteristicConfiguration);
-        if (notification.isValid()) {
-            m_service->writeDescriptor(notification, QByteArray::fromHex("0100"));
-        } else {
-            qDebug() << "DE1Device: ShotSample CCCD not valid";
-        }
-    } else {
-        qDebug() << "DE1Device: ShotSample characteristic NOT FOUND";
-    }
+    // Subscribe to notifications
+    subscribe(DE1::Characteristic::STATE_INFO);
+    subscribe(DE1::Characteristic::SHOT_SAMPLE);
+    subscribe(DE1::Characteristic::WATER_LEVELS);
+    subscribe(DE1::Characteristic::READ_FROM_MMR);
+    subscribe(DE1::Characteristic::TEMPERATURES);
 
-    // Subscribe to WaterLevels notifications
-    if (m_characteristics.contains(DE1::Characteristic::WATER_LEVELS)) {
-        qDebug() << "DE1Device: Subscribing to WaterLevels";
-        QLowEnergyCharacteristic c = m_characteristics[DE1::Characteristic::WATER_LEVELS];
-        QLowEnergyDescriptor notification = c.descriptor(
-            QBluetoothUuid::DescriptorType::ClientCharacteristicConfiguration);
-        if (notification.isValid()) {
-            m_service->writeDescriptor(notification, QByteArray::fromHex("0100"));
-        } else {
-            qDebug() << "DE1Device: WaterLevels CCCD not valid";
-        }
-    } else {
-        qDebug() << "DE1Device: WaterLevels characteristic NOT FOUND";
-    }
-
-    // Subscribe to ReadFromMMR notifications (required for GHC status, etc.)
-    if (m_characteristics.contains(DE1::Characteristic::READ_FROM_MMR)) {
-        qDebug() << "DE1Device: Subscribing to ReadFromMMR";
-        QLowEnergyCharacteristic c = m_characteristics[DE1::Characteristic::READ_FROM_MMR];
-        QLowEnergyDescriptor notification = c.descriptor(
-            QBluetoothUuid::DescriptorType::ClientCharacteristicConfiguration);
-        if (notification.isValid()) {
-            m_service->writeDescriptor(notification, QByteArray::fromHex("0100"));
-        } else {
-            qDebug() << "DE1Device: ReadFromMMR CCCD not valid";
-        }
-    } else {
-        qDebug() << "DE1Device: ReadFromMMR characteristic NOT FOUND";
-    }
-
-    // Subscribe to Temperatures notifications (required for operations)
-    if (m_characteristics.contains(DE1::Characteristic::TEMPERATURES)) {
-        qDebug() << "DE1Device: Subscribing to Temperatures";
-        QLowEnergyCharacteristic c = m_characteristics[DE1::Characteristic::TEMPERATURES];
-        QLowEnergyDescriptor notification = c.descriptor(
-            QBluetoothUuid::DescriptorType::ClientCharacteristicConfiguration);
-        if (notification.isValid()) {
-            m_service->writeDescriptor(notification, QByteArray::fromHex("0100"));
-        } else {
-            qDebug() << "DE1Device: Temperatures CCCD not valid";
-        }
-    } else {
-        qDebug() << "DE1Device: Temperatures characteristic NOT FOUND";
-    }
-
-    // Read version
+    // Read initial values
     if (m_characteristics.contains(DE1::Characteristic::VERSION)) {
-        qDebug() << "DE1Device: Reading firmware version";
         m_service->readCharacteristic(m_characteristics[DE1::Characteristic::VERSION]);
-    } else {
-        qDebug() << "DE1Device: Version characteristic NOT FOUND";
     }
-
-    // Read initial state - machine expects this to complete connection handshake
     if (m_characteristics.contains(DE1::Characteristic::STATE_INFO)) {
-        qDebug() << "DE1Device: Reading initial state";
         m_service->readCharacteristic(m_characteristics[DE1::Characteristic::STATE_INFO]);
     }
-
-    // Read water level
     if (m_characteristics.contains(DE1::Characteristic::WATER_LEVELS)) {
-        qDebug() << "DE1Device: Reading water level";
         m_service->readCharacteristic(m_characteristics[DE1::Characteristic::WATER_LEVELS]);
     }
 
     // Send Idle state to wake the machine (this is what the tablet app does)
-    qDebug() << "DE1Device: Sending Idle to wake machine";
     requestState(DE1::State::Idle);  // Makes fan go quiet
 }
 
 void DE1Device::onCharacteristicChanged(const QLowEnergyCharacteristic& c, const QByteArray& value) {
-    // Only log state changes and MMR responses (not the frequent shot samples)
-    if (c.uuid() != DE1::Characteristic::SHOT_SAMPLE &&
-        c.uuid() != DE1::Characteristic::WATER_LEVELS) {
-        qDebug() << "DE1Device: Notification from" << c.uuid().toString() << "data:" << value.toHex();
-    }
-
     if (c.uuid() == DE1::Characteristic::STATE_INFO) {
         parseStateInfo(value);
     } else if (c.uuid() == DE1::Characteristic::SHOT_SAMPLE) {
@@ -464,11 +362,6 @@ void DE1Device::parseShotSample(const QByteArray& data) {
     // DE1 has two BLE specs with different packet formats:
     // Old spec (< 1.0): 17 bytes, pressure/flow are 1 byte each (U8P4)
     // New spec (>= 1.0): 19 bytes, pressure/flow are 2 bytes each (U16P12), temp is 3 bytes
-
-    static int logCount = 0;
-    if (logCount++ % 25 == 0) {
-        qDebug() << "ShotSample:" << data.size() << "bytes, hex:" << data.toHex(' ');
-    }
 
     const uint8_t* d = reinterpret_cast<const uint8_t*>(data.constData());
     ShotSample sample;
@@ -572,30 +465,16 @@ void DE1Device::parseVersion(const QByteArray& data) {
     emit firmwareVersionChanged();
 
     // Trigger full initialization after version is received (like de1app does)
-    qDebug() << "DE1Device: Triggering post-connection initialization";
     sendInitialSettings();
 }
 
 void DE1Device::parseMMRResponse(const QByteArray& data) {
-    if (data.size() < 4) return;
-
     // MMR response format:
     // Byte 0: Length
     // Bytes 1-3: Address (big endian)
     // Bytes 4+: Data (little endian)
-    const uint8_t* d = reinterpret_cast<const uint8_t*>(data.constData());
-    uint32_t address = (d[1] << 16) | (d[2] << 8) | d[3];
-
-    if (data.size() >= 8) {
-        uint32_t value = d[4] | (d[5] << 8) | (d[6] << 16) | (d[7] << 24);
-        qDebug() << "DE1Device: MMR response - address:" << QString::number(address, 16)
-                 << "value:" << value << "(0x" + QString::number(value, 16) + ")";
-
-        if (address == DE1::MMR::GHC_INFO) {
-            qDebug() << "  GHC Info: Present=" << ((value & 0x1) != 0)
-                     << "Active=" << ((value & 0x2) != 0);
-        }
-    }
+    Q_UNUSED(data);
+    // Silently consume MMR responses - used internally for GHC status etc.
 }
 
 void DE1Device::writeCharacteristic(const QBluetoothUuid& uuid, const QByteArray& data) {
@@ -624,30 +503,24 @@ void DE1Device::processCommandQueue() {
 // Machine control methods
 void DE1Device::requestState(DE1::State state) {
     QByteArray data(1, static_cast<char>(state));
-    qDebug() << "DE1Device::requestState" << static_cast<int>(state)
-             << "(" << DE1::stateToString(state) << ") data:" << data.toHex();
     queueCommand([this, data]() {
         writeCharacteristic(DE1::Characteristic::REQUESTED_STATE, data);
     });
 }
 
 void DE1Device::startEspresso() {
-    qDebug() << "DE1Device::startEspresso called";
     requestState(DE1::State::Espresso);
 }
 
 void DE1Device::startSteam() {
-    qDebug() << "DE1Device::startSteam called";
     requestState(DE1::State::Steam);
 }
 
 void DE1Device::startHotWater() {
-    qDebug() << "DE1Device::startHotWater called";
     requestState(DE1::State::HotWater);
 }
 
 void DE1Device::startFlush() {
-    qDebug() << "DE1Device::startFlush called";
     requestState(DE1::State::HotWaterRinse);
 }
 
@@ -662,7 +535,6 @@ void DE1Device::goToSleep() {
 
     // Send sleep command directly (don't queue it)
     QByteArray data(1, static_cast<char>(DE1::State::Sleep));
-    qDebug() << "DE1Device::goToSleep - sending immediately";
     writeCharacteristic(DE1::Characteristic::REQUESTED_STATE, data);
 }
 
@@ -739,9 +611,6 @@ void DE1Device::setUsbChargerOn(bool on, bool force) {
 
     if (stateChanged) {
         m_usbChargerOn = on;
-        qDebug() << "DE1Device: Setting USB charger" << (on ? "ON" : "OFF");
-    } else {
-        qDebug() << "DE1Device: Resending USB charger" << (on ? "ON" : "OFF") << "(keep-alive)";
     }
 
     writeMMR(DE1::MMR::USB_CHARGER, on ? 1 : 0);
@@ -754,7 +623,6 @@ void DE1Device::setUsbChargerOn(bool on, bool force) {
 void DE1Device::sendInitialSettings() {
     // This mimics de1app's later_new_de1_connection_setup
     // Send a basic profile and shot settings to trigger machine wake-up response
-    qDebug() << "DE1Device: Sending initial profile and settings";
 
     // Ensure USB charger is ON at startup (safe default like de1app)
     // This prevents the tablet from dying if it was left with charger off
@@ -780,7 +648,6 @@ void DE1Device::sendInitialSettings() {
     header[4] = 96;  // MaximumFlow (U8P4) = 6.0 * 16
 
     queueCommand([this, header]() {
-        qDebug() << "DE1Device: Writing profile header";
         writeCharacteristic(DE1::Characteristic::HEADER_WRITE, header);
     });
 
@@ -797,7 +664,6 @@ void DE1Device::sendInitialSettings() {
     frame[7] = 0;    // MaxVol low byte
 
     queueCommand([this, frame]() {
-        qDebug() << "DE1Device: Writing profile frame";
         writeCharacteristic(DE1::Characteristic::FRAME_WRITE, frame);
     });
 
@@ -808,7 +674,6 @@ void DE1Device::sendInitialSettings() {
     // Bytes 1-7 are all 0 (no volume limit)
 
     queueCommand([this, tailFrame]() {
-        qDebug() << "DE1Device: Writing profile tail frame";
         writeCharacteristic(DE1::Characteristic::FRAME_WRITE, tailFrame);
     });
 
@@ -822,7 +687,6 @@ void DE1Device::sendInitialSettings() {
     mmrRead[3] = 0x1C;   // Address low byte (GHC info)
 
     queueCommand([this, mmrRead]() {
-        qDebug() << "DE1Device: Reading GHC info via MMR";
         writeCharacteristic(DE1::Characteristic::READ_FROM_MMR, mmrRead);
     });
 
@@ -838,7 +702,6 @@ void DE1Device::sendInitialSettings() {
 
     // Signal that initial settings are complete (after queue processes)
     queueCommand([this]() {
-        qDebug() << "DE1Device: Initial settings complete";
         emit initialSettingsComplete();
     });
 }

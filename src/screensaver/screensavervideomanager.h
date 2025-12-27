@@ -210,10 +210,6 @@ private:
     // Video selection
     int selectNextVideoIndex();
 
-    // Migration
-    void migrateToNewBucketStructure();
-    void migrateFromOldCacheLocation();
-
 private:
     Settings* m_settings;
     QNetworkAccessManager* m_networkManager;

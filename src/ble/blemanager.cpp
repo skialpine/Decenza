@@ -85,9 +85,7 @@ QString BLEManager::getScaleType(const QString& address) const {
 }
 
 void BLEManager::startScan() {
-    qDebug() << "BLEManager::startScan called, already scanning:" << m_scanning;
     if (m_scanning) {
-        qDebug() << "Scan already in progress, skipping";
         return;
     }
 
@@ -157,12 +155,8 @@ void BLEManager::doStartScan() {
     emit scanStarted();  // Notify that scan has actually started
     emit de1LogMessage("Scanning for devices...");
 
-    qDebug() << "Starting BLE scan with timeout:" << m_discoveryAgent->lowEnergyDiscoveryTimeout() << "ms";
-
     // Scan for BLE devices only
     m_discoveryAgent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
-
-    qDebug() << "BLE scan started, isActive:" << m_discoveryAgent->isActive();
 }
 
 void BLEManager::stopScan() {
@@ -183,8 +177,6 @@ void BLEManager::clearDevices() {
 }
 
 void BLEManager::onDeviceDiscovered(const QBluetoothDeviceInfo& device) {
-    qDebug() << "Device discovered:" << device.name() << device.address().toString();
-
     // Check if it's a DE1
     if (isDE1Device(device)) {
         // Avoid duplicates
@@ -222,7 +214,6 @@ void BLEManager::onDeviceDiscovered(const QBluetoothDeviceInfo& device) {
 }
 
 void BLEManager::onScanFinished() {
-    qDebug() << "BLE scan finished";
     m_scanning = false;
     m_scanningForScales = false;
     emit de1LogMessage("Scan complete");
@@ -305,7 +296,6 @@ void BLEManager::setScaleDevice(ScaleDevice* scale) {
 void BLEManager::onScaleConnectedChanged() {
     if (m_scaleDevice && m_scaleDevice->isConnected()) {
         // Scale connected - stop timeout timer, clear failure flag
-        qDebug() << "Scale connected";
         m_scaleConnectionTimer->stop();
         if (m_scaleConnectionFailed) {
             m_scaleConnectionFailed = false;
@@ -316,7 +306,7 @@ void BLEManager::onScaleConnectedChanged() {
 
 void BLEManager::onScaleConnectionTimeout() {
     if (!m_scaleDevice || !m_scaleDevice->isConnected()) {
-        qDebug() << "Scale connection timeout - scale not responding";
+        qWarning() << "Scale connection timeout - scale not responding";
         m_scaleConnectionFailed = true;
         emit scaleConnectionFailedChanged();
     }
@@ -325,7 +315,6 @@ void BLEManager::onScaleConnectionTimeout() {
 void BLEManager::setSavedScaleAddress(const QString& address, const QString& type) {
     m_savedScaleAddress = address;
     m_savedScaleType = type;
-    qDebug() << "Saved scale address:" << address << "type:" << type;
 }
 
 void BLEManager::clearSavedScale() {
@@ -333,11 +322,9 @@ void BLEManager::clearSavedScale() {
     m_savedScaleType.clear();
     m_scaleConnectionFailed = false;
     emit scaleConnectionFailedChanged();
-    qDebug() << "Cleared saved scale";
 }
 
 void BLEManager::scanForScales() {
-    qDebug() << "User requested scale scan";
     emit scaleLogMessage("Starting scale scan...");
     m_scaleConnectionFailed = false;
     emit scaleConnectionFailedChanged();
@@ -354,16 +341,12 @@ void BLEManager::scanForScales() {
 
 void BLEManager::tryDirectConnectToScale() {
     if (m_savedScaleAddress.isEmpty() || m_savedScaleType.isEmpty()) {
-        qDebug() << "No saved scale address, cannot try direct connect";
         return;
     }
 
     if (m_scaleDevice && m_scaleDevice->isConnected()) {
-        qDebug() << "Scale already connected";
         return;
     }
-
-    qDebug() << "Trying direct connect to wake scale:" << m_savedScaleAddress << "type:" << m_savedScaleType;
 
     // Create a QBluetoothDeviceInfo from just the address - this allows us to
     // connect directly to a sleeping scale without scanning. The BLE connection

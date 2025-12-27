@@ -14,7 +14,6 @@ void FlowScale::connectToDevice(const QBluetoothDeviceInfo& device) {
 }
 
 void FlowScale::tare() {
-    qDebug() << "FlowScale: Tare (resetting accumulated weight from" << m_accumulatedWeight << "to 0)";
     m_accumulatedWeight = 0.0;
     setWeight(0.0);
     setFlowRate(0.0);

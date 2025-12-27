@@ -48,10 +48,6 @@ double MachineState::shotTime() const {
 }
 
 void MachineState::setScale(ScaleDevice* scale) {
-    qDebug() << "MachineState::setScale() switching from"
-             << (m_scale ? m_scale->name() : "null")
-             << "to" << (scale ? scale->name() : "null");
-
     if (m_scale) {
         disconnect(m_scale, nullptr, this, nullptr);
     }
@@ -65,7 +61,6 @@ void MachineState::setScale(ScaleDevice* scale) {
         connect(m_scale, &ScaleDevice::weightChanged, this, [this](double) {
             emit scaleWeightChanged();
         });
-        qDebug() << "MachineState: Connected to scale" << m_scale->name();
         // Emit immediately so QML picks up current weight
         emit scaleWeightChanged();
     }
@@ -157,8 +152,6 @@ void MachineState::updatePhase() {
     }
 
     if (m_phase != oldPhase) {
-        qDebug() << "PHASE:" << static_cast<int>(oldPhase) << "->" << static_cast<int>(m_phase);
-
         // Detect espresso cycle start (entering preheating from non-espresso state)
         bool wasInEspresso = (oldPhase == Phase::EspressoPreheating ||
                               oldPhase == Phase::Preinfusion ||
@@ -168,8 +161,6 @@ void MachineState::updatePhase() {
                              m_phase == Phase::Preinfusion ||
                              m_phase == Phase::Pouring ||
                              m_phase == Phase::Ending);
-
-        qDebug() << "  wasInEspresso:" << wasInEspresso << "isInEspresso:" << isInEspresso;
 
         // Start/stop shot timer (do this immediately, before deferred signals)
         bool wasFlowing = (oldPhase == Phase::Preinfusion ||
@@ -272,7 +263,6 @@ double MachineState::scaleFlowRate() const {
 
 void MachineState::tareScale() {
     if (m_scale && m_scale->isConnected()) {
-        qDebug() << "MachineState: Taring scale";
         m_scale->tare();
         m_scale->resetFlowCalculation();  // Avoid flow rate spikes after tare
         m_tareCompleted = true;  // Now safe to check stop-at-weight

@@ -20,18 +20,19 @@ MainController::MainController(Settings* settings, DE1Device* device,
     , m_machineState(machineState)
     , m_shotDataModel(shotDataModel)
 {
+    // Set up delayed settings timer (5 seconds after connection)
+    m_settingsTimer.setSingleShot(true);
+    m_settingsTimer.setInterval(5000);
+    connect(&m_settingsTimer, &QTimer::timeout, this, &MainController::applyAllSettings);
+
     // Connect to shot sample updates
     if (m_device) {
         connect(m_device, &DE1Device::shotSampleReceived,
                 this, &MainController::onShotSampleReceived);
 
-        // Upload profile after device initial settings complete
-        // This ensures we upload AFTER sendInitialSettings() which writes a basic profile
+        // Start delayed settings timer after device initial settings complete
         connect(m_device, &DE1Device::initialSettingsComplete, this, [this]() {
-            if (m_currentProfile.mode() == Profile::Mode::FrameBased) {
-                qDebug() << "MainController: Initial settings complete, uploading profile:" << m_currentProfile.title();
-                uploadCurrentProfile();
-            }
+            m_settingsTimer.start();
         });
     }
 
@@ -346,10 +347,6 @@ void MainController::applySteamSettings() {
 
     // Send steam flow via MMR
     m_device->writeMMR(0x803828, m_settings->steamFlow());
-
-    qDebug() << "Applied steam settings: temp=" << m_settings->steamTemperature()
-             << "timeout=" << m_settings->steamTimeout()
-             << "flow=" << m_settings->steamFlow();
 }
 
 void MainController::applyHotWaterSettings() {
@@ -363,9 +360,6 @@ void MainController::applyHotWaterSettings() {
         m_settings->waterVolume(),
         93.0  // Group temp
     );
-
-    qDebug() << "Applied hot water settings: temp=" << m_settings->waterTemperature()
-             << "volume=" << m_settings->waterVolume();
 }
 
 void MainController::applyFlushSettings() {
@@ -378,9 +372,22 @@ void MainController::applyFlushSettings() {
 
     m_device->writeMMR(0x803840, flowValue);
     m_device->writeMMR(0x803848, secondsValue);
+}
 
-    qDebug() << "Applied flush settings: flow=" << m_settings->flushFlow()
-             << "seconds=" << m_settings->flushSeconds();
+void MainController::applyAllSettings() {
+    // 1. Upload current profile (espresso)
+    if (m_currentProfile.mode() == Profile::Mode::FrameBased) {
+        uploadCurrentProfile();
+    }
+
+    // 2. Apply steam settings
+    applySteamSettings();
+
+    // 3. Apply hot water settings
+    applyHotWaterSettings();
+
+    // 4. Apply flush settings
+    applyFlushSettings();
 }
 
 void MainController::setSteamTemperatureImmediate(double temp) {

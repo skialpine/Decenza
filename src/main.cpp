@@ -5,6 +5,7 @@
 #include <QIcon>
 #include <QTimer>
 #include <QGuiApplication>
+#include <QLoggingCategory>
 #include <memory>
 #include "buildinfo.h"
 
@@ -55,6 +56,13 @@ void messageFilter(QtMsgType type, const QMessageLogContext &context, const QStr
 
 int main(int argc, char *argv[])
 {
+    // Suppress Qt's internal Bluetooth debug logs (very noisy on Android)
+    QLoggingCategory::setFilterRules(QStringLiteral(
+        "qt.bluetooth.android=false\n"
+        "qt.bluetooth.bluez=false\n"
+        "qt.bluetooth=false\n"
+    ));
+
     // Install message filter to suppress Windows BLE driver noise
     originalHandler = qInstallMessageHandler(messageFilter);
 
@@ -91,7 +99,6 @@ int main(int argc, char *argv[])
     QObject::connect(&flowScaleFallbackTimer, &QTimer::timeout,
                      [&machineState, &physicalScale, &flowScale, &bleManager]() {
         if (!physicalScale || !physicalScale->isConnected()) {
-            qDebug() << "No physical scale found after 30 seconds, falling back to FlowScale";
             machineState.setScale(&flowScale);
             emit bleManager.flowScaleFallback();
         }
@@ -99,7 +106,6 @@ int main(int argc, char *argv[])
     // Start timer only when scanning actually begins (after first-run dialog)
     QObject::connect(&bleManager, &BLEManager::scanStarted, &flowScaleFallbackTimer, [&flowScaleFallbackTimer]() {
         if (!flowScaleFallbackTimer.isActive()) {
-            qDebug() << "Scan started, starting 30s FlowScale fallback timer";
             flowScaleFallbackTimer.start();
         }
     });
@@ -111,7 +117,6 @@ int main(int argc, char *argv[])
     QObject::connect(&bleManager, &BLEManager::de1Discovered,
                      &de1Device, [&de1Device](const QBluetoothDeviceInfo& device) {
         if (!de1Device.isConnected() && !de1Device.isConnecting()) {
-            qDebug() << "Auto-connecting to DE1:" << device.name();
             de1Device.connectToDevice(device);
         }
     });
@@ -126,7 +131,6 @@ int main(int argc, char *argv[])
 
         // If we already have a scale object, just reconnect to it
         if (physicalScale) {
-            qDebug() << "Reconnecting to" << type << "scale:" << device.name();
             flowScaleFallbackTimer.stop();  // Stop timer - we found a scale
             physicalScale->connectToDevice(device);
             return;
@@ -138,8 +142,6 @@ int main(int argc, char *argv[])
             qWarning() << "Failed to create scale for type:" << type;
             return;
         }
-
-        qDebug() << "Auto-connecting to" << type << "scale:" << device.name() << "at" << device.address().toString();
 
         // Stop the FlowScale fallback timer since we found a physical scale
         flowScaleFallbackTimer.stop();
@@ -158,21 +160,10 @@ int main(int argc, char *argv[])
         QObject::connect(physicalScale.get(), &ScaleDevice::weightChanged,
                          &mainController, &MainController::onScaleWeightChanged);
 
-        // Log scale weight during shots
-        QObject::connect(physicalScale.get(), &ScaleDevice::weightChanged,
-                         [&physicalScale, &machineState]() {
-            if (physicalScale && machineState.isFlowing()) {
-                qDebug().nospace()
-                    << "SCALE [" << physicalScale->name() << "] weight:" << QString::number(physicalScale->weight(), 'f', 1) << "g "
-                    << "flow:" << QString::number(physicalScale->flowRate(), 'f', 2) << "g/s";
-            }
-        });
-
         // When physical scale disconnects, fall back to FlowScale
         QObject::connect(physicalScale.get(), &ScaleDevice::connectedChanged,
                          [&physicalScale, &flowScale, &machineState, &engine, &bleManager]() {
             if (physicalScale && !physicalScale->isConnected()) {
-                qDebug() << "Physical scale disconnected, falling back to FlowScale";
                 machineState.setScale(&flowScale);
                 // Update QML context to use FlowScale
                 engine.rootContext()->setContextProperty("ScaleDevice", &flowScale);
@@ -240,6 +231,20 @@ int main(int argc, char *argv[])
     QJniObject activity = QNativeInterface::QAndroidApplication::context();
     if (activity.isValid()) {
         activity.callMethod<void>("setRequestedOrientation", "(I)V", 0);
+
+        // Enable immersive sticky mode to hide navigation bar
+        // Flags: IMMERSIVE_STICKY | FULLSCREEN | HIDE_NAVIGATION | LAYOUT_STABLE | LAYOUT_HIDE_NAVIGATION | LAYOUT_FULLSCREEN
+        // 0x1000 | 0x4 | 0x2 | 0x100 | 0x200 | 0x400 = 0x1706
+        QJniObject window = activity.callObjectMethod("getWindow", "()Landroid/view/Window;");
+        if (window.isValid()) {
+            // FLAG_LAYOUT_NO_LIMITS = 0x200 - extend window into navigation bar area
+            window.callMethod<void>("addFlags", "(I)V", 0x200);
+
+            QJniObject decorView = window.callObjectMethod("getDecorView", "()Landroid/view/View;");
+            if (decorView.isValid()) {
+                decorView.callMethod<void>("setSystemUiVisibility", "(I)V", 0x1706);
+            }
+        }
     }
 #endif
 

@@ -2,9 +2,9 @@ pragma Singleton
 import QtQuick
 
 QtObject {
-    // Reference design size
-    readonly property real refWidth: 1280
-    readonly property real refHeight: 800
+    // Reference design size (based on Android tablet in dp)
+    readonly property real refWidth: 960
+    readonly property real refHeight: 600
 
     // Scale factor - set from main.qml based on window size
     property real scale: 1.0

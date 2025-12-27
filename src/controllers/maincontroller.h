@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QVariantList>
 #include <QMap>
+#include <QTimer>
 #include "../profile/profile.h"
 #include "../network/visualizeruploader.h"
 
@@ -73,6 +74,7 @@ private slots:
 private:
     void loadDefaultProfile();
     QString profilesPath() const;
+    void applyAllSettings();
 
     Settings* m_settings = nullptr;
     DE1Device* m_device = nullptr;
@@ -91,4 +93,6 @@ private:
 
     QString m_baseProfileName;
     bool m_profileModified = false;
+
+    QTimer m_settingsTimer;  // Delayed settings application after connection
 };

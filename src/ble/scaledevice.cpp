@@ -23,7 +23,6 @@ void ScaleDevice::setSimulationMode(bool enabled) {
         return;
     }
     m_simulationMode = enabled;
-    qDebug() << "ScaleDevice: Simulation mode" << (enabled ? "ENABLED" : "DISABLED");
 
     if (enabled) {
         // Set some default simulated state

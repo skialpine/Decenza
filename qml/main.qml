@@ -8,8 +8,9 @@ ApplicationWindow {
     id: root
     visible: true
     visibility: Qt.platform.os === "android" ? Window.FullScreen : Window.AutomaticVisibility
-    width: 1280
-    height: 800
+    // On desktop use reference size; on Android let system control fullscreen
+    width: 960
+    height: 600
     title: "Decenza DE1"
     color: Theme.backgroundColor
 
@@ -109,20 +110,7 @@ ApplicationWindow {
     onWidthChanged: updateScale()
     onHeightChanged: updateScale()
     Component.onCompleted: {
-        // On Android, scale window to physical pixels (Qt reports logical dp)
-        if (Qt.platform.os === "android") {
-            var dpr = Screen.devicePixelRatio
-            console.log("Android - devicePixelRatio:", dpr, "Logical:", Screen.width, "x", Screen.height)
-            root.width = Screen.width * dpr
-            root.height = Screen.height * dpr
-            console.log("Android - Window set to:", root.width, "x", root.height)
-        }
-
         updateScale()
-        console.log("Auto-sleep setting:", root.autoSleepMinutes, "minutes (0 = never)")
-
-        // Re-check size after Android fullscreen transition completes
-        fullscreenDelayTimer.start()
 
         // Check for first run and show welcome dialog or start scanning
         var firstRunComplete = Settings.value("firstRunComplete", false)
@@ -133,21 +121,11 @@ ApplicationWindow {
         }
     }
 
-    // Timer to re-check window size after Android hides navigation bar
-    Timer {
-        id: fullscreenDelayTimer
-        interval: 500
-        onTriggered: {
-            updateScale()
-            console.log("Delayed size check - Window:", width, "x", height)
-        }
-    }
-
     function updateScale() {
+        // Scale based on window size vs reference (960x600 tablet dp)
         var scaleX = width / Theme.refWidth
         var scaleY = height / Theme.refHeight
         Theme.scale = Math.min(scaleX, scaleY)
-        console.log("Window:", width, "x", height, "Scale:", Theme.scale.toFixed(2))
     }
 
     // Page stack for navigation
@@ -354,7 +332,6 @@ ApplicationWindow {
 
     // Start BLE scanning (called after first-run dialog or on subsequent launches)
     function startBluetoothScan() {
-        console.log("Starting Bluetooth scan, hasSavedScale:", BLEManager.hasSavedScale)
         if (BLEManager.hasSavedScale) {
             // Try direct connect if we have a saved scale (this also starts scanning)
             BLEManager.tryDirectConnectToScale()
@@ -369,10 +346,7 @@ ApplicationWindow {
     Timer {
         id: scanDelayTimer
         interval: 1000  // Give direct connect time, then ensure scan is running
-        onTriggered: {
-            console.log("Scan timer triggered, starting scan")
-            BLEManager.startScan()
-        }
+        onTriggered: BLEManager.startScan()
     }
 
     // Status bar overlay (hidden during screensaver)
