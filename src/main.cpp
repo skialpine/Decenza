@@ -5,7 +5,8 @@
 #include <QIcon>
 #include <QTimer>
 #include <QGuiApplication>
-#include <QLoggingCategory>
+#include <QStandardPaths>
+#include <QDebug>
 #include <memory>
 #include "buildinfo.h"
 
@@ -15,6 +16,7 @@
 #endif
 
 #include "core/settings.h"
+#include "core/logger.h"
 #include "core/batterymanager.h"
 #include "core/batterydrainer.h"
 #include "ble/blemanager.h"
@@ -29,43 +31,8 @@
 
 using namespace Qt::StringLiterals;
 
-// Custom message handler to filter noisy BLE driver messages
-static QtMessageHandler originalHandler = nullptr;
-void messageFilter(QtMsgType type, const QMessageLogContext &context, const QString &msg)
-{
-    // Filter out Windows Bluetooth driver noise
-    if (msg.contains("Windows.Devices.Bluetooth") ||
-        msg.contains("ReturnHr") ||
-        msg.contains("LogHr")) {
-        return;
-    }
-
-    // Filter out Android QtBluetoothGatt noise (check both category and message)
-    const char* cat = context.category ? context.category : "";
-    if (QString::fromLatin1(cat).contains("QtBluetoothGatt") ||
-        msg.contains("Perform next BTLE IO") ||
-        msg.contains("Performing queued job") ||
-        msg.contains("BluetoothGatt")) {
-        return;
-    }
-
-    if (originalHandler) {
-        originalHandler(type, context, msg);
-    }
-}
-
 int main(int argc, char *argv[])
 {
-    // Suppress Qt's internal Bluetooth debug logs (very noisy on Android)
-    QLoggingCategory::setFilterRules(QStringLiteral(
-        "qt.bluetooth.android=false\n"
-        "qt.bluetooth.bluez=false\n"
-        "qt.bluetooth=false\n"
-    ));
-
-    // Install message filter to suppress Windows BLE driver noise
-    originalHandler = qInstallMessageHandler(messageFilter);
-
     QApplication app(argc, argv);
 
     // Set application metadata
@@ -76,6 +43,13 @@ int main(int argc, char *argv[])
 
     // Use Material style for modern look
     QQuickStyle::setStyle("Material");
+
+    // Initialize logger - captures all qDebug() to file
+    // Use app's external storage: Android/data/io.github.kulitorum.decenza_de1/files/
+    QString logPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/decenza.log";
+    Logger::init(logPath);
+    qDebug() << "App started - build" << BUILD_NUMBER_STRING;
+    qDebug() << "Log file:" << logPath;
 
     // Create core objects
     Settings settings;
@@ -232,19 +206,22 @@ int main(int argc, char *argv[])
     if (activity.isValid()) {
         activity.callMethod<void>("setRequestedOrientation", "(I)V", 0);
 
-        // Enable immersive sticky mode to hide navigation bar
-        // Flags: IMMERSIVE_STICKY | FULLSCREEN | HIDE_NAVIGATION | LAYOUT_STABLE | LAYOUT_HIDE_NAVIGATION | LAYOUT_FULLSCREEN
-        // 0x1000 | 0x4 | 0x2 | 0x100 | 0x200 | 0x400 = 0x1706
-        QJniObject window = activity.callObjectMethod("getWindow", "()Landroid/view/Window;");
-        if (window.isValid()) {
-            // FLAG_LAYOUT_NO_LIMITS = 0x200 - extend window into navigation bar area
-            window.callMethod<void>("addFlags", "(I)V", 0x200);
+        // Enable immersive mode - must run on UI thread
+        QNativeInterface::QAndroidApplication::runOnAndroidMainThread([activity]() {
+            QJniObject window = activity.callObjectMethod("getWindow", "()Landroid/view/Window;");
+            if (window.isValid()) {
+                // FLAG_LAYOUT_NO_LIMITS = 0x200 - extend window into navigation bar area
+                window.callMethod<void>("addFlags", "(I)V", 0x200);
 
-            QJniObject decorView = window.callObjectMethod("getDecorView", "()Landroid/view/View;");
-            if (decorView.isValid()) {
-                decorView.callMethod<void>("setSystemUiVisibility", "(I)V", 0x1706);
+                // Immersive sticky mode flags
+                // IMMERSIVE_STICKY | FULLSCREEN | HIDE_NAVIGATION | LAYOUT_STABLE | LAYOUT_HIDE_NAVIGATION | LAYOUT_FULLSCREEN
+                // 0x1000 | 0x4 | 0x2 | 0x100 | 0x200 | 0x400 = 0x1706
+                QJniObject decorView = window.callObjectMethod("getDecorView", "()Landroid/view/View;");
+                if (decorView.isValid()) {
+                    decorView.callMethod<void>("setSystemUiVisibility", "(I)V", 0x1706);
+                }
             }
-        }
+        });
     }
 #endif
 
@@ -284,6 +261,11 @@ int main(int argc, char *argv[])
                 QTimer::singleShot(500, &bleManager, &BLEManager::tryDirectConnectToScale);
             }
         }
+    });
+
+    // Cleanup on exit
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, []() {
+        Logger::shutdown();
     });
 
     return app.exec();

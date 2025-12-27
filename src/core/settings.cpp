@@ -407,6 +407,25 @@ bool Settings::isFavoriteProfile(const QString& filename) const {
     return false;
 }
 
+bool Settings::updateFavoriteProfile(const QString& oldFilename, const QString& newFilename, const QString& newTitle) {
+    QByteArray data = m_settings.value("profile/favorites").toByteArray();
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    QJsonArray arr = doc.array();
+
+    for (int i = 0; i < arr.size(); ++i) {
+        QJsonObject obj = arr[i].toObject();
+        if (obj["filename"].toString() == oldFilename) {
+            obj["filename"] = newFilename;
+            obj["name"] = newTitle;
+            arr[i] = obj;
+            m_settings.setValue("profile/favorites", QJsonDocument(arr).toJson());
+            emit favoriteProfilesChanged();
+            return true;
+        }
+    }
+    return false;
+}
+
 // Hot water settings
 double Settings::waterTemperature() const {
     return m_settings.value("water/temperature", 85.0).toDouble();

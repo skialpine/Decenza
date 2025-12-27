@@ -312,6 +312,9 @@ void MainController::markProfileClean() {
 }
 
 bool MainController::saveProfileAs(const QString& filename, const QString& title) {
+    // Remember old filename for favorite update
+    QString oldFilename = m_baseProfileName;
+
     // Update the profile title
     m_currentProfile.setTitle(title);
 
@@ -323,6 +326,10 @@ bool MainController::saveProfileAs(const QString& filename, const QString& title
         m_baseProfileName = filename;
         if (m_settings) {
             m_settings->setCurrentProfile(filename);
+            // Update favorite to point to new file
+            if (!oldFilename.isEmpty() && oldFilename != filename) {
+                m_settings->updateFavoriteProfile(oldFilename, filename, title);
+            }
         }
         markProfileClean();
         refreshProfiles();

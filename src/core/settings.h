@@ -108,6 +108,7 @@ public:
     Q_INVOKABLE void moveFavoriteProfile(int from, int to);
     Q_INVOKABLE QVariantMap getFavoriteProfile(int index) const;
     Q_INVOKABLE bool isFavoriteProfile(const QString& filename) const;
+    Q_INVOKABLE bool updateFavoriteProfile(const QString& oldFilename, const QString& newFilename, const QString& newTitle);
 
     // Hot water settings
     double waterTemperature() const;

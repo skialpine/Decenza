@@ -258,18 +258,19 @@ Page {
         }
     }
 
-    // Save As dialog
+    // Save As dialog - horizontal layout positioned above keyboard
     Dialog {
         id: saveAsDialog
         title: "Save Profile As"
-        anchors.centerIn: parent
-        width: Theme.scaled(400)
+        x: (parent.width - width) / 2
+        y: Theme.scaled(80)  // Position near top, above keyboard
+        width: Theme.scaled(700)
         modal: true
         standardButtons: Dialog.Save | Dialog.Cancel
 
-        ColumnLayout {
+        RowLayout {
             width: parent.width
-            spacing: Theme.scaled(15)
+            spacing: Theme.scaled(20)
 
             ColumnLayout {
                 Layout.fillWidth: true
@@ -286,7 +287,8 @@ Page {
                     Layout.fillWidth: true
                     text: profile ? profile.title : ""
                     font: Theme.bodyFont
-                    placeholderText: "Enter profile title"
+                    placeholderText: "Enter title"
+                    onAccepted: saveAsFilenameField.forceActiveFocus()
                 }
             }
 
@@ -305,8 +307,9 @@ Page {
                     Layout.fillWidth: true
                     text: originalProfileName || "my_profile"
                     font: Theme.bodyFont
-                    placeholderText: "Enter filename (without .json)"
+                    placeholderText: "filename"
                     validator: RegularExpressionValidator { regularExpression: /[a-zA-Z0-9_-]+/ }
+                    onAccepted: saveAsDialog.accept()
                 }
             }
         }

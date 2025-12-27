@@ -47,7 +47,7 @@ Page {
 
                     delegate: Rectangle {
                         width: allProfilesList.width
-                        height: Theme.scaled(50)
+                        height: Theme.scaled(60)
                         radius: Theme.scaled(6)
                         color: modelData.name === MainController.currentProfile ?
                                Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.2) :
@@ -60,6 +60,7 @@ Page {
 
                             Text {
                                 Layout.fillWidth: true
+                                Layout.alignment: Qt.AlignVCenter
                                 text: modelData.title
                                 color: Theme.textColor
                                 font: Theme.bodyFont
@@ -71,6 +72,7 @@ Page {
                                 visible: !Settings.isFavoriteProfile(modelData.name) && Settings.favoriteProfiles.length < 5
                                 Layout.preferredWidth: Theme.scaled(40)
                                 Layout.preferredHeight: Theme.scaled(40)
+                                Layout.alignment: Qt.AlignVCenter
                                 flat: true
                                 text: "+"
                                 font.pixelSize: Theme.scaled(24)
