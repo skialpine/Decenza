@@ -280,7 +280,6 @@ Page {
 
                     ValueInput {
                         id: volumeInput
-                        Layout.preferredWidth: Theme.scaled(150)
                         value: getCurrentVesselVolume()
                         from: 50
                         to: 500
@@ -320,7 +319,6 @@ Page {
 
                     ValueInput {
                         id: temperatureInput
-                        Layout.preferredWidth: Theme.scaled(150)
                         value: Settings.waterTemperature
                         from: 40
                         to: 100
@@ -350,23 +348,16 @@ Page {
             root.goToIdle()
         }
 
-        Row {
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: Theme.spacingMedium
-
-            Text {
-                text: volumeInput.value.toFixed(0) + " ml"
-                color: "white"
-                font: Theme.bodyFont
-            }
-
-            Rectangle { width: 1; height: Theme.scaled(30); color: "white"; opacity: 0.3 }
-
-            Text {
-                text: temperatureInput.value.toFixed(0) + "°C"
-                color: "white"
-                font: Theme.bodyFont
-            }
+        Text {
+            text: volumeInput.value.toFixed(0) + " ml"
+            color: "white"
+            font: Theme.bodyFont
+        }
+        Rectangle { width: 1; height: Theme.scaled(30); color: "white"; opacity: 0.3 }
+        Text {
+            text: temperatureInput.value.toFixed(0) + "°C"
+            color: "white"
+            font: Theme.bodyFont
         }
     }
 

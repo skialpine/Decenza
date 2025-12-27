@@ -256,18 +256,20 @@ Page {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: Theme.scaled(70)
+        height: Theme.bottomBarHeight
         color: Theme.surfaceColor
 
         RowLayout {
             anchors.fill: parent
-            anchors.leftMargin: Theme.scaled(15)
-            anchors.rightMargin: Theme.scaled(15)
-            spacing: Theme.scaled(15)
+            anchors.leftMargin: Theme.spacingMedium
+            anchors.rightMargin: Theme.spacingMedium
+            spacing: Theme.spacingMedium
 
-            // Sleep button
+            // Sleep button - fills bar height
             Button {
-                Layout.preferredHeight: Theme.scaled(50)
+                Layout.fillHeight: true
+                Layout.topMargin: Theme.spacingSmall
+                Layout.bottomMargin: Theme.spacingSmall
                 enabled: DE1Device.connected
                 onClicked: {
                     // Put scale to sleep and disconnect (if connected)
@@ -293,18 +295,17 @@ Page {
                     }
                 }
                 background: Rectangle {
-                    implicitWidth: Theme.scaled(120)
-                    implicitHeight: Theme.scaled(50)
+                    implicitWidth: Theme.scaled(140)
                     color: parent.down ? Qt.darker("#555555", 1.2) : "#555555"
-                    radius: Theme.scaled(8)
+                    radius: Theme.cardRadius
                     opacity: parent.enabled ? 1.0 : 0.5
                 }
                 contentItem: RowLayout {
-                    spacing: Theme.scaled(8)
+                    spacing: Theme.spacingSmall
                     Image {
                         source: "qrc:/icons/sleep.svg"
-                        sourceSize.width: Theme.scaled(24)
-                        sourceSize.height: Theme.scaled(24)
+                        sourceSize.width: Theme.scaled(28)
+                        sourceSize.height: Theme.scaled(28)
                         Layout.alignment: Qt.AlignVCenter
                     }
                     Text {
@@ -318,16 +319,22 @@ Page {
 
             Item { Layout.fillWidth: true }
 
-            // Settings button
-            RoundButton {
-                Layout.preferredWidth: Theme.scaled(50)
-                Layout.preferredHeight: Theme.scaled(50)
-                icon.source: "qrc:/icons/settings.svg"
-                icon.width: Theme.scaled(28)
-                icon.height: Theme.scaled(28)
-                flat: true
-                icon.color: Theme.textColor
-                onClicked: root.goToSettings()
+            // Settings button - square, fills bar height
+            Item {
+                Layout.preferredWidth: Theme.bottomBarHeight
+                Layout.preferredHeight: Theme.bottomBarHeight
+
+                Image {
+                    anchors.centerIn: parent
+                    source: "qrc:/icons/settings.svg"
+                    sourceSize.width: Theme.scaled(32)
+                    sourceSize.height: Theme.scaled(32)
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: root.goToSettings()
+                }
             }
         }
     }

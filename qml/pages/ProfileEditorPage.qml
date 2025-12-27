@@ -203,100 +203,57 @@ Page {
     }
 
     // Bottom bar
-    Rectangle {
+    BottomBar {
         id: bottomBar
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        height: 70
-        color: Theme.primaryColor
+        title: profile ? profile.title : "Profile"
+        onBackClicked: {
+            if (profileModified) {
+                exitDialog.open()
+            } else {
+                root.goBack()
+            }
+        }
 
-        RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: 10
-            anchors.rightMargin: 20
-            spacing: 15
-
-            // Back button (large hitbox, icon aligned left)
-            RoundButton {
-                Layout.preferredWidth: 80
-                Layout.preferredHeight: 70
-                flat: true
-                icon.source: "qrc:/icons/back.svg"
-                icon.width: 28
-                icon.height: 28
-                icon.color: "white"
-                display: AbstractButton.IconOnly
-                leftPadding: 0
-                rightPadding: 52
-                onClicked: {
-                    if (profileModified) {
-                        exitDialog.open()
-                    } else {
-                        root.goBack()
-                    }
+        // Modified indicator
+        Text {
+            text: profileModified ? "\u2022 Modified" : ""
+            color: "#FFCC00"
+            font: Theme.bodyFont
+            visible: profileModified
+        }
+        Rectangle { width: 1; height: Theme.scaled(30); color: "white"; opacity: 0.3; visible: profile }
+        Text {
+            text: profile ? profile.steps.length + " frames" : ""
+            color: "white"
+            font: Theme.bodyFont
+        }
+        Rectangle { width: 1; height: Theme.scaled(30); color: "white"; opacity: 0.3; visible: profile }
+        Text {
+            text: profile ? profile.target_weight.toFixed(0) + "g" : ""
+            color: "white"
+            font: Theme.bodyFont
+        }
+        Button {
+            text: "Done"
+            onClicked: {
+                if (profileModified) {
+                    exitDialog.open()
+                } else {
+                    root.goBack()
                 }
             }
-
-            // Profile name
-            Text {
-                text: profile ? profile.title : "Profile"
-                color: "white"
-                font.pixelSize: 20
-                font.bold: true
+            background: Rectangle {
+                implicitWidth: Theme.scaled(100)
+                implicitHeight: Theme.scaled(40)
+                radius: Theme.scaled(8)
+                color: parent.down ? Qt.darker("white", 1.2) : "white"
             }
-
-            Item { Layout.fillWidth: true }
-
-            // Modified indicator
-            Text {
-                text: profileModified ? "\u2022 Modified" : ""
-                color: "#FFCC00"
+            contentItem: Text {
+                text: parent.text
                 font: Theme.bodyFont
-                visible: profileModified
-            }
-
-            Rectangle { width: 1; height: 30; color: "white"; opacity: 0.3; visible: profile }
-
-            // Frame count
-            Text {
-                text: profile ? profile.steps.length + " frames" : ""
-                color: "white"
-                font: Theme.bodyFont
-            }
-
-            Rectangle { width: 1; height: 30; color: "white"; opacity: 0.3; visible: profile }
-
-            // Target weight
-            Text {
-                text: profile ? profile.target_weight.toFixed(0) + "g" : ""
-                color: "white"
-                font: Theme.bodyFont
-            }
-
-            // Done button
-            Button {
-                text: "Done"
-                onClicked: {
-                    if (profileModified) {
-                        exitDialog.open()
-                    } else {
-                        root.goBack()
-                    }
-                }
-                background: Rectangle {
-                    implicitWidth: Theme.scaled(100)
-                    implicitHeight: Theme.scaled(40)
-                    radius: Theme.scaled(8)
-                    color: parent.down ? Qt.darker("white", 1.2) : "white"
-                }
-                contentItem: Text {
-                    text: parent.text
-                    font: Theme.bodyFont
-                    color: Theme.primaryColor
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
+                color: Theme.primaryColor
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
             }
         }
     }

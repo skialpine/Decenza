@@ -6,6 +6,7 @@ import DecenzaDE1
 ApplicationWindow {
     id: root
     visible: true
+    visibility: Qt.platform.os === "android" ? Window.FullScreen : Window.AutomaticVisibility
     width: 1280
     height: 800
     title: "Decenza DE1"
@@ -123,7 +124,12 @@ ApplicationWindow {
         // Scale based on the smaller ratio to maintain aspect ratio
         var scaleX = width / Theme.refWidth
         var scaleY = height / Theme.refHeight
-        Theme.scale = Math.min(scaleX, scaleY)
+        var scale = Math.min(scaleX, scaleY)
+        // Android reports window size minus system bars, and in dp not pixels.
+        // On a 1280x800 tablet, this can report as low as 962x553.
+        // Minimum scale of 1.0 ensures UI matches the reference design.
+        Theme.scale = Math.max(1.0, scale)
+        console.log("Window:", width, "x", height, "Scale:", Theme.scale.toFixed(2))
     }
 
     // Page stack for navigation

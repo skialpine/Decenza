@@ -106,7 +106,6 @@ Page {
 
                 ValueInput {
                     id: steamingFlowSlider
-                    Layout.preferredWidth: Theme.scaled(150)
                     from: 40
                     to: 250
                     stepSize: 5
@@ -332,7 +331,6 @@ Page {
 
                     ValueInput {
                         id: durationSlider
-                        Layout.preferredWidth: Theme.scaled(150)
                         from: 1
                         to: 120
                         stepSize: 1
@@ -378,7 +376,6 @@ Page {
 
                     ValueInput {
                         id: flowSlider
-                        Layout.preferredWidth: Theme.scaled(150)
                         from: 40
                         to: 250
                         stepSize: 5
@@ -424,7 +421,6 @@ Page {
 
                     ValueInput {
                         id: steamTempSlider
-                        Layout.preferredWidth: Theme.scaled(150)
                         from: 120
                         to: 170
                         stepSize: 1
@@ -446,7 +442,7 @@ Page {
         Item { Layout.fillHeight: true; visible: isSteaming }
     }
 
-    // Bottom bar with back button and ready summary
+    // Bottom bar
     BottomBar {
         visible: !isSteaming
         title: getCurrentPitcherName() || "No pitcher"
@@ -455,31 +451,22 @@ Page {
             root.goToIdle()
         }
 
-        Row {
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: Theme.spacingMedium
-
-            Text {
-                text: durationSlider.value.toFixed(0) + "s"
-                color: "white"
-                font: Theme.bodyFont
-            }
-
-            Rectangle { width: 1; height: Theme.scaled(30); color: "white"; opacity: 0.3 }
-
-            Text {
-                text: "Flow " + flowToDisplay(flowSlider.value)
-                color: "white"
-                font: Theme.bodyFont
-            }
-
-            Rectangle { width: 1; height: Theme.scaled(30); color: "white"; opacity: 0.3 }
-
-            Text {
-                text: steamTempSlider.value.toFixed(0) + "°C"
-                color: "white"
-                font: Theme.bodyFont
-            }
+        Text {
+            text: durationSlider.value.toFixed(0) + "s"
+            color: "white"
+            font: Theme.bodyFont
+        }
+        Rectangle { width: 1; height: Theme.scaled(30); color: "white"; opacity: 0.3 }
+        Text {
+            text: "Flow " + flowToDisplay(flowSlider.value)
+            color: "white"
+            font: Theme.bodyFont
+        }
+        Rectangle { width: 1; height: Theme.scaled(30); color: "white"; opacity: 0.3 }
+        Text {
+            text: steamTempSlider.value.toFixed(0) + "°C"
+            color: "white"
+            font: Theme.bodyFont
         }
     }
 

@@ -733,7 +733,6 @@ Page {
 
                             ValueInput {
                                 id: sleepInput
-                                Layout.preferredWidth: Theme.scaled(150)
                                 from: 0
                                 to: 240
                                 stepSize: 5
@@ -1501,7 +1500,6 @@ Page {
                                 to: 30
                                 stepSize: 1
                                 suffix: " sec"
-                                Layout.preferredWidth: 120
 
                                 onValueModified: function(newValue) {
                                     Settings.visualizerMinDuration = newValue

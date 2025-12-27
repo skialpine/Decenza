@@ -282,7 +282,6 @@ Page {
 
                     ValueInput {
                         id: secondsInput
-                        Layout.preferredWidth: Theme.scaled(150)
                         value: getCurrentPresetSeconds()
                         from: 1
                         to: 30
@@ -322,7 +321,6 @@ Page {
 
                     ValueInput {
                         id: flowInput
-                        Layout.preferredWidth: Theme.scaled(150)
                         value: getCurrentPresetFlow()
                         from: 2
                         to: 10
@@ -353,23 +351,16 @@ Page {
             root.goToIdle()
         }
 
-        Row {
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: Theme.spacingMedium
-
-            Text {
-                text: secondsInput.value.toFixed(1) + "s"
-                color: "white"
-                font: Theme.bodyFont
-            }
-
-            Rectangle { width: 1; height: Theme.scaled(30); color: "white"; opacity: 0.3 }
-
-            Text {
-                text: flowInput.value.toFixed(1) + " mL/s"
-                color: "white"
-                font: Theme.bodyFont
-            }
+        Text {
+            text: secondsInput.value.toFixed(1) + "s"
+            color: "white"
+            font: Theme.bodyFont
+        }
+        Rectangle { width: 1; height: Theme.scaled(30); color: "white"; opacity: 0.3 }
+        Text {
+            text: flowInput.value.toFixed(1) + " mL/s"
+            color: "white"
+            font: Theme.bodyFont
         }
     }
 

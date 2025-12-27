@@ -67,21 +67,24 @@ Page {
             anchors.margins: Theme.spacingMedium
             spacing: Theme.spacingMedium
 
-            // Back button (large hitbox, icon aligned left)
-            RoundButton {
-                Layout.preferredWidth: Theme.scaled(80)
-                Layout.preferredHeight: Theme.bottomBarHeight
-                flat: true
-                icon.source: "qrc:/icons/back.svg"
-                icon.width: Theme.scaled(28)
-                icon.height: Theme.scaled(28)
-                icon.color: Theme.textColor
-                display: AbstractButton.IconOnly
-                leftPadding: 0
-                rightPadding: Theme.scaled(52)
-                onClicked: {
-                    DE1Device.stopOperation()
-                    root.goToIdle()
+            // Back button (square hitbox, full height)
+            Item {
+                Layout.fillHeight: true
+                Layout.preferredWidth: height
+
+                Image {
+                    anchors.centerIn: parent
+                    source: "qrc:/icons/back.svg"
+                    sourceSize.width: Theme.scaled(28)
+                    sourceSize.height: Theme.scaled(28)
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: {
+                        DE1Device.stopOperation()
+                        root.goToIdle()
+                    }
                 }
             }
 

@@ -190,6 +190,7 @@ set(QML_FILES
     qml/components/ShotGraph.qml
     qml/components/StatusBar.qml
     qml/components/ProfileGraph.qml
+    qml/components/BottomBar.qml
 )
 
 qt_add_qml_module(Decenza_DE1

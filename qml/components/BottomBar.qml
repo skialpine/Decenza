@@ -9,9 +9,8 @@ Rectangle {
     property string title: ""
     property color barColor: Theme.primaryColor
     property bool showBackButton: true
-
-    // Allow additional content to be added on the right side
-    default property alias extraContent: extraContentItem.data
+    property string rightText: ""  // Simple right-aligned text
+    default property alias content: contentRow.data  // Custom content goes here
 
     signal backClicked()
 
@@ -27,18 +26,23 @@ Rectangle {
         anchors.rightMargin: Theme.spacingLarge
         spacing: Theme.spacingMedium
 
-        // Back button (square hitbox)
-        RoundButton {
+        // Back button (square hitbox, full bar height)
+        Item {
             visible: root.showBackButton
-            Layout.preferredWidth: Theme.touchTargetLarge
-            Layout.preferredHeight: Theme.touchTargetLarge
-            flat: true
-            icon.source: "qrc:/icons/back.svg"
-            icon.width: Theme.scaled(28)
-            icon.height: Theme.scaled(28)
-            icon.color: "white"
-            display: AbstractButton.IconOnly
-            onClicked: root.backClicked()
+            Layout.preferredWidth: Theme.bottomBarHeight
+            Layout.preferredHeight: Theme.bottomBarHeight
+
+            Image {
+                anchors.centerIn: parent
+                source: "qrc:/icons/back.svg"
+                sourceSize.width: Theme.scaled(28)
+                sourceSize.height: Theme.scaled(28)
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: root.backClicked()
+            }
         }
 
         Text {
@@ -51,11 +55,18 @@ Rectangle {
 
         Item { Layout.fillWidth: true }
 
-        // Container for additional content
-        Item {
-            id: extraContentItem
-            Layout.fillHeight: true
-            implicitWidth: childrenRect.width
+        // Custom content area
+        RowLayout {
+            id: contentRow
+            spacing: Theme.spacingMedium
+        }
+
+        // Simple right text (alternative to custom content)
+        Text {
+            visible: root.rightText !== ""
+            text: root.rightText
+            color: "white"
+            font: Theme.bodyFont
         }
     }
 }

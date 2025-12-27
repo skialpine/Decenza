@@ -294,13 +294,7 @@ Page {
     // Bottom bar
     BottomBar {
         title: "Profiles"
+        rightText: "Current: " + MainController.currentProfileName
         onBackClicked: root.goBack()
-
-        Text {
-            text: "Current: " + MainController.currentProfileName
-            color: "white"
-            font: Theme.bodyFont
-            anchors.verticalCenter: parent.verticalCenter
-        }
     }
 }

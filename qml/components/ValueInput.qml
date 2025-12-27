@@ -22,8 +22,18 @@ Item {
     // Signals - emits the new value for parent to apply
     signal valueModified(real newValue)
 
-    implicitWidth: Theme.scaled(160)
+    // Auto-size based on content
+    // Buttons: 32 each, margins: 4 each side, spacing: 2 each side = 76 total fixed
+    implicitWidth: Theme.scaled(76) + textMetrics.width + Theme.scaled(24)
     implicitHeight: Theme.scaled(56)
+
+    // Measure the text width for auto-sizing
+    TextMetrics {
+        id: textMetrics
+        font.pixelSize: Theme.scaled(24)
+        font.bold: true
+        text: root.displayText || (root.value.toFixed(root.decimals) + root.suffix)
+    }
 
     // Compact value display
     Rectangle {
@@ -98,8 +108,6 @@ Item {
 
                     property real startX: 0
                     property real startY: 0
-                    property real currentX: 0
-                    property real lastTime: 0
                     property bool isDragging: false
 
                     drag.target: Item {}  // Enable drag detection
@@ -109,13 +117,10 @@ Item {
                     onPressed: function(mouse) {
                         startX = mouse.x
                         startY = mouse.y
-                        currentX = mouse.x
-                        lastTime = Date.now()
                         isDragging = false
                     }
 
                     onPositionChanged: function(mouse) {
-                        currentX = mouse.x
                         var deltaX = mouse.x - startX
                         var deltaY = startY - mouse.y  // Inverted: up = increase
 
@@ -127,22 +132,13 @@ Item {
                         }
 
                         if (isDragging) {
-                            var now = Date.now()
-                            var dt = Math.max(now - lastTime, 1)
-                            var velocity = Math.abs(delta) / dt  // pixels per ms
-
-                            // Accelerate based on velocity squared (softer gearing)
-                            var multiplier = 1 + velocity * velocity * 20
-                            var effectiveDelta = delta * multiplier
-
-                            var steps = Math.round(effectiveDelta / 20)
+                            // Simple 1:1 dragging - every 20 pixels = 1 step
+                            var steps = Math.round(delta / 20)
                             if (steps !== 0) {
                                 adjustValue(steps)
+                                startX = mouse.x
+                                startY = mouse.y
                             }
-
-                            startX = mouse.x
-                            startY = mouse.y
-                            lastTime = now
                         }
                     }
 
@@ -384,20 +380,15 @@ Item {
 
                             property real startX: 0
                             property real startY: 0
-                            property real currentX: 0
-                            property real lastTime: 0
                             property bool isDragging: false
 
                             onPressed: function(mouse) {
                                 startX = mouse.x
                                 startY = mouse.y
-                                currentX = mouse.x
-                                lastTime = Date.now()
                                 isDragging = false
                             }
 
                             onPositionChanged: function(mouse) {
-                                currentX = mouse.x
                                 var deltaX = mouse.x - startX
                                 var deltaY = startY - mouse.y
                                 var delta = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY
@@ -407,22 +398,13 @@ Item {
                                 }
 
                                 if (isDragging) {
-                                    var now = Date.now()
-                                    var dt = Math.max(now - lastTime, 1)
-                                    var velocity = Math.abs(delta) / dt  // pixels per ms
-
-                                    // Accelerate based on velocity squared (softer gearing)
-                                    var multiplier = 1 + velocity * velocity * 20
-                                    var effectiveDelta = delta * multiplier
-
-                                    var steps = Math.round(effectiveDelta / 20)
+                                    // Simple 1:1 dragging - every 20 pixels = 1 step
+                                    var steps = Math.round(delta / 20)
                                     if (steps !== 0) {
                                         adjustValue(steps)
+                                        startX = mouse.x
+                                        startY = mouse.y
                                     }
-
-                                    startX = mouse.x
-                                    startY = mouse.y
-                                    lastTime = now
                                 }
                             }
 
