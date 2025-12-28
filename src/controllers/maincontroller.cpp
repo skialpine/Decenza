@@ -646,8 +646,24 @@ void MainController::onShotEnded() {
 void MainController::onShotSampleReceived(const ShotSample& sample) {
     if (!m_shotDataModel || !m_machineState) return;
 
-    // Record during preheating and actual shot phases
     MachineState::Phase phase = m_machineState->phase();
+
+    // Forward flow samples to MachineState for FlowScale during any dispensing phase
+    bool isDispensingPhase = (phase == MachineState::Phase::Preinfusion ||
+                              phase == MachineState::Phase::Pouring ||
+                              phase == MachineState::Phase::Steaming ||
+                              phase == MachineState::Phase::HotWater ||
+                              phase == MachineState::Phase::Flushing);
+
+    if (isDispensingPhase && m_lastSampleTime > 0) {
+        double deltaTime = sample.timer - m_lastSampleTime;
+        if (deltaTime > 0 && deltaTime < 1.0) {
+            m_machineState->onFlowSample(sample.groupFlow, deltaTime);
+        }
+    }
+    m_lastSampleTime = sample.timer;
+
+    // Record shot data only during espresso phases
     bool isEspressoPhase = (phase == MachineState::Phase::EspressoPreheating ||
                            phase == MachineState::Phase::Preinfusion ||
                            phase == MachineState::Phase::Pouring ||
@@ -656,7 +672,6 @@ void MainController::onShotSampleReceived(const ShotSample& sample) {
     if (!isEspressoPhase) {
         m_shotStartTime = 0;  // Reset for next shot
         m_extractionStarted = false;
-        m_lastSampleTime = 0;
         return;
     }
 
@@ -668,13 +683,6 @@ void MainController::onShotSampleReceived(const ShotSample& sample) {
     }
 
     double time = sample.timer - m_shotStartTime;
-
-    // Calculate delta time and send flow sample to MachineState for volume accumulation
-    double deltaTime = sample.timer - m_lastSampleTime;
-    m_lastSampleTime = sample.timer;
-    if (deltaTime > 0 && deltaTime < 1.0) {  // Sanity check: ignore gaps > 1s
-        m_machineState->onFlowSample(sample.groupFlow, deltaTime);
-    }
 
     // Mark when extraction actually starts (transition from preheating to preinfusion/pouring)
     bool isExtracting = (phase == MachineState::Phase::Preinfusion ||
