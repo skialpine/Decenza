@@ -51,20 +51,25 @@ ApplicationWindow {
     }
 
     // Global tap handler for accessibility - announces any Text tapped
-    // Using TapHandler instead of MouseArea because it doesn't block other handlers
-    TapHandler {
-        id: accessibilityTapHandler
-        enabled: typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled
-        // grabPermissions set to allow underlying controls to also receive the tap
-        grabPermissions: PointerHandler.CanTakeOverFromAnything | PointerHandler.ApprovesTakeOverByAnything
+    // Using Item + TapHandler instead of MouseArea because TapHandler doesn't block other handlers
+    Item {
+        anchors.fill: parent
+        z: 10000
 
-        onTapped: function(eventPoint) {
-            // Find Text at tap location
-            var textItem = findTextAt(parent, eventPoint.position.x, eventPoint.position.y)
+        TapHandler {
+            id: accessibilityTapHandler
+            enabled: typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled
+            // Allow underlying controls to also receive the tap
+            grabPermissions: PointerHandler.ApprovesTakeOverByAnything
 
-            if (textItem && textItem.text) {
-                // Use label voice (lower pitch, faster) to distinguish from buttons
-                AccessibilityManager.announceLabel(textItem.text)
+            onTapped: function(eventPoint) {
+                // Find Text at tap location
+                var textItem = findTextAt(root, eventPoint.position.x, eventPoint.position.y)
+
+                if (textItem && textItem.text) {
+                    // Use label voice (lower pitch, faster) to distinguish from buttons
+                    AccessibilityManager.announceLabel(textItem.text)
+                }
             }
         }
     }
