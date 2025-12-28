@@ -159,18 +159,21 @@ gh release create v1.0.XXX \
 ### Example with Full Path
 ```bash
 cd /c/CODE/de1-qt
-gh release create v1.0.373 \
-  --title "Decenza DE1 v1.0.373" \
+gh release create v1.0.XXX \
+  --title "Decenza DE1 v1.0.XXX" \
   --notes "## Changes
 - Feature 1
 - Bug fix 2
 
 ## Installation
-Download APK and install (allow unknown sources)." \
-  "build/Qt_6_10_1_for_Android_arm64_v8a-Release/android-build-Decenza_DE1/build/outputs/apk/release/Decenza_DE1_1.0.373.apk"
+**Direct APK download:** https://github.com/Kulitorum/de1-qt/releases/download/v1.0.XXX/Decenza_DE1_1.0.XXX.apk
+
+Install on your Android device (allow unknown sources)." \
+  "build/Qt_6_10_1_for_Android_arm64_v8a-Release/android-build-Decenza_DE1/build/outputs/apk/release/Decenza_DE1_1.0.XXX.apk"
 ```
 
 ### Notes
+- Always include direct APK link in release notes (old browsers can't see Assets section)
 - APK files are for direct distribution (sideloading)
 - AAB files are only for Google Play Store uploads
 - Users cannot install AAB files directly
