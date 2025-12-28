@@ -265,3 +265,12 @@ if(APPLE AND NOT IOS)
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/macos/Info.plist"
     )
 endif()
+
+# Windows installer - generate version.iss for Inno Setup
+if(WIN32)
+    configure_file(
+        "${CMAKE_SOURCE_DIR}/installer/version.iss.in"
+        "${CMAKE_SOURCE_DIR}/installer/version.iss"
+        @ONLY
+    )
+endif()

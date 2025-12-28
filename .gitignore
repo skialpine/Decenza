@@ -20,3 +20,8 @@ cmake-build-*/
 *.obj
 *.apk
 *.aab
+
+# Installer
+installer/setupvars.iss
+installer/deploy/
+installer/Output/
