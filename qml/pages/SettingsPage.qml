@@ -12,7 +12,7 @@ Page {
     Component.onCompleted: root.currentPageTitle = "Settings"
     StackView.onActivated: root.currentPageTitle = "Settings"
 
-    // Tap 5x anywhere for simulation mode
+    // Tap 7x anywhere for simulation mode
     property int simTapCount: 0
 
     Timer {
@@ -37,9 +37,9 @@ Page {
         Text {
             id: simToastText
             anchors.centerIn: parent
-            text: simTapCount >= 5 ?
+            text: simTapCount >= 7 ?
                   (DE1Device.simulationMode ? "Simulation ON" : "Simulation OFF") :
-                  (5 - simTapCount) + " taps to toggle simulation"
+                  (7 - simTapCount) + " taps to toggle simulation"
             color: "white"
             font.pixelSize: 14
         }
@@ -60,7 +60,7 @@ Page {
             simTapCount++
             simTapResetTimer.restart()
 
-            if (simTapCount >= 5) {
+            if (simTapCount >= 7) {
                 var newState = !DE1Device.simulationMode
                 console.log("Simulation mode toggled:", newState ? "ON" : "OFF")
                 DE1Device.simulationMode = newState
@@ -70,7 +70,7 @@ Page {
                 simToast.opacity = 1
                 simToastHideTimer.restart()
                 simTapCount = 0
-            } else if (simTapCount >= 3) {
+            } else if (simTapCount >= 5) {
                 simToast.opacity = 1
                 simToastHideTimer.restart()
             }
