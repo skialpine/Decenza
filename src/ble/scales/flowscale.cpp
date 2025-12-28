@@ -27,8 +27,8 @@ void FlowScale::tare() {
 void FlowScale::addFlowSample(double flowRate, double deltaTime) {
     // Integrate flow: weight += flow_rate * time * calibration
     // flowRate is in mL/s, deltaTime is in seconds
-    // Calibration factor from settings (default 0.78 based on original testing)
-    double calibrationFactor = m_settings ? m_settings->flowCalibrationFactor() : 0.78;
+    // Calibration factor from settings (default 1.29 based on testing)
+    double calibrationFactor = m_settings ? m_settings->flowCalibrationFactor() : 1.29;
     if (deltaTime > 0 && deltaTime < 1.0) {  // Sanity check
         // Track raw (uncalibrated) integral for calibration purposes
         double rawIncrement = flowRate * deltaTime;

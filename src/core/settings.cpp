@@ -131,7 +131,7 @@ void Settings::setScaleType(const QString& type) {
 
 // Flow sensor calibration
 double Settings::flowCalibrationFactor() const {
-    return m_settings.value("flow/calibrationFactor", 0.78).toDouble();
+    return m_settings.value("flow/calibrationFactor", 1.29).toDouble();
 }
 
 void Settings::setFlowCalibrationFactor(double factor) {
