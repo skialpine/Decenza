@@ -354,28 +354,12 @@ Item {
         dim: false
         closePolicy: Popup.CloseOnPressOutside
 
-        Accessible.role: Accessible.Dialog
-        Accessible.name: "Value editor"
-
         onOpened: {
             popupValueContainer.forceActiveFocus()
             if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
                 AccessibilityManager.announce("Value editor. Current value: " + root.value.toFixed(root.decimals) + " " + root.suffix.trim(), true)
             }
         }
-
-        // Escape to close
-        Keys.onEscapePressed: scrubberPopup.close()
-
-        // Arrow keys for adjustment
-        Keys.onUpPressed: adjustValue(1)
-        Keys.onDownPressed: adjustValue(-1)
-        Keys.onLeftPressed: adjustValue(-1)
-        Keys.onRightPressed: adjustValue(1)
-
-        // Enter to confirm and close
-        Keys.onReturnPressed: scrubberPopup.close()
-        Keys.onEnterPressed: scrubberPopup.close()
 
         background: Rectangle {
             color: "#80000000"
@@ -384,6 +368,9 @@ Item {
         // Content
         Item {
             anchors.fill: parent
+
+            Accessible.role: Accessible.Dialog
+            Accessible.name: "Value editor"
 
             // Tap outside to close
             MouseArea {
@@ -448,6 +435,16 @@ Item {
                         id: popupValueContainer
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        focus: true
+
+                        // Keyboard navigation
+                        Keys.onEscapePressed: scrubberPopup.close()
+                        Keys.onUpPressed: adjustValue(1)
+                        Keys.onDownPressed: adjustValue(-1)
+                        Keys.onLeftPressed: adjustValue(-1)
+                        Keys.onRightPressed: adjustValue(1)
+                        Keys.onReturnPressed: scrubberPopup.close()
+                        Keys.onEnterPressed: scrubberPopup.close()
 
                         Text {
                             anchors.centerIn: parent

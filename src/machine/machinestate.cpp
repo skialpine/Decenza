@@ -262,8 +262,12 @@ void MachineState::checkStopAtWeight(double weight) {
 }
 
 void MachineState::onFlowSample(double flowRate, double deltaTime) {
-    // Only process during espresso extraction
-    if (m_device->state() != DE1::State::Espresso) return;
+    // Only process during active dispensing states
+    auto state = m_device->state();
+    if (state != DE1::State::Espresso &&
+        state != DE1::State::Steam &&
+        state != DE1::State::HotWater &&
+        state != DE1::State::HotWaterRinse) return;
     if (!isFlowing()) return;
 
     // Forward flow samples to the scale (FlowScale will integrate, physical scales ignore)
