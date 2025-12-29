@@ -611,18 +611,22 @@ void MainController::onEspressoCycleStarted() {
     m_shotStartTime = 0;
     m_extractionStarted = false;
     m_lastFrameNumber = -1;
-    m_tareDone = false;  // Reset tare flag for new shot
+    m_tareDone = true;  // We tare immediately now, not at frame 0
     if (m_shotDataModel) {
         m_shotDataModel->clear();
     }
-    qDebug() << "=== ESPRESSO CYCLE STARTED (graph cleared) ===";
+    // Tare scale immediately at cycle start (before stop-at-weight can trigger)
+    // The cup is already on the scale, so we need to zero it now
+    if (m_machineState) {
+        m_machineState->tareScale();
+    }
+    qDebug() << "=== ESPRESSO CYCLE STARTED (graph cleared, scale tared) ===";
 }
 
 void MainController::onShotEnded() {
     // Upload to visualizer.coffee if enabled - only for espresso shots
     if (m_extractionStarted && m_settings && m_settings->visualizerAutoUpload() && m_shotDataModel && m_visualizer) {
         double duration = m_shotDataModel->maxTime();
-        QString profileTitle = m_currentProfile.title();
 
         // Get final weight from shot data
         const auto& weightData = m_shotDataModel->weightData();
@@ -634,11 +638,11 @@ void MainController::onShotEnded() {
         double doseWeight = m_settings->targetWeight();  // Use target weight as dose
 
         qDebug() << "MainController: Shot ended, uploading to visualizer -"
-                 << "Profile:" << profileTitle
+                 << "Profile:" << m_currentProfile.title()
                  << "Duration:" << duration << "s"
                  << "Weight:" << finalWeight << "g";
 
-        m_visualizer->uploadShot(m_shotDataModel, profileTitle, duration, finalWeight, doseWeight);
+        m_visualizer->uploadShot(m_shotDataModel, &m_currentProfile, duration, finalWeight, doseWeight);
     }
 
     // Note: Don't reset m_extractionStarted here - it's reset in onEspressoCycleStarted
@@ -702,13 +706,6 @@ void MainController::onShotSampleReceived(const ShotSample& sample) {
     if (isExtracting && sample.frameNumber >= 0 && sample.frameNumber != m_lastFrameNumber) {
         QString frameName;
         int frameIndex = sample.frameNumber;
-
-        // Tare scale when frame 0 starts (first profile frame, after machine's internal preheat)
-        if (!m_tareDone && frameIndex == 0) {
-            qDebug() << "=== TARE: Frame 0 started ===";
-            m_machineState->tareScale();
-            m_tareDone = true;
-        }
 
         // Look up frame name from current profile
         const auto& steps = m_currentProfile.steps();

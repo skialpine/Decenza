@@ -1,6 +1,7 @@
 #include "visualizeruploader.h"
 #include "../models/shotdatamodel.h"
 #include "../core/settings.h"
+#include "../profile/profile.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -18,7 +19,7 @@ VisualizerUploader::VisualizerUploader(Settings* settings, QObject* parent)
 }
 
 void VisualizerUploader::uploadShot(ShotDataModel* shotData,
-                                     const QString& profileTitle,
+                                     const Profile* profile,
                                      double duration,
                                      double finalWeight,
                                      double doseWeight)
@@ -54,7 +55,7 @@ void VisualizerUploader::uploadShot(ShotDataModel* shotData,
     emit lastUploadStatusChanged();
 
     // Build JSON payload
-    QByteArray jsonData = buildShotJson(shotData, profileTitle, finalWeight, doseWeight);
+    QByteArray jsonData = buildShotJson(shotData, profile, finalWeight, doseWeight);
 
     // Build multipart form data
     QString boundary = QUuid::createUuid().toString(QUuid::WithoutBraces);
@@ -166,7 +167,7 @@ void VisualizerUploader::onTestFinished(QNetworkReply* reply)
 }
 
 QByteArray VisualizerUploader::buildShotJson(ShotDataModel* shotData,
-                                              const QString& profileTitle,
+                                              const Profile* profile,
                                               double finalWeight,
                                               double doseWeight)
 {
@@ -255,10 +256,8 @@ QByteArray VisualizerUploader::buildShotJson(ShotDataModel* shotData,
     }
     root["temperature"] = temperature;
 
-    // Profile info
-    QJsonObject profile;
-    profile["title"] = profileTitle;
-    root["profile"] = profile;
+    // Profile info - include full profile data in Visualizer format
+    root["profile"] = buildVisualizerProfileJson(profile);
 
     // Totals - weight should be an array (espresso_weight time series)
     QJsonObject totals;
@@ -281,6 +280,89 @@ QByteArray VisualizerUploader::buildShotJson(ShotDataModel* shotData,
     root["app"] = app;
 
     return QJsonDocument(root).toJson(QJsonDocument::Compact);
+}
+
+QJsonObject VisualizerUploader::buildVisualizerProfileJson(const Profile* profile)
+{
+    QJsonObject obj;
+
+    if (!profile) {
+        obj["title"] = "Unknown";
+        return obj;
+    }
+
+    // Basic metadata
+    obj["title"] = profile->title();
+    obj["author"] = profile->author();
+    obj["notes"] = profile->notes();
+    obj["beverage_type"] = profile->beverageType();
+
+    // Convert steps to Visualizer format
+    QJsonArray stepsArray;
+    for (const auto& step : profile->steps()) {
+        QJsonObject stepObj;
+
+        // Values as strings (Visualizer format)
+        stepObj["name"] = step.name;
+        stepObj["temperature"] = QString::number(step.temperature, 'f', 2);
+        stepObj["sensor"] = step.sensor;
+        stepObj["pump"] = step.pump;
+        stepObj["transition"] = step.transition;
+        stepObj["pressure"] = QString::number(step.pressure, 'f', 2);
+        stepObj["flow"] = QString::number(step.flow, 'f', 2);
+        stepObj["seconds"] = QString::number(step.seconds, 'f', 2);
+        stepObj["volume"] = QString::number(step.volume, 'f', 0);
+        stepObj["weight"] = "0";  // Per-step weight not used
+
+        // Exit condition (Visualizer format: {type, value, condition})
+        if (step.exitIf && !step.exitType.isEmpty()) {
+            QJsonObject exitObj;
+            if (step.exitType == "pressure_over") {
+                exitObj["type"] = "pressure";
+                exitObj["value"] = QString::number(step.exitPressureOver, 'f', 2);
+                exitObj["condition"] = "over";
+            } else if (step.exitType == "pressure_under") {
+                exitObj["type"] = "pressure";
+                exitObj["value"] = QString::number(step.exitPressureUnder, 'f', 2);
+                exitObj["condition"] = "under";
+            } else if (step.exitType == "flow_over") {
+                exitObj["type"] = "flow";
+                exitObj["value"] = QString::number(step.exitFlowOver, 'f', 2);
+                exitObj["condition"] = "over";
+            } else if (step.exitType == "flow_under") {
+                exitObj["type"] = "flow";
+                exitObj["value"] = QString::number(step.exitFlowUnder, 'f', 2);
+                exitObj["condition"] = "under";
+            }
+            if (!exitObj.isEmpty()) {
+                stepObj["exit"] = exitObj;
+            }
+        }
+
+        // Limiter (Visualizer format: {value, range})
+        QJsonObject limiterObj;
+        limiterObj["value"] = QString::number(step.maxFlowOrPressure, 'f', 1);
+        limiterObj["range"] = QString::number(step.maxFlowOrPressureRange, 'f', 1);
+        stepObj["limiter"] = limiterObj;
+
+        stepsArray.append(stepObj);
+    }
+    obj["steps"] = stepsArray;
+
+    // Additional Visualizer metadata
+    obj["tank_temperature"] = "0";
+    obj["target_weight"] = QString::number(profile->targetWeight(), 'f', 0);
+    obj["target_volume"] = QString::number(profile->targetVolume(), 'f', 0);
+    obj["target_volume_count_start"] = "2";
+    obj["legacy_profile_type"] = profile->profileType();
+    obj["type"] = "advanced";
+    obj["lang"] = "en";
+    obj["hidden"] = "0";
+    obj["reference_file"] = profile->title();
+    obj["changes_since_last_espresso"] = "";
+    obj["version"] = "2";
+
+    return obj;
 }
 
 QByteArray VisualizerUploader::buildMultipartData(const QByteArray& jsonData, const QString& boundary)

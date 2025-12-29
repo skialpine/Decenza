@@ -8,6 +8,7 @@
 
 class ShotDataModel;
 class Settings;
+class Profile;
 
 class VisualizerUploader : public QObject {
     Q_OBJECT
@@ -25,7 +26,7 @@ public:
 
     // Upload shot data to visualizer.coffee
     Q_INVOKABLE void uploadShot(ShotDataModel* shotData,
-                                 const QString& profileTitle,
+                                 const Profile* profile,
                                  double duration,
                                  double finalWeight = 0,
                                  double doseWeight = 0);
@@ -47,10 +48,11 @@ private slots:
 
 private:
     QByteArray buildShotJson(ShotDataModel* shotData,
-                             const QString& profileTitle,
+                             const Profile* profile,
                              double finalWeight,
                              double doseWeight);
 
+    QJsonObject buildVisualizerProfileJson(const Profile* profile);
     QByteArray buildMultipartData(const QByteArray& jsonData, const QString& boundary);
     QString authHeader() const;
 
