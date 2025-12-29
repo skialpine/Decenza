@@ -1,5 +1,6 @@
 #include "maincontroller.h"
 #include "../core/settings.h"
+#include "../core/profilestorage.h"
 #include "../ble/de1device.h"
 #include "../machine/machinestate.h"
 #include "../models/shotdatamodel.h"
@@ -15,12 +16,14 @@
 
 MainController::MainController(Settings* settings, DE1Device* device,
                                MachineState* machineState, ShotDataModel* shotDataModel,
+                               ProfileStorage* profileStorage,
                                QObject* parent)
     : QObject(parent)
     , m_settings(settings)
     , m_device(device)
     , m_machineState(machineState)
     , m_shotDataModel(shotDataModel)
+    , m_profileStorage(profileStorage)
 {
     // Set up delayed settings timer (5 seconds after connection)
     m_settingsTimer.setSingleShot(true);
@@ -49,6 +52,16 @@ MainController::MainController(Settings* settings, DE1Device* device,
     // Create visualizer uploader and importer
     m_visualizer = new VisualizerUploader(m_settings, this);
     m_visualizerImporter = new VisualizerImporter(this, this);
+
+    // Refresh profiles when storage permission changes (Android)
+    if (m_profileStorage) {
+        connect(m_profileStorage, &ProfileStorage::configuredChanged, this, [this]() {
+            if (m_profileStorage->isConfigured()) {
+                qDebug() << "[MainController] Storage configured, refreshing profiles";
+                refreshProfiles();
+            }
+        });
+    }
 
     // Migrate profile folders (one-time migration for existing users)
     migrateProfileFolders();
@@ -206,18 +219,32 @@ bool MainController::deleteProfile(const QString& filename) {
         return false;
     }
 
-    // Determine the file path based on source
-    QString path;
-    if (source == ProfileSource::Downloaded) {
-        path = downloadedProfilesPath() + "/" + filename + ".json";
-    } else if (source == ProfileSource::UserCreated) {
-        path = userProfilesPath() + "/" + filename + ".json";
+    bool deleted = false;
+
+    // Try ProfileStorage first (SAF on Android)
+    if (m_profileStorage && m_profileStorage->isConfigured()) {
+        if (m_profileStorage->deleteProfile(filename)) {
+            qDebug() << "Deleted profile from ProfileStorage:" << filename;
+            deleted = true;
+        }
     }
 
-    // Delete the file
-    if (QFile::remove(path)) {
-        qDebug() << "Deleted profile:" << path;
+    // Also try deleting from local folders (fallback or legacy)
+    if (!deleted) {
+        QString path;
+        if (source == ProfileSource::Downloaded) {
+            path = downloadedProfilesPath() + "/" + filename + ".json";
+        } else if (source == ProfileSource::UserCreated) {
+            path = userProfilesPath() + "/" + filename + ".json";
+        }
 
+        if (QFile::remove(path)) {
+            qDebug() << "Deleted profile from local storage:" << path;
+            deleted = true;
+        }
+    }
+
+    if (deleted) {
         // Remove from favorites if it was a favorite
         if (m_settings && m_settings->isFavoriteProfile(filename)) {
             // Find index and remove
@@ -233,10 +260,10 @@ bool MainController::deleteProfile(const QString& filename) {
         // Refresh the profile list
         refreshProfiles();
         return true;
-    } else {
-        qWarning() << "Failed to delete profile:" << path;
-        return false;
     }
+
+    qWarning() << "Failed to delete profile:" << filename;
+    return false;
 }
 
 QVariantMap MainController::getCurrentProfile() const {
@@ -277,14 +304,26 @@ void MainController::loadProfile(const QString& profileName) {
     QString path;
     bool found = false;
 
-    // 1. Check user profiles first
-    path = userProfilesPath() + "/" + profileName + ".json";
-    if (QFile::exists(path)) {
-        m_currentProfile = Profile::loadFromFile(path);
-        found = true;
+    // 1. Check ProfileStorage first (SAF folder on Android)
+    if (m_profileStorage && m_profileStorage->isConfigured()) {
+        QString jsonContent = m_profileStorage->readProfile(profileName);
+        if (!jsonContent.isEmpty()) {
+            m_currentProfile = Profile::loadFromJsonString(jsonContent);
+            found = true;
+            qDebug() << "Loaded profile from ProfileStorage:" << profileName;
+        }
     }
 
-    // 2. Check downloaded profiles
+    // 2. Check user profiles (local fallback)
+    if (!found) {
+        path = userProfilesPath() + "/" + profileName + ".json";
+        if (QFile::exists(path)) {
+            m_currentProfile = Profile::loadFromFile(path);
+            found = true;
+        }
+    }
+
+    // 3. Check downloaded profiles (local fallback)
     if (!found) {
         path = downloadedProfilesPath() + "/" + profileName + ".json";
         if (QFile::exists(path)) {
@@ -293,7 +332,7 @@ void MainController::loadProfile(const QString& profileName) {
         }
     }
 
-    // 3. Check built-in profiles
+    // 4. Check built-in profiles
     if (!found) {
         path = ":/profiles/" + profileName + ".json";
         if (QFile::exists(path)) {
@@ -302,7 +341,7 @@ void MainController::loadProfile(const QString& profileName) {
         }
     }
 
-    // 4. Fall back to default
+    // 5. Fall back to default
     if (!found) {
         loadDefaultProfile();
     }
@@ -337,7 +376,7 @@ void MainController::refreshProfiles() {
     m_profileTitles.clear();
     m_allProfiles.clear();
 
-    // Helper to load profile metadata
+    // Helper to load profile metadata from file path
     auto loadProfileMeta = [](const QString& path) -> QPair<QString, QString> {
         QFile file(path);
         if (file.open(QIODevice::ReadOnly)) {
@@ -346,6 +385,13 @@ void MainController::refreshProfiles() {
             return {obj["title"].toString(), obj["beverage_type"].toString()};
         }
         return {QString(), QString()};
+    };
+
+    // Helper to load profile metadata from JSON string
+    auto loadProfileMetaFromJson = [](const QString& jsonContent) -> QPair<QString, QString> {
+        QJsonDocument doc = QJsonDocument::fromJson(jsonContent.toUtf8());
+        QJsonObject obj = doc.object();
+        return {obj["title"].toString(), obj["beverage_type"].toString()};
     };
 
     QStringList filters;
@@ -369,11 +415,42 @@ void MainController::refreshProfiles() {
         m_profileTitles[name] = info.title;
     }
 
-    // 2. Load downloaded profiles
+    // 2. Load profiles from ProfileStorage (SAF folder or fallback)
+    if (m_profileStorage) {
+        QStringList storageProfiles = m_profileStorage->listProfiles();
+        for (const QString& name : storageProfiles) {
+            if (m_availableProfiles.contains(name)) {
+                continue;  // Skip if already loaded (e.g., built-in with same name)
+            }
+
+            QString jsonContent = m_profileStorage->readProfile(name);
+            if (jsonContent.isEmpty()) {
+                continue;
+            }
+
+            auto [title, beverageType] = loadProfileMetaFromJson(jsonContent);
+
+            ProfileInfo info;
+            info.filename = name;
+            info.title = title.isEmpty() ? name : title;
+            info.beverageType = beverageType;
+            info.source = ProfileSource::UserCreated;  // All SAF profiles are user-created
+            m_allProfiles.append(info);
+
+            m_availableProfiles.append(name);
+            m_profileTitles[name] = info.title;
+        }
+    }
+
+    // 3. Load downloaded profiles (legacy local folder)
     QDir downloadedDir(downloadedProfilesPath());
     files = downloadedDir.entryList(filters, QDir::Files);
     for (const QString& file : files) {
         QString name = file.left(file.length() - 5);
+        if (m_availableProfiles.contains(name)) {
+            continue;  // Skip if already loaded from ProfileStorage
+        }
+
         auto [title, beverageType] = loadProfileMeta(downloadedDir.filePath(file));
 
         ProfileInfo info;
@@ -383,17 +460,19 @@ void MainController::refreshProfiles() {
         info.source = ProfileSource::Downloaded;
         m_allProfiles.append(info);
 
-        if (!m_availableProfiles.contains(name)) {
-            m_availableProfiles.append(name);
-            m_profileTitles[name] = info.title;
-        }
+        m_availableProfiles.append(name);
+        m_profileTitles[name] = info.title;
     }
 
-    // 3. Load user-created profiles
+    // 4. Load user-created profiles (legacy local folder)
     QDir userDir(userProfilesPath());
     files = userDir.entryList(filters, QDir::Files);
     for (const QString& file : files) {
         QString name = file.left(file.length() - 5);
+        if (m_availableProfiles.contains(name)) {
+            continue;  // Skip if already loaded from ProfileStorage
+        }
+
         auto [title, beverageType] = loadProfileMeta(userDir.filePath(file));
 
         ProfileInfo info;
@@ -403,10 +482,8 @@ void MainController::refreshProfiles() {
         info.source = ProfileSource::UserCreated;
         m_allProfiles.append(info);
 
-        if (!m_availableProfiles.contains(name)) {
-            m_availableProfiles.append(name);
-            m_profileTitles[name] = info.title;
-        }
+        m_availableProfiles.append(name);
+        m_profileTitles[name] = info.title;
     }
 
     emit profilesChanged();
@@ -476,12 +553,28 @@ void MainController::uploadProfile(const QVariantMap& profileData) {
 }
 
 bool MainController::saveProfile(const QString& filename) {
-    // Always save to user profiles folder
-    QString path = userProfilesPath() + "/" + filename + ".json";
-    bool success = m_currentProfile.saveToFile(path);
-    if (success) {
-        qDebug() << "Saved profile to:" << path;
+    bool success = false;
 
+    // Try ProfileStorage first (SAF on Android), then fall back to local file
+    if (m_profileStorage && m_profileStorage->isConfigured()) {
+        success = m_profileStorage->writeProfile(filename, m_currentProfile.toJsonString());
+        if (success) {
+            qDebug() << "Saved profile to ProfileStorage:" << filename;
+        }
+    }
+
+    if (!success) {
+        // Fall back to local file
+        QString path = userProfilesPath() + "/" + filename + ".json";
+        success = m_currentProfile.saveToFile(path);
+        if (success) {
+            qDebug() << "Saved profile to local file:" << path;
+        } else {
+            qWarning() << "Failed to save profile to:" << path;
+        }
+    }
+
+    if (success) {
         // If saving a built-in profile, auto-select it and update favorites
         if (m_settings) {
             // Check if this was originally a built-in
@@ -502,8 +595,6 @@ bool MainController::saveProfile(const QString& filename) {
         m_baseProfileName = filename;
         markProfileClean();
         refreshProfiles();
-    } else {
-        qWarning() << "Failed to save profile to:" << path;
     }
     return success;
 }
@@ -528,11 +619,28 @@ bool MainController::saveProfileAs(const QString& filename, const QString& title
     // Update the profile title
     m_currentProfile.setTitle(title);
 
-    // Always save to user profiles folder
-    QString path = userProfilesPath() + "/" + filename + ".json";
-    bool success = m_currentProfile.saveToFile(path);
+    bool success = false;
+
+    // Try ProfileStorage first (SAF on Android), then fall back to local file
+    if (m_profileStorage && m_profileStorage->isConfigured()) {
+        success = m_profileStorage->writeProfile(filename, m_currentProfile.toJsonString());
+        if (success) {
+            qDebug() << "Saved profile as to ProfileStorage:" << filename;
+        }
+    }
+
+    if (!success) {
+        // Fall back to local file
+        QString path = userProfilesPath() + "/" + filename + ".json";
+        success = m_currentProfile.saveToFile(path);
+        if (success) {
+            qDebug() << "Saved profile as to local file:" << path;
+        } else {
+            qWarning() << "Failed to save profile to:" << path;
+        }
+    }
+
     if (success) {
-        qDebug() << "Saved profile as:" << path;
         m_baseProfileName = filename;
         if (m_settings) {
             m_settings->setCurrentProfile(filename);
@@ -544,8 +652,6 @@ bool MainController::saveProfileAs(const QString& filename, const QString& title
         markProfileClean();
         refreshProfiles();
         emit currentProfileChanged();
-    } else {
-        qWarning() << "Failed to save profile to:" << path;
     }
     return success;
 }

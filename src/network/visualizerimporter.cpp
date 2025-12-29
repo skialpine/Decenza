@@ -7,6 +7,7 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QDebug>
+#include "../core/profilestorage.h"
 
 VisualizerImporter::VisualizerImporter(MainController* controller, QObject* parent)
     : QObject(parent)
@@ -301,51 +302,93 @@ ProfileFrame VisualizerImporter::parseVisualizerStep(const QJsonObject& json) {
 int VisualizerImporter::saveImportedProfile(const Profile& profile) {
     // Returns: 1 = saved, 0 = waiting for user (duplicate), -1 = failed
 
-    // Get downloaded profiles directory path
-    QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    path += "/profiles/downloaded";
+    // Generate filename from title
+    QString filename = m_controller->titleToFilename(profile.title());
 
-    QDir dir(path);
+    // Check if profile already exists (in ProfileStorage or local)
+    ProfileStorage* storage = m_controller->profileStorage();
+    bool exists = false;
+
+    if (storage && storage->isConfigured()) {
+        exists = storage->profileExists(filename);
+    }
+
+    if (!exists) {
+        // Also check local downloaded folder for legacy profiles
+        QString localPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        localPath += "/profiles/downloaded/" + filename + ".json";
+        exists = QFile::exists(localPath);
+    }
+
+    if (exists) {
+        // Store pending profile and emit signal for user choice
+        m_pendingProfile = profile;
+        m_pendingPath = filename;  // Store just the filename now
+        qDebug() << "Duplicate profile found, waiting for user decision. Filename:" << filename;
+        emit duplicateFound(profile.title(), filename);
+        return 0;  // Waiting for user decision
+    }
+
+    // Save the profile
+    if (storage && storage->isConfigured()) {
+        if (storage->writeProfile(filename, profile.toJsonString())) {
+            qDebug() << "Saved imported profile to ProfileStorage:" << filename;
+            m_controller->refreshProfiles();
+            return 1;  // Success
+        }
+    }
+
+    // Fall back to local file
+    QString localPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    localPath += "/profiles/downloaded";
+    QDir dir(localPath);
     if (!dir.exists()) {
         dir.mkpath(".");
     }
 
-    // Generate filename from title
-    QString filename = m_controller->titleToFilename(profile.title());
-    QString fullPath = path + "/" + filename + ".json";
-
-    // Check if file already exists
-    if (QFile::exists(fullPath)) {
-        // Store pending profile and emit signal for user choice
-        m_pendingProfile = profile;
-        m_pendingPath = fullPath;
-        qDebug() << "Duplicate profile found, waiting for user decision. Pending path:" << m_pendingPath;
-        emit duplicateFound(profile.title(), fullPath);
-        return 0;  // Waiting for user decision
-    }
-
+    QString fullPath = localPath + "/" + filename + ".json";
     if (profile.saveToFile(fullPath)) {
+        qDebug() << "Saved imported profile to local file:" << fullPath;
         m_controller->refreshProfiles();
         return 1;  // Success
     }
 
-    qWarning() << "Failed to save imported profile to:" << fullPath;
+    qWarning() << "Failed to save imported profile:" << filename;
     return -1;  // Failed
 }
 
 void VisualizerImporter::saveOverwrite() {
-    qDebug() << "saveOverwrite called, pendingPath:" << m_pendingPath;
+    qDebug() << "saveOverwrite called, pendingFilename:" << m_pendingPath;
     if (m_pendingPath.isEmpty()) {
-        qWarning() << "saveOverwrite: pendingPath is empty, cannot save!";
+        qWarning() << "saveOverwrite: pendingFilename is empty, cannot save!";
         return;
     }
 
-    if (m_pendingProfile.saveToFile(m_pendingPath)) {
+    bool saved = false;
+    ProfileStorage* storage = m_controller->profileStorage();
+
+    if (storage && storage->isConfigured()) {
+        if (storage->writeProfile(m_pendingPath, m_pendingProfile.toJsonString())) {
+            qDebug() << "saveOverwrite: Successfully saved to ProfileStorage:" << m_pendingPath;
+            saved = true;
+        }
+    }
+
+    if (!saved) {
+        // Fall back to local file
+        QString localPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        localPath += "/profiles/downloaded/" + m_pendingPath + ".json";
+        if (m_pendingProfile.saveToFile(localPath)) {
+            qDebug() << "saveOverwrite: Successfully saved to local:" << localPath;
+            saved = true;
+        }
+    }
+
+    if (saved) {
         m_controller->refreshProfiles();
-        qDebug() << "saveOverwrite: Successfully saved to" << m_pendingPath;
         emit importSuccess(m_pendingProfile.title());
     } else {
-        qWarning() << "saveOverwrite: Failed to save to" << m_pendingPath;
+        qWarning() << "saveOverwrite: Failed to save:" << m_pendingPath;
         emit importFailed("Failed to overwrite profile");
     }
 
@@ -353,23 +396,43 @@ void VisualizerImporter::saveOverwrite() {
 }
 
 void VisualizerImporter::saveAsNew() {
-    qDebug() << "saveAsNew called, pendingPath:" << m_pendingPath;
+    qDebug() << "saveAsNew called, pendingFilename:" << m_pendingPath;
     if (m_pendingPath.isEmpty()) {
-        qWarning() << "saveAsNew: pendingPath is empty, cannot save!";
+        qWarning() << "saveAsNew: pendingFilename is empty, cannot save!";
         return;
     }
 
     // Find a unique filename by appending _1, _2, etc.
-    QString basePath = m_pendingPath;
-    basePath.chop(5);  // Remove ".json"
+    QString baseFilename = m_pendingPath;
+    ProfileStorage* storage = m_controller->profileStorage();
 
     int counter = 1;
-    QString newPath;
+    QString newFilename;
     do {
-        newPath = basePath + "_" + QString::number(counter++) + ".json";
-    } while (QFile::exists(newPath));
+        newFilename = baseFilename + "_" + QString::number(counter++);
+    } while ((storage && storage->profileExists(newFilename)) ||
+             QFile::exists(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) +
+                          "/profiles/downloaded/" + newFilename + ".json"));
 
-    if (m_pendingProfile.saveToFile(newPath)) {
+    bool saved = false;
+
+    if (storage && storage->isConfigured()) {
+        if (storage->writeProfile(newFilename, m_pendingProfile.toJsonString())) {
+            qDebug() << "saveAsNew: Successfully saved to ProfileStorage:" << newFilename;
+            saved = true;
+        }
+    }
+
+    if (!saved) {
+        QString localPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        localPath += "/profiles/downloaded/" + newFilename + ".json";
+        if (m_pendingProfile.saveToFile(localPath)) {
+            qDebug() << "saveAsNew: Successfully saved to local:" << localPath;
+            saved = true;
+        }
+    }
+
+    if (saved) {
         m_controller->refreshProfiles();
         emit importSuccess(m_pendingProfile.title());
     } else {
@@ -380,9 +443,9 @@ void VisualizerImporter::saveAsNew() {
 }
 
 void VisualizerImporter::saveWithNewName(const QString& newTitle) {
-    qDebug() << "saveWithNewName called, newTitle:" << newTitle << "pendingPath:" << m_pendingPath;
+    qDebug() << "saveWithNewName called, newTitle:" << newTitle << "pendingFilename:" << m_pendingPath;
     if (m_pendingPath.isEmpty()) {
-        qWarning() << "saveWithNewName: pendingPath is empty, cannot save!";
+        qWarning() << "saveWithNewName: pendingFilename is empty, cannot save!";
         return;
     }
 
@@ -395,34 +458,56 @@ void VisualizerImporter::saveWithNewName(const QString& newTitle) {
     // Update the profile title
     m_pendingProfile.setTitle(newTitle);
 
-    // Generate new filename from the new title (save to downloaded folder)
-    QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    path += "/profiles/downloaded";
-
-    QDir dir(path);
-    if (!dir.exists()) {
-        dir.mkpath(".");
-    }
-
+    // Generate new filename from the new title
     QString filename = m_controller->titleToFilename(newTitle);
-    QString newPath = path + "/" + filename + ".json";
+    ProfileStorage* storage = m_controller->profileStorage();
 
-    // Check if this name also exists
-    if (QFile::exists(newPath)) {
+    // Check if this name also exists (in ProfileStorage or local)
+    auto checkExists = [&](const QString& name) {
+        if (storage && storage->profileExists(name)) return true;
+        QString localPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        localPath += "/profiles/downloaded/" + name + ".json";
+        return QFile::exists(localPath);
+    };
+
+    if (checkExists(filename)) {
         // Find unique name
         int counter = 1;
-        QString basePath = path + "/" + filename;
+        QString newFilename;
         do {
-            newPath = basePath + "_" + QString::number(counter++) + ".json";
-        } while (QFile::exists(newPath));
+            newFilename = filename + "_" + QString::number(counter++);
+        } while (checkExists(newFilename));
+        filename = newFilename;
     }
 
-    if (m_pendingProfile.saveToFile(newPath)) {
+    bool saved = false;
+
+    if (storage && storage->isConfigured()) {
+        if (storage->writeProfile(filename, m_pendingProfile.toJsonString())) {
+            qDebug() << "saveWithNewName: Successfully saved to ProfileStorage:" << filename;
+            saved = true;
+        }
+    }
+
+    if (!saved) {
+        QString localPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        localPath += "/profiles/downloaded";
+        QDir dir(localPath);
+        if (!dir.exists()) {
+            dir.mkpath(".");
+        }
+        QString fullPath = localPath + "/" + filename + ".json";
+        if (m_pendingProfile.saveToFile(fullPath)) {
+            qDebug() << "saveWithNewName: Successfully saved to local:" << fullPath;
+            saved = true;
+        }
+    }
+
+    if (saved) {
         m_controller->refreshProfiles();
-        qDebug() << "saveWithNewName: Successfully saved to" << newPath;
         emit importSuccess(m_pendingProfile.title());
     } else {
-        qWarning() << "saveWithNewName: Failed to save to" << newPath;
+        qWarning() << "saveWithNewName: Failed to save:" << filename;
         emit importFailed("Failed to save profile");
     }
 

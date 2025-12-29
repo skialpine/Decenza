@@ -12,6 +12,7 @@ class Settings;
 class DE1Device;
 class MachineState;
 class ShotDataModel;
+class ProfileStorage;
 struct ShotSample;
 
 // Profile source enumeration
@@ -48,6 +49,7 @@ class MainController : public QObject {
 public:
     explicit MainController(Settings* settings, DE1Device* device,
                            MachineState* machineState, ShotDataModel* shotDataModel,
+                           ProfileStorage* profileStorage = nullptr,
                            QObject* parent = nullptr);
 
     QString currentProfileName() const;
@@ -61,6 +63,7 @@ public:
     QVariantList cleaningProfiles() const;
     VisualizerUploader* visualizer() const { return m_visualizer; }
     VisualizerImporter* visualizerImporter() const { return m_visualizerImporter; }
+    ProfileStorage* profileStorage() const { return m_profileStorage; }
     bool isCalibrationMode() const { return m_calibrationMode; }
     QString currentFrameName() const { return m_currentFrameName; }
 
@@ -123,6 +126,7 @@ private:
     DE1Device* m_device = nullptr;
     MachineState* m_machineState = nullptr;
     ShotDataModel* m_shotDataModel = nullptr;
+    ProfileStorage* m_profileStorage = nullptr;
     VisualizerUploader* m_visualizer = nullptr;
     VisualizerImporter* m_visualizerImporter = nullptr;
 

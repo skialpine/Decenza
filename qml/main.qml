@@ -181,7 +181,9 @@ ApplicationWindow {
         if (!firstRunComplete) {
             firstRunDialog.open()
         } else {
-            startBluetoothScan()
+            // On subsequent launches, still check if storage setup is needed
+            // (e.g., after reinstall when QSettings was restored but SAF permission wasn't)
+            checkStorageSetup()
         }
     }
 
@@ -564,9 +566,93 @@ ApplicationWindow {
                 onClicked: {
                     Settings.setValue("firstRunComplete", true)
                     firstRunDialog.close()
-                    startBluetoothScan()
+                    checkStorageSetup()
                 }
             }
+        }
+    }
+
+    // Storage setup dialog (Android 11+ - request MANAGE_EXTERNAL_STORAGE permission)
+    Dialog {
+        id: storageSetupDialog
+        title: "Save profiles to Documents?"
+        modal: true
+        anchors.centerIn: parent
+        closePolicy: Popup.NoAutoClose
+
+        Column {
+            spacing: Theme.spacingLarge
+            width: Theme.dialogWidth
+
+            Label {
+                text: "Allow Decenza to save profiles to Documents/Decenza so they survive if you reinstall the app."
+                wrapMode: Text.Wrap
+                width: parent.width
+                font: Theme.bodyFont
+            }
+
+            Label {
+                text: "If you skip this, profiles may be lost on reinstall (updates should be fine)."
+                wrapMode: Text.Wrap
+                width: parent.width
+                font: Theme.labelFont
+                color: Theme.warningColor
+            }
+
+            Row {
+                spacing: Theme.spacingLarge
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                AccessibleButton {
+                    text: "Skip"
+                    accessibleName: "Skip storage setup"
+                    onClicked: {
+                        ProfileStorage.skipSetup()
+                        storageSetupDialog.close()
+                        startBluetoothScan()
+                    }
+                }
+
+                AccessibleButton {
+                    text: "Allow"
+                    accessibleName: "Allow storage access"
+                    onClicked: {
+                        ProfileStorage.selectFolder()
+                        // Dialog stays open - will close when app resumes with permission granted
+                    }
+                }
+            }
+        }
+    }
+
+    // Check permission when app becomes active (user returns from settings)
+    Connections {
+        target: Qt.application
+        function onStateChanged(state) {
+            if (state === Qt.ApplicationActive && storageSetupDialog.opened) {
+                // User returned from settings - check if permission was granted
+                ProfileStorage.checkPermissionAndNotify()
+            }
+        }
+    }
+
+    // Handle permission result
+    Connections {
+        target: ProfileStorage
+        function onFolderSelected(success) {
+            if (storageSetupDialog.opened) {
+                storageSetupDialog.close()
+                startBluetoothScan()
+            }
+        }
+    }
+
+    // Check if storage setup is needed (Android only)
+    function checkStorageSetup() {
+        if (ProfileStorage.needsSetup) {
+            storageSetupDialog.open()
+        } else {
+            startBluetoothScan()
         }
     }
 

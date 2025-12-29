@@ -19,6 +19,7 @@
 #include "core/batterymanager.h"
 #include "core/batterydrainer.h"
 #include "core/accessibilitymanager.h"
+#include "core/profilestorage.h"
 #include "ble/blemanager.h"
 #include "ble/de1device.h"
 #include "ble/scaledevice.h"
@@ -57,7 +58,8 @@ int main(int argc, char *argv[])
     machineState.setSettings(&settings);
     machineState.setScale(&flowScale);  // Start with FlowScale, switch to physical scale if found
     flowScale.setSettings(&settings);
-    MainController mainController(&settings, &de1Device, &machineState, &shotDataModel);
+    ProfileStorage profileStorage;
+    MainController mainController(&settings, &de1Device, &machineState, &shotDataModel, &profileStorage);
 
     // Connect FlowScale to graph initially (will be disconnected if physical scale found)
     QObject::connect(&flowScale, &ScaleDevice::weightChanged,
@@ -203,6 +205,7 @@ int main(int argc, char *argv[])
     context->setContextProperty("BatteryManager", &batteryManager);
     context->setContextProperty("BatteryDrainer", &batteryDrainer);
     context->setContextProperty("AccessibilityManager", &accessibilityManager);
+    context->setContextProperty("ProfileStorage", &profileStorage);
     context->setContextProperty("BuildNumber", BUILD_NUMBER_STRING);
 #ifdef QT_DEBUG
     context->setContextProperty("IsDebugBuild", true);

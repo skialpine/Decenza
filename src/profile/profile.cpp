@@ -102,6 +102,15 @@ bool Profile::saveToFile(const QString& filePath) const {
     return true;
 }
 
+Profile Profile::loadFromJsonString(const QString& jsonContent) {
+    QJsonDocument doc = QJsonDocument::fromJson(jsonContent.toUtf8());
+    return fromJson(doc);
+}
+
+QString Profile::toJsonString() const {
+    return QString::fromUtf8(toJson().toJson(QJsonDocument::Indented));
+}
+
 Profile Profile::loadFromTclFile(const QString& filePath) {
     // Parse de1app .tcl profile files
     // Format: Tcl script with "array set" commands setting profile variables

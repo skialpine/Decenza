@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.github.kulitorum.decenza_de1"
-    android:versionCode="512"
-    android:versionName="1.0.512">
+    android:versionCode="533"
+    android:versionName="1.0.533">
 
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
@@ -11,10 +11,12 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Storage permission for Android 9 (SDK 28) to save screensaver videos to Movies folder -->
-    <!-- On Android 10+ scoped storage allows this without permission -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <!-- Storage permissions -->
+    <!-- Android 9 (SDK 28): needs WRITE_EXTERNAL_STORAGE -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Android 11+ (SDK 30+): needs MANAGE_EXTERNAL_STORAGE for profile backup to Documents -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
@@ -26,7 +28,7 @@
         android:allowBackup="true">
 
         <activity
-            android:name="org.qtproject.qt.android.bindings.QtActivity"
+            android:name="io.github.kulitorum.decenza_de1.DecenzaActivity"
             android:configChanges="orientation|screenSize|screenLayout|uiMode|keyboard|keyboardHidden"
             android:launchMode="singleTop"
             android:screenOrientation="sensorLandscape"

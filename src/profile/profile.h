@@ -97,7 +97,9 @@ public:
 
     // === File I/O ===
     static Profile loadFromFile(const QString& filePath);
+    static Profile loadFromJsonString(const QString& jsonContent);
     bool saveToFile(const QString& filePath) const;
+    QString toJsonString() const;
 
     // Import from de1app .tcl file
     static Profile loadFromTclFile(const QString& filePath);
