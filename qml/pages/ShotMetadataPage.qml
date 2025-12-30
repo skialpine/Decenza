@@ -13,15 +13,19 @@ Page {
     StackView.onActivated: root.currentPageTitle = "Shot Info"
 
     property bool hasPendingShot: true  // TODO: set to false for production
-    property real keyboardOffset: 0
+    property bool keyboardVisible: Qt.inputMethod.visible
 
-    function updateKeyboardOffset(field) {
-        if (!field) return
-        let fieldY = field.mapToItem(shotMetadataPage, 0, field.height).y
-        let visibleHeight = shotMetadataPage.height - Qt.inputMethod.keyboardRectangle.height / Screen.devicePixelRatio
-        if (fieldY > visibleHeight - 50) {
-            keyboardOffset = fieldY - visibleHeight + 100
-        }
+    function scrollToField(field) {
+        if (!field || !keyboardVisible) return
+        let fieldY = field.mapToItem(flickable.contentItem, 0, 0).y
+        let keyboardTop = shotMetadataPage.height - Qt.inputMethod.keyboardRectangle.height / Screen.devicePixelRatio
+        let targetY = fieldY - keyboardTop / 2 + field.height
+        flickable.contentY = Math.max(0, Math.min(targetY, flickable.contentHeight - flickable.height))
+    }
+
+    function hideKeyboard() {
+        Qt.inputMethod.hide()
+        flickable.forceActiveFocus()
     }
 
     // Announce upload status changes
@@ -41,22 +45,28 @@ Page {
         }
     }
 
-    Connections {
-        target: Qt.inputMethod
-        function onKeyboardRectangleChanged() {
-            if (!Qt.inputMethod.visible) keyboardOffset = 0
-        }
+    // Tap background to dismiss keyboard
+    MouseArea {
+        anchors.fill: parent
+        visible: keyboardVisible
+        onClicked: hideKeyboard()
+        z: -1
     }
 
     Flickable {
+        id: flickable
         anchors.fill: parent
         anchors.topMargin: Theme.pageTopMargin
-        anchors.bottomMargin: Theme.bottomBarHeight
+        anchors.bottomMargin: keyboardVisible ? Qt.inputMethod.keyboardRectangle.height / Screen.devicePixelRatio + 10 : Theme.bottomBarHeight
         anchors.leftMargin: Theme.standardMargin
         anchors.rightMargin: Theme.standardMargin
         contentHeight: mainColumn.height
         clip: true
         boundsBehavior: Flickable.StopAtBounds
+
+        Behavior on anchors.bottomMargin {
+            NumberAnimation { duration: 150 }
+        }
 
         ColumnLayout {
             id: mainColumn
@@ -180,6 +190,12 @@ Page {
                             ratingInput.value = newValue
                             Settings.dyeEspressoEnjoyment = newValue
                         }
+                        onActiveFocusChanged: {
+                            if (activeFocus) {
+                                hideKeyboard()
+                                Qt.callLater(function() { scrollToField(ratingInput) })
+                            }
+                        }
                     }
                 }
 
@@ -224,9 +240,12 @@ Page {
                         Accessible.description: text.length > 0 ? text : "Empty"
 
                         onActiveFocusChanged: {
-                            if (activeFocus && AccessibilityManager.enabled) {
-                                let announcement = "Notes. " + (text.length > 0 ? text : "Empty")
-                                AccessibilityManager.announce(announcement)
+                            if (activeFocus) {
+                                Qt.callLater(function() { scrollToField(notesField) })
+                                if (AccessibilityManager.enabled) {
+                                    let announcement = "Notes. " + (text.length > 0 ? text : "Empty")
+                                    AccessibilityManager.announce(announcement)
+                                }
                             }
                         }
                     }
@@ -315,10 +334,12 @@ Page {
             inputMethodHints: parent.inputHints
             onTextChanged: parent.textEdited(text)
             onActiveFocusChanged: {
-                if (activeFocus && Qt.inputMethod.visible) updateKeyboardOffset(this)
-                if (activeFocus && AccessibilityManager.enabled) {
-                    let announcement = parent.label + ". " + (text.length > 0 ? text : "Empty")
-                    AccessibilityManager.announce(announcement)
+                if (activeFocus) {
+                    Qt.callLater(function() { scrollToField(fieldInput) })
+                    if (AccessibilityManager.enabled) {
+                        let announcement = parent.label + ". " + (text.length > 0 ? text : "Empty")
+                        AccessibilityManager.announce(announcement)
+                    }
                 }
             }
 

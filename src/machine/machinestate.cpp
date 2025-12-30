@@ -182,9 +182,15 @@ void MachineState::updatePhase() {
         if (isFlowing() && !wasFlowing) {
             startShotTimer();
             m_stopAtWeightTriggered = false;
-            m_tareCompleted = false;  // Don't check weight until tare happens
+            m_stopAtTimeTriggered = false;
 
-            // Auto-tare for Hot Water (espresso tares at frame 0 via MainController)
+            // Only reset tareCompleted for non-espresso operations
+            // (espresso tares at cycle start, before flowing begins)
+            if (!wasInEspresso) {
+                m_tareCompleted = false;
+            }
+
+            // Auto-tare for Hot Water (espresso tares at cycle start via MainController)
             if (m_phase == Phase::HotWater) {
                 QTimer::singleShot(100, this, [this]() {
                     tareScale();
@@ -291,6 +297,35 @@ void MachineState::updateShotTimer() {
     qint64 elapsed = QDateTime::currentMSecsSinceEpoch() - m_shotStartTime;
     m_shotTime = elapsed / 1000.0;
     emit shotTimeChanged();
+
+    // Check stop-at-time for Steam and Flush
+    checkStopAtTime();
+}
+
+void MachineState::checkStopAtTime() {
+    if (m_stopAtTimeTriggered) return;
+    if (!m_settings) return;
+
+    double target = 0;
+    if (m_phase == Phase::Steaming) {
+        target = m_settings->steamTimeout();
+    } else if (m_phase == Phase::Flushing) {
+        target = m_settings->flushSeconds();
+    } else {
+        return;  // Only Steam and Flush use time-based stop
+    }
+
+    if (target <= 0) return;
+
+    if (m_shotTime >= target) {
+        m_stopAtTimeTriggered = true;
+
+        // Stop the operation
+        if (m_device) {
+            m_device->stopOperation();
+            qDebug() << "=== STOP AT TIME: reached" << target << "seconds ===";
+        }
+    }
 }
 
 double MachineState::scaleWeight() const {

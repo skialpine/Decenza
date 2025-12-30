@@ -938,57 +938,59 @@ void MainController::onEspressoCycleStarted() {
 }
 
 void MainController::onShotEnded() {
-    // Upload to visualizer.coffee if enabled - only for espresso shots
-    if (m_extractionStarted && m_settings && m_settings->visualizerAutoUpload() && m_shotDataModel && m_visualizer) {
-        double duration = m_shotDataModel->maxTime();
+    // Only process espresso shots that actually extracted
+    if (!m_extractionStarted || !m_settings || !m_shotDataModel) {
+        return;
+    }
 
-        // Get final weight from shot data
-        const auto& weightData = m_shotDataModel->weightData();
-        double finalWeight = 0;
-        if (!weightData.isEmpty()) {
-            finalWeight = weightData.last().y() * 5.0;  // Undo the /5 scaling
+    double duration = m_shotDataModel->maxTime();
+
+    // Get final weight from shot data
+    const auto& weightData = m_shotDataModel->weightData();
+    double finalWeight = 0;
+    if (!weightData.isEmpty()) {
+        finalWeight = weightData.last().y() * 5.0;  // Undo the /5 scaling
+    }
+
+    double doseWeight = m_settings->targetWeight();  // Use target weight as dose
+
+    // Check if we should show metadata page after shot (regardless of auto-upload)
+    if (m_settings->visualizerExtendedMetadata() && m_settings->visualizerShowAfterShot()) {
+        // Store pending shot data for later upload
+        m_hasPendingShot = true;
+        m_pendingShotDuration = duration;
+        m_pendingShotFinalWeight = finalWeight;
+        m_pendingShotDoseWeight = doseWeight;
+
+        qDebug() << "MainController: Shot ended, showing metadata page -"
+                 << "Profile:" << m_currentProfile.title()
+                 << "Duration:" << duration << "s"
+                 << "Weight:" << finalWeight << "g";
+
+        emit shotEndedShowMetadata();
+    } else if (m_settings->visualizerAutoUpload() && m_visualizer) {
+        // Auto-upload without showing metadata page
+        ShotMetadata metadata;
+        if (m_settings->visualizerExtendedMetadata()) {
+            metadata.beanBrand = m_settings->dyeBeanBrand();
+            metadata.beanType = m_settings->dyeBeanType();
+            metadata.roastDate = m_settings->dyeRoastDate();
+            metadata.roastLevel = m_settings->dyeRoastLevel();
+            metadata.grinderModel = m_settings->dyeGrinderModel();
+            metadata.grinderSetting = m_settings->dyeGrinderSetting();
+            metadata.drinkTds = m_settings->dyeDrinkTds();
+            metadata.drinkEy = m_settings->dyeDrinkEy();
+            metadata.espressoEnjoyment = m_settings->dyeEspressoEnjoyment();
+            metadata.espressoNotes = m_settings->dyeEspressoNotes();
+            metadata.barista = m_settings->dyeBarista();
         }
 
-        double doseWeight = m_settings->targetWeight();  // Use target weight as dose
+        qDebug() << "MainController: Shot ended, uploading to visualizer -"
+                 << "Profile:" << m_currentProfile.title()
+                 << "Duration:" << duration << "s"
+                 << "Weight:" << finalWeight << "g";
 
-        // Check if extended metadata is enabled and should show page after shot
-        if (m_settings->visualizerExtendedMetadata() && m_settings->visualizerShowAfterShot()) {
-            // Store pending shot data for later upload
-            m_hasPendingShot = true;
-            m_pendingShotDuration = duration;
-            m_pendingShotFinalWeight = finalWeight;
-            m_pendingShotDoseWeight = doseWeight;
-
-            qDebug() << "MainController: Shot ended, showing metadata page -"
-                     << "Profile:" << m_currentProfile.title()
-                     << "Duration:" << duration << "s"
-                     << "Weight:" << finalWeight << "g";
-
-            emit shotEndedShowMetadata();
-        } else {
-            // Build metadata from settings and upload immediately
-            ShotMetadata metadata;
-            if (m_settings->visualizerExtendedMetadata()) {
-                metadata.beanBrand = m_settings->dyeBeanBrand();
-                metadata.beanType = m_settings->dyeBeanType();
-                metadata.roastDate = m_settings->dyeRoastDate();
-                metadata.roastLevel = m_settings->dyeRoastLevel();
-                metadata.grinderModel = m_settings->dyeGrinderModel();
-                metadata.grinderSetting = m_settings->dyeGrinderSetting();
-                metadata.drinkTds = m_settings->dyeDrinkTds();
-                metadata.drinkEy = m_settings->dyeDrinkEy();
-                metadata.espressoEnjoyment = m_settings->dyeEspressoEnjoyment();
-                metadata.espressoNotes = m_settings->dyeEspressoNotes();
-                metadata.barista = m_settings->dyeBarista();
-            }
-
-            qDebug() << "MainController: Shot ended, uploading to visualizer -"
-                     << "Profile:" << m_currentProfile.title()
-                     << "Duration:" << duration << "s"
-                     << "Weight:" << finalWeight << "g";
-
-            m_visualizer->uploadShot(m_shotDataModel, &m_currentProfile, duration, finalWeight, doseWeight, metadata);
-        }
+        m_visualizer->uploadShot(m_shotDataModel, &m_currentProfile, duration, finalWeight, doseWeight, metadata);
     }
 
     // Note: Don't reset m_extractionStarted here - it's reset in onEspressoCycleStarted

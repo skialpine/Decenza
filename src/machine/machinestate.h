@@ -83,6 +83,7 @@ private:
     void startShotTimer();
     void stopShotTimer();
     void checkStopAtWeight(double weight);
+    void checkStopAtTime();
 
     DE1Device* m_device = nullptr;
     ScaleDevice* m_scale = nullptr;  // Either FlowScale (fallback) or physical BLE scale
@@ -95,5 +96,6 @@ private:
     QTimer* m_shotTimer = nullptr;
     qint64 m_shotStartTime = 0;
     bool m_stopAtWeightTriggered = false;
+    bool m_stopAtTimeTriggered = false;
     bool m_tareCompleted = false;
 };
