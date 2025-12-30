@@ -25,6 +25,7 @@ Page {
 
     function hideKeyboard() {
         Qt.inputMethod.hide()
+        flickable.contentY = 0
         flickable.forceActiveFocus()
     }
 
@@ -193,7 +194,6 @@ Page {
                         onActiveFocusChanged: {
                             if (activeFocus) {
                                 hideKeyboard()
-                                Qt.callLater(function() { scrollToField(ratingInput) })
                             }
                         }
                     }

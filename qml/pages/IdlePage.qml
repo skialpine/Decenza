@@ -330,20 +330,21 @@ Page {
             // Temperature (tap to announce)
             Item {
                 id: temperatureStatus
-                width: temperatureColumn.width
-                height: temperatureColumn.height
+                Layout.alignment: Qt.AlignTop
+                implicitWidth: temperatureColumn.width
+                implicitHeight: temperatureColumn.height
 
-                Column {
+                ColumnLayout {
                     id: temperatureColumn
                     spacing: Theme.spacingSmall
                     Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
+                        Layout.alignment: Qt.AlignHCenter
                         text: DE1Device.temperature.toFixed(1) + "°C"
                         color: Theme.temperatureColor
                         font: Theme.valueFont
                     }
                     Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
+                        Layout.alignment: Qt.AlignHCenter
                         text: "Group Temp"
                         color: Theme.textSecondaryColor
                         font: Theme.labelFont
@@ -362,20 +363,21 @@ Page {
             // Water level (tap to announce)
             Item {
                 id: waterLevelStatus
-                width: waterLevelColumn.width
-                height: waterLevelColumn.height
+                Layout.alignment: Qt.AlignTop
+                implicitWidth: waterLevelColumn.width
+                implicitHeight: waterLevelColumn.height
 
-                Column {
+                ColumnLayout {
                     id: waterLevelColumn
                     spacing: Theme.spacingSmall
                     Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
+                        Layout.alignment: Qt.AlignHCenter
                         text: DE1Device.waterLevel.toFixed(0) + "%"
                         color: DE1Device.waterLevel > 20 ? Theme.primaryColor : Theme.warningColor
                         font: Theme.valueFont
                     }
                     Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
+                        Layout.alignment: Qt.AlignHCenter
                         text: "Water Level"
                         color: Theme.textSecondaryColor
                         font: Theme.labelFont
@@ -396,6 +398,7 @@ Page {
             // Connection status (tap to announce)
             Item {
                 id: connectionStatus
+                Layout.alignment: Qt.AlignTop
                 implicitWidth: connectionIndicator.implicitWidth
                 implicitHeight: connectionIndicator.implicitHeight
 
