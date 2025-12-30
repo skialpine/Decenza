@@ -17,6 +17,7 @@
 
 
 #include "core/settings.h"
+#include "core/translationmanager.h"
 #include "core/batterymanager.h"
 #include "core/batterydrainer.h"
 #include "core/accessibilitymanager.h"
@@ -51,6 +52,7 @@ int main(int argc, char *argv[])
 
     // Create core objects
     Settings settings;
+    TranslationManager translationManager(&settings);
     BLEManager bleManager;
     DE1Device de1Device;
     std::unique_ptr<ScaleDevice> physicalScale;  // Physical BLE scale (when connected)
@@ -200,6 +202,7 @@ int main(int argc, char *argv[])
     // Expose C++ objects to QML
     QQmlContext* context = engine.rootContext();
     context->setContextProperty("Settings", &settings);
+    context->setContextProperty("TranslationManager", &translationManager);
     context->setContextProperty("BLEManager", &bleManager);
     context->setContextProperty("DE1Device", &de1Device);
     context->setContextProperty("ScaleDevice", &flowScale);  // FlowScale initially, updated when physical scale connects

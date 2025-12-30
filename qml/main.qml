@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
 import DecenzaDE1
+import "components"
 
 ApplicationWindow {
     id: root
@@ -77,6 +78,78 @@ ApplicationWindow {
         return closest
     }
 
+    // --- Translation Edit Mode: find closest translatable item ---
+
+    // Collect all translatable items (Tr components or items with translationKey)
+    function collectTranslatables(item, offsetX, offsetY, results) {
+        if (!item || !item.visible) return
+
+        // Handle ScrollView/Flickable scroll offset
+        var scrollOffsetX = 0
+        var scrollOffsetY = 0
+        if (item.contentItem && item.contentX !== undefined) {
+            scrollOffsetX = -item.contentX
+            scrollOffsetY = -item.contentY
+        }
+
+        // Check if this item is translatable:
+        // - Has a 'key' property (Tr component)
+        // - Or has a 'translationKey' property (ActionButton, etc.)
+        var isTranslatable = false
+        var trKey = ""
+        var trFallback = ""
+
+        if (item.key !== undefined && item.fallback !== undefined && typeof item.openEditor === "function") {
+            // This is a Tr component
+            isTranslatable = true
+            trKey = item.key
+            trFallback = item.fallback
+        } else if (item.translationKey !== undefined && item.translationKey !== "") {
+            // This has translationKey (e.g., ActionButton)
+            isTranslatable = true
+            trKey = item.translationKey
+            trFallback = item.translationFallback || ""
+        }
+
+        if (isTranslatable) {
+            var centerX = offsetX + item.width / 2
+            var centerY = offsetY + item.height / 2
+            results.push({ item: item, key: trKey, fallback: trFallback, x: centerX, y: centerY })
+        }
+
+        // Check contentItem for ScrollView/Flickable
+        if (item.contentItem && item.contentX !== undefined) {
+            collectTranslatables(item.contentItem, offsetX + scrollOffsetX, offsetY + scrollOffsetY, results)
+        }
+
+        // Recurse into children
+        var childList = item.children || item.contentChildren || []
+        for (var i = 0; i < childList.length; i++) {
+            var child = childList[i]
+            if (!child || !child.visible || child.width === undefined) continue
+            collectTranslatables(child, offsetX + child.x + scrollOffsetX, offsetY + child.y + scrollOffsetY, results)
+        }
+    }
+
+    function findTranslatableAt(item, tapX, tapY) {
+        var results = []
+        collectTranslatables(item, 0, 0, results)
+
+        var closest = null
+        var closestDist = accessibilitySearchRadius
+
+        for (var i = 0; i < results.length; i++) {
+            var dx = results[i].x - tapX
+            var dy = results[i].y - tapY
+            var dist = Math.sqrt(dx * dx + dy * dy)
+            if (dist < closestDist) {
+                closestDist = dist
+                closest = results[i]
+            }
+        }
+
+        return closest
+    }
 
     // Put machine and scale to sleep when closing the app
     onClosing: function(close) {
@@ -214,6 +287,253 @@ ApplicationWindow {
         onReleased: function(mouse) { mouse.accepted = false }
     }
 
+    // Global tap handler for translation edit mode - opens editor for nearest translatable
+    MouseArea {
+        id: translationEditOverlay
+        anchors.fill: parent
+        z: 10001  // Above accessibility overlay
+        enabled: typeof TranslationManager !== "undefined" && TranslationManager.editModeEnabled
+        propagateComposedEvents: false  // Block events to prevent normal actions
+
+        onClicked: function(mouse) {
+            var result = findTranslatableAt(parent, mouse.x, mouse.y)
+            if (result) {
+                // If it's a Tr component with openEditor, use that
+                if (typeof result.item.openEditor === "function") {
+                    result.item.openEditor()
+                } else {
+                    // Otherwise use the global translation editor
+                    globalTranslationEditor.openFor(result.key, result.fallback)
+                }
+            }
+        }
+    }
+
+    // Global translation editor popup (for items without their own editor)
+    Popup {
+        id: globalTranslationEditor
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        dim: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        property string editKey: ""
+        property string editFallback: ""
+
+        function openFor(key, fallback) {
+            editKey = key
+            editFallback = fallback
+            open()
+        }
+
+        width: Math.min(450, root.width - 40)
+        padding: Theme.spacingMedium
+
+        background: Rectangle {
+            color: Theme.surfaceColor
+            radius: Theme.cardRadius
+            border.width: 1
+            border.color: Theme.borderColor
+        }
+
+        onOpened: {
+            globalTranslationInput.text = TranslationManager.translate(editKey, "")
+            globalTranslationInput.forceActiveFocus()
+        }
+
+        contentItem: ColumnLayout {
+            spacing: Theme.spacingMedium
+
+            Text {
+                text: "Edit Translation"
+                font: Theme.titleFont
+                color: Theme.textColor
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingSmall
+
+                Text {
+                    text: "Key:"
+                    font: Theme.labelFont
+                    color: Theme.textSecondaryColor
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    text: globalTranslationEditor.editKey
+                    font: Theme.labelFont
+                    color: Theme.textColor
+                    elide: Text.ElideMiddle
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingSmall
+
+                Text {
+                    text: "English (original):"
+                    font: Theme.labelFont
+                    color: Theme.textSecondaryColor
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: globalEnglishText.height + 16
+                    color: Theme.backgroundColor
+                    radius: 4
+
+                    Text {
+                        id: globalEnglishText
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        text: globalTranslationEditor.editFallback
+                        font: Theme.bodyFont
+                        color: Theme.textColor
+                        wrapMode: Text.Wrap
+                    }
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingSmall
+
+                Text {
+                    text: "Translation (" + TranslationManager.getLanguageDisplayName(TranslationManager.currentLanguage) + "):"
+                    font: Theme.labelFont
+                    color: Theme.textSecondaryColor
+                }
+
+                StyledTextField {
+                    id: globalTranslationInput
+                    Layout.fillWidth: true
+                    placeholderText: "Enter translation..."
+
+                    Keys.onReturnPressed: globalSaveButton.clicked()
+                    Keys.onEnterPressed: globalSaveButton.clicked()
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingMedium
+
+                Item { Layout.fillWidth: true }
+
+                Button {
+                    text: "Cancel"
+                    onClicked: globalTranslationEditor.close()
+
+                    background: Rectangle {
+                        implicitWidth: 80
+                        implicitHeight: Theme.touchTargetMin
+                        color: parent.down ? Qt.darker(Theme.surfaceColor, 1.2) : Theme.surfaceColor
+                        radius: Theme.buttonRadius
+                        border.width: 1
+                        border.color: Theme.borderColor
+                    }
+
+                    contentItem: Text {
+                        text: parent.text
+                        font: Theme.bodyFont
+                        color: Theme.textColor
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                Button {
+                    id: globalSaveButton
+                    text: "Save"
+                    onClicked: {
+                        if (globalTranslationInput.text.trim() !== "") {
+                            TranslationManager.setTranslation(globalTranslationEditor.editKey, globalTranslationInput.text.trim())
+                        } else {
+                            TranslationManager.deleteTranslation(globalTranslationEditor.editKey)
+                        }
+                        globalTranslationEditor.close()
+                    }
+
+                    background: Rectangle {
+                        implicitWidth: 80
+                        implicitHeight: Theme.touchTargetMin
+                        color: parent.down ? Qt.darker(Theme.primaryColor, 1.2) : Theme.primaryColor
+                        radius: Theme.buttonRadius
+                    }
+
+                    contentItem: Text {
+                        text: parent.text
+                        font: Theme.bodyFont
+                        color: "white"
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+            }
+        }
+    }
+
+    // Floating "Done Editing" button - appears when translation edit mode is active
+    Rectangle {
+        id: doneEditingButton
+        visible: typeof TranslationManager !== "undefined" && TranslationManager.editModeEnabled
+        z: 10002  // Above the translation overlay
+
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.topMargin: Theme.scaled(10)
+
+        width: doneEditingRow.width + Theme.scaled(24)
+        height: Theme.scaled(40)
+        radius: height / 2
+        color: Theme.primaryColor
+
+        RowLayout {
+            id: doneEditingRow
+            anchors.centerIn: parent
+            spacing: Theme.spacingSmall
+
+            Text {
+                text: "✓"
+                font.pixelSize: Theme.scaled(16)
+                color: "white"
+            }
+
+            Text {
+                text: "Done Editing"
+                font: Theme.bodyFont
+                color: "white"
+            }
+
+            // Show count of untranslated strings
+            Rectangle {
+                visible: TranslationManager.untranslatedCount > 0
+                width: untranslatedText.width + Theme.scaled(12)
+                height: Theme.scaled(22)
+                radius: height / 2
+                color: Theme.warningColor
+
+                Text {
+                    id: untranslatedText
+                    anchors.centerIn: parent
+                    text: TranslationManager.untranslatedCount
+                    font.pixelSize: Theme.scaled(12)
+                    font.bold: true
+                    color: "white"
+                }
+            }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: TranslationManager.editModeEnabled = false
+        }
+    }
+
     // Page stack for navigation
     StackView {
         id: pageStack
@@ -287,16 +607,20 @@ ApplicationWindow {
     // Global error dialog for BLE issues
     Dialog {
         id: bleErrorDialog
-        title: "Enable Location"
         modal: true
         anchors.centerIn: parent
 
         property string errorMessage: ""
         property bool isLocationError: false
 
+        // Translatable title
+        Tr { id: trEnableLocation; key: "main.dialog.enableLocation.title"; fallback: "Enable Location"; visible: false }
+        Tr { id: trErrorPrefix; key: "common.accessibility.errorPrefix"; fallback: "Error:"; visible: false }
+        title: trEnableLocation.text
+
         onOpened: {
             if (AccessibilityManager.enabled) {
-                AccessibilityManager.announce("Error: " + errorMessage, true)
+                AccessibilityManager.announce(trErrorPrefix.text + " " + errorMessage, true)
             }
         }
 
@@ -311,8 +635,9 @@ ApplicationWindow {
             }
 
             AccessibleButton {
-                text: "Open Location Settings"
-                accessibleName: "Open location settings"
+                Tr { id: trOpenLocationSettings; key: "main.button.openLocationSettings"; fallback: "Open Location Settings"; visible: false }
+                text: trOpenLocationSettings.text
+                accessibleName: trOpenLocationSettings.text
                 visible: bleErrorDialog.isLocationError
                 anchors.horizontalCenter: parent.horizontalCenter
                 onClicked: {
@@ -322,8 +647,10 @@ ApplicationWindow {
             }
 
             AccessibleButton {
-                text: "OK"
-                accessibleName: "Dismiss dialog"
+                Tr { id: trOkBle; key: "common.button.ok"; fallback: "OK"; visible: false }
+                text: trOkBle.text
+                accessibleName: trDismissDialogBle.text
+                Tr { id: trDismissDialogBle; key: "common.accessibility.dismissDialog"; fallback: "Dismiss dialog"; visible: false }
                 anchors.horizontalCenter: parent.horizontalCenter
                 onClicked: bleErrorDialog.close()
             }
@@ -359,30 +686,37 @@ ApplicationWindow {
     // FlowScale fallback dialog (no scale found at startup)
     Dialog {
         id: flowScaleDialog
-        title: "No Scale Found"
         modal: true
         anchors.centerIn: parent
 
+        Tr { id: trNoScaleFoundTitle; key: "main.dialog.noScaleFound.title"; fallback: "No Scale Found"; visible: false }
+        title: trNoScaleFoundTitle.text
+
         onOpened: {
             if (AccessibilityManager.enabled) {
-                AccessibilityManager.announce("No Bluetooth scale detected. Using estimated weight from flow measurement.", true)
+                AccessibilityManager.announce(trNoScaleFoundAnnounce.text, true)
             }
         }
+
+        Tr { id: trNoScaleFoundAnnounce; key: "main.dialog.noScaleFound.announce"; fallback: "No Bluetooth scale detected. Using estimated weight from flow measurement."; visible: false }
 
         Column {
             spacing: Theme.spacingMedium
             width: Theme.dialogWidth
 
-            Label {
-                text: "No Bluetooth scale was detected.\n\nUsing estimated weight from DE1 flow measurement instead.\n\nYou can search for your scale in Settings → Bluetooth."
+            Tr {
+                key: "main.dialog.noScaleFound.message"
+                fallback: "No Bluetooth scale was detected.\n\nUsing estimated weight from DE1 flow measurement instead.\n\nYou can search for your scale in Settings → Bluetooth."
                 wrapMode: Text.Wrap
                 width: parent.width
                 font: Theme.labelFont
             }
 
             AccessibleButton {
-                text: "OK"
-                accessibleName: "Dismiss dialog"
+                Tr { id: trOkFlow; key: "common.button.ok"; fallback: "OK"; visible: false }
+                Tr { id: trDismissFlow; key: "common.accessibility.dismissDialog"; fallback: "Dismiss dialog"; visible: false }
+                text: trOkFlow.text
+                accessibleName: trDismissFlow.text
                 anchors.horizontalCenter: parent.horizontalCenter
                 onClicked: flowScaleDialog.close()
             }
@@ -392,30 +726,37 @@ ApplicationWindow {
     // Scale disconnected dialog
     Dialog {
         id: scaleDisconnectedDialog
-        title: "Scale Disconnected"
         modal: true
         anchors.centerIn: parent
 
+        Tr { id: trScaleDisconnectedTitle; key: "main.dialog.scaleDisconnected.title"; fallback: "Scale Disconnected"; visible: false }
+        title: trScaleDisconnectedTitle.text
+
         onOpened: {
             if (AccessibilityManager.enabled) {
-                AccessibilityManager.announce("Warning: Scale disconnected", true)
+                AccessibilityManager.announce(trScaleDisconnectedAnnounce.text, true)
             }
         }
+
+        Tr { id: trScaleDisconnectedAnnounce; key: "main.dialog.scaleDisconnected.announce"; fallback: "Warning: Scale disconnected"; visible: false }
 
         Column {
             spacing: Theme.spacingMedium
             width: Theme.dialogWidth
 
-            Label {
-                text: "Your Bluetooth scale has disconnected.\n\nUsing estimated weight from DE1 flow measurement until the scale reconnects.\n\nCheck that your scale is powered on and in range."
+            Tr {
+                key: "main.dialog.scaleDisconnected.message"
+                fallback: "Your Bluetooth scale has disconnected.\n\nUsing estimated weight from DE1 flow measurement until the scale reconnects.\n\nCheck that your scale is powered on and in range."
                 wrapMode: Text.Wrap
                 width: parent.width
                 font: Theme.labelFont
             }
 
             AccessibleButton {
-                text: "OK"
-                accessibleName: "Dismiss dialog"
+                Tr { id: trOkScaleDisc; key: "common.button.ok"; fallback: "OK"; visible: false }
+                Tr { id: trDismissScaleDisc; key: "common.accessibility.dismissDialog"; fallback: "Dismiss dialog"; visible: false }
+                text: trOkScaleDisc.text
+                accessibleName: trDismissScaleDisc.text
                 anchors.horizontalCenter: parent.horizontalCenter
                 onClicked: scaleDisconnectedDialog.close()
             }
@@ -425,31 +766,38 @@ ApplicationWindow {
     // Water tank refill dialog
     Dialog {
         id: refillDialog
-        title: "Refill Water Tank"
         modal: true
         anchors.centerIn: parent
         closePolicy: Popup.NoAutoClose
 
+        Tr { id: trRefillTitle; key: "main.dialog.refillWater.title"; fallback: "Refill Water Tank"; visible: false }
+        title: trRefillTitle.text
+
         onOpened: {
             if (AccessibilityManager.enabled) {
-                AccessibilityManager.announce("Warning: Water tank needs refill", true)
+                AccessibilityManager.announce(trRefillAnnounce.text, true)
             }
         }
+
+        Tr { id: trRefillAnnounce; key: "main.dialog.refillWater.announce"; fallback: "Warning: Water tank needs refill"; visible: false }
 
         Column {
             spacing: Theme.spacingMedium
             width: Theme.dialogWidth
 
-            Label {
-                text: "The water tank is empty.\n\nPlease refill the water tank and press OK to continue."
+            Tr {
+                key: "main.dialog.refillWater.message"
+                fallback: "The water tank is empty.\n\nPlease refill the water tank and press OK to continue."
                 wrapMode: Text.Wrap
                 width: parent.width
                 font: Theme.bodyFont
             }
 
             AccessibleButton {
-                text: "OK"
-                accessibleName: "Dismiss refill warning"
+                Tr { id: trOkRefill; key: "common.button.ok"; fallback: "OK"; visible: false }
+                Tr { id: trDismissRefill; key: "main.accessibility.dismissRefillWarning"; fallback: "Dismiss refill warning"; visible: false }
+                text: trOkRefill.text
+                accessibleName: trDismissRefill.text
                 anchors.horizontalCenter: parent.horizontalCenter
                 onClicked: refillDialog.close()
             }
@@ -471,6 +819,11 @@ ApplicationWindow {
     // Completion overlay
     property string completionMessage: ""
     property string completionType: ""  // "steam", "hotwater", "flush"
+
+    // Translatable completion messages
+    Tr { id: trSteamComplete; key: "main.completion.steam"; fallback: "Steam Complete"; visible: false }
+    Tr { id: trHotWaterComplete; key: "main.completion.hotwater"; fallback: "Hot Water Complete"; visible: false }
+    Tr { id: trFlushComplete; key: "main.completion.flush"; fallback: "Flush Complete"; visible: false }
 
     Rectangle {
         id: completionOverlay
@@ -548,25 +901,30 @@ ApplicationWindow {
     // First-run welcome dialog
     Dialog {
         id: firstRunDialog
-        title: "Welcome to Decenza DE1"
         modal: true
         anchors.centerIn: parent
         closePolicy: Popup.NoAutoClose
+
+        Tr { id: trWelcomeTitle; key: "main.dialog.welcome.title"; fallback: "Welcome to Decenza DE1"; visible: false }
+        title: trWelcomeTitle.text
 
         Column {
             spacing: Theme.spacingLarge
             width: Theme.dialogWidth
 
-            Label {
-                text: "Before we begin:\n\n• Turn on your DE1 by holding the middle stop button for a few seconds\n• Power on your Bluetooth scale\n\nThe app will search for your DE1 espresso machine and compatible scales."
+            Tr {
+                key: "main.dialog.welcome.message"
+                fallback: "Before we begin:\n\n• Turn on your DE1 by holding the middle stop button for a few seconds\n• Power on your Bluetooth scale\n\nThe app will search for your DE1 espresso machine and compatible scales."
                 wrapMode: Text.Wrap
                 width: parent.width
                 font: Theme.bodyFont
             }
 
             AccessibleButton {
-                text: "Continue"
-                accessibleName: "Continue to app"
+                Tr { id: trContinue; key: "common.button.continue"; fallback: "Continue"; visible: false }
+                Tr { id: trContinueToApp; key: "main.accessibility.continueToApp"; fallback: "Continue to app"; visible: false }
+                text: trContinue.text
+                accessibleName: trContinueToApp.text
                 anchors.horizontalCenter: parent.horizontalCenter
                 onClicked: {
                     Settings.setValue("firstRunComplete", true)
@@ -580,24 +938,28 @@ ApplicationWindow {
     // Storage setup dialog (Android 11+ - request MANAGE_EXTERNAL_STORAGE permission)
     Dialog {
         id: storageSetupDialog
-        title: "Save profiles to Documents?"
         modal: true
         anchors.centerIn: parent
         closePolicy: Popup.NoAutoClose
+
+        Tr { id: trStorageTitle; key: "main.dialog.storage.title"; fallback: "Save profiles to Documents?"; visible: false }
+        title: trStorageTitle.text
 
         Column {
             spacing: Theme.spacingLarge
             width: Theme.dialogWidth
 
-            Label {
-                text: "Allow Decenza to save profiles to Documents/Decenza so they survive if you reinstall the app."
+            Tr {
+                key: "main.dialog.storage.message"
+                fallback: "Allow Decenza to save profiles to Documents/Decenza so they survive if you reinstall the app."
                 wrapMode: Text.Wrap
                 width: parent.width
                 font: Theme.bodyFont
             }
 
-            Label {
-                text: "If you skip this, profiles may be lost on reinstall (updates should be fine)."
+            Tr {
+                key: "main.dialog.storage.warning"
+                fallback: "If you skip this, profiles may be lost on reinstall (updates should be fine)."
                 wrapMode: Text.Wrap
                 width: parent.width
                 font: Theme.labelFont
@@ -609,8 +971,10 @@ ApplicationWindow {
                 anchors.horizontalCenter: parent.horizontalCenter
 
                 AccessibleButton {
-                    text: "Skip"
-                    accessibleName: "Skip storage setup"
+                    Tr { id: trSkip; key: "common.button.skip"; fallback: "Skip"; visible: false }
+                    Tr { id: trSkipStorage; key: "main.accessibility.skipStorageSetup"; fallback: "Skip storage setup"; visible: false }
+                    text: trSkip.text
+                    accessibleName: trSkipStorage.text
                     onClicked: {
                         ProfileStorage.skipSetup()
                         storageSetupDialog.close()
@@ -619,8 +983,10 @@ ApplicationWindow {
                 }
 
                 AccessibleButton {
-                    text: "Allow"
-                    accessibleName: "Allow storage access"
+                    Tr { id: trAllow; key: "common.button.allow"; fallback: "Allow"; visible: false }
+                    Tr { id: trAllowStorage; key: "main.accessibility.allowStorageAccess"; fallback: "Allow storage access"; visible: false }
+                    text: trAllow.text
+                    accessibleName: trAllowStorage.text
                     onClicked: {
                         ProfileStorage.selectFolder()
                         // Dialog stays open - will close when app resumes with permission granted
@@ -724,11 +1090,11 @@ ApplicationWindow {
                 // Note: Don't check pageStack.busy here - completion must always be handled
 
                 if (currentPage === "steamPage") {
-                    showCompletion("Steam Complete", "steam")
+                    showCompletion(trSteamComplete.text, "steam")
                 } else if (currentPage === "hotWaterPage") {
-                    showCompletion("Hot Water Complete", "hotwater")
+                    showCompletion(trHotWaterComplete.text, "hotwater")
                 } else if (currentPage === "flushPage") {
-                    showCompletion("Flush Complete", "flush")
+                    showCompletion(trFlushComplete.text, "flush")
                 }
             }
         }
@@ -881,10 +1247,11 @@ ApplicationWindow {
         color: "#E65100"
         z: 999
 
-        Text {
+        Tr {
             id: simLabel
             anchors.centerIn: parent
-            text: "SIMULATION MODE (Ctrl+D to toggle)"
+            key: "main.label.simulationMode"
+            fallback: "SIMULATION MODE (Ctrl+D to toggle)"
             color: "white"
             font.pixelSize: 14
             font.bold: true
@@ -919,7 +1286,7 @@ ApplicationWindow {
                 // Swipe left threshold: -100 pixels
                 if (avgDeltaX < -100) {
                     // Two-finger swipe left = go back
-                    AccessibilityManager.announce("Going back")
+                    AccessibilityManager.announce(trAnnounceGoingBack.text)
                     if (stackView.depth > 1) {
                         stackView.pop()
                     } else {
@@ -952,6 +1319,20 @@ ApplicationWindow {
     }
 
     // ============ ACCESSIBILITY: Machine State Announcements ============
+    // Translatable accessibility announcements for machine state
+    Tr { id: trAnnounceDisconnected; key: "main.accessibility.machineDisconnected"; fallback: "Machine disconnected"; visible: false }
+    Tr { id: trAnnounceSleeping; key: "main.accessibility.machineSleeping"; fallback: "Machine sleeping"; visible: false }
+    Tr { id: trAnnounceIdle; key: "main.accessibility.machineIdle"; fallback: "Machine idle"; visible: false }
+    Tr { id: trAnnounceHeating; key: "main.accessibility.heating"; fallback: "Heating"; visible: false }
+    Tr { id: trAnnounceReady; key: "main.accessibility.ready"; fallback: "Ready"; visible: false }
+    Tr { id: trAnnouncePreheating; key: "main.accessibility.preheatingEspresso"; fallback: "Preheating for espresso"; visible: false }
+    Tr { id: trAnnouncePreinfusion; key: "main.accessibility.preinfusionStarted"; fallback: "Preinfusion started"; visible: false }
+    Tr { id: trAnnouncePouring; key: "main.accessibility.pouring"; fallback: "Pouring"; visible: false }
+    Tr { id: trAnnounceShotComplete; key: "main.accessibility.shotComplete"; fallback: "Shot complete"; visible: false }
+    Tr { id: trAnnounceSteaming; key: "main.accessibility.steaming"; fallback: "Steaming"; visible: false }
+    Tr { id: trAnnounceHotWater; key: "main.accessibility.dispensingHotWater"; fallback: "Dispensing hot water"; visible: false }
+    Tr { id: trAnnounceFlushing; key: "main.accessibility.flushing"; fallback: "Flushing"; visible: false }
+
     Connections {
         target: MachineState
         enabled: AccessibilityManager.enabled
@@ -962,40 +1343,40 @@ ApplicationWindow {
 
             switch (phase) {
                 case MachineStateType.Phase.Disconnected:
-                    announcement = "Machine disconnected"
+                    announcement = trAnnounceDisconnected.text
                     break
                 case MachineStateType.Phase.Sleep:
-                    announcement = "Machine sleeping"
+                    announcement = trAnnounceSleeping.text
                     break
                 case MachineStateType.Phase.Idle:
-                    announcement = "Machine idle"
+                    announcement = trAnnounceIdle.text
                     break
                 case MachineStateType.Phase.Heating:
-                    announcement = "Heating"
+                    announcement = trAnnounceHeating.text
                     break
                 case MachineStateType.Phase.Ready:
-                    announcement = "Ready"
+                    announcement = trAnnounceReady.text
                     break
                 case MachineStateType.Phase.EspressoPreheating:
-                    announcement = "Preheating for espresso"
+                    announcement = trAnnouncePreheating.text
                     break
                 case MachineStateType.Phase.Preinfusion:
-                    announcement = "Preinfusion started"
+                    announcement = trAnnouncePreinfusion.text
                     break
                 case MachineStateType.Phase.Pouring:
-                    announcement = "Pouring"
+                    announcement = trAnnouncePouring.text
                     break
                 case MachineStateType.Phase.Ending:
-                    announcement = "Shot complete"
+                    announcement = trAnnounceShotComplete.text
                     break
                 case MachineStateType.Phase.Steaming:
-                    announcement = "Steaming"
+                    announcement = trAnnounceSteaming.text
                     break
                 case MachineStateType.Phase.HotWater:
-                    announcement = "Dispensing hot water"
+                    announcement = trAnnounceHotWater.text
                     break
                 case MachineStateType.Phase.Flushing:
-                    announcement = "Flushing"
+                    announcement = trAnnounceFlushing.text
                     break
             }
 
@@ -1006,15 +1387,19 @@ ApplicationWindow {
     }
 
     // ============ ACCESSIBILITY: Connection Status Announcements ============
+    Tr { id: trAnnounceMachineConnected; key: "main.accessibility.machineConnected"; fallback: "Machine connected"; visible: false }
+    Tr { id: trAnnounceScaleConnected; key: "main.accessibility.scaleConnected"; fallback: "Scale connected:"; visible: false }
+    Tr { id: trAnnounceGoingBack; key: "main.accessibility.goingBack"; fallback: "Going back"; visible: false }
+
     Connections {
         target: DE1Device
         enabled: AccessibilityManager.enabled
 
         function onConnectedChanged() {
             if (DE1Device.connected) {
-                AccessibilityManager.announce("Machine connected")
+                AccessibilityManager.announce(trAnnounceMachineConnected.text)
             } else {
-                AccessibilityManager.announce("Machine disconnected", true)
+                AccessibilityManager.announce(trAnnounceDisconnected.text, true)
             }
         }
     }
@@ -1025,9 +1410,53 @@ ApplicationWindow {
 
         function onConnectedChanged() {
             if (ScaleDevice && ScaleDevice.connected) {
-                AccessibilityManager.announce("Scale connected: " + ScaleDevice.name)
+                AccessibilityManager.announce(trAnnounceScaleConnected.text + " " + ScaleDevice.name)
             }
             // Disconnection is handled by scaleDisconnectedDialog
+        }
+    }
+
+    // ============ GLOBAL HIDE KEYBOARD BUTTON ============
+    // Appears when soft keyboard is visible - positioned at top right below status bar
+    Rectangle {
+        id: globalHideKeyboardButton
+        visible: Qt.inputMethod.visible
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.rightMargin: Theme.standardMargin
+        anchors.topMargin: Theme.pageTopMargin + 4
+        width: hideKeyboardText.contentWidth + 24
+        height: 32
+        radius: 16
+        color: Theme.primaryColor
+        z: 9999  // Above everything
+
+        Row {
+            anchors.centerIn: parent
+            spacing: 6
+
+            Image {
+                source: "qrc:/icons/keyboard_hide.svg"
+                sourceSize.width: 18
+                sourceSize.height: 18
+                anchors.verticalCenter: parent.verticalCenter
+                visible: status === Image.Ready
+            }
+
+            Tr {
+                id: hideKeyboardText
+                key: "main.button.hideKeyboard"
+                fallback: "Hide keyboard"
+                color: "white"
+                font.pixelSize: 13
+                font.bold: true
+                verticalAlignment: Text.AlignVCenter
+            }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: Qt.inputMethod.hide()
         }
     }
 }

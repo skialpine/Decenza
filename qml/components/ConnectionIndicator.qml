@@ -9,22 +9,64 @@ ColumnLayout {
 
     spacing: Theme.spacingSmall
 
-    Text {
+    // Connection status (Online/Offline)
+    Item {
         Layout.alignment: Qt.AlignHCenter
-        text: machineConnected ? "Online" : "Offline"
-        color: machineConnected ? Theme.successColor : Theme.errorColor
-        font: Theme.valueFont
+        implicitWidth: machineConnected ? onlineText.implicitWidth : offlineText.implicitWidth
+        implicitHeight: machineConnected ? onlineText.implicitHeight : offlineText.implicitHeight
+
+        Tr {
+            id: onlineText
+            key: "connection.online"
+            fallback: "Online"
+            visible: machineConnected
+            color: Theme.successColor
+            font: Theme.valueFont
+        }
+
+        Tr {
+            id: offlineText
+            key: "connection.offline"
+            fallback: "Offline"
+            visible: !machineConnected
+            color: Theme.errorColor
+            font: Theme.valueFont
+        }
     }
 
-    Text {
+    // Connection details (Machine, Machine + Scale, etc.)
+    Item {
         Layout.alignment: Qt.AlignHCenter
-        text: {
-            if (!machineConnected) return "Machine"
-            if (scaleConnected && !isFlowScale) return "Machine + Scale"
-            if (isFlowScale) return "Machine + Simulated Scale"
-            return "Machine"
+        implicitWidth: Math.max(machineOnlyText.visible ? machineOnlyText.implicitWidth : 0,
+                                machineScaleText.visible ? machineScaleText.implicitWidth : 0,
+                                machineSimulatedText.visible ? machineSimulatedText.implicitWidth : 0)
+        implicitHeight: machineOnlyText.implicitHeight
+
+        Tr {
+            id: machineOnlyText
+            key: "connection.machine"
+            fallback: "Machine"
+            visible: !machineConnected || (machineConnected && !scaleConnected && !isFlowScale)
+            color: Theme.textSecondaryColor
+            font: Theme.labelFont
         }
-        color: Theme.textSecondaryColor
-        font: Theme.labelFont
+
+        Tr {
+            id: machineScaleText
+            key: "connection.machineScale"
+            fallback: "Machine + Scale"
+            visible: machineConnected && scaleConnected && !isFlowScale
+            color: Theme.textSecondaryColor
+            font: Theme.labelFont
+        }
+
+        Tr {
+            id: machineSimulatedText
+            key: "connection.machineSimulatedScale"
+            fallback: "Machine + Simulated Scale"
+            visible: machineConnected && isFlowScale
+            color: Theme.textSecondaryColor
+            font: Theme.labelFont
+        }
     }
 }

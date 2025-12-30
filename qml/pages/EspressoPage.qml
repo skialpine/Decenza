@@ -140,10 +140,11 @@ Page {
         Accessible.role: Accessible.Alert
         Accessible.name: "Preheating"
 
-        Text {
+        Tr {
             id: statusText
             anchors.centerIn: parent
-            text: "PREHEATING..."
+            key: "espresso.status.preheating"
+            fallback: "PREHEATING..."
             color: Theme.textColor
             font: Theme.bodyFont
         }
@@ -205,8 +206,9 @@ Page {
                     font.pixelSize: Theme.scaled(36)
                     font.weight: Font.Bold
                 }
-                Text {
-                    text: "Time"
+                Tr {
+                    key: "espresso.label.time"
+                    fallback: "Time"
                     color: Theme.textSecondaryColor
                     font: Theme.captionFont
                 }
@@ -236,8 +238,9 @@ Page {
                     font.pixelSize: Theme.scaled(28)
                     font.weight: Font.Medium
                 }
-                Text {
-                    text: "bar"
+                Tr {
+                    key: "espresso.unit.bar"
+                    fallback: "bar"
                     color: Theme.textSecondaryColor
                     font: Theme.captionFont
                 }
@@ -257,8 +260,9 @@ Page {
                     font.pixelSize: Theme.scaled(28)
                     font.weight: Font.Medium
                 }
-                Text {
-                    text: "mL/s"
+                Tr {
+                    key: "espresso.unit.flowRate"
+                    fallback: "mL/s"
                     color: Theme.textSecondaryColor
                     font: Theme.captionFont
                 }
@@ -278,8 +282,9 @@ Page {
                     font.pixelSize: Theme.scaled(28)
                     font.weight: Font.Medium
                 }
-                Text {
-                    text: "°C"
+                Tr {
+                    key: "espresso.unit.celsius"
+                    fallback: "°C"
                     color: Theme.textSecondaryColor
                     font: Theme.captionFont
                 }

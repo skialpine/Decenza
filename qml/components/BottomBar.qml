@@ -36,8 +36,8 @@ Rectangle {
             activeFocusOnTab: true
 
             Accessible.role: Accessible.Button
-            Accessible.name: "Back"
-            Accessible.description: "Go back to previous screen"
+            Accessible.name: TranslationManager.translate("bottombar.button.back", "Back")
+            Accessible.description: TranslationManager.translate("bottombar.button.back.description", "Go back to previous screen")
             Accessible.focusable: true
 
             // Focus indicator
@@ -64,7 +64,7 @@ Rectangle {
 
             AccessibleMouseArea {
                 anchors.fill: parent
-                accessibleName: "Back. Return to previous screen"
+                accessibleName: TranslationManager.translate("bottombar.button.back.accessible", "Back. Return to previous screen")
                 accessibleItem: backButton
                 onAccessibleClicked: root.backClicked()
             }

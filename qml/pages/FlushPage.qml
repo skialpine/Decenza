@@ -8,14 +8,16 @@ Page {
     objectName: "flushPage"
     background: Rectangle { color: Theme.backgroundColor }
 
+    property string pageTitle: TranslationManager.translate("flush.title", "Flush")
+
     Component.onCompleted: {
-        root.currentPageTitle = "Flush"
+        root.currentPageTitle = pageTitle
         // Sync Settings with selected preset
         Settings.flushFlow = getCurrentPresetFlow()
         Settings.flushSeconds = getCurrentPresetSeconds()
         MainController.applyFlushSettings()
     }
-    StackView.onActivated: root.currentPageTitle = "Flush"
+    StackView.onActivated: root.currentPageTitle = pageTitle
 
     property bool isFlushing: MachineState.phase === MachineStateType.Phase.Flushing || root.debugLiveView
     property int editingPresetIndex: -1
@@ -144,9 +146,10 @@ Page {
                 radius: Theme.cardRadius
                 color: stopMouseArea.pressed ? Qt.darker(Theme.errorColor, 1.2) : Theme.errorColor
 
-                Text {
+                Tr {
                     anchors.centerIn: parent
-                    text: "Stop"
+                    key: "flush.button.stop"
+                    fallback: "Stop"
                     color: "white"
                     font.pixelSize: Theme.scaled(24)
                     font.weight: Font.Bold
@@ -155,7 +158,7 @@ Page {
                 AccessibleMouseArea {
                     id: stopMouseArea
                     anchors.fill: parent
-                    accessibleName: "Stop flushing"
+                    accessibleName: TranslationManager.translate("flush.accessible.stopFlushing", "Stop flushing")
                     accessibleItem: flushStopButton
                     onAccessibleClicked: {
                         DE1Device.stopOperation()
@@ -186,8 +189,9 @@ Page {
                     anchors.margins: 12
                     spacing: Theme.scaled(20)
 
-                    Text {
-                        text: "Flush Preset"
+                    Tr {
+                        key: "flush.label.preset"
+                        fallback: "Flush Preset"
                         color: Theme.textColor
                         font.pixelSize: Theme.scaled(24)
                     }
@@ -331,7 +335,7 @@ Page {
 
                             AccessibleMouseArea {
                                 anchors.fill: parent
-                                accessibleName: "Add new flush preset"
+                                accessibleName: TranslationManager.translate("flush.accessible.addPreset", "Add new flush preset")
                                 accessibleItem: addPresetButton
                                 onAccessibleClicked: addPresetDialog.open()
                             }
@@ -340,8 +344,9 @@ Page {
 
                     Item { Layout.fillWidth: true }
 
-                    Text {
-                        text: "Drag to reorder, hold or double-click to edit"
+                    Tr {
+                        key: "flush.hint.reorder"
+                        fallback: "Drag to reorder, hold or double-click to edit"
                         color: Theme.textSecondaryColor
                         font: Theme.labelFont
                     }
@@ -365,8 +370,9 @@ Page {
                         Layout.fillWidth: true
                         spacing: 16
 
-                        Text {
-                            text: "Duration"
+                        Tr {
+                            key: "flush.label.duration"
+                            fallback: "Duration"
                             color: Theme.textColor
                             font.pixelSize: Theme.scaled(24)
                         }
@@ -399,8 +405,9 @@ Page {
                         Layout.fillWidth: true
                         spacing: 16
 
-                        Text {
-                            text: "Flow Rate"
+                        Tr {
+                            key: "flush.label.flowRate"
+                            fallback: "Flow Rate"
                             color: Theme.textColor
                             font.pixelSize: Theme.scaled(24)
                         }
@@ -435,7 +442,7 @@ Page {
     // Bottom bar
     BottomBar {
         visible: !isFlushing
-        title: getCurrentPresetName() || "Flush"
+        title: getCurrentPresetName() || pageTitle
         onBackClicked: {
             MainController.applyFlushSettings()
             root.goToIdle()
@@ -490,8 +497,9 @@ Page {
         contentItem: ColumnLayout {
             spacing: 15
 
-            Text {
-                text: "Edit Flush Preset"
+            Tr {
+                key: "flush.popup.editPreset"
+                fallback: "Edit Flush Preset"
                 color: Theme.textColor
                 font: Theme.subtitleFont
             }
@@ -513,10 +521,11 @@ Page {
                     verticalAlignment: TextInput.AlignVCenter
                     inputMethodHints: Qt.ImhNoPredictiveText
 
-                    Text {
+                    Tr {
                         anchors.fill: parent
                         verticalAlignment: Text.AlignVCenter
-                        text: "Preset name"
+                        key: "flush.placeholder.presetName"
+                        fallback: "Preset name"
                         color: Theme.textSecondaryColor
                         font: parent.font
                         visible: !parent.text && !parent.activeFocus
@@ -528,8 +537,8 @@ Page {
                 spacing: 10
 
                 AccessibleButton {
-                    text: "Delete"
-                    accessibleName: "Delete preset"
+                    text: TranslationManager.translate("flush.button.delete", "Delete")
+                    accessibleName: TranslationManager.translate("flush.accessible.deletePreset", "Delete preset")
                     onClicked: {
                         Settings.removeFlushPreset(editingPresetIndex)
                         editPresetPopup.close()
@@ -552,8 +561,8 @@ Page {
                 Item { Layout.fillWidth: true }
 
                 AccessibleButton {
-                    text: "Cancel"
-                    accessibleName: "Cancel"
+                    text: TranslationManager.translate("flush.button.cancel", "Cancel")
+                    accessibleName: TranslationManager.translate("flush.button.cancel", "Cancel")
                     onClicked: editPresetPopup.close()
                     background: Rectangle {
                         implicitWidth: 70
@@ -571,8 +580,8 @@ Page {
                 }
 
                 AccessibleButton {
-                    text: "Save"
-                    accessibleName: "Save preset"
+                    text: TranslationManager.translate("flush.button.save", "Save")
+                    accessibleName: TranslationManager.translate("flush.accessible.savePreset", "Save preset")
                     onClicked: {
                         var preset = Settings.getFlushPreset(editingPresetIndex)
                         Settings.updateFlushPreset(editingPresetIndex, editPresetNameInput.text, preset.flow, preset.seconds)
@@ -632,8 +641,9 @@ Page {
         contentItem: ColumnLayout {
             spacing: 15
 
-            Text {
-                text: "Add Flush Preset"
+            Tr {
+                key: "flush.popup.addPreset"
+                fallback: "Add Flush Preset"
                 color: Theme.textColor
                 font: Theme.subtitleFont
             }
@@ -655,10 +665,11 @@ Page {
                     verticalAlignment: TextInput.AlignVCenter
                     inputMethodHints: Qt.ImhNoPredictiveText
 
-                    Text {
+                    Tr {
                         anchors.fill: parent
                         verticalAlignment: Text.AlignVCenter
-                        text: "Preset name"
+                        key: "flush.placeholder.presetName"
+                        fallback: "Preset name"
                         color: Theme.textSecondaryColor
                         font: parent.font
                         visible: !parent.text && !parent.activeFocus
@@ -672,8 +683,8 @@ Page {
                 Item { Layout.fillWidth: true }
 
                 AccessibleButton {
-                    text: "Cancel"
-                    accessibleName: "Cancel"
+                    text: TranslationManager.translate("flush.button.cancel", "Cancel")
+                    accessibleName: TranslationManager.translate("flush.button.cancel", "Cancel")
                     onClicked: addPresetDialog.close()
                     background: Rectangle {
                         implicitWidth: 70
@@ -691,8 +702,8 @@ Page {
                 }
 
                 AccessibleButton {
-                    text: "Add"
-                    accessibleName: "Add preset"
+                    text: TranslationManager.translate("flush.button.add", "Add")
+                    accessibleName: TranslationManager.translate("flush.accessible.addPresetConfirm", "Add preset")
                     onClicked: {
                         if (newPresetNameInput.text.length > 0) {
                             Settings.addFlushPreset(newPresetNameInput.text, 6.0, 5.0)

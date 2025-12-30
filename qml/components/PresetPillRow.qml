@@ -38,7 +38,7 @@ FocusScope {
     function announceCurrentPill() {
         if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled && presets.length > 0) {
             var name = presets[focusedIndex].name || ""
-            var status = focusedIndex === selectedIndex ? ", selected" : ""
+            var status = focusedIndex === selectedIndex ? ", " + TranslationManager.translate("presets.selected", "selected") : ""
             AccessibilityManager.announce(name + status)
         }
     }
@@ -181,8 +181,8 @@ FocusScope {
                         border.width: 1
 
                         Accessible.role: Accessible.Button
-                        Accessible.name: (modelData.preset.name || "") + (isSelected ? ", selected" : "")
-                        Accessible.description: "Double-tap to select."
+                        Accessible.name: (modelData.preset.name || "") + (isSelected ? ", " + TranslationManager.translate("presets.selected", "selected") : "")
+                        Accessible.description: TranslationManager.translate("presets.doubleTapToSelect", "Double-tap to select.")
                         Accessible.focusable: true
 
                         Behavior on color { ColorAnimation { duration: 150 } }
@@ -213,7 +213,7 @@ FocusScope {
                             accessibleName: {
                                 if (!modelData || !modelData.preset) return ""
                                 var name = modelData.preset.name || ""
-                                var status = modelData.index === root.selectedIndex ? ", selected" : ""
+                                var status = modelData.index === root.selectedIndex ? ", " + TranslationManager.translate("presets.selected", "selected") : ""
                                 return name + status
                             }
                             accessibleItem: pill
@@ -222,7 +222,7 @@ FocusScope {
                                 if (!modelData || !modelData.preset) return
                                 // Announce selection
                                 if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
-                                    AccessibilityManager.announce(modelData.preset.name + " selected")
+                                    AccessibilityManager.announce(modelData.preset.name + " " + TranslationManager.translate("presets.selected", "selected"))
                                 }
                                 root.presetSelected(modelData.index)
                             }

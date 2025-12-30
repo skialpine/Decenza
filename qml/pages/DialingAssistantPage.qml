@@ -9,8 +9,8 @@ Page {
     objectName: "dialingAssistantPage"
     background: Rectangle { color: Theme.backgroundColor }
 
-    Component.onCompleted: root.currentPageTitle = "AI Recommendation"
-    StackView.onActivated: root.currentPageTitle = "AI Recommendation"
+    Component.onCompleted: root.currentPageTitle = TranslationManager.translate("dialingassistant.title", "AI Recommendation")
+    StackView.onActivated: root.currentPageTitle = TranslationManager.translate("dialingassistant.title", "AI Recommendation")
 
     ColumnLayout {
         anchors.fill: parent
@@ -36,15 +36,17 @@ Page {
                     palette.dark: Theme.primaryColor
                 }
 
-                Text {
-                    text: "Analyzing your shot..."
+                Tr {
+                    key: "dialingassistant.loading.analyzing"
+                    fallback: "Analyzing your shot..."
                     color: Theme.textSecondaryColor
                     font: Theme.bodyFont
                     Layout.alignment: Qt.AlignHCenter
                 }
 
-                Text {
-                    text: "This may take a few seconds"
+                Tr {
+                    key: "dialingassistant.loading.wait"
+                    fallback: "This may take a few seconds"
                     color: Theme.textSecondaryColor
                     font.pixelSize: 12
                     Layout.alignment: Qt.AlignHCenter
@@ -82,8 +84,9 @@ Page {
                     }
                 }
 
-                Text {
-                    text: "Analysis Failed"
+                Tr {
+                    key: "dialingassistant.error.title"
+                    fallback: "Analysis Failed"
                     color: Theme.textColor
                     font: Theme.subtitleFont
                     Layout.alignment: Qt.AlignHCenter
@@ -111,8 +114,9 @@ Page {
                         border.color: Theme.borderColor
                         border.width: 1
                     }
-                    contentItem: Text {
-                        text: parent.text
+                    contentItem: Tr {
+                        key: "dialingassistant.button.goback"
+                        fallback: "Go Back"
                         color: Theme.textColor
                         font: Theme.bodyFont
                         horizontalAlignment: Text.AlignHCenter
@@ -155,7 +159,7 @@ Page {
                         "ollama": "Ollama"
                     }[provider] || provider
 
-                    return recommendation + "\n\n---\n*Advice by " + providerName + "*"
+                    return recommendation + "\n\n---\n*" + TranslationManager.translate("dialingassistant.attribution", "Advice by") + " " + providerName + "*"
                 }
                 textFormat: Text.MarkdownText
                 wrapMode: TextEdit.WordWrap
@@ -194,8 +198,9 @@ Page {
                     border.color: Theme.borderColor
                     border.width: 1
                 }
-                contentItem: Text {
-                    text: parent.text
+                contentItem: Tr {
+                    key: "dialingassistant.button.copy"
+                    fallback: "Copy"
                     color: Theme.textColor
                     font: Theme.bodyFont
                     horizontalAlignment: Text.AlignHCenter
@@ -213,8 +218,9 @@ Page {
                     radius: 6
                     color: Theme.primaryColor
                 }
-                contentItem: Text {
-                    text: parent.text
+                contentItem: Tr {
+                    key: "dialingassistant.button.done"
+                    fallback: "Done"
                     color: "white"
                     font: Theme.bodyFont
                     horizontalAlignment: Text.AlignHCenter
@@ -241,10 +247,11 @@ Page {
             NumberAnimation { duration: 200 }
         }
 
-        Text {
+        Tr {
             id: copyText
             anchors.centerIn: parent
-            text: "Copied to clipboard"
+            key: "dialingassistant.toast.copied"
+            fallback: "Copied to clipboard"
             color: "white"
             font: Theme.bodyFont
         }

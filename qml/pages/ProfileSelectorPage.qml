@@ -9,8 +9,8 @@ Page {
     objectName: "profileSelectorPage"
     background: Rectangle { color: Theme.backgroundColor }
 
-    Component.onCompleted: root.currentPageTitle = "Profiles"
-    StackView.onActivated: root.currentPageTitle = "Profiles"
+    Component.onCompleted: root.currentPageTitle = TranslationManager.translate("profileselector.title", "Profiles")
+    StackView.onActivated: root.currentPageTitle = TranslationManager.translate("profileselector.title", "Profiles")
 
     RowLayout {
         anchors.fill: parent
@@ -39,7 +39,11 @@ Page {
                         id: viewFilter
                         Layout.preferredWidth: Theme.scaled(230)
                         Layout.preferredHeight: Theme.scaled(44)
-                        model: ["Selected", "Cleaning/Descale", "All Decent Profiles"]
+                        model: [
+                            TranslationManager.translate("profileselector.filter.selected", "Selected"),
+                            TranslationManager.translate("profileselector.filter.cleaning", "Cleaning/Descale"),
+                            TranslationManager.translate("profileselector.filter.all", "All Decent Profiles")
+                        ]
                         currentIndex: 0
 
                         background: Rectangle {
@@ -114,7 +118,7 @@ Page {
 
                     Button {
                         visible: viewFilter.currentIndex === 1  // Cleaning/Descale view
-                        text: "Descaling Wizard"
+                        text: TranslationManager.translate("profileselector.button.descaling_wizard", "Descaling Wizard")
                         Layout.preferredHeight: Theme.scaled(36)
                         onClicked: root.goToDescaling()
 
@@ -136,7 +140,7 @@ Page {
                     }
 
                     Button {
-                        text: "Import from Visualizer"
+                        text: TranslationManager.translate("profileselector.button.import_visualizer", "Import from Visualizer")
                         Layout.preferredHeight: Theme.scaled(36)
                         onClicked: root.goToVisualizerBrowser()
 
@@ -177,15 +181,15 @@ Page {
                     // Helper to get display category from beverageType
                     function getCategoryName(beverageType) {
                         switch (beverageType) {
-                            case "espresso": return "Espresso"
+                            case "espresso": return TranslationManager.translate("profileselector.category.espresso", "Espresso")
                             case "tea":
-                            case "tea_portafilter": return "Tea"
+                            case "tea_portafilter": return TranslationManager.translate("profileselector.category.tea", "Tea")
                             case "pourover":
-                            case "filter": return "Pour Over"
+                            case "filter": return TranslationManager.translate("profileselector.category.pourover", "Pour Over")
                             case "cleaning":
                             case "calibrate":
-                            case "manual": return "Utility"
-                            default: return "Other"
+                            case "manual": return TranslationManager.translate("profileselector.category.utility", "Utility")
+                            default: return TranslationManager.translate("profileselector.category.other", "Other")
                         }
                     }
 
@@ -245,9 +249,9 @@ Page {
 
                                 // Accessibility
                                 Accessible.role: Accessible.StaticText
-                                Accessible.name: profileDelegate.isBuiltIn ? "Decent profile" :
-                                                 profileDelegate.isDownloaded ? "Downloaded from Visualizer" :
-                                                 "User profile"
+                                Accessible.name: profileDelegate.isBuiltIn ? TranslationManager.translate("profileselector.accessible.decent_profile", "Decent profile") :
+                                                 profileDelegate.isDownloaded ? TranslationManager.translate("profileselector.accessible.downloaded_profile", "Downloaded from Visualizer") :
+                                                 TranslationManager.translate("profileselector.accessible.user_profile", "User profile")
                             }
 
                             // Profile name
@@ -290,7 +294,7 @@ Page {
                                 }
 
                                 Accessible.role: Accessible.Button
-                                Accessible.name: profileDelegate.isSelected ? "Remove from selected" : "Add to selected"
+                                Accessible.name: profileDelegate.isSelected ? TranslationManager.translate("profileselector.accessible.remove_from_selected", "Remove from selected") : TranslationManager.translate("profileselector.accessible.add_to_selected", "Add to selected")
                             }
 
                             // === "Selected" view: Favorite toggle button (hollow/filled star) ===
@@ -331,7 +335,7 @@ Page {
                                 }
 
                                 Accessible.role: Accessible.Button
-                                Accessible.name: profileDelegate.isFavorite ? "Remove from favorites" : "Add to favorites"
+                                Accessible.name: profileDelegate.isFavorite ? TranslationManager.translate("profileselector.accessible.remove_from_favorites", "Remove from favorites") : TranslationManager.translate("profileselector.accessible.add_to_favorites", "Add to favorites")
                             }
 
                             // === "Selected" view: Overflow menu button ===
@@ -363,7 +367,7 @@ Page {
                                 }
 
                                 Accessible.role: Accessible.Button
-                                Accessible.name: "More options for " + modelData.title
+                                Accessible.name: TranslationManager.translate("profileselector.accessible.more_options", "More options for") + " " + modelData.title
                             }
                         }
 
@@ -379,7 +383,7 @@ Page {
                             }
 
                             MenuItem {
-                                text: "\u270E  Edit Profile"
+                                text: "\u270E  " + TranslationManager.translate("profileselector.menu.edit", "Edit Profile")
                                 onTriggered: {
                                     MainController.loadProfile(modelData.name)
                                     root.goToProfileEditor()
@@ -396,7 +400,7 @@ Page {
                                 }
 
                                 Accessible.role: Accessible.MenuItem
-                                Accessible.name: "Edit profile"
+                                Accessible.name: TranslationManager.translate("profileselector.accessible.edit_profile", "Edit profile")
                             }
 
                             MenuSeparator {
@@ -407,7 +411,7 @@ Page {
                             }
 
                             MenuItem {
-                                text: profileDelegate.isBuiltIn ? "\u2212  Remove from Selected" : "\u2717  Delete Profile"
+                                text: profileDelegate.isBuiltIn ? "\u2212  " + TranslationManager.translate("profileselector.menu.remove_from_selected", "Remove from Selected") : "\u2717  " + TranslationManager.translate("profileselector.menu.delete", "Delete Profile")
                                 onTriggered: {
                                     if (profileDelegate.isBuiltIn) {
                                         Settings.removeSelectedBuiltInProfile(modelData.name)
@@ -430,7 +434,7 @@ Page {
                                 }
 
                                 Accessible.role: Accessible.MenuItem
-                                Accessible.name: profileDelegate.isBuiltIn ? "Remove from selected list" : "Delete profile permanently"
+                                Accessible.name: profileDelegate.isBuiltIn ? TranslationManager.translate("profileselector.accessible.remove_from_list", "Remove from selected list") : TranslationManager.translate("profileselector.accessible.delete_permanently", "Delete profile permanently")
                             }
                         }
 
@@ -445,11 +449,11 @@ Page {
 
                         Accessible.role: Accessible.ListItem
                         Accessible.name: {
-                            var source = profileDelegate.isBuiltIn ? "Decent" :
-                                         profileDelegate.isDownloaded ? "Downloaded" : "Custom"
-                            var fav = profileDelegate.isFavorite ? ", favorite" : ""
-                            var current = profileDelegate.isCurrentProfile ? ", currently selected" : ""
-                            return source + " profile: " + modelData.title + fav + current
+                            var source = profileDelegate.isBuiltIn ? TranslationManager.translate("profileselector.accessible.source_decent", "Decent") :
+                                         profileDelegate.isDownloaded ? TranslationManager.translate("profileselector.accessible.source_downloaded", "Downloaded") : TranslationManager.translate("profileselector.accessible.source_custom", "Custom")
+                            var fav = profileDelegate.isFavorite ? ", " + TranslationManager.translate("profileselector.accessible.favorite", "favorite") : ""
+                            var current = profileDelegate.isCurrentProfile ? ", " + TranslationManager.translate("profileselector.accessible.currently_selected", "currently selected") : ""
+                            return source + " " + TranslationManager.translate("profileselector.accessible.profile_label", "profile:") + " " + modelData.title + fav + current
                         }
                     }
                 }
@@ -471,28 +475,37 @@ Page {
                 RowLayout {
                     Layout.fillWidth: true
 
+                    Tr {
+                        key: "profileselector.favorites.title"
+                        fallback: "Favorites"
+                        font: Theme.subtitleFont
+                        color: Theme.textColor
+                    }
+
                     Text {
-                        text: "Favorites (" + Settings.favoriteProfiles.length + ")"
+                        text: "(" + Settings.favoriteProfiles.length + ")"
                         font: Theme.subtitleFont
                         color: Theme.textColor
                     }
 
                     Item { Layout.fillWidth: true }
 
-                    Text {
+                    Tr {
                         visible: Settings.favoriteProfiles.length > 1
-                        text: "Drag to reorder"
+                        key: "profileselector.favorites.drag_hint"
+                        fallback: "Drag to reorder"
                         font: Theme.captionFont
                         color: Theme.textSecondaryColor
                     }
                 }
 
                 // Empty state
-                Text {
+                Tr {
                     visible: Settings.favoriteProfiles.length === 0
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    text: "No favorites yet.\nUse the \u22EE menu on a profile\nto add it to favorites."
+                    key: "profileselector.favorites.empty"
+                    fallback: "No favorites yet.\nUse the \u22EE menu on a profile\nto add it to favorites."
                     color: Theme.textSecondaryColor
                     font: Theme.bodyFont
                     horizontalAlignment: Text.AlignHCenter
@@ -595,7 +608,7 @@ Page {
 
                                     AccessibleMouseArea {
                                         anchors.fill: parent
-                                        accessibleName: modelData ? ("Edit " + root.cleanForSpeech(modelData.name)) : ""
+                                        accessibleName: modelData ? (TranslationManager.translate("profileselector.accessible.edit", "Edit") + " " + root.cleanForSpeech(modelData.name)) : ""
                                         accessibleItem: editFavoriteButton
                                         onAccessibleClicked: editFavoriteButton.doEdit()
                                     }
@@ -615,7 +628,7 @@ Page {
                                         var name = root.cleanForSpeech(modelData.name)
                                         Settings.removeFavoriteProfile(index)
                                         if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
-                                            AccessibilityManager.announce(name + " removed from favorites")
+                                            AccessibilityManager.announce(name + " " + TranslationManager.translate("profileselector.accessible.removed_from_favorites", "removed from favorites"))
                                         }
                                     }
 
@@ -635,7 +648,7 @@ Page {
 
                                     AccessibleMouseArea {
                                         anchors.fill: parent
-                                        accessibleName: modelData ? ("Remove " + root.cleanForSpeech(modelData.name) + " from favorites") : ""
+                                        accessibleName: modelData ? (TranslationManager.translate("profileselector.accessible.remove", "Remove") + " " + root.cleanForSpeech(modelData.name) + " " + TranslationManager.translate("profileselector.accessible.from_favorites", "from favorites")) : ""
                                         accessibleItem: removeFavoriteButton
                                         onAccessibleClicked: removeFavoriteButton.doRemove()
                                     }
@@ -645,7 +658,7 @@ Page {
                             AccessibleMouseArea {
                                 anchors.fill: parent
                                 z: -1
-                                accessibleName: modelData ? (root.cleanForSpeech(modelData.name) + (index === Settings.selectedFavoriteProfile ? ", selected favorite" : ", favorite")) : ""
+                                accessibleName: modelData ? (root.cleanForSpeech(modelData.name) + (index === Settings.selectedFavoriteProfile ? ", " + TranslationManager.translate("profileselector.accessible.selected_favorite", "selected favorite") : ", " + TranslationManager.translate("profileselector.accessible.favorite", "favorite"))) : ""
                                 accessibleItem: favoritePill
                                 onAccessibleClicked: {
                                     if (!modelData) return
@@ -657,7 +670,7 @@ Page {
                                     } else {
                                         // Select it (first click)
                                         if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
-                                            AccessibilityManager.announce(root.cleanForSpeech(modelData.name) + " selected")
+                                            AccessibilityManager.announce(root.cleanForSpeech(modelData.name) + " " + TranslationManager.translate("profileselector.accessible.selected", "selected"))
                                         }
                                         Settings.selectedFavoriteProfile = index
                                     }
@@ -676,7 +689,7 @@ Page {
         anchors.centerIn: parent
         width: Theme.scaled(350)
         modal: true
-        title: "Delete Profile"
+        title: TranslationManager.translate("profileselector.dialog.delete_title", "Delete Profile")
 
         property string profileName: ""
         property string profileTitle: ""
@@ -688,8 +701,8 @@ Page {
             Text {
                 Layout.fillWidth: true
                 text: deleteDialog.isFavorite ?
-                      "\"" + deleteDialog.profileTitle + "\" is in your favorites.\n\nDeleting will also remove it from favorites.\n\nAre you sure you want to delete this profile?" :
-                      "Are you sure you want to delete \"" + deleteDialog.profileTitle + "\"?\n\nThis cannot be undone."
+                      "\"" + deleteDialog.profileTitle + "\" " + TranslationManager.translate("profileselector.dialog.delete_favorite_msg", "is in your favorites.\n\nDeleting will also remove it from favorites.\n\nAre you sure you want to delete this profile?") :
+                      TranslationManager.translate("profileselector.dialog.delete_confirm_prefix", "Are you sure you want to delete") + " \"" + deleteDialog.profileTitle + "\"?\n\n" + TranslationManager.translate("profileselector.dialog.delete_confirm_suffix", "This cannot be undone.")
                 color: Theme.textColor
                 font: Theme.bodyFont
                 wrapMode: Text.WordWrap
@@ -701,7 +714,7 @@ Page {
 
                 Button {
                     Layout.fillWidth: true
-                    text: "Cancel"
+                    text: TranslationManager.translate("profileselector.button.cancel", "Cancel")
                     onClicked: deleteDialog.close()
 
                     background: Rectangle {
@@ -720,7 +733,7 @@ Page {
 
                 Button {
                     Layout.fillWidth: true
-                    text: "Delete"
+                    text: TranslationManager.translate("profileselector.button.delete", "Delete")
                     onClicked: {
                         MainController.deleteProfile(deleteDialog.profileName)
                         deleteDialog.close()
@@ -750,8 +763,8 @@ Page {
 
     // Bottom bar
     BottomBar {
-        title: "Profiles"
-        rightText: "Current: " + MainController.currentProfileName
+        title: TranslationManager.translate("profileselector.title", "Profiles")
+        rightText: TranslationManager.translate("profileselector.current_prefix", "Current:") + " " + MainController.currentProfileName
         onBackClicked: root.goBack()
     }
 }

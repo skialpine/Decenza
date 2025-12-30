@@ -9,8 +9,8 @@ Page {
     objectName: "shotMetadataPage"
     background: Rectangle { color: Theme.backgroundColor }
 
-    Component.onCompleted: root.currentPageTitle = "Shot Info"
-    StackView.onActivated: root.currentPageTitle = "Shot Info"
+    Component.onCompleted: root.currentPageTitle = TranslationManager.translate("shotmetadata.title", "Shot Info")
+    StackView.onActivated: root.currentPageTitle = TranslationManager.translate("shotmetadata.title", "Shot Info")
 
     property bool hasPendingShot: false  // Set to true by goToShotMetadata() after a shot
     property bool keyboardVisible: Qt.inputMethod.visible
@@ -71,7 +71,7 @@ Page {
         function onUploadingChanged() {
             if (AccessibilityManager.enabled) {
                 if (MainController.visualizer.uploading) {
-                    AccessibilityManager.announce("Uploading to Visualizer", true)
+                    AccessibilityManager.announce(TranslationManager.translate("shotmetadata.accessible.uploadingtovisualizer", "Uploading to Visualizer"), true)
                 }
             }
         }
@@ -121,21 +121,21 @@ Page {
                 // === ROW 1: Bean info ===
                 LabeledField {
                     Layout.fillWidth: true
-                    label: "Roaster"
+                    label: TranslationManager.translate("shotmetadata.label.roaster", "Roaster")
                     text: Settings.dyeBeanBrand
                     onTextEdited: function(t) { Settings.dyeBeanBrand = t }
                 }
 
                 LabeledField {
                     Layout.fillWidth: true
-                    label: "Coffee"
+                    label: TranslationManager.translate("shotmetadata.label.coffee", "Coffee")
                     text: Settings.dyeBeanType
                     onTextEdited: function(t) { Settings.dyeBeanType = t }
                 }
 
                 LabeledField {
                     Layout.fillWidth: true
-                    label: "Roast date (yyyy-mm-dd)"
+                    label: TranslationManager.translate("shotmetadata.label.roastdate", "Roast date (yyyy-mm-dd)")
                     text: Settings.dyeRoastDate
                     inputHints: Qt.ImhDate
                     onTextEdited: function(t) { Settings.dyeRoastDate = t }
@@ -144,22 +144,27 @@ Page {
                 // === ROW 2: Roast level, Grinder ===
                 LabeledComboBox {
                     Layout.fillWidth: true
-                    label: "Roast level"
-                    model: ["", "Light", "Medium-Light", "Medium", "Medium-Dark", "Dark"]
+                    label: TranslationManager.translate("shotmetadata.label.roastlevel", "Roast level")
+                    model: ["",
+                        TranslationManager.translate("shotmetadata.roastlevel.light", "Light"),
+                        TranslationManager.translate("shotmetadata.roastlevel.mediumlight", "Medium-Light"),
+                        TranslationManager.translate("shotmetadata.roastlevel.medium", "Medium"),
+                        TranslationManager.translate("shotmetadata.roastlevel.mediumdark", "Medium-Dark"),
+                        TranslationManager.translate("shotmetadata.roastlevel.dark", "Dark")]
                     currentValue: Settings.dyeRoastLevel
                     onValueChanged: function(v) { Settings.dyeRoastLevel = v }
                 }
 
                 LabeledField {
                     Layout.fillWidth: true
-                    label: "Grinder"
+                    label: TranslationManager.translate("shotmetadata.label.grinder", "Grinder")
                     text: Settings.dyeGrinderModel
                     onTextEdited: function(t) { Settings.dyeGrinderModel = t }
                 }
 
                 LabeledField {
                     Layout.fillWidth: true
-                    label: "Setting"
+                    label: TranslationManager.translate("shotmetadata.label.setting", "Setting")
                     text: Settings.dyeGrinderSetting
                     onTextEdited: function(t) { Settings.dyeGrinderSetting = t }
                 }
@@ -168,7 +173,7 @@ Page {
                 LabeledField {
                     Layout.columnSpan: 3
                     Layout.fillWidth: true
-                    label: "Barista"
+                    label: TranslationManager.translate("shotmetadata.label.barista", "Barista")
                     text: Settings.dyeBarista
                     onTextEdited: function(t) { Settings.dyeBarista = t }
                 }
@@ -179,11 +184,12 @@ Page {
                     Layout.fillWidth: true
                     Layout.preferredHeight: measurementsLabel.height + measurementsRow.height + 4
 
-                    Text {
+                    Tr {
                         id: measurementsLabel
                         anchors.left: parent.left
                         anchors.top: parent.top
-                        text: "Measurements"
+                        key: "shotmetadata.section.measurements"
+                        fallback: "Measurements"
                         color: Theme.textColor
                         font.pixelSize: 11
                     }
@@ -200,8 +206,9 @@ Page {
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 2
-                            Text {
-                                text: "Dose"
+                            Tr {
+                                key: "shotmetadata.label.dose"
+                                fallback: "Dose"
                                 color: Theme.textSecondaryColor
                                 font.pixelSize: 10
                             }
@@ -216,7 +223,7 @@ Page {
                                 suffix: "g"
                                 valueColor: Theme.dyeDoseColor
                                 value: Settings.dyeBeanWeight
-                                accessibleName: "Dose " + value + " grams"
+                                accessibleName: TranslationManager.translate("shotmetadata.label.dose", "Dose") + " " + value + " " + TranslationManager.translate("shotmetadata.unit.grams", "grams")
                                 onValueModified: function(newValue) {
                                     doseInput.value = newValue
                                     Settings.dyeBeanWeight = newValue
@@ -229,8 +236,9 @@ Page {
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 2
-                            Text {
-                                text: "Out"
+                            Tr {
+                                key: "shotmetadata.label.out"
+                                fallback: "Out"
                                 color: Theme.textSecondaryColor
                                 font.pixelSize: 10
                             }
@@ -245,7 +253,7 @@ Page {
                                 suffix: "g"
                                 valueColor: Theme.dyeOutputColor
                                 value: Settings.dyeDrinkWeight
-                                accessibleName: "Output " + value + " grams"
+                                accessibleName: TranslationManager.translate("shotmetadata.accessible.output", "Output") + " " + value + " " + TranslationManager.translate("shotmetadata.unit.grams", "grams")
                                 onValueModified: function(newValue) {
                                     outInput.value = newValue
                                     Settings.dyeDrinkWeight = newValue
@@ -258,8 +266,9 @@ Page {
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 2
-                            Text {
-                                text: "TDS"
+                            Tr {
+                                key: "shotmetadata.label.tds"
+                                fallback: "TDS"
                                 color: Theme.textSecondaryColor
                                 font.pixelSize: 10
                             }
@@ -274,7 +283,7 @@ Page {
                                 suffix: "%"
                                 valueColor: Theme.dyeTdsColor
                                 value: Settings.dyeDrinkTds
-                                accessibleName: "TDS " + value + " percent"
+                                accessibleName: TranslationManager.translate("shotmetadata.label.tds", "TDS") + " " + value + " " + TranslationManager.translate("shotmetadata.unit.percent", "percent")
                                 onValueModified: function(newValue) {
                                     tdsInput.value = newValue
                                     Settings.dyeDrinkTds = newValue
@@ -287,8 +296,9 @@ Page {
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 2
-                            Text {
-                                text: "EY"
+                            Tr {
+                                key: "shotmetadata.label.ey"
+                                fallback: "EY"
                                 color: Theme.textSecondaryColor
                                 font.pixelSize: 10
                             }
@@ -303,7 +313,7 @@ Page {
                                 suffix: "%"
                                 valueColor: Theme.dyeEyColor
                                 value: Settings.dyeDrinkEy
-                                accessibleName: "Extraction yield " + value + " percent"
+                                accessibleName: TranslationManager.translate("shotmetadata.accessible.extractionyield", "Extraction yield") + " " + value + " " + TranslationManager.translate("shotmetadata.unit.percent", "percent")
                                 onValueModified: function(newValue) {
                                     eyInput.value = newValue
                                     Settings.dyeDrinkEy = newValue
@@ -320,11 +330,12 @@ Page {
                     Layout.fillWidth: true
                     Layout.preferredHeight: ratingLabel.height + 40 + 2
 
-                    Text {
+                    Tr {
                         id: ratingLabel
                         anchors.left: parent.left
                         anchors.top: parent.top
-                        text: "Rating"
+                        key: "shotmetadata.label.rating"
+                        fallback: "Rating"
                         color: Theme.textColor
                         font.pixelSize: 11
                     }
@@ -344,7 +355,7 @@ Page {
                         suffix: " %"
                         valueColor: Theme.primaryColor  // Blue (default accent)
                         value: Settings.dyeEspressoEnjoyment > 0 ? Settings.dyeEspressoEnjoyment : 75
-                        accessibleName: "Rating " + value + " percent"
+                        accessibleName: TranslationManager.translate("shotmetadata.label.rating", "Rating") + " " + value + " " + TranslationManager.translate("shotmetadata.unit.percent", "percent")
                         onValueModified: function(newValue) {
                             ratingInput.value = newValue
                             Settings.dyeEspressoEnjoyment = newValue
@@ -363,11 +374,12 @@ Page {
                     Layout.fillWidth: true
                     Layout.preferredHeight: notesLabel.height + 100 + 2
 
-                    Text {
+                    Tr {
                         id: notesLabel
                         anchors.left: parent.left
                         anchors.top: parent.top
-                        text: "Notes"
+                        key: "shotmetadata.label.notes"
+                        fallback: "Notes"
                         color: Theme.textColor
                         font.pixelSize: 11
                     }
@@ -394,15 +406,15 @@ Page {
                         onTextChanged: Settings.dyeEspressoNotes = text
 
                         Accessible.role: Accessible.EditableText
-                        Accessible.name: "Notes"
-                        Accessible.description: text.length > 0 ? text : "Empty"
+                        Accessible.name: TranslationManager.translate("shotmetadata.label.notes", "Notes")
+                        Accessible.description: text.length > 0 ? text : TranslationManager.translate("shotmetadata.accessible.empty", "Empty")
 
                         onActiveFocusChanged: {
                             if (activeFocus) {
                                 focusedField = notesField
                                 focusResetTimer.stop()
                                 if (AccessibilityManager.enabled) {
-                                    let announcement = "Notes. " + (text.length > 0 ? text : "Empty")
+                                    let announcement = TranslationManager.translate("shotmetadata.label.notes", "Notes") + ". " + (text.length > 0 ? text : TranslationManager.translate("shotmetadata.accessible.empty", "Empty"))
                                     AccessibilityManager.announce(announcement)
                                 }
                             } else {
@@ -434,10 +446,11 @@ Page {
         color: Theme.primaryColor
         z: 100
 
-        Text {
+        Tr {
             id: hideKeyboardText
             anchors.centerIn: parent
-            text: "Hide keyboard"
+            key: "shotmetadata.button.hidekeyboard"
+            fallback: "Hide keyboard"
             color: "white"
             font.pixelSize: 13
             font.bold: true
@@ -456,9 +469,10 @@ Page {
     BottomBar {
         onBackClicked: root.goBack()
 
-        Text {
+        Tr {
             visible: MainController.visualizer.uploading
-            text: "Uploading..."
+            key: "shotmetadata.status.uploading"
+            fallback: "Uploading..."
             color: Theme.textSecondaryColor
             font: Theme.labelFont
         }
@@ -475,7 +489,7 @@ Page {
             opacity: MainController.aiManager && MainController.aiManager.isAnalyzing ? 0.6 : 1.0
 
             Accessible.role: Accessible.Button
-            Accessible.name: "Get AI Advice"
+            Accessible.name: TranslationManager.translate("shotmetadata.accessible.getaiadvice", "Get AI Advice")
             Accessible.onPressAction: aiAdviceArea.clicked(null)
 
             Row {
@@ -491,8 +505,10 @@ Page {
                     visible: status === Image.Ready
                 }
 
-                Text {
-                    text: MainController.aiManager && MainController.aiManager.isAnalyzing
+                Tr {
+                    key: MainController.aiManager && MainController.aiManager.isAnalyzing
+                          ? "shotmetadata.button.analyzing" : "shotmetadata.button.aiadvice"
+                    fallback: MainController.aiManager && MainController.aiManager.isAnalyzing
                           ? "Analyzing..." : "AI Advice"
                     color: MainController.aiManager && MainController.aiManager.isConfigured
                            ? "white" : Theme.textColor
@@ -540,7 +556,7 @@ Page {
             color: Theme.surfaceColor
 
             Accessible.role: Accessible.Button
-            Accessible.name: "Email AI prompt to yourself"
+            Accessible.name: TranslationManager.translate("shotmetadata.accessible.emailprompt", "Email AI prompt to yourself")
             Accessible.onPressAction: emailPromptArea.clicked(null)
 
             Row {
@@ -557,8 +573,9 @@ Page {
                     opacity: 0.6
                 }
 
-                Text {
-                    text: "Email Prompt"
+                Tr {
+                    key: "shotmetadata.button.emailprompt"
+                    fallback: "Email Prompt"
                     color: Theme.textColor
                     font: Theme.bodyFont
                     anchors.verticalCenter: parent.verticalCenter
@@ -601,13 +618,14 @@ Page {
             color: Theme.surfaceColor
 
             Accessible.role: Accessible.Button
-            Accessible.name: "Upload to Visualizer"
+            Accessible.name: TranslationManager.translate("shotmetadata.button.upload", "Upload to Visualizer")
             Accessible.onPressAction: uploadArea.clicked(null)
 
-            Text {
+            Tr {
                 id: uploadText
                 anchors.centerIn: parent
-                text: "Upload to Visualizer"
+                key: "shotmetadata.button.upload"
+                fallback: "Upload to Visualizer"
                 color: Theme.textColor
                 font: Theme.bodyFont
             }
@@ -658,7 +676,7 @@ Page {
                     focusedField = fieldInput
                     focusResetTimer.stop()
                     if (AccessibilityManager.enabled) {
-                        let announcement = parent.label + ". " + (text.length > 0 ? text : "Empty")
+                        let announcement = parent.label + ". " + (text.length > 0 ? text : TranslationManager.translate("shotmetadata.accessible.empty", "Empty"))
                         AccessibilityManager.announce(announcement)
                     }
                 } else {
@@ -668,7 +686,7 @@ Page {
 
             Accessible.role: Accessible.EditableText
             Accessible.name: parent.label
-            Accessible.description: text.length > 0 ? text : "Empty"
+            Accessible.description: text.length > 0 ? text : TranslationManager.translate("shotmetadata.accessible.empty", "Empty")
         }
     }
 
@@ -702,11 +720,11 @@ Page {
 
             Accessible.role: Accessible.ComboBox
             Accessible.name: parent.label
-            Accessible.description: currentIndex > 0 ? currentText : "Not set"
+            Accessible.description: currentIndex > 0 ? currentText : TranslationManager.translate("shotmetadata.accessible.notset", "Not set")
 
             onActiveFocusChanged: {
                 if (activeFocus && AccessibilityManager.enabled) {
-                    let value = currentIndex > 0 ? currentText : "Not set"
+                    let value = currentIndex > 0 ? currentText : TranslationManager.translate("shotmetadata.accessible.notset", "Not set")
                     AccessibilityManager.announce(parent.label + ". " + value)
                 }
             }
@@ -739,7 +757,7 @@ Page {
                 width: combo.width
                 height: 32
                 contentItem: Text {
-                    text: modelData || "(None)"
+                    text: modelData || TranslationManager.translate("shotmetadata.option.none", "(None)")
                     color: Theme.textColor
                     font.pixelSize: 14
                     verticalAlignment: Text.AlignVCenter
@@ -750,7 +768,7 @@ Page {
                 highlighted: combo.highlightedIndex === index
 
                 Accessible.role: Accessible.ListItem
-                Accessible.name: modelData || "None"
+                Accessible.name: modelData || TranslationManager.translate("shotmetadata.accessible.none", "None")
             }
 
             popup: Popup {

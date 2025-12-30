@@ -95,9 +95,10 @@ Page {
             anchors.centerIn: parent
             spacing: 20
 
-            Text {
+            Tr {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "DRAINING BATTERY"
+                key: "settings.drain.drainingBattery"
+                fallback: "DRAINING BATTERY"
                 color: "white"
                 font.pixelSize: 48
                 font.bold: true
@@ -116,8 +117,9 @@ Page {
 
                 Column {
                     spacing: 4
-                    Text {
-                        text: "CPU"
+                    Tr {
+                        key: "settings.drain.cpu"
+                        fallback: "CPU"
                         color: "#ff6666"
                         font.pixelSize: 18
                         font.bold: true
@@ -140,8 +142,9 @@ Page {
 
                 Column {
                     spacing: 4
-                    Text {
-                        text: "GPU"
+                    Tr {
+                        key: "settings.drain.gpu"
+                        fallback: "GPU"
                         color: "#66ff66"
                         font.pixelSize: 18
                         font.bold: true
@@ -163,9 +166,10 @@ Page {
                 }
             }
 
-            Text {
+            Tr {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "Screen: MAX brightness"
+                key: "settings.drain.screenMaxBrightness"
+                fallback: "Screen: MAX brightness"
                 color: "#ffaa66"
                 font.pixelSize: 24
             }
@@ -178,9 +182,10 @@ Page {
                 font.bold: true
             }
 
-            Text {
+            Tr {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "Tap anywhere to stop"
+                key: "settings.drain.tapToStop"
+                fallback: "Tap anywhere to stop"
                 color: "#aaaaaa"
                 font.pixelSize: 18
             }
@@ -202,7 +207,7 @@ Page {
         // Announce tab when changed (accessibility)
         onCurrentIndexChanged: {
             if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
-                var tabNames = IsDebugBuild ? ["Bluetooth", "Preferences", "Screensaver", "Visualizer", "AI", "Accessibility", "Themes", "Debug"] : ["Bluetooth", "Preferences", "Screensaver", "Visualizer", "AI", "Accessibility", "Themes"]
+                var tabNames = IsDebugBuild ? ["Bluetooth", "Preferences", "Screensaver", "Visualizer", "AI", "Accessibility", "Themes", "Language", "Debug"] : ["Bluetooth", "Preferences", "Screensaver", "Visualizer", "AI", "Accessibility", "Themes", "Language"]
                 if (currentIndex >= 0 && currentIndex < tabNames.length) {
                     AccessibilityManager.announce(tabNames[currentIndex] + " tab")
                 }
@@ -396,19 +401,40 @@ Page {
         }
 
         TabButton {
-            id: debugTabButton
-            visible: typeof IsDebugBuild !== "undefined" && IsDebugBuild
-            text: "Debug"
+            id: languageTabButton
+            text: "Language"
             width: implicitWidth
             font.pixelSize: 14
             font.bold: tabBar.currentIndex === 7
-            Accessible.name: "Debug tab" + (tabBar.currentIndex === 7 ? ", selected" : "")
-            contentItem: Text {
-                text: parent.text
-                font: parent.font
-                color: tabBar.currentIndex === 7 ? Theme.textColor : Theme.textSecondaryColor
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
+            Accessible.name: "Language tab" + (tabBar.currentIndex === 7 ? ", selected" : "")
+            contentItem: Row {
+                spacing: 4
+                Text {
+                    text: parent.parent.text
+                    font: parent.parent.font
+                    color: tabBar.currentIndex === 7 ? Theme.textColor : Theme.textSecondaryColor
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+                // Badge for untranslated strings
+                Rectangle {
+                    visible: TranslationManager.currentLanguage !== "en" && TranslationManager.untranslatedCount > 0
+                    width: badgeText.width + 8
+                    height: 16
+                    radius: 8
+                    color: Theme.warningColor
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    Text {
+                        id: badgeText
+                        anchors.centerIn: parent
+                        text: TranslationManager.untranslatedCount > 99 ? "99+" : TranslationManager.untranslatedCount
+                        font.pixelSize: 10
+                        font.bold: true
+                        color: "white"
+                    }
+                }
             }
             background: Rectangle {
                 color: tabBar.currentIndex === 7 ? Theme.surfaceColor : "transparent"
@@ -416,9 +442,36 @@ Page {
             }
             AccessibleMouseArea {
                 anchors.fill: parent
-                accessibleName: "Debug tab" + (tabBar.currentIndex === 7 ? ", selected" : "")
-                accessibleItem: debugTabButton
+                accessibleName: "Language tab" + (tabBar.currentIndex === 7 ? ", selected" : "")
+                accessibleItem: languageTabButton
                 onAccessibleClicked: tabBar.currentIndex = 7
+            }
+        }
+
+        TabButton {
+            id: debugTabButton
+            visible: typeof IsDebugBuild !== "undefined" && IsDebugBuild
+            text: "Debug"
+            width: implicitWidth
+            font.pixelSize: 14
+            font.bold: tabBar.currentIndex === 8
+            Accessible.name: "Debug tab" + (tabBar.currentIndex === 8 ? ", selected" : "")
+            contentItem: Text {
+                text: parent.text
+                font: parent.font
+                color: tabBar.currentIndex === 8 ? Theme.textColor : Theme.textSecondaryColor
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+            background: Rectangle {
+                color: tabBar.currentIndex === 8 ? Theme.surfaceColor : "transparent"
+                radius: 6
+            }
+            AccessibleMouseArea {
+                anchors.fill: parent
+                accessibleName: "Debug tab" + (tabBar.currentIndex === 8 ? ", selected" : "")
+                accessibleItem: debugTabButton
+                onAccessibleClicked: tabBar.currentIndex = 8
             }
         }
     }
@@ -455,8 +508,9 @@ Page {
                         anchors.margins: 15
                         spacing: 10
 
-                        Text {
-                            text: "Machine"
+                        Tr {
+                            key: "settings.bluetooth.machine"
+                            fallback: "Machine"
                             color: Theme.textColor
                             font.pixelSize: 16
                             font.bold: true
@@ -465,13 +519,15 @@ Page {
                         RowLayout {
                             Layout.fillWidth: true
 
-                            Text {
-                                text: "Status:"
+                            Tr {
+                                key: "settings.bluetooth.status"
+                                fallback: "Status:"
                                 color: Theme.textSecondaryColor
                             }
 
-                            Text {
-                                text: DE1Device.connected ? "Connected" : "Disconnected"
+                            Tr {
+                                key: DE1Device.connected ? "settings.bluetooth.connected" : "settings.bluetooth.disconnected"
+                                fallback: DE1Device.connected ? "Connected" : "Disconnected"
                                 color: DE1Device.connected ? Theme.successColor : Theme.errorColor
                             }
 
@@ -516,9 +572,10 @@ Page {
                                 onClicked: DE1Device.connectToDevice(modelData.address)
                             }
 
-                            Label {
+                            Tr {
                                 anchors.centerIn: parent
-                                text: "No devices found"
+                                key: "settings.bluetooth.noDevices"
+                                fallback: "No devices found"
                                 visible: parent.count === 0
                                 color: Theme.textSecondaryColor
                             }
@@ -572,8 +629,9 @@ Page {
                         anchors.margins: 15
                         spacing: 10
 
-                        Text {
-                            text: "Scale"
+                        Tr {
+                            key: "settings.bluetooth.scale"
+                            fallback: "Scale"
                             color: Theme.textColor
                             font.pixelSize: 16
                             font.bold: true
@@ -582,13 +640,20 @@ Page {
                         RowLayout {
                             Layout.fillWidth: true
 
-                            Text {
-                                text: "Status:"
+                            Tr {
+                                key: "settings.bluetooth.status"
+                                fallback: "Status:"
                                 color: Theme.textSecondaryColor
                             }
 
-                            Text {
-                                text: {
+                            Tr {
+                                key: {
+                                    if (ScaleDevice && ScaleDevice.connected) {
+                                        return ScaleDevice.name === "Flow Scale" ? "settings.bluetooth.simulated" : "settings.bluetooth.connected"
+                                    }
+                                    return BLEManager.scaleConnectionFailed ? "settings.bluetooth.notFound" : "settings.bluetooth.disconnected"
+                                }
+                                fallback: {
                                     if (ScaleDevice && ScaleDevice.connected) {
                                         return ScaleDevice.name === "Flow Scale" ? "Simulated" : "Connected"
                                     }
@@ -622,11 +687,12 @@ Page {
                             border.width: 1
                             visible: ScaleDevice && ScaleDevice.name === "Flow Scale"
 
-                            Text {
+                            Tr {
                                 id: flowScaleNotice
                                 anchors.fill: parent
                                 anchors.margins: 8
-                                text: "Using Flow Scale (estimated weight from DE1 flow data)"
+                                key: "settings.bluetooth.flowScaleNotice"
+                                fallback: "Using Flow Scale (estimated weight from DE1 flow data)"
                                 color: Theme.warningColor
                                 font.pixelSize: 12
                                 wrapMode: Text.Wrap
@@ -639,8 +705,9 @@ Page {
                             Layout.fillWidth: true
                             visible: BLEManager.hasSavedScale
 
-                            Text {
-                                text: "Saved scale:"
+                            Tr {
+                                key: "settings.bluetooth.savedScale"
+                                fallback: "Saved scale:"
                                 color: Theme.textSecondaryColor
                             }
 
@@ -667,8 +734,9 @@ Page {
                             Layout.fillWidth: true
                             visible: ScaleDevice && ScaleDevice.connected
 
-                            Text {
-                                text: "Weight:"
+                            Tr {
+                                key: "settings.bluetooth.weight"
+                                fallback: "Weight:"
                                 color: Theme.textSecondaryColor
                             }
 
@@ -719,9 +787,10 @@ Page {
                                 }
                             }
 
-                            Label {
+                            Tr {
                                 anchors.centerIn: parent
-                                text: "No scales found"
+                                key: "settings.bluetooth.noScales"
+                                fallback: "No scales found"
                                 visible: parent.count === 0
                                 color: Theme.textSecondaryColor
                             }
@@ -793,15 +862,17 @@ Page {
                             anchors.margins: 15
                             spacing: 10
 
-                            Text {
-                                text: "Auto-Sleep"
+                            Tr {
+                                key: "settings.preferences.autoSleep"
+                                fallback: "Auto-Sleep"
                                 color: Theme.textColor
                                 font.pixelSize: 16
                                 font.bold: true
                             }
 
-                            Text {
-                                text: "Put the machine to sleep after inactivity"
+                            Tr {
+                                key: "settings.preferences.autoSleepDesc"
+                                fallback: "Put the machine to sleep after inactivity"
                                 color: Theme.textSecondaryColor
                                 font.pixelSize: 12
                             }
@@ -839,8 +910,9 @@ Page {
                             anchors.margins: 15
                             spacing: 8
 
-                            Text {
-                                text: "About"
+                            Tr {
+                                key: "settings.preferences.about"
+                                fallback: "About"
                                 color: Theme.textColor
                                 font.pixelSize: 16
                                 font.bold: true
@@ -891,19 +963,21 @@ Page {
                         anchors.margins: 15
                         spacing: 10
 
-                        Text {
-                            text: "Battery Charging"
+                        Tr {
+                            key: "settings.preferences.batteryCharging"
+                            fallback: "Battery Charging"
                             color: Theme.textColor
                             font.pixelSize: 16
                             font.bold: true
                         }
 
-                        Text {
-                            text: "Control the USB charger output from the DE1"
+                        Tr {
+                            Layout.fillWidth: true
+                            key: "settings.preferences.batteryChargingDesc"
+                            fallback: "Control the USB charger output from the DE1"
                             color: Theme.textSecondaryColor
                             font.pixelSize: 12
                             wrapMode: Text.WordWrap
-                            Layout.fillWidth: true
                         }
 
                         Item { height: 5 }
@@ -913,8 +987,9 @@ Page {
                             Layout.fillWidth: true
                             spacing: 10
 
-                            Text {
-                                text: "Battery:"
+                            Tr {
+                                key: "settings.preferences.battery"
+                                fallback: "Battery:"
                                 color: Theme.textSecondaryColor
                             }
 
@@ -958,8 +1033,9 @@ Page {
 
                             Item { Layout.fillWidth: true }
 
-                            Text {
-                                text: BatteryManager.isCharging ? "Charging" : "Not charging"
+                            Tr {
+                                key: BatteryManager.isCharging ? "settings.preferences.charging" : "settings.preferences.notCharging"
+                                fallback: BatteryManager.isCharging ? "Charging" : "Not charging"
                                 color: BatteryManager.isCharging ? Theme.successColor : Theme.textSecondaryColor
                                 font.pixelSize: 12
                             }
@@ -968,8 +1044,9 @@ Page {
                         Item { height: 10 }
 
                         // Smart charging mode selector
-                        Text {
-                            text: "Smart Charging Mode"
+                        Tr {
+                            key: "settings.preferences.smartChargingMode"
+                            fallback: "Smart Charging Mode"
                             color: Theme.textSecondaryColor
                             font.pixelSize: 12
                         }
@@ -1051,8 +1128,9 @@ Page {
                             Layout.fillWidth: true
                             visible: BatteryManager.chargingMode === 0
 
-                            Text {
-                                text: "USB Charger"
+                            Tr {
+                                key: "settings.preferences.usbCharger"
+                                fallback: "USB Charger"
                                 color: Theme.textColor
                                 font.pixelSize: 14
                             }
@@ -1100,19 +1178,21 @@ Page {
                         anchors.margins: 15
                         spacing: 10
 
-                        Text {
-                            text: "Flow Sensor Calibration"
+                        Tr {
+                            key: "settings.preferences.flowSensorCalibration"
+                            fallback: "Flow Sensor Calibration"
                             color: Theme.textColor
                             font.pixelSize: 16
                             font.bold: true
                         }
 
-                        Text {
-                            text: "Calibrate the virtual scale for users without a BLE scale"
+                        Tr {
+                            Layout.fillWidth: true
+                            key: "settings.preferences.flowSensorCalibrationDesc"
+                            fallback: "Calibrate the virtual scale for users without a BLE scale"
                             color: Theme.textSecondaryColor
                             font.pixelSize: 12
                             wrapMode: Text.WordWrap
-                            Layout.fillWidth: true
                         }
 
                         Item { height: 5 }
@@ -1122,8 +1202,9 @@ Page {
                             Layout.fillWidth: true
                             spacing: 10
 
-                            Text {
-                                text: "Current factor:"
+                            Tr {
+                                key: "settings.preferences.currentFactor"
+                                fallback: "Current factor:"
                                 color: Theme.textSecondaryColor
                             }
 
@@ -1158,12 +1239,13 @@ Page {
                             }
                         }
 
-                        Text {
-                            text: "Requires a separate scale to measure water weight"
+                        Tr {
+                            Layout.fillWidth: true
+                            key: "settings.preferences.requiresScale"
+                            fallback: "Requires a separate scale to measure water weight"
                             color: Theme.textSecondaryColor
                             font.pixelSize: 10
                             wrapMode: Text.WordWrap
-                            Layout.fillWidth: true
                         }
                     }
                 }
@@ -1191,19 +1273,21 @@ Page {
                         anchors.margins: 15
                         spacing: 10
 
-                        Text {
-                            text: "Video Category"
+                        Tr {
+                            key: "settings.screensaver.videoCategory"
+                            fallback: "Video Category"
                             color: Theme.textColor
                             font.pixelSize: 16
                             font.bold: true
                         }
 
-                        Text {
-                            text: "Choose a theme for screensaver videos"
+                        Tr {
+                            Layout.fillWidth: true
+                            key: "settings.screensaver.videoCategoryDesc"
+                            fallback: "Choose a theme for screensaver videos"
                             color: Theme.textSecondaryColor
                             font.pixelSize: 12
                             wrapMode: Text.WordWrap
-                            Layout.fillWidth: true
                         }
 
                         Item { height: 10 }
@@ -1243,9 +1327,10 @@ Page {
                                 }
                             }
 
-                            Label {
+                            Tr {
                                 anchors.centerIn: parent
-                                text: ScreensaverManager.isFetchingCategories ? "Loading..." : "No categories"
+                                key: ScreensaverManager.isFetchingCategories ? "settings.screensaver.loading" : "settings.screensaver.noCategories"
+                                fallback: ScreensaverManager.isFetchingCategories ? "Loading..." : "No categories"
                                 visible: parent.count === 0
                                 color: Theme.textSecondaryColor
                             }
@@ -1273,8 +1358,9 @@ Page {
                         anchors.margins: 15
                         spacing: 15
 
-                        Text {
-                            text: "Screensaver Settings"
+                        Tr {
+                            key: "settings.screensaver.settings"
+                            fallback: "Screensaver Settings"
                             color: Theme.textColor
                             font.pixelSize: 16
                             font.bold: true
@@ -1288,8 +1374,9 @@ Page {
                             ColumnLayout {
                                 spacing: 4
 
-                                Text {
-                                    text: "Current Category"
+                                Tr {
+                                    key: "settings.screensaver.currentCategory"
+                                    fallback: "Current Category"
                                     color: Theme.textSecondaryColor
                                     font.pixelSize: 12
                                 }
@@ -1305,8 +1392,9 @@ Page {
                             ColumnLayout {
                                 spacing: 4
 
-                                Text {
-                                    text: "Videos"
+                                Tr {
+                                    key: "settings.screensaver.videos"
+                                    fallback: "Videos"
                                     color: Theme.textSecondaryColor
                                     font.pixelSize: 12
                                 }
@@ -1321,8 +1409,9 @@ Page {
                             ColumnLayout {
                                 spacing: 4
 
-                                Text {
-                                    text: "Cache Usage"
+                                Tr {
+                                    key: "settings.screensaver.cacheUsage"
+                                    fallback: "Cache Usage"
                                     color: Theme.textSecondaryColor
                                     font.pixelSize: 12
                                 }
@@ -1364,8 +1453,9 @@ Page {
                             RowLayout {
                                 spacing: 10
 
-                                Text {
-                                    text: "Enabled"
+                                Tr {
+                                    key: "settings.screensaver.enabled"
+                                    fallback: "Enabled"
                                     color: Theme.textColor
                                     font.pixelSize: 14
                                 }
@@ -1379,8 +1469,9 @@ Page {
                             RowLayout {
                                 spacing: 10
 
-                                Text {
-                                    text: "Cache Videos"
+                                Tr {
+                                    key: "settings.screensaver.cacheVideos"
+                                    fallback: "Cache Videos"
                                     color: Theme.textColor
                                     font.pixelSize: 14
                                 }
@@ -1493,19 +1584,21 @@ Page {
                         anchors.margins: 15
                         spacing: 12
 
-                        Text {
-                            text: "Visualizer.coffee Account"
+                        Tr {
+                            key: "settings.visualizer.account"
+                            fallback: "Visualizer.coffee Account"
                             color: Theme.textColor
                             font.pixelSize: 16
                             font.bold: true
                         }
 
-                        Text {
-                            text: "Upload your shots to visualizer.coffee for tracking and analysis"
+                        Tr {
+                            Layout.fillWidth: true
+                            key: "settings.visualizer.accountDesc"
+                            fallback: "Upload your shots to visualizer.coffee for tracking and analysis"
                             color: Theme.textSecondaryColor
                             font.pixelSize: 12
                             wrapMode: Text.WordWrap
-                            Layout.fillWidth: true
                         }
 
                         Item { height: 5 }
@@ -1515,8 +1608,9 @@ Page {
                             Layout.fillWidth: true
                             spacing: 4
 
-                            Text {
-                                text: "Username / Email"
+                            Tr {
+                                key: "settings.visualizer.username"
+                                fallback: "Username / Email"
                                 color: Theme.textSecondaryColor
                                 font.pixelSize: 12
                             }
@@ -1552,8 +1646,9 @@ Page {
                             Layout.fillWidth: true
                             spacing: 4
 
-                            Text {
-                                text: "Password"
+                            Tr {
+                                key: "settings.visualizer.password"
+                                fallback: "Password"
                                 color: Theme.textSecondaryColor
                                 font.pixelSize: 12
                             }
@@ -1639,9 +1734,10 @@ Page {
                         Item { Layout.fillHeight: true }
 
                         // Sign up link
-                        Text {
+                        Tr {
                             id: signUpLink
-                            text: "Don't have an account? Sign up at visualizer.coffee"
+                            key: "settings.visualizer.signUp"
+                            fallback: "Don't have an account? Sign up at visualizer.coffee"
                             color: Theme.textSecondaryColor
                             font.pixelSize: 12
                             Layout.fillWidth: true
@@ -1669,8 +1765,9 @@ Page {
                         anchors.margins: 15
                         spacing: 12
 
-                        Text {
-                            text: "Upload Settings"
+                        Tr {
+                            key: "settings.visualizer.uploadSettings"
+                            fallback: "Upload Settings"
                             color: Theme.textColor
                             font.pixelSize: 16
                             font.bold: true
@@ -1684,14 +1781,16 @@ Page {
                             ColumnLayout {
                                 spacing: 2
 
-                                Text {
-                                    text: "Auto-Upload Shots"
+                                Tr {
+                                    key: "settings.visualizer.autoUpload"
+                                    fallback: "Auto-Upload Shots"
                                     color: Theme.textColor
                                     font.pixelSize: 14
                                 }
 
-                                Text {
-                                    text: "Automatically upload espresso shots after completion"
+                                Tr {
+                                    key: "settings.visualizer.autoUploadDesc"
+                                    fallback: "Automatically upload espresso shots after completion"
                                     color: Theme.textSecondaryColor
                                     font.pixelSize: 12
                                 }
@@ -1713,14 +1812,16 @@ Page {
                             ColumnLayout {
                                 spacing: 2
 
-                                Text {
-                                    text: "Minimum Duration"
+                                Tr {
+                                    key: "settings.visualizer.minDuration"
+                                    fallback: "Minimum Duration"
                                     color: Theme.textColor
                                     font.pixelSize: 14
                                 }
 
-                                Text {
-                                    text: "Only upload shots longer than this (skip aborted shots)"
+                                Tr {
+                                    key: "settings.visualizer.minDurationDesc"
+                                    fallback: "Only upload shots longer than this (skip aborted shots)"
                                     color: Theme.textSecondaryColor
                                     font.pixelSize: 12
                                 }
@@ -1752,14 +1853,16 @@ Page {
                             ColumnLayout {
                                 spacing: 2
 
-                                Text {
-                                    text: "Extended Metadata"
+                                Tr {
+                                    key: "settings.visualizer.extendedMetadata"
+                                    fallback: "Extended Metadata"
                                     color: Theme.textColor
                                     font.pixelSize: 14
                                 }
 
-                                Text {
-                                    text: "Include bean, grinder, and tasting notes with uploads"
+                                Tr {
+                                    key: "settings.visualizer.extendedMetadataDesc"
+                                    fallback: "Include bean, grinder, and tasting notes with uploads"
                                     color: Theme.textSecondaryColor
                                     font.pixelSize: 12
                                 }
@@ -1782,14 +1885,16 @@ Page {
                             ColumnLayout {
                                 spacing: 2
 
-                                Text {
-                                    text: "Edit After Shot"
+                                Tr {
+                                    key: "settings.visualizer.editAfterShot"
+                                    fallback: "Edit After Shot"
                                     color: Theme.textColor
                                     font.pixelSize: 14
                                 }
 
-                                Text {
-                                    text: "Open Shot Info page after each espresso extraction"
+                                Tr {
+                                    key: "settings.visualizer.editAfterShotDesc"
+                                    fallback: "Open Shot Info page after each espresso extraction"
                                     color: Theme.textSecondaryColor
                                     font.pixelSize: 12
                                 }
@@ -1818,8 +1923,9 @@ Page {
                                 anchors.margins: 10
                                 spacing: 6
 
-                                Text {
-                                    text: "Last Upload"
+                                Tr {
+                                    key: "settings.visualizer.lastUpload"
+                                    fallback: "Last Upload"
                                     color: Theme.textSecondaryColor
                                     font.pixelSize: 12
                                 }
@@ -1971,8 +2077,9 @@ Page {
                             Layout.fillWidth: true
                             spacing: 6
 
-                            Text {
-                                text: "API Key"
+                            Tr {
+                                key: "settings.ai.apiKey"
+                                fallback: "API Key"
                                 color: Theme.textColor
                                 font.pixelSize: 13
                                 font.bold: true
@@ -2022,8 +2129,9 @@ Page {
                             Layout.fillWidth: true
                             spacing: 6
 
-                            Text {
-                                text: "Ollama Settings"
+                            Tr {
+                                key: "settings.ai.ollamaSettings"
+                                fallback: "Ollama Settings"
                                 color: Theme.textColor
                                 font.pixelSize: 13
                                 font.bold: true
@@ -2177,19 +2285,21 @@ Page {
                         anchors.margins: 15
                         spacing: 12
 
-                        Text {
-                            text: "Accessibility"
+                        Tr {
+                            key: "settings.accessibility.title"
+                            fallback: "Accessibility"
                             color: Theme.textColor
                             font.pixelSize: 16
                             font.bold: true
                         }
 
-                        Text {
-                            text: "Screen reader support and audio feedback for blind and visually impaired users"
+                        Tr {
+                            Layout.fillWidth: true
+                            key: "settings.accessibility.desc"
+                            fallback: "Screen reader support and audio feedback for blind and visually impaired users"
                             color: Theme.textSecondaryColor
                             font.pixelSize: 12
                             wrapMode: Text.WordWrap
-                            Layout.fillWidth: true
                         }
 
                         // Tip about backdoor activation
@@ -2201,11 +2311,12 @@ Page {
                             border.color: Theme.primaryColor
                             border.width: 1
 
-                            Text {
+                            Tr {
                                 id: tipText
                                 anchors.fill: parent
                                 anchors.margins: 8
-                                text: "Tip: 4-finger tap anywhere to toggle accessibility on/off"
+                                key: "settings.accessibility.tip"
+                                fallback: "Tip: 4-finger tap anywhere to toggle accessibility on/off"
                                 color: Theme.primaryColor
                                 font.pixelSize: 12
                                 wrapMode: Text.Wrap
@@ -2220,8 +2331,9 @@ Page {
                             Layout.fillWidth: true
                             spacing: 15
 
-                            Text {
-                                text: "Enable Accessibility"
+                            Tr {
+                                key: "settings.accessibility.enable"
+                                fallback: "Enable Accessibility"
                                 color: Theme.textColor
                                 font.pixelSize: 14
                             }
@@ -2240,8 +2352,9 @@ Page {
                             spacing: 15
                             opacity: AccessibilityManager.enabled ? 1.0 : 0.5
 
-                            Text {
-                                text: "Voice Announcements"
+                            Tr {
+                                key: "settings.accessibility.voiceAnnouncements"
+                                fallback: "Voice Announcements"
                                 color: Theme.textColor
                                 font.pixelSize: 14
                             }
@@ -2277,13 +2390,15 @@ Page {
 
                             ColumnLayout {
                                 spacing: 2
-                                Text {
-                                    text: "Frame Tick Sound"
+                                Tr {
+                                    key: "settings.accessibility.frameTick"
+                                    fallback: "Frame Tick Sound"
                                     color: Theme.textColor
                                     font.pixelSize: 14
                                 }
-                                Text {
-                                    text: "Play a tick when extraction frames change"
+                                Tr {
+                                    key: "settings.accessibility.frameTickDesc"
+                                    fallback: "Play a tick when extraction frames change"
                                     color: Theme.textSecondaryColor
                                     font.pixelSize: 11
                                 }
@@ -2309,8 +2424,9 @@ Page {
                             spacing: 15
                             opacity: (AccessibilityManager.enabled && AccessibilityManager.tickEnabled) ? 1.0 : 0.5
 
-                            Text {
-                                text: "Tick Sound"
+                            Tr {
+                                key: "settings.accessibility.tickSound"
+                                fallback: "Tick Sound"
                                 color: Theme.textColor
                                 font.pixelSize: 14
                             }
@@ -2637,7 +2753,8 @@ Page {
                             // Random theme button
                             Button {
                                 Layout.fillWidth: true
-                                text: "Random Theme"
+                                property string buttonText: TranslationManager.translate("settings.themes.randomTheme", "Random Theme")
+                                text: buttonText
                                 onClicked: {
                                     var randomHue = Math.random() * 360
                                     var randomSat = 65 + Math.random() * 20  // 65-85%
@@ -2659,7 +2776,7 @@ Page {
                                     opacity: parent.pressed ? 0.8 : 1.0
                                 }
                                 contentItem: Text {
-                                    text: parent.text
+                                    text: parent.buttonText
                                     color: "white"
                                     font.pixelSize: Theme.bodyFont.pixelSize
                                     font.bold: true
@@ -2671,6 +2788,496 @@ Page {
                     }
                 }
             }
+
+        // ============ LANGUAGE TAB ============
+        Item {
+            id: languageTab
+
+            RowLayout {
+                anchors.fill: parent
+                spacing: Theme.spacingMedium
+
+                // Left column: Language selection
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.maximumWidth: Theme.settingsColumnMax
+                    color: Theme.surfaceColor
+                    radius: Theme.cardRadius
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: Theme.spacingMedium
+                        spacing: Theme.spacingMedium
+
+                        // Header
+                        Text {
+                            text: "Languages"
+                            font: Theme.titleFont
+                            color: Theme.textColor
+                        }
+
+                        // Language list
+                        ListView {
+                            id: languageList
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            clip: true
+                            model: TranslationManager.availableLanguages
+
+                            delegate: ItemDelegate {
+                                width: languageList.width
+                                height: Theme.touchTargetMin
+                                highlighted: modelData === TranslationManager.currentLanguage
+
+                                background: Rectangle {
+                                    color: highlighted ? Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.2) : "transparent"
+                                    radius: 4
+                                }
+
+                                contentItem: RowLayout {
+                                    spacing: Theme.spacingSmall
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: TranslationManager.getLanguageDisplayName(modelData) +
+                                              (TranslationManager.getLanguageNativeName(modelData) !== TranslationManager.getLanguageDisplayName(modelData) ?
+                                               " (" + TranslationManager.getLanguageNativeName(modelData) + ")" : "")
+                                        font: Theme.bodyFont
+                                        color: highlighted ? Theme.primaryColor : Theme.textColor
+                                        elide: Text.ElideRight
+                                    }
+
+                                    // Progress indicator for non-English
+                                    Text {
+                                        visible: modelData !== "en" && modelData === TranslationManager.currentLanguage
+                                        text: {
+                                            var total = TranslationManager.totalStringCount
+                                            if (total === 0) return ""
+                                            var translated = total - TranslationManager.untranslatedCount
+                                            return Math.round((translated / total) * 100) + "%"
+                                        }
+                                        font: Theme.labelFont
+                                        color: Theme.textSecondaryColor
+                                    }
+                                }
+
+                                onClicked: TranslationManager.currentLanguage = modelData
+                            }
+                        }
+
+                        // Add language button
+                        Button {
+                            Layout.fillWidth: true
+                            text: "Add Language..."
+                            onClicked: addLanguageDialog.open()
+
+                            background: Rectangle {
+                                implicitHeight: Theme.touchTargetMin
+                                color: parent.down ? Qt.darker(Theme.surfaceColor, 1.2) : Theme.backgroundColor
+                                radius: Theme.buttonRadius
+                                border.width: 1
+                                border.color: Theme.borderColor
+                            }
+
+                            contentItem: Text {
+                                text: parent.text
+                                font: Theme.bodyFont
+                                color: Theme.textColor
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                        }
+
+                        // Download languages button
+                        Button {
+                            Layout.fillWidth: true
+                            text: TranslationManager.downloading ? "Downloading..." : "Download Community Languages"
+                            enabled: !TranslationManager.downloading
+
+                            background: Rectangle {
+                                implicitHeight: Theme.touchTargetMin
+                                color: parent.down ? Qt.darker(Theme.primaryColor, 1.2) : Theme.primaryColor
+                                radius: Theme.buttonRadius
+                                opacity: parent.enabled ? 1.0 : 0.5
+                            }
+
+                            contentItem: Text {
+                                text: parent.text
+                                font: Theme.bodyFont
+                                color: "white"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            onClicked: TranslationManager.downloadLanguageList()
+                        }
+                    }
+                }
+
+                // Right column: Translation tools
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    color: Theme.surfaceColor
+                    radius: Theme.cardRadius
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: Theme.spacingMedium
+                        spacing: Theme.spacingMedium
+
+                        Text {
+                            text: "Translation Tools"
+                            font: Theme.titleFont
+                            color: Theme.textColor
+                        }
+
+                        // Edit mode toggle
+                        Rectangle {
+                            Layout.fillWidth: true
+                            implicitHeight: editModeRow.implicitHeight + Theme.spacingMedium * 2
+                            color: Theme.backgroundColor
+                            radius: 4
+
+                            RowLayout {
+                                id: editModeRow
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.margins: Theme.spacingMedium
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 4
+
+                                    Text {
+                                        text: "Edit Mode"
+                                        font: Theme.subtitleFont
+                                        color: Theme.textColor
+                                    }
+
+                                    Text {
+                                        text: "Click any text in the app to translate it"
+                                        font: Theme.labelFont
+                                        color: Theme.textSecondaryColor
+                                        wrapMode: Text.Wrap
+                                        Layout.fillWidth: true
+                                    }
+                                }
+
+                                Switch {
+                                    checked: TranslationManager.editModeEnabled
+                                    onCheckedChanged: TranslationManager.editModeEnabled = checked
+                                }
+                            }
+                        }
+
+                        // Translation status
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: translationStatusColumn.height + Theme.spacingMedium * 2
+                            color: Theme.backgroundColor
+                            radius: 4
+                            visible: TranslationManager.currentLanguage !== "en"
+
+                            ColumnLayout {
+                                id: translationStatusColumn
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.margins: Theme.spacingMedium
+                                spacing: 8
+
+                                Text {
+                                    text: "Translation Status: " + TranslationManager.getLanguageDisplayName(TranslationManager.currentLanguage)
+                                    font: Theme.subtitleFont
+                                    color: Theme.textColor
+                                }
+
+                                ProgressBar {
+                                    Layout.fillWidth: true
+                                    from: 0
+                                    to: Math.max(1, TranslationManager.totalStringCount)
+                                    value: TranslationManager.totalStringCount - TranslationManager.untranslatedCount
+
+                                    background: Rectangle {
+                                        implicitHeight: 8
+                                        color: Theme.borderColor
+                                        radius: 4
+                                    }
+
+                                    contentItem: Item {
+                                        Rectangle {
+                                            width: parent.parent.visualPosition * parent.width
+                                            height: parent.height
+                                            radius: 4
+                                            color: Theme.successColor
+                                        }
+                                    }
+                                }
+
+                                Text {
+                                    text: (TranslationManager.totalStringCount - TranslationManager.untranslatedCount) +
+                                          " of " + TranslationManager.totalStringCount + " strings translated"
+                                    font: Theme.labelFont
+                                    color: Theme.textSecondaryColor
+                                }
+                            }
+                        }
+
+                        // Current language info
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: langInfoColumn.height + Theme.spacingMedium * 2
+                            color: Theme.backgroundColor
+                            radius: 4
+                            visible: TranslationManager.currentLanguage === "en"
+
+                            ColumnLayout {
+                                id: langInfoColumn
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.margins: Theme.spacingMedium
+                                spacing: 4
+
+                                Text {
+                                    text: "English (Source Language)"
+                                    font: Theme.subtitleFont
+                                    color: Theme.textColor
+                                }
+
+                                Text {
+                                    text: "Select a different language to start translating, or add a new language."
+                                    font: Theme.labelFont
+                                    color: Theme.textSecondaryColor
+                                    wrapMode: Text.Wrap
+                                    Layout.fillWidth: true
+                                }
+                            }
+                        }
+
+                        Item { Layout.fillHeight: true }
+
+                        // Export/Import buttons
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.spacingMedium
+
+                            Button {
+                                Layout.fillWidth: true
+                                text: "Export"
+                                enabled: TranslationManager.currentLanguage !== "en"
+
+                                background: Rectangle {
+                                    implicitHeight: Theme.touchTargetMin
+                                    color: parent.down ? Qt.darker(Theme.surfaceColor, 1.2) : Theme.backgroundColor
+                                    radius: Theme.buttonRadius
+                                    border.width: 1
+                                    border.color: Theme.borderColor
+                                    opacity: parent.enabled ? 1.0 : 0.5
+                                }
+
+                                contentItem: Text {
+                                    text: parent.text
+                                    font: Theme.bodyFont
+                                    color: Theme.textColor
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    opacity: parent.enabled ? 1.0 : 0.5
+                                }
+
+                                onClicked: {
+                                    // Export to downloads folder
+                                    var filename = TranslationManager.currentLanguage + "_translation.json"
+                                    TranslationManager.exportTranslation(filename)
+                                }
+                            }
+
+                            Button {
+                                Layout.fillWidth: true
+                                text: "Import"
+
+                                background: Rectangle {
+                                    implicitHeight: Theme.touchTargetMin
+                                    color: parent.down ? Qt.darker(Theme.surfaceColor, 1.2) : Theme.backgroundColor
+                                    radius: Theme.buttonRadius
+                                    border.width: 1
+                                    border.color: Theme.borderColor
+                                }
+
+                                contentItem: Text {
+                                    text: parent.text
+                                    font: Theme.bodyFont
+                                    color: Theme.textColor
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                                onClicked: {
+                                    // TODO: Open file picker
+                                    console.log("Import not yet implemented - use file manager to copy JSON to app data folder")
+                                }
+                            }
+                        }
+
+                        // Submit to community button
+                        Button {
+                            Layout.fillWidth: true
+                            text: "Submit to Community"
+                            enabled: TranslationManager.currentLanguage !== "en"
+
+                            background: Rectangle {
+                                implicitHeight: Theme.touchTargetMin
+                                color: parent.down ? Qt.darker(Theme.successColor, 1.2) : Theme.successColor
+                                radius: Theme.buttonRadius
+                                opacity: parent.enabled ? 1.0 : 0.5
+                            }
+
+                            contentItem: Text {
+                                text: parent.text
+                                font: Theme.bodyFont
+                                color: "white"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            onClicked: TranslationManager.openGitHubSubmission()
+                        }
+                    }
+                }
+            }
+
+            // Add Language Dialog
+            Dialog {
+                id: addLanguageDialog
+                title: "Add New Language"
+                modal: true
+                anchors.centerIn: parent
+                width: Math.min(350, parent.width - 40)
+
+                background: Rectangle {
+                    color: Theme.surfaceColor
+                    radius: Theme.cardRadius
+                    border.width: 1
+                    border.color: Theme.borderColor
+                }
+
+                header: Rectangle {
+                    color: "transparent"
+                    height: 50
+                    Text {
+                        anchors.centerIn: parent
+                        text: addLanguageDialog.title
+                        font: Theme.titleFont
+                        color: Theme.textColor
+                    }
+                }
+
+                contentItem: ColumnLayout {
+                    spacing: Theme.spacingMedium
+
+                    Text {
+                        text: "Language Code (e.g., de, fr, es):"
+                        font: Theme.labelFont
+                        color: Theme.textSecondaryColor
+                    }
+
+                    StyledTextField {
+                        id: langCodeInput
+                        Layout.fillWidth: true
+                        placeholderText: "en"
+                        maximumLength: 5
+                    }
+
+                    Text {
+                        text: "Display Name (e.g., German, French):"
+                        font: Theme.labelFont
+                        color: Theme.textSecondaryColor
+                    }
+
+                    StyledTextField {
+                        id: langNameInput
+                        Layout.fillWidth: true
+                        placeholderText: "English"
+                    }
+
+                    Text {
+                        text: "Native Name (e.g., Deutsch, Francais):"
+                        font: Theme.labelFont
+                        color: Theme.textSecondaryColor
+                    }
+
+                    StyledTextField {
+                        id: langNativeNameInput
+                        Layout.fillWidth: true
+                        placeholderText: "Optional"
+                    }
+                }
+
+                footer: RowLayout {
+                    spacing: Theme.spacingMedium
+
+                    Item { Layout.fillWidth: true }
+
+                    Button {
+                        text: "Cancel"
+                        onClicked: addLanguageDialog.close()
+
+                        background: Rectangle {
+                            implicitWidth: 80
+                            implicitHeight: Theme.touchTargetMin
+                            color: parent.down ? Qt.darker(Theme.surfaceColor, 1.2) : Theme.surfaceColor
+                            radius: Theme.buttonRadius
+                            border.width: 1
+                            border.color: Theme.borderColor
+                        }
+
+                        contentItem: Text {
+                            text: parent.text
+                            font: Theme.bodyFont
+                            color: Theme.textColor
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                    }
+
+                    Button {
+                        text: "Add"
+                        enabled: langCodeInput.text.trim().length >= 2 && langNameInput.text.trim().length >= 2
+
+                        background: Rectangle {
+                            implicitWidth: 80
+                            implicitHeight: Theme.touchTargetMin
+                            color: parent.down ? Qt.darker(Theme.primaryColor, 1.2) : Theme.primaryColor
+                            radius: Theme.buttonRadius
+                            opacity: parent.enabled ? 1.0 : 0.5
+                        }
+
+                        contentItem: Text {
+                            text: parent.text
+                            font: Theme.bodyFont
+                            color: "white"
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        onClicked: {
+                            TranslationManager.addLanguage(
+                                langCodeInput.text.trim().toLowerCase(),
+                                langNameInput.text.trim(),
+                                langNativeNameInput.text.trim()
+                            )
+                            langCodeInput.text = ""
+                            langNameInput.text = ""
+                            langNativeNameInput.text = ""
+                            addLanguageDialog.close()
+                        }
+                    }
+                }
+            }
+        }
 
         // ============ DEBUG TAB ============
         Item {
@@ -2692,27 +3299,30 @@ Page {
                         anchors.margins: 15
                         spacing: 12
 
-                        Text {
-                            text: "Simulation"
+                        Tr {
+                            key: "settings.debug.simulation"
+                            fallback: "Simulation"
                             color: Theme.textColor
                             font.pixelSize: 16
                             font.bold: true
                         }
 
-                        Text {
-                            text: "Enable these options to test the app without hardware connected."
+                        Tr {
+                            Layout.fillWidth: true
+                            key: "settings.debug.simulationDesc"
+                            fallback: "Enable these options to test the app without hardware connected."
                             color: Theme.textSecondaryColor
                             font.pixelSize: 12
                             wrapMode: Text.Wrap
-                            Layout.fillWidth: true
                         }
 
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 20
 
-                            Text {
-                                text: "Simulate machine connection"
+                            Tr {
+                                key: "settings.debug.simulateMachine"
+                                fallback: "Simulate machine connection"
                                 color: Theme.textColor
                                 font.pixelSize: 14
                             }
@@ -2734,8 +3344,9 @@ Page {
                             Layout.fillWidth: true
                             spacing: 20
 
-                            Text {
-                                text: "Headless mode (no GHC)"
+                            Tr {
+                                key: "settings.debug.headlessMode"
+                                fallback: "Headless mode (no GHC)"
                                 color: Theme.textColor
                                 font.pixelSize: 14
                             }
@@ -2765,19 +3376,21 @@ Page {
                         anchors.margins: 15
                         spacing: 12
 
-                        Text {
-                            text: "Battery Drain Test"
+                        Tr {
+                            key: "settings.debug.batteryDrainTest"
+                            fallback: "Battery Drain Test"
                             color: Theme.textColor
                             font.pixelSize: 16
                             font.bold: true
                         }
 
-                        Text {
-                            text: "Drains battery by maxing CPU, GPU, screen brightness and flashlight. Useful for testing smart charging."
+                        Tr {
+                            Layout.fillWidth: true
+                            key: "settings.debug.batteryDrainTestDesc"
+                            fallback: "Drains battery by maxing CPU, GPU, screen brightness and flashlight. Useful for testing smart charging."
                             color: Theme.textSecondaryColor
                             font.pixelSize: 12
                             wrapMode: Text.Wrap
-                            Layout.fillWidth: true
                         }
 
                         RowLayout {
@@ -2833,8 +3446,9 @@ Page {
                         anchors.margins: 15
                         spacing: 12
 
-                        Text {
-                            text: "Window Resolution"
+                        Tr {
+                            key: "settings.debug.windowResolution"
+                            fallback: "Window Resolution"
                             color: Theme.textColor
                             font.pixelSize: 16
                             font.bold: true
@@ -2844,8 +3458,9 @@ Page {
                             Layout.fillWidth: true
                             spacing: 20
 
-                            Text {
-                                text: "Resize window to test UI scaling"
+                            Tr {
+                                key: "settings.debug.resizeWindow"
+                                fallback: "Resize window to test UI scaling"
                                 color: Theme.textSecondaryColor
                                 font.pixelSize: 12
                             }
@@ -3176,13 +3791,13 @@ Page {
                         columnSpacing: 20
                         Layout.alignment: Qt.AlignHCenter
 
-                        Text { text: "Test"; color: Theme.textSecondaryColor; font.bold: true }
-                        Text { text: "Raw Flow"; color: Theme.textSecondaryColor; font.bold: true }
-                        Text { text: "Actual"; color: Theme.textSecondaryColor; font.bold: true }
-                        Text { text: "Factor"; color: Theme.textSecondaryColor; font.bold: true }
+                        Tr { key: "settings.calibration.test"; fallback: "Test"; color: Theme.textSecondaryColor; font.bold: true }
+                        Tr { key: "settings.calibration.rawFlow"; fallback: "Raw Flow"; color: Theme.textSecondaryColor; font.bold: true }
+                        Tr { key: "settings.calibration.actual"; fallback: "Actual"; color: Theme.textSecondaryColor; font.bold: true }
+                        Tr { key: "settings.calibration.factor"; fallback: "Factor"; color: Theme.textSecondaryColor; font.bold: true }
 
                         // Low
-                        Text { text: "Low"; color: Theme.textColor }
+                        Tr { key: "settings.calibration.low"; fallback: "Low"; color: Theme.textColor }
                         Text { text: flowCalibrationDialog.flowIntegrals[0].toFixed(1) + "g"; color: Theme.textColor }
                         Text { text: flowCalibrationDialog.measuredWeights[0].toFixed(1) + "g"; color: Theme.textColor }
                         Text {
@@ -3193,7 +3808,7 @@ Page {
                         }
 
                         // Medium
-                        Text { text: "Medium"; color: Theme.textColor }
+                        Tr { key: "settings.calibration.medium"; fallback: "Medium"; color: Theme.textColor }
                         Text { text: flowCalibrationDialog.flowIntegrals[1].toFixed(1) + "g"; color: Theme.textColor }
                         Text { text: flowCalibrationDialog.measuredWeights[1].toFixed(1) + "g"; color: Theme.textColor }
                         Text {
@@ -3204,7 +3819,7 @@ Page {
                         }
 
                         // High
-                        Text { text: "High"; color: Theme.textColor }
+                        Tr { key: "settings.calibration.high"; fallback: "High"; color: Theme.textColor }
                         Text { text: flowCalibrationDialog.flowIntegrals[2].toFixed(1) + "g"; color: Theme.textColor }
                         Text { text: flowCalibrationDialog.measuredWeights[2].toFixed(1) + "g"; color: Theme.textColor }
                         Text {
@@ -3287,22 +3902,22 @@ Page {
                         columnSpacing: 12
                         Layout.alignment: Qt.AlignHCenter
 
-                        Text { text: "Test"; color: Theme.textSecondaryColor; font.pixelSize: 12 }
-                        Text { text: "Raw"; color: Theme.textSecondaryColor; font.pixelSize: 12 }
-                        Text { text: "Actual"; color: Theme.textSecondaryColor; font.pixelSize: 12 }
-                        Text { text: "Factor"; color: Theme.textSecondaryColor; font.pixelSize: 12 }
+                        Tr { key: "settings.calibration.test"; fallback: "Test"; color: Theme.textSecondaryColor; font.pixelSize: 12 }
+                        Tr { key: "settings.calibration.raw"; fallback: "Raw"; color: Theme.textSecondaryColor; font.pixelSize: 12 }
+                        Tr { key: "settings.calibration.actual"; fallback: "Actual"; color: Theme.textSecondaryColor; font.pixelSize: 12 }
+                        Tr { key: "settings.calibration.factor"; fallback: "Factor"; color: Theme.textSecondaryColor; font.pixelSize: 12 }
 
-                        Text { text: "Low"; color: Theme.textColor; font.pixelSize: 12 }
+                        Tr { key: "settings.calibration.low"; fallback: "Low"; color: Theme.textColor; font.pixelSize: 12 }
                         Text { text: flowCalibrationDialog.flowIntegrals[0].toFixed(0) + "g"; color: Theme.textColor; font.pixelSize: 12 }
                         Text { text: flowCalibrationDialog.measuredWeights[0].toFixed(0) + "g"; color: Theme.textColor; font.pixelSize: 12 }
                         Text { text: flowCalibrationDialog.flowIntegrals[0] > 0 ? (flowCalibrationDialog.measuredWeights[0] / flowCalibrationDialog.flowIntegrals[0]).toFixed(2) : "-"; color: Theme.primaryColor; font.pixelSize: 12 }
 
-                        Text { text: "Med"; color: Theme.textColor; font.pixelSize: 12 }
+                        Tr { key: "settings.calibration.med"; fallback: "Med"; color: Theme.textColor; font.pixelSize: 12 }
                         Text { text: flowCalibrationDialog.flowIntegrals[1].toFixed(0) + "g"; color: Theme.textColor; font.pixelSize: 12 }
                         Text { text: flowCalibrationDialog.measuredWeights[1].toFixed(0) + "g"; color: Theme.textColor; font.pixelSize: 12 }
                         Text { text: flowCalibrationDialog.flowIntegrals[1] > 0 ? (flowCalibrationDialog.measuredWeights[1] / flowCalibrationDialog.flowIntegrals[1]).toFixed(2) : "-"; color: Theme.primaryColor; font.pixelSize: 12 }
 
-                        Text { text: "High"; color: Theme.textColor; font.pixelSize: 12 }
+                        Tr { key: "settings.calibration.high"; fallback: "High"; color: Theme.textColor; font.pixelSize: 12 }
                         Text { text: flowCalibrationDialog.flowIntegrals[2].toFixed(0) + "g"; color: Theme.textColor; font.pixelSize: 12 }
                         Text { text: flowCalibrationDialog.measuredWeights[2].toFixed(0) + "g"; color: Theme.textColor; font.pixelSize: 12 }
                         Text { text: flowCalibrationDialog.flowIntegrals[2] > 0 ? (flowCalibrationDialog.measuredWeights[2] / flowCalibrationDialog.flowIntegrals[2]).toFixed(2) : "-"; color: Theme.primaryColor; font.pixelSize: 12 }
@@ -3536,8 +4151,9 @@ Page {
             anchors.fill: parent
             spacing: Theme.spacingMedium
 
-            Text {
-                text: "Save Theme"
+            Tr {
+                key: "settings.themes.saveTheme"
+                fallback: "Save Theme"
                 color: Theme.textColor
                 font: Theme.subtitleFont
                 Layout.alignment: Qt.AlignHCenter
@@ -3574,7 +4190,8 @@ Page {
 
                 Button {
                     Layout.fillWidth: true
-                    text: "Cancel"
+                    property string buttonText: TranslationManager.translate("common.cancel", "Cancel")
+                    text: buttonText
                     onClicked: saveThemeDialog.close()
                     background: Rectangle {
                         color: Theme.surfaceColor
@@ -3583,7 +4200,7 @@ Page {
                         border.width: 1
                     }
                     contentItem: Text {
-                        text: parent.text
+                        text: parent.buttonText
                         color: Theme.textColor
                         font: Theme.labelFont
                         horizontalAlignment: Text.AlignHCenter
@@ -3592,7 +4209,8 @@ Page {
 
                 Button {
                     Layout.fillWidth: true
-                    text: "Save"
+                    property string buttonText: TranslationManager.translate("common.save", "Save")
+                    text: buttonText
                     enabled: saveThemeDialog.themeName.trim().length > 0
                     onClicked: {
                         var name = saveThemeDialog.themeName.trim()
@@ -3608,7 +4226,7 @@ Page {
                         opacity: parent.pressed ? 0.8 : 1.0
                     }
                     contentItem: Text {
-                        text: parent.text
+                        text: parent.buttonText
                         color: parent.enabled ? "white" : Theme.textSecondaryColor
                         font: Theme.labelFont
                         horizontalAlignment: Text.AlignHCenter

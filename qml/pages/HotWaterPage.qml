@@ -9,12 +9,15 @@ Page {
     background: Rectangle { color: Theme.backgroundColor }
 
     Component.onCompleted: {
-        root.currentPageTitle = "Hot Water"
+        root.currentPageTitle = pageTitleText.text
         // Sync Settings.waterVolume with selected preset
         Settings.waterVolume = getCurrentVesselVolume()
         MainController.applyHotWaterSettings()
     }
-    StackView.onActivated: root.currentPageTitle = "Hot Water"
+    StackView.onActivated: root.currentPageTitle = pageTitleText.text
+
+    // Hidden Tr component for page title (used by root.currentPageTitle)
+    Tr { id: pageTitleText; key: "hotwater.title"; fallback: "Hot Water"; visible: false }
 
     property bool isDispensing: MachineState.phase === MachineStateType.Phase.HotWater || root.debugLiveView
     property int editingVesselIndex: -1
@@ -137,9 +140,10 @@ Page {
                 radius: Theme.cardRadius
                 color: stopMouseArea.pressed ? Qt.darker(Theme.errorColor, 1.2) : Theme.errorColor
 
-                Text {
+                Tr {
                     anchors.centerIn: parent
-                    text: "Stop"
+                    key: "hotwater.button.stop"
+                    fallback: "Stop"
                     color: "white"
                     font.pixelSize: Theme.scaled(24)
                     font.weight: Font.Bold
@@ -179,8 +183,9 @@ Page {
                     anchors.margins: 12
                     spacing: Theme.scaled(20)
 
-                    Text {
-                        text: "Vessel Preset"
+                    Tr {
+                        key: "hotwater.label.vesselPreset"
+                        fallback: "Vessel Preset"
                         color: Theme.textColor
                         font.pixelSize: Theme.scaled(24)
                     }
@@ -331,8 +336,9 @@ Page {
 
                     Item { Layout.fillWidth: true }
 
-                    Text {
-                        text: "Drag to reorder, hold or double-click to edit"
+                    Tr {
+                        key: "hotwater.hint.reorder"
+                        fallback: "Drag to reorder, hold or double-click to edit"
                         color: Theme.textSecondaryColor
                         font: Theme.labelFont
                     }
@@ -356,8 +362,9 @@ Page {
                         Layout.fillWidth: true
                         spacing: 16
 
-                        Text {
-                            text: "Weight"
+                        Tr {
+                            key: "hotwater.label.weight"
+                            fallback: "Weight"
                             color: Theme.textColor
                             font.pixelSize: Theme.scaled(24)
                         }
@@ -390,8 +397,9 @@ Page {
                         Layout.fillWidth: true
                         spacing: 16
 
-                        Text {
-                            text: "Temperature"
+                        Tr {
+                            key: "hotwater.label.temperature"
+                            fallback: "Temperature"
                             color: Theme.textColor
                             font.pixelSize: Theme.scaled(24)
                         }
@@ -422,10 +430,13 @@ Page {
         }
     }
 
+    // Hidden Tr for "No vessel" fallback
+    Tr { id: noVesselText; key: "hotwater.label.noVessel"; fallback: "No vessel"; visible: false }
+
     // Bottom bar
     BottomBar {
         visible: !isDispensing
-        title: getCurrentVesselName() || "No vessel"
+        title: getCurrentVesselName() || noVesselText.text
         onBackClicked: {
             MainController.applyHotWaterSettings()
             root.goToIdle()
@@ -480,8 +491,9 @@ Page {
         contentItem: ColumnLayout {
             spacing: 15
 
-            Text {
-                text: "Edit Vessel Preset"
+            Tr {
+                key: "hotwater.popup.editVesselPreset"
+                fallback: "Edit Vessel Preset"
                 color: Theme.textColor
                 font: Theme.subtitleFont
             }
@@ -503,10 +515,11 @@ Page {
                     verticalAlignment: TextInput.AlignVCenter
                     inputMethodHints: Qt.ImhNoPredictiveText
 
-                    Text {
+                    Tr {
                         anchors.fill: parent
                         verticalAlignment: Text.AlignVCenter
-                        text: "Vessel name"
+                        key: "hotwater.placeholder.vesselName"
+                        fallback: "Vessel name"
                         color: Theme.textSecondaryColor
                         font: parent.font
                         visible: !parent.text && !parent.activeFocus
@@ -518,12 +531,13 @@ Page {
                 spacing: 10
 
                 AccessibleButton {
-                    text: "Delete"
+                    text: deleteButtonText.text
                     accessibleName: "Delete preset"
                     onClicked: {
                         Settings.removeWaterVesselPreset(editingVesselIndex)
                         editVesselPopup.close()
                     }
+                    Tr { id: deleteButtonText; key: "hotwater.button.delete"; fallback: "Delete"; visible: false }
                     background: Rectangle {
                         implicitWidth: 80
                         implicitHeight: 36
@@ -542,9 +556,10 @@ Page {
                 Item { Layout.fillWidth: true }
 
                 AccessibleButton {
-                    text: "Cancel"
+                    text: cancelButtonText.text
                     accessibleName: "Cancel"
                     onClicked: editVesselPopup.close()
+                    Tr { id: cancelButtonText; key: "hotwater.button.cancel"; fallback: "Cancel"; visible: false }
                     background: Rectangle {
                         implicitWidth: 70
                         implicitHeight: 36
@@ -561,13 +576,14 @@ Page {
                 }
 
                 AccessibleButton {
-                    text: "Save"
+                    text: saveButtonText.text
                     accessibleName: "Save preset"
                     onClicked: {
                         var preset = Settings.getWaterVesselPreset(editingVesselIndex)
                         Settings.updateWaterVesselPreset(editingVesselIndex, editVesselNameInput.text, preset.volume)
                         editVesselPopup.close()
                     }
+                    Tr { id: saveButtonText; key: "hotwater.button.save"; fallback: "Save"; visible: false }
                     background: Rectangle {
                         implicitWidth: 70
                         implicitHeight: 36
@@ -622,8 +638,9 @@ Page {
         contentItem: ColumnLayout {
             spacing: 15
 
-            Text {
-                text: "Add Vessel Preset"
+            Tr {
+                key: "hotwater.popup.addVesselPreset"
+                fallback: "Add Vessel Preset"
                 color: Theme.textColor
                 font: Theme.subtitleFont
             }
@@ -645,10 +662,11 @@ Page {
                     verticalAlignment: TextInput.AlignVCenter
                     inputMethodHints: Qt.ImhNoPredictiveText
 
-                    Text {
+                    Tr {
                         anchors.fill: parent
                         verticalAlignment: Text.AlignVCenter
-                        text: "Vessel name"
+                        key: "hotwater.placeholder.vesselName"
+                        fallback: "Vessel name"
                         color: Theme.textSecondaryColor
                         font: parent.font
                         visible: !parent.text && !parent.activeFocus
@@ -662,9 +680,10 @@ Page {
                 Item { Layout.fillWidth: true }
 
                 AccessibleButton {
-                    text: "Cancel"
+                    text: addCancelButtonText.text
                     accessibleName: "Cancel"
                     onClicked: addVesselDialog.close()
+                    Tr { id: addCancelButtonText; key: "hotwater.button.cancel"; fallback: "Cancel"; visible: false }
                     background: Rectangle {
                         implicitWidth: 70
                         implicitHeight: 36
@@ -681,7 +700,7 @@ Page {
                 }
 
                 AccessibleButton {
-                    text: "Add"
+                    text: addButtonText.text
                     accessibleName: "Add preset"
                     onClicked: {
                         if (newVesselNameInput.text.length > 0) {
@@ -690,6 +709,7 @@ Page {
                             addVesselDialog.close()
                         }
                     }
+                    Tr { id: addButtonText; key: "hotwater.button.add"; fallback: "Add"; visible: false }
                     background: Rectangle {
                         implicitWidth: 70
                         implicitHeight: 36

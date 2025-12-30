@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtMultimedia
 import DecenzaDE1
+import "../components"
 
 Page {
     id: screensaverPage
@@ -249,8 +250,10 @@ Page {
 
         Text {
             anchors.centerIn: parent
-            text: (isCurrentItemImage ? "Photo by " : "Video by ") +
-                  ScreensaverManager.currentVideoAuthor + " (Pexels)"
+            text: (isCurrentItemImage
+                   ? TranslationManager.translate("screensaver.photo_by", "Photo by %1 (Pexels)")
+                   : TranslationManager.translate("screensaver.video_by", "Video by %1 (Pexels)"))
+                  .arg(ScreensaverManager.currentVideoAuthor)
             color: "white"
             opacity: 0.7
             font.pixelSize: 14
@@ -305,11 +308,12 @@ Page {
     }
 
     // Touch hint (fades out)
-    Text {
+    Tr {
         id: touchHint
         z: 2
         anchors.centerIn: parent
-        text: "Touch to wake"
+        key: "screensaver.touch_to_wake"
+        fallback: "Touch to wake"
         color: "white"
         opacity: 0.5
         font.pixelSize: 24

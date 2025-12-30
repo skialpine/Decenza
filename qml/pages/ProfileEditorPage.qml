@@ -83,7 +83,7 @@ Page {
     }
 
     function updatePageTitle() {
-        root.currentPageTitle = profile ? profile.title : "Profile Editor"
+        root.currentPageTitle = profile ? profile.title : qsTr("Profile Editor")
     }
 
     // Auto-upload profile to machine on any change
@@ -147,8 +147,9 @@ Page {
                         Layout.fillWidth: true
                         spacing: Theme.scaled(10)
 
-                        Text {
-                            text: "Frames"
+                        Tr {
+                            key: "profileeditor.frames.title"
+                            fallback: "Frames"
                             font: Theme.subtitleFont
                             color: Theme.textColor
                         }
@@ -156,8 +157,8 @@ Page {
                         Item { Layout.fillWidth: true }
 
                         AccessibleButton {
-                            text: "+ Add"
-                            accessibleName: "Add frame"
+                            text: qsTr("+ Add")
+                            accessibleName: qsTr("Add frame")
                             onClicked: addStep()
                             background: Rectangle {
                                 implicitWidth: Theme.scaled(80)
@@ -175,8 +176,8 @@ Page {
                         }
 
                         AccessibleButton {
-                            text: "Delete"
-                            accessibleName: "Delete selected frame"
+                            text: qsTr("Delete")
+                            accessibleName: qsTr("Delete selected frame")
                             enabled: selectedStepIndex >= 0
                             onClicked: deleteStep(selectedStepIndex)
                             background: Rectangle {
@@ -198,7 +199,7 @@ Page {
 
                         AccessibleButton {
                             text: "\u2190"
-                            accessibleName: "Move frame left"
+                            accessibleName: qsTr("Move frame left")
                             enabled: selectedStepIndex > 0
                             onClicked: moveStep(selectedStepIndex, selectedStepIndex - 1)
                             background: Rectangle {
@@ -220,7 +221,7 @@ Page {
 
                         AccessibleButton {
                             text: "\u2192"
-                            accessibleName: "Move frame right"
+                            accessibleName: qsTr("Move frame right")
                             enabled: selectedStepIndex >= 0 && selectedStepIndex < (profile ? profile.steps.length - 1 : 0)
                             onClicked: moveStep(selectedStepIndex, selectedStepIndex + 1)
                             background: Rectangle {
@@ -276,7 +277,7 @@ Page {
     // Bottom bar
     BottomBar {
         id: bottomBar
-        title: profile ? profile.title : "Profile"
+        title: profile ? profile.title : qsTr("Profile")
         onBackClicked: {
             if (profileModified) {
                 exitDialog.open()
@@ -286,15 +287,16 @@ Page {
         }
 
         // Modified indicator
-        Text {
-            text: profileModified ? "\u2022 Modified" : ""
+        Tr {
+            key: "profileeditor.status.modified"
+            fallback: "\u2022 Modified"
             color: "#FFCC00"
             font: Theme.bodyFont
             visible: profileModified
         }
         Rectangle { width: 1; height: Theme.scaled(30); color: "white"; opacity: 0.3; visible: profile }
         Text {
-            text: profile ? profile.steps.length + " frames" : ""
+            text: profile ? profile.steps.length + " " + qsTr("frames") : ""
             color: "white"
             font: Theme.bodyFont
         }
@@ -305,8 +307,8 @@ Page {
             font: Theme.bodyFont
         }
         AccessibleButton {
-            text: "Done"
-            accessibleName: profileModified ? "Done. Unsaved changes" : "Done"
+            text: qsTr("Done")
+            accessibleName: profileModified ? qsTr("Done. Unsaved changes") : qsTr("Done")
             onClicked: {
                 if (profileModified) {
                     exitDialog.open()
@@ -333,7 +335,7 @@ Page {
     // Save As dialog - just title input, filename derived automatically
     Dialog {
         id: saveAsDialog
-        title: "Save Profile As"
+        title: qsTr("Save Profile As")
         x: (parent.width - width) / 2
         y: Theme.scaled(80)
         width: Theme.scaled(400)
@@ -346,8 +348,9 @@ Page {
             width: parent.width
             spacing: Theme.scaled(10)
 
-            Text {
-                text: "Profile Title"
+            Tr {
+                key: "profileeditor.label.profiletitle"
+                fallback: "Profile Title"
                 font: Theme.captionFont
                 color: Theme.textSecondaryColor
             }
@@ -396,16 +399,17 @@ Page {
     // Overwrite confirmation dialog
     Dialog {
         id: overwriteDialog
-        title: "Profile Exists"
+        title: qsTr("Profile Exists")
         x: (parent.width - width) / 2
         y: Theme.scaled(80)
         width: Theme.scaled(400)
         modal: true
         standardButtons: Dialog.Yes | Dialog.No
 
-        Text {
+        Tr {
             width: parent.width
-            text: "A profile with this name already exists.\nDo you want to overwrite it?"
+            key: "profileeditor.dialog.overwriteconfirm"
+            fallback: "A profile with this name already exists.\nDo you want to overwrite it?"
             font: Theme.bodyFont
             color: Theme.textColor
             wrapMode: Text.Wrap
@@ -420,7 +424,7 @@ Page {
     // Exit dialog for unsaved changes
     Dialog {
         id: exitDialog
-        title: "Unsaved Changes"
+        title: qsTr("Unsaved Changes")
         anchors.centerIn: parent
         width: Theme.scaled(480)
         padding: Theme.scaled(20)
@@ -430,8 +434,9 @@ Page {
             anchors.fill: parent
             spacing: Theme.scaled(20)
 
-            Text {
-                text: "You have unsaved changes to this profile.\nWhat would you like to do?"
+            Tr {
+                key: "profileeditor.dialog.unsavedmessage"
+                fallback: "You have unsaved changes to this profile.\nWhat would you like to do?"
                 font: Theme.bodyFont
                 color: Theme.textColor
                 wrapMode: Text.Wrap
@@ -443,8 +448,8 @@ Page {
                 spacing: Theme.scaled(10)
 
                 AccessibleButton {
-                    text: "Discard"
-                    accessibleName: "Discard changes"
+                    text: qsTr("Discard")
+                    accessibleName: qsTr("Discard changes")
                     onClicked: {
                         // Reload original profile to discard changes
                         if (originalProfileName) {
@@ -471,8 +476,8 @@ Page {
                 Item { Layout.fillWidth: true }
 
                 AccessibleButton {
-                    text: "Save As..."
-                    accessibleName: "Save as new profile"
+                    text: qsTr("Save As...")
+                    accessibleName: qsTr("Save as new profile")
                     onClicked: {
                         exitDialog.close()
                         saveAsDialog.open()
@@ -493,8 +498,8 @@ Page {
                 }
 
                 AccessibleButton {
-                    text: "Save"
-                    accessibleName: "Save profile"
+                    text: qsTr("Save")
+                    accessibleName: qsTr("Save profile")
                     enabled: originalProfileName !== ""
                     onClicked: {
                         saveProfile()
@@ -529,15 +534,17 @@ Page {
                 anchors.centerIn: parent
                 spacing: Theme.scaled(15)
 
-                Text {
-                    text: "Select a frame"
+                Tr {
+                    key: "profileeditor.noselection.title"
+                    fallback: "Select a frame"
                     font: Theme.titleFont
                     color: Theme.textSecondaryColor
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
 
-                Text {
-                    text: "Click on the graph to select\na frame for editing"
+                Tr {
+                    key: "profileeditor.noselection.hint"
+                    fallback: "Click on the graph to select\na frame for editing"
                     font: Theme.bodyFont
                     color: Theme.textSecondaryColor
                     horizontalAlignment: Text.AlignHCenter
@@ -572,8 +579,9 @@ Page {
                     Layout.fillWidth: true
                     spacing: Theme.scaled(4)
 
-                    Text {
-                        text: "Frame Name"
+                    Tr {
+                        key: "profileeditor.label.framename"
+                        fallback: "Frame Name"
                         font: Theme.captionFont
                         color: Theme.textSecondaryColor
                     }
@@ -605,7 +613,7 @@ Page {
                 // Pump mode
                 GroupBox {
                     Layout.fillWidth: true
-                    title: "Pump Mode"
+                    title: qsTr("Pump Mode")
                     background: Rectangle {
                         color: Qt.rgba(255, 255, 255, 0.05)
                         radius: Theme.scaled(8)
@@ -624,7 +632,7 @@ Page {
                         spacing: Theme.scaled(20)
 
                         RadioButton {
-                            text: "Pressure"
+                            text: qsTr("Pressure")
                             checked: step && step.pump === "pressure"
                             contentItem: Text {
                                 text: parent.text
@@ -642,7 +650,7 @@ Page {
                         }
 
                         RadioButton {
-                            text: "Flow"
+                            text: qsTr("Flow")
                             checked: step && step.pump === "flow"
                             contentItem: Text {
                                 text: parent.text
@@ -667,7 +675,7 @@ Page {
                     spacing: Theme.scaled(12)
 
                     Text {
-                        text: step && step.pump === "flow" ? "Flow" : "Pressure"
+                        text: step && step.pump === "flow" ? qsTr("Flow") : qsTr("Pressure")
                         font: Theme.captionFont
                         color: Theme.textSecondaryColor
                         Layout.preferredWidth: Theme.scaled(80)
@@ -701,8 +709,9 @@ Page {
                     Layout.fillWidth: true
                     spacing: Theme.scaled(12)
 
-                    Text {
-                        text: "Temp"
+                    Tr {
+                        key: "profileeditor.label.temp"
+                        fallback: "Temp"
                         font: Theme.captionFont
                         color: Theme.textSecondaryColor
                         Layout.preferredWidth: Theme.scaled(80)
@@ -732,8 +741,9 @@ Page {
                     Layout.fillWidth: true
                     spacing: Theme.scaled(12)
 
-                    Text {
-                        text: "Duration"
+                    Tr {
+                        key: "profileeditor.label.duration"
+                        fallback: "Duration"
                         font: Theme.captionFont
                         color: Theme.textSecondaryColor
                         Layout.preferredWidth: Theme.scaled(80)
@@ -761,7 +771,7 @@ Page {
                 // Transition
                 GroupBox {
                     Layout.fillWidth: true
-                    title: "Transition"
+                    title: qsTr("Transition")
                     background: Rectangle {
                         color: Qt.rgba(255, 255, 255, 0.05)
                         radius: Theme.scaled(8)
@@ -780,7 +790,7 @@ Page {
                         spacing: Theme.scaled(20)
 
                         RadioButton {
-                            text: "Fast"
+                            text: qsTr("Fast")
                             checked: step && step.transition === "fast"
                             contentItem: Text {
                                 text: parent.text
@@ -798,7 +808,7 @@ Page {
                         }
 
                         RadioButton {
-                            text: "Smooth"
+                            text: qsTr("Smooth")
                             checked: step && step.transition === "smooth"
                             contentItem: Text {
                                 text: parent.text
@@ -820,7 +830,7 @@ Page {
                 // Exit conditions (collapsible)
                 GroupBox {
                     Layout.fillWidth: true
-                    title: "Exit Condition"
+                    title: qsTr("Exit Condition")
                     background: Rectangle {
                         color: Qt.rgba(255, 255, 255, 0.05)
                         radius: Theme.scaled(8)
@@ -840,7 +850,7 @@ Page {
 
                         CheckBox {
                             id: exitIfCheck
-                            text: "Enable early exit"
+                            text: qsTr("Enable early exit")
                             checked: step ? step.exit_if : false
                             contentItem: Text {
                                 text: parent.text
@@ -861,7 +871,7 @@ Page {
                             id: exitTypeCombo
                             Layout.fillWidth: true
                             enabled: exitIfCheck.checked
-                            model: ["Pressure Over", "Pressure Under", "Flow Over", "Flow Under"]
+                            model: [qsTr("Pressure Over"), qsTr("Pressure Under"), qsTr("Flow Over"), qsTr("Flow Under")]
                             contentItem: Text {
                                 text: exitTypeCombo.displayText
                                 font: Theme.bodyFont
@@ -960,7 +970,7 @@ Page {
                     spacing: Theme.scaled(12)
 
                     Text {
-                        text: step && step.pump === "flow" ? "Max P" : "Max F"
+                        text: step && step.pump === "flow" ? qsTr("Max P") : qsTr("Max F")
                         font: Theme.captionFont
                         color: Theme.textSecondaryColor
                         Layout.preferredWidth: Theme.scaled(80)
@@ -994,7 +1004,7 @@ Page {
     // Profile name edit dialog
     Dialog {
         id: profileNameDialog
-        title: "Edit Profile Name"
+        title: qsTr("Edit Profile Name")
         anchors.centerIn: parent
         width: Theme.scaled(400)
         modal: true

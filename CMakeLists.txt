@@ -36,6 +36,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     Svg
     Multimedia
     TextToSpeech
+    Network
 )
 
 # Silence Qt policy warnings
@@ -77,6 +78,7 @@ set(SOURCES
     src/core/batterydrainer.cpp
     src/core/accessibilitymanager.cpp
     src/core/profilestorage.cpp
+    src/core/translationmanager.cpp
     src/ble/protocol/binarycodec.cpp
     src/ble/blemanager.cpp
     src/ble/de1device.cpp
@@ -115,6 +117,7 @@ set(HEADERS
     src/core/batterydrainer.h
     src/core/accessibilitymanager.h
     src/core/profilestorage.h
+    src/core/translationmanager.h
     src/ble/protocol/binarycodec.h
     src/ble/protocol/de1characteristics.h
     src/ble/blemanager.h
@@ -171,6 +174,7 @@ target_link_libraries(Decenza_DE1 PRIVATE
     Qt6::Svg
     Qt6::Multimedia
     Qt6::TextToSpeech
+    Qt6::Network
 )
 
 # Include directories
@@ -217,6 +221,8 @@ set(QML_FILES
     qml/components/ColorEditor.qml
     qml/components/ColorSwatch.qml
     qml/components/StyledTextField.qml
+    qml/components/Tr.qml
+    qml/components/AccessibleLabel.qml
 )
 
 qt_add_qml_module(Decenza_DE1

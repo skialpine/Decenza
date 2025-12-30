@@ -140,7 +140,8 @@ Page {
 
             ActionButton {
                 id: espressoButton
-                text: "Espresso"
+                translationKey: "idle.button.espresso"
+                translationFallback: "Espresso"
                 iconSource: "qrc:/icons/espresso.svg"
                 enabled: DE1Device.connected
                 onClicked: {
@@ -157,7 +158,8 @@ Page {
 
             ActionButton {
                 id: shotInfoButton
-                text: "Shot Info"
+                translationKey: "idle.button.shotinfo"
+                translationFallback: "Shot Info"
                 iconSource: "qrc:/icons/edit.svg"
                 iconSize: Theme.scaled(43)
                 backgroundColor: Theme.primaryColor
@@ -174,7 +176,8 @@ Page {
 
             ActionButton {
                 id: steamButton
-                text: "Steam"
+                translationKey: "idle.button.steam"
+                translationFallback: "Steam"
                 iconSource: "qrc:/icons/steam.svg"
                 enabled: DE1Device.connected
                 onClicked: {
@@ -192,7 +195,8 @@ Page {
 
             ActionButton {
                 id: hotWaterButton
-                text: "Hot Water"
+                translationKey: "idle.button.hotwater"
+                translationFallback: "Hot Water"
                 iconSource: "qrc:/icons/water.svg"
                 enabled: DE1Device.connected
                 onClicked: {
@@ -210,7 +214,8 @@ Page {
 
             ActionButton {
                 id: flushButton
-                text: "Flush"
+                translationKey: "idle.button.flush"
+                translationFallback: "Flush"
                 iconSource: "qrc:/icons/flush.svg"
                 enabled: DE1Device.connected
                 onClicked: {
@@ -394,9 +399,10 @@ Page {
                         color: Theme.temperatureColor
                         font: Theme.valueFont
                     }
-                    Text {
+                    Tr {
                         Layout.alignment: Qt.AlignHCenter
-                        text: "Group Temp"
+                        key: "idle.label.grouptemp"
+                        fallback: "Group Temp"
                         color: Theme.textSecondaryColor
                         font: Theme.labelFont
                     }
@@ -427,9 +433,10 @@ Page {
                         color: DE1Device.waterLevel > 20 ? Theme.primaryColor : Theme.warningColor
                         font: Theme.valueFont
                     }
-                    Text {
+                    Tr {
                         Layout.alignment: Qt.AlignHCenter
-                        text: "Water Level"
+                        key: "idle.label.waterlevel"
+                        fallback: "Water Level"
                         color: Theme.textSecondaryColor
                         font: Theme.labelFont
                     }
@@ -570,8 +577,9 @@ Page {
                         sourceSize.height: Theme.scaled(28)
                         Layout.alignment: Qt.AlignVCenter
                     }
-                    Text {
-                        text: "Sleep"
+                    Tr {
+                        key: "idle.button.sleep"
+                        fallback: "Sleep"
                         font: Theme.bodyFont
                         color: "white"
                         verticalAlignment: Text.AlignVCenter

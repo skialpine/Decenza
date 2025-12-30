@@ -8,14 +8,17 @@ Page {
     objectName: "steamPage"
     background: Rectangle { color: Theme.backgroundColor }
 
+    property string pageTitle: steamPageTitle.text
+    Tr { id: steamPageTitle; key: "steam.title"; fallback: "Steam"; visible: false }
+
     Component.onCompleted: {
-        root.currentPageTitle = "Steam"
+        root.currentPageTitle = pageTitle
         // Sync Settings with selected preset
         Settings.steamTimeout = getCurrentPitcherDuration()
         Settings.steamFlow = getCurrentPitcherFlow()
         MainController.applySteamSettings()
     }
-    StackView.onActivated: root.currentPageTitle = "Steam"
+    StackView.onActivated: root.currentPageTitle = pageTitle
 
     property bool isSteaming: MachineState.phase === MachineStateType.Phase.Steaming || root.debugLiveView
     property int editingPitcherIndex: -1  // For the edit popup
@@ -145,9 +148,10 @@ Page {
                 Layout.rightMargin: 40
                 spacing: 12
 
-                Text {
+                Tr {
                     Layout.alignment: Qt.AlignHCenter
-                    text: "Steam Flow"
+                    key: "steam.label.steamFlow"
+                    fallback: "Steam Flow"
                     color: Theme.textSecondaryColor
                     font: Theme.bodyFont
                 }
@@ -168,9 +172,10 @@ Page {
                     }
                 }
 
-                Text {
+                Tr {
                     Layout.alignment: Qt.AlignHCenter
-                    text: "Low = flat, High = foamy"
+                    key: "steam.hint.flowHint"
+                    fallback: "Low = flat, High = foamy"
                     color: Theme.textSecondaryColor
                     font: Theme.labelFont
                 }
@@ -188,9 +193,10 @@ Page {
                 radius: Theme.cardRadius
                 color: stopMouseArea.pressed ? Qt.darker(Theme.errorColor, 1.2) : Theme.errorColor
 
-                Text {
+                Tr {
                     anchors.centerIn: parent
-                    text: "Stop"
+                    key: "steam.button.stop"
+                    fallback: "Stop"
                     color: "white"
                     font.pixelSize: Theme.scaled(24)
                     font.weight: Font.Bold
@@ -230,8 +236,9 @@ Page {
                     anchors.margins: 12
                     spacing: Theme.scaled(20)
 
-                    Text {
-                        text: "Pitcher Preset"
+                    Tr {
+                        key: "steam.label.pitcherPreset"
+                        fallback: "Pitcher Preset"
                         color: Theme.textColor
                         font.pixelSize: Theme.scaled(24)
                     }
@@ -385,8 +392,9 @@ Page {
 
                     Item { Layout.fillWidth: true }
 
-                    Text {
-                        text: "Drag to reorder, hold or double-click to edit"
+                    Tr {
+                        key: "steam.hint.presetReorder"
+                        fallback: "Drag to reorder, hold or double-click to edit"
                         color: Theme.textSecondaryColor
                         font: Theme.labelFont
                     }
@@ -410,8 +418,9 @@ Page {
                         Layout.fillWidth: true
                         spacing: 16
 
-                        Text {
-                            text: "Duration"
+                        Tr {
+                            key: "steam.label.duration"
+                            fallback: "Duration"
                             color: Theme.textColor
                             font.pixelSize: Theme.scaled(24)
                         }
@@ -444,13 +453,15 @@ Page {
                         spacing: 16
 
                         Column {
-                            Text {
-                                text: "Steam Flow"
+                            Tr {
+                                key: "steam.label.steamFlow"
+                                fallback: "Steam Flow"
                                 color: Theme.textColor
                                 font.pixelSize: Theme.scaled(24)
                             }
-                            Text {
-                                text: "Low = flat, High = foamy"
+                            Tr {
+                                key: "steam.hint.flowHint"
+                                fallback: "Low = flat, High = foamy"
                                 color: Theme.textSecondaryColor
                                 font: Theme.labelFont
                             }
@@ -484,13 +495,15 @@ Page {
                         spacing: 16
 
                         Column {
-                            Text {
-                                text: "Temperature"
+                            Tr {
+                                key: "steam.label.temperature"
+                                fallback: "Temperature"
                                 color: Theme.textColor
                                 font.pixelSize: Theme.scaled(24)
                             }
-                            Text {
-                                text: "Higher = drier steam"
+                            Tr {
+                                key: "steam.hint.temperatureHint"
+                                fallback: "Higher = drier steam"
                                 color: Theme.textSecondaryColor
                                 font: Theme.labelFont
                             }
@@ -523,10 +536,13 @@ Page {
         Item { Layout.fillHeight: true; visible: isSteaming }
     }
 
+    // Hidden translation helper for "No pitcher"
+    Tr { id: noPitcherText; key: "steam.label.noPitcher"; fallback: "No pitcher"; visible: false }
+
     // Bottom bar
     BottomBar {
         visible: !isSteaming
-        title: getCurrentPitcherName() || "No pitcher"
+        title: getCurrentPitcherName() || noPitcherText.text
         onBackClicked: {
             MainController.applySteamSettings()
             root.goToIdle()
@@ -538,8 +554,14 @@ Page {
             font: Theme.bodyFont
         }
         Rectangle { width: 1; height: Theme.scaled(30); color: "white"; opacity: 0.3 }
+        Tr {
+            id: flowLabelText
+            key: "steam.label.flow"
+            fallback: "Flow"
+            visible: false
+        }
         Text {
-            text: "Flow " + flowToDisplay(flowSlider.value)
+            text: flowLabelText.text + " " + flowToDisplay(flowSlider.value)
             color: "white"
             font: Theme.bodyFont
         }
@@ -588,11 +610,14 @@ Page {
         contentItem: ColumnLayout {
             spacing: 15
 
-            Text {
-                text: "Edit Pitcher"
+            Tr {
+                key: "steam.popup.editPitcher"
+                fallback: "Edit Pitcher"
                 color: Theme.textColor
                 font: Theme.subtitleFont
             }
+
+            Tr { id: pitcherNamePlaceholder; key: "steam.placeholder.pitcherName"; fallback: "Pitcher name"; visible: false }
 
             Rectangle {
                 Layout.preferredWidth: 280
@@ -614,7 +639,7 @@ Page {
                     Text {
                         anchors.fill: parent
                         verticalAlignment: Text.AlignVCenter
-                        text: "Pitcher name"
+                        text: pitcherNamePlaceholder.text
                         color: Theme.textSecondaryColor
                         font: parent.font
                         visible: !parent.text && !parent.activeFocus
@@ -622,11 +647,15 @@ Page {
                 }
             }
 
+            Tr { id: deleteButtonText; key: "steam.button.delete"; fallback: "Delete"; visible: false }
+            Tr { id: cancelButtonText; key: "steam.button.cancel"; fallback: "Cancel"; visible: false }
+            Tr { id: saveButtonText; key: "steam.button.save"; fallback: "Save"; visible: false }
+
             RowLayout {
                 spacing: 10
 
                 AccessibleButton {
-                    text: "Delete"
+                    text: deleteButtonText.text
                     accessibleName: "Delete preset"
                     onClicked: {
                         Settings.removeSteamPitcherPreset(editingPitcherIndex)
@@ -650,7 +679,7 @@ Page {
                 Item { Layout.fillWidth: true }
 
                 AccessibleButton {
-                    text: "Cancel"
+                    text: cancelButtonText.text
                     accessibleName: "Cancel"
                     onClicked: editPitcherPopup.close()
                     background: Rectangle {
@@ -669,7 +698,7 @@ Page {
                 }
 
                 AccessibleButton {
-                    text: "Save"
+                    text: saveButtonText.text
                     accessibleName: "Save preset"
                     onClicked: {
                         var preset = Settings.getSteamPitcherPreset(editingPitcherIndex)
@@ -731,11 +760,16 @@ Page {
         contentItem: ColumnLayout {
             spacing: 15
 
-            Text {
-                text: "Add Pitcher Preset"
+            Tr {
+                key: "steam.popup.addPitcherPreset"
+                fallback: "Add Pitcher Preset"
                 color: Theme.textColor
                 font: Theme.subtitleFont
             }
+
+            Tr { id: addPitcherNamePlaceholder; key: "steam.placeholder.pitcherName"; fallback: "Pitcher name"; visible: false }
+            Tr { id: addCancelButtonText; key: "steam.button.cancel"; fallback: "Cancel"; visible: false }
+            Tr { id: addButtonText; key: "steam.button.add"; fallback: "Add"; visible: false }
 
             Rectangle {
                 Layout.preferredWidth: 280
@@ -757,7 +791,7 @@ Page {
                     Text {
                         anchors.fill: parent
                         verticalAlignment: Text.AlignVCenter
-                        text: "Pitcher name"
+                        text: addPitcherNamePlaceholder.text
                         color: Theme.textSecondaryColor
                         font: parent.font
                         visible: !parent.text && !parent.activeFocus
@@ -771,7 +805,7 @@ Page {
                 Item { Layout.fillWidth: true }
 
                 AccessibleButton {
-                    text: "Cancel"
+                    text: addCancelButtonText.text
                     accessibleName: "Cancel"
                     onClicked: addPitcherDialog.close()
                     background: Rectangle {
@@ -790,7 +824,7 @@ Page {
                 }
 
                 AccessibleButton {
-                    text: "Add"
+                    text: addButtonText.text
                     accessibleName: "Add preset"
                     onClicked: {
                         if (newPitcherName.text.trim() !== "") {

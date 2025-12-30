@@ -30,7 +30,7 @@ Item {
     // Accessibility - expose as a slider
     Accessible.role: Accessible.Slider
     Accessible.name: root.displayText || (root.value.toFixed(root.decimals) + root.suffix)
-    Accessible.description: "Use plus and minus buttons to adjust. Tap center for full-screen editor."
+    Accessible.description: TranslationManager.translate("valueinput.accessibility.description", "Use plus and minus buttons to adjust. Tap center for full-screen editor.")
     Accessible.focusable: true
 
     // Keyboard handling
@@ -109,7 +109,7 @@ Item {
                 color: minusArea.pressed ? Qt.darker(Theme.surfaceColor, 1.3) : "transparent"
 
                 Accessible.role: Accessible.Button
-                Accessible.name: "Decrease"
+                Accessible.name: TranslationManager.translate("valueinput.button.decrease", "Decrease")
                 Accessible.focusable: true
 
                 Text {
@@ -313,7 +313,7 @@ Item {
                 color: plusArea.pressed ? Qt.darker(Theme.surfaceColor, 1.3) : "transparent"
 
                 Accessible.role: Accessible.Button
-                Accessible.name: "Increase"
+                Accessible.name: TranslationManager.translate("valueinput.button.increase", "Increase")
                 Accessible.focusable: true
 
                 Text {
@@ -357,7 +357,7 @@ Item {
         onOpened: {
             popupValueContainer.forceActiveFocus()
             if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
-                AccessibilityManager.announce("Value editor. Current value: " + root.value.toFixed(root.decimals) + " " + root.suffix.trim(), true)
+                AccessibilityManager.announce(TranslationManager.translate("valueinput.editor.announce", "Value editor. Current value:") + " " + root.value.toFixed(root.decimals) + " " + root.suffix.trim(), true)
             }
         }
 
@@ -370,7 +370,7 @@ Item {
             anchors.fill: parent
 
             Accessible.role: Accessible.Dialog
-            Accessible.name: "Value editor"
+            Accessible.name: TranslationManager.translate("valueinput.editor.title", "Value editor")
 
             // Tap outside to close
             MouseArea {
@@ -402,7 +402,7 @@ Item {
                         color: popupMinusArea.pressed ? Qt.darker(Theme.surfaceColor, 1.3) : "transparent"
 
                         Accessible.role: Accessible.Button
-                        Accessible.name: "Decrease"
+                        Accessible.name: TranslationManager.translate("valueinput.button.decrease", "Decrease")
                         Accessible.focusable: true
 
                         Text {
@@ -594,7 +594,7 @@ Item {
                         color: popupPlusArea.pressed ? Qt.darker(Theme.surfaceColor, 1.3) : "transparent"
 
                         Accessible.role: Accessible.Button
-                        Accessible.name: "Increase"
+                        Accessible.name: TranslationManager.translate("valueinput.button.increase", "Increase")
                         Accessible.focusable: true
 
                         Text {

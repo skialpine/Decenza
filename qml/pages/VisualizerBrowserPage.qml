@@ -9,15 +9,18 @@ Page {
     objectName: "visualizerBrowserPage"
     background: Rectangle { color: Theme.backgroundColor }
 
-    Component.onCompleted: root.currentPageTitle = "Import from Visualizer"
-    StackView.onActivated: root.currentPageTitle = "Import from Visualizer"
+    // Translatable strings for page title
+    Tr { id: trPageTitle; key: "visualizer.title"; fallback: "Import from Visualizer"; visible: false }
+
+    Component.onCompleted: root.currentPageTitle = trPageTitle.text
+    StackView.onActivated: root.currentPageTitle = trPageTitle.text
 
     // Import success/failure handling
     Connections {
         target: MainController.visualizerImporter
 
         function onImportSuccess(profileTitle) {
-            importStatus.statusMessage = "Imported: " + profileTitle
+            importStatus.statusMessage = TranslationManager.translate("visualizer.status.imported", "Imported:") + " " + profileTitle
             importStatus.statusColor = Theme.successColor
             importStatus.visible = true
             statusTimer.restart()
@@ -25,7 +28,7 @@ Page {
         }
 
         function onImportFailed(error) {
-            importStatus.statusMessage = "Error: " + error
+            importStatus.statusMessage = TranslationManager.translate("visualizer.status.error", "Error:") + " " + error
             importStatus.statusColor = Theme.errorColor
             importStatus.visible = true
             statusTimer.restart()
@@ -103,15 +106,17 @@ Page {
                     spacing: Theme.spacingLarge
                     width: Math.min(parent.width - Theme.scaled(40), Theme.scaled(500))
 
-                    Text {
-                        text: "Import Profile from Visualizer"
+                    Tr {
+                        key: "visualizer.heading.import"
+                        fallback: "Import Profile from Visualizer"
                         color: Theme.textColor
                         font: Theme.headingFont
                         anchors.horizontalCenter: parent.horizontalCenter
                     }
 
-                    Text {
-                        text: "Enter the 4-character share code from visualizer.coffee"
+                    Tr {
+                        key: "visualizer.instruction.enterCode"
+                        fallback: "Enter the 4-character share code from visualizer.coffee"
                         wrapMode: Text.Wrap
                         width: parent.width
                         horizontalAlignment: Text.AlignHCenter
@@ -163,11 +168,15 @@ Page {
 
                     // Import button
                     Button {
-                        text: MainController.visualizerImporter.importing ? "Importing..." : "Import Profile"
+                        id: importButton
                         enabled: shareCodeInput.text.length === 4 && !MainController.visualizerImporter.importing
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: Theme.scaled(200)
                         height: Theme.scaled(50)
+
+                        // Translatable button texts
+                        Tr { id: trImporting; key: "visualizer.button.importing"; fallback: "Importing..."; visible: false }
+                        Tr { id: trImportProfile; key: "visualizer.button.import"; fallback: "Import Profile"; visible: false }
 
                         onClicked: {
                             MainController.visualizerImporter.importFromShareCode(shareCodeInput.text)
@@ -178,8 +187,8 @@ Page {
                             color: parent.enabled ? Theme.primaryColor : Theme.surfaceColor
                         }
                         contentItem: Text {
-                            text: parent.text
-                            color: parent.enabled ? "white" : Theme.textSecondaryColor
+                            text: MainController.visualizerImporter.importing ? trImporting.text : trImportProfile.text
+                            color: importButton.enabled ? "white" : Theme.textSecondaryColor
                             font: Theme.bodyFont
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
@@ -208,39 +217,44 @@ Page {
                             width: parent.width - Theme.scaled(20)
                             spacing: Theme.scaled(8)
 
-                            Text {
-                                text: "How to get a share code:"
+                            Tr {
+                                key: "visualizer.instructions.title"
+                                fallback: "How to get a share code:"
                                 color: Theme.textColor
                                 font.bold: true
                                 font.pixelSize: Theme.bodyFont.pixelSize
                             }
 
-                            Text {
-                                text: "1. Open visualizer.coffee on your phone or computer"
+                            Tr {
+                                key: "visualizer.instructions.step1"
+                                fallback: "1. Open visualizer.coffee on your phone or computer"
                                 color: Theme.textSecondaryColor
                                 font: Theme.captionFont
                                 wrapMode: Text.Wrap
                                 width: parent.width
                             }
 
-                            Text {
-                                text: "2. Find a shot with a profile you want"
+                            Tr {
+                                key: "visualizer.instructions.step2"
+                                fallback: "2. Find a shot with a profile you want"
                                 color: Theme.textSecondaryColor
                                 font: Theme.captionFont
                                 wrapMode: Text.Wrap
                                 width: parent.width
                             }
 
-                            Text {
-                                text: "3. Tap 'Share' and copy the 4-character code"
+                            Tr {
+                                key: "visualizer.instructions.step3"
+                                fallback: "3. Tap 'Share' and copy the 4-character code"
                                 color: Theme.textSecondaryColor
                                 font: Theme.captionFont
                                 wrapMode: Text.Wrap
                                 width: parent.width
                             }
 
-                            Text {
-                                text: "4. Enter the code above and tap Import"
+                            Tr {
+                                key: "visualizer.instructions.step4"
+                                fallback: "4. Enter the code above and tap Import"
                                 color: Theme.textSecondaryColor
                                 font: Theme.captionFont
                                 wrapMode: Text.Wrap
@@ -262,15 +276,17 @@ Page {
                     spacing: Theme.spacingLarge
                     width: Math.min(parent.width - Theme.scaled(40), Theme.scaled(400))
 
-                    Text {
-                        text: "Profile Already Exists"
+                    Tr {
+                        key: "visualizer.duplicate.title"
+                        fallback: "Profile Already Exists"
                         color: Theme.textColor
                         font: Theme.headingFont
                         anchors.horizontalCenter: parent.horizontalCenter
                     }
 
+                    // Dynamic text with profile name - use Text with TranslationManager
                     Text {
-                        text: "A profile named \"" + duplicateProfileTitle + "\" already exists.\n\nWhat would you like to do?"
+                        text: TranslationManager.translate("visualizer.duplicate.message", "A profile named \"%1\" already exists.\n\nWhat would you like to do?").replace("%1", duplicateProfileTitle)
                         wrapMode: Text.Wrap
                         width: parent.width
                         horizontalAlignment: Text.AlignHCenter
@@ -283,7 +299,8 @@ Page {
                         anchors.horizontalCenter: parent.horizontalCenter
 
                         Button {
-                            text: "Overwrite"
+                            id: overwriteButton
+                            Tr { id: trOverwrite; key: "visualizer.button.overwrite"; fallback: "Overwrite"; visible: false }
                             onClicked: {
                                 MainController.visualizerImporter.saveOverwrite()
                                 hideDuplicateDialog()
@@ -293,7 +310,7 @@ Page {
                                 color: Theme.errorColor
                             }
                             contentItem: Text {
-                                text: parent.text
+                                text: trOverwrite.text
                                 color: "white"
                                 font: Theme.bodyFont
                                 horizontalAlignment: Text.AlignHCenter
@@ -304,7 +321,8 @@ Page {
                         }
 
                         Button {
-                            text: "Save as New"
+                            id: saveAsNewButton
+                            Tr { id: trSaveAsNew; key: "visualizer.button.saveAsNew"; fallback: "Save as New"; visible: false }
                             onClicked: {
                                 newNameInput.text = duplicateProfileTitle + " (copy)"
                                 showingNameInput = true
@@ -314,7 +332,7 @@ Page {
                                 color: Theme.primaryColor
                             }
                             contentItem: Text {
-                                text: parent.text
+                                text: trSaveAsNew.text
                                 color: "white"
                                 font: Theme.bodyFont
                                 horizontalAlignment: Text.AlignHCenter
@@ -325,7 +343,8 @@ Page {
                         }
 
                         Button {
-                            text: "Cancel"
+                            id: cancelButton
+                            Tr { id: trCancel; key: "visualizer.button.cancel"; fallback: "Cancel"; visible: false }
                             onClicked: hideDuplicateDialog()
                             background: Rectangle {
                                 radius: Theme.scaled(4)
@@ -334,7 +353,7 @@ Page {
                                 border.width: 1
                             }
                             contentItem: Text {
-                                text: parent.text
+                                text: trCancel.text
                                 color: Theme.textColor
                                 font: Theme.bodyFont
                                 horizontalAlignment: Text.AlignHCenter
@@ -389,8 +408,9 @@ Page {
                     spacing: Theme.spacingLarge
                     width: Math.min(parent.width - Theme.scaled(40), Theme.scaled(400))
 
-                    Text {
-                        text: "Enter New Name"
+                    Tr {
+                        key: "visualizer.newName.title"
+                        fallback: "Enter New Name"
                         color: Theme.textColor
                         font: Theme.headingFont
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -425,7 +445,8 @@ Page {
                         anchors.horizontalCenter: parent.horizontalCenter
 
                         Button {
-                            text: "Save"
+                            id: saveButton
+                            Tr { id: trSave; key: "visualizer.button.save"; fallback: "Save"; visible: false }
                             enabled: newNameInput.text.trim().length > 0
                             onClicked: {
                                 MainController.visualizerImporter.saveWithNewName(newNameInput.text.trim())
@@ -436,8 +457,8 @@ Page {
                                 color: parent.enabled ? Theme.primaryColor : Theme.surfaceColor
                             }
                             contentItem: Text {
-                                text: parent.text
-                                color: parent.enabled ? "white" : Theme.textSecondaryColor
+                                text: trSave.text
+                                color: saveButton.enabled ? "white" : Theme.textSecondaryColor
                                 font: Theme.bodyFont
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
@@ -447,7 +468,8 @@ Page {
                         }
 
                         Button {
-                            text: "Back"
+                            id: backButton
+                            Tr { id: trBack; key: "visualizer.button.back"; fallback: "Back"; visible: false }
                             onClicked: showingNameInput = false
                             background: Rectangle {
                                 radius: Theme.scaled(4)
@@ -456,7 +478,7 @@ Page {
                                 border.width: 1
                             }
                             contentItem: Text {
-                                text: parent.text
+                                text: trBack.text
                                 color: Theme.textColor
                                 font: Theme.bodyFont
                                 horizontalAlignment: Text.AlignHCenter
@@ -471,10 +493,14 @@ Page {
         }
     }
 
+    // Translatable strings for bottom bar
+    Tr { id: trBottomTitle; key: "visualizer.bottomBar.title"; fallback: "Visualizer"; visible: false }
+    Tr { id: trBottomHint; key: "visualizer.bottomBar.hint"; fallback: "Enter share code to import"; visible: false }
+
     // Bottom bar
     BottomBar {
-        title: "Visualizer"
-        rightText: "Enter share code to import"
+        title: trBottomTitle.text
+        rightText: trBottomHint.text
         onBackClicked: root.goBack()
     }
 }

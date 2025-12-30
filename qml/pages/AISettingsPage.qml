@@ -9,8 +9,8 @@ Page {
     objectName: "aiSettingsPage"
     background: Rectangle { color: Theme.backgroundColor }
 
-    Component.onCompleted: root.currentPageTitle = "AI Dialing Assistant"
-    StackView.onActivated: root.currentPageTitle = "AI Dialing Assistant"
+    Component.onCompleted: root.currentPageTitle = TranslationManager.translate("aisettings.title", "AI Dialing Assistant")
+    StackView.onActivated: root.currentPageTitle = TranslationManager.translate("aisettings.title", "AI Dialing Assistant")
 
     property string testResultMessage: ""
     property bool testResultSuccess: false
@@ -27,8 +27,9 @@ Page {
             spacing: Theme.spacingMedium
 
             // Header description
-            Text {
-                text: "Get AI-powered recommendations to dial in your espresso. Follows James Hoffmann's methodology: one variable at a time."
+            Tr {
+                key: "aisettings.description"
+                fallback: "Get AI-powered recommendations to dial in your espresso. Follows James Hoffmann's methodology: one variable at a time."
                 color: Theme.textSecondaryColor
                 font: Theme.bodyFont
                 wrapMode: Text.WordWrap
@@ -38,8 +39,9 @@ Page {
             Item { height: Theme.spacingSmall }
 
             // Provider Selection
-            Text {
-                text: "AI Provider"
+            Tr {
+                key: "aisettings.label.provider"
+                fallback: "AI Provider"
                 color: Theme.textColor
                 font: Theme.subtitleFont
             }
@@ -47,10 +49,10 @@ Page {
             // Provider cards
             Repeater {
                 model: [
-                    { id: "openai", name: "OpenAI", desc: "GPT-4o - excellent reasoning" },
-                    { id: "anthropic", name: "Anthropic", desc: "Claude Sonnet - nuanced analysis" },
-                    { id: "gemini", name: "Google Gemini", desc: "Gemini Pro - fast & capable" },
-                    { id: "ollama", name: "Ollama (Local)", desc: "Free, private, runs on your computer" }
+                    { id: "openai", nameKey: "aisettings.provider.openai", name: "OpenAI", descKey: "aisettings.provider.openai.desc", desc: "GPT-4o - excellent reasoning" },
+                    { id: "anthropic", nameKey: "aisettings.provider.anthropic", name: "Anthropic", descKey: "aisettings.provider.anthropic.desc", desc: "Claude Sonnet - nuanced analysis" },
+                    { id: "gemini", nameKey: "aisettings.provider.gemini", name: "Google Gemini", descKey: "aisettings.provider.gemini.desc", desc: "Gemini Pro - fast & capable" },
+                    { id: "ollama", nameKey: "aisettings.provider.ollama", name: "Ollama (Local)", descKey: "aisettings.provider.ollama.desc", desc: "Free, private, runs on your computer" }
                 ]
 
                 delegate: Rectangle {
@@ -70,13 +72,15 @@ Page {
                             Layout.fillWidth: true
                             spacing: 2
 
-                            Text {
-                                text: modelData.name
+                            Tr {
+                                key: modelData.nameKey
+                                fallback: modelData.name
                                 font: Theme.bodyFont
                                 color: Theme.textColor
                             }
-                            Text {
-                                text: modelData.desc
+                            Tr {
+                                key: modelData.descKey
+                                fallback: modelData.desc
                                 font.pixelSize: 12
                                 color: Theme.textSecondaryColor
                             }
@@ -117,8 +121,9 @@ Page {
                 Layout.fillWidth: true
                 spacing: 4
 
-                Text {
-                    text: "API Key"
+                Tr {
+                    key: "aisettings.label.apikey"
+                    fallback: "API Key"
                     color: Theme.textSecondaryColor
                     font.pixelSize: 12
                 }
@@ -127,7 +132,7 @@ Page {
                     id: apiKeyField
                     Layout.fillWidth: true
                     echoMode: TextInput.Password
-                    placeholderText: "Paste your API key here"
+                    placeholderText: TranslationManager.translate("aisettings.placeholder.apikey", "Paste your API key here")
                     text: {
                         switch(Settings.aiProvider) {
                             case "openai": return Settings.openaiApiKey
@@ -152,8 +157,9 @@ Page {
                 Layout.fillWidth: true
                 spacing: Theme.spacingSmall
 
-                Text {
-                    text: "Ollama Endpoint"
+                Tr {
+                    key: "aisettings.label.endpoint"
+                    fallback: "Ollama Endpoint"
                     color: Theme.textSecondaryColor
                     font.pixelSize: 12
                 }
@@ -168,8 +174,9 @@ Page {
 
                 Item { height: Theme.spacingSmall }
 
-                Text {
-                    text: "Model"
+                Tr {
+                    key: "aisettings.label.model"
+                    fallback: "Model"
                     color: Theme.textSecondaryColor
                     font.pixelSize: 12
                 }
@@ -193,7 +200,7 @@ Page {
                         }
 
                         contentItem: Text {
-                            text: ollamaModelCombo.displayText || "Select a model"
+                            text: ollamaModelCombo.displayText || TranslationManager.translate("aisettings.placeholder.model", "Select a model")
                             color: Theme.textColor
                             font: Theme.bodyFont
                             leftPadding: 12
@@ -202,8 +209,8 @@ Page {
                     }
 
                     AccessibleButton {
-                        text: "Refresh"
-                        accessibleName: "Refresh Ollama models"
+                        text: TranslationManager.translate("aisettings.button.refresh", "Refresh")
+                        accessibleName: TranslationManager.translate("aisettings.accessible.refresh", "Refresh Ollama models")
                         onClicked: {
                             if (MainController.aiManager) {
                                 MainController.aiManager.refreshOllamaModels()
@@ -236,11 +243,11 @@ Page {
                 spacing: Theme.spacingSmall
 
                 AccessibleButton {
-                    text: "Test Connection"
-                    accessibleName: "Test AI provider connection"
+                    text: TranslationManager.translate("aisettings.button.test", "Test Connection")
+                    accessibleName: TranslationManager.translate("aisettings.accessible.test", "Test AI provider connection")
                     enabled: MainController.aiManager && MainController.aiManager.isConfigured
                     onClicked: {
-                        aiSettingsPage.testResultMessage = "Testing..."
+                        aiSettingsPage.testResultMessage = TranslationManager.translate("aisettings.status.testing", "Testing...")
                         MainController.aiManager.testConnection()
                     }
                     background: Rectangle {
@@ -273,8 +280,9 @@ Page {
             Item { height: Theme.spacingLarge }
 
             // Help text
-            Text {
-                text: "How to get an API key:"
+            Tr {
+                key: "aisettings.help.title"
+                fallback: "How to get an API key:"
                 color: Theme.textColor
                 font: Theme.subtitleFont
             }
@@ -282,10 +290,10 @@ Page {
             Text {
                 text: {
                     switch(Settings.aiProvider) {
-                        case "openai": return "1. Visit platform.openai.com\n2. Create an account or sign in\n3. Go to API Keys section\n4. Create a new key and paste it above"
-                        case "anthropic": return "1. Visit console.anthropic.com\n2. Create an account or sign in\n3. Go to API Keys section\n4. Create a new key and paste it above"
-                        case "gemini": return "1. Visit aistudio.google.com\n2. Sign in with your Google account\n3. Click 'Get API Key'\n4. Create a key and paste it above"
-                        case "ollama": return "1. Install Ollama from ollama.ai\n2. Open a terminal and run:\n   ollama pull llama3.2\n3. Ensure Ollama is running\n4. Click Refresh above to see models"
+                        case "openai": return TranslationManager.translate("aisettings.help.openai", "1. Visit platform.openai.com\n2. Create an account or sign in\n3. Go to API Keys section\n4. Create a new key and paste it above")
+                        case "anthropic": return TranslationManager.translate("aisettings.help.anthropic", "1. Visit console.anthropic.com\n2. Create an account or sign in\n3. Go to API Keys section\n4. Create a new key and paste it above")
+                        case "gemini": return TranslationManager.translate("aisettings.help.gemini", "1. Visit aistudio.google.com\n2. Sign in with your Google account\n3. Click 'Get API Key'\n4. Create a key and paste it above")
+                        case "ollama": return TranslationManager.translate("aisettings.help.ollama", "1. Install Ollama from ollama.ai\n2. Open a terminal and run:\n   ollama pull llama3.2\n3. Ensure Ollama is running\n4. Click Refresh above to see models")
                         default: return ""
                     }
                 }
@@ -312,8 +320,9 @@ Page {
                     anchors.margins: Theme.spacingMedium
                     spacing: 4
 
-                    Text {
-                        text: "Estimated Cost"
+                    Tr {
+                        key: "aisettings.cost.title"
+                        fallback: "Estimated Cost"
                         color: Theme.textColor
                         font: Theme.subtitleFont
                     }
@@ -321,10 +330,10 @@ Page {
                     Text {
                         text: {
                             switch(Settings.aiProvider) {
-                                case "openai": return "~$0.01 per analysis (GPT-4o)"
-                                case "anthropic": return "~$0.003 per analysis (Claude Sonnet)"
-                                case "gemini": return "~$0.002 per analysis (Gemini Pro)"
-                                case "ollama": return "Free (runs locally on your computer)"
+                                case "openai": return TranslationManager.translate("aisettings.cost.openai", "~$0.01 per analysis (GPT-4o)")
+                                case "anthropic": return TranslationManager.translate("aisettings.cost.anthropic", "~$0.003 per analysis (Claude Sonnet)")
+                                case "gemini": return TranslationManager.translate("aisettings.cost.gemini", "~$0.002 per analysis (Gemini Pro)")
+                                case "ollama": return TranslationManager.translate("aisettings.cost.ollama", "Free (runs locally on your computer)")
                                 default: return ""
                             }
                         }
@@ -332,9 +341,10 @@ Page {
                         font: Theme.bodyFont
                     }
 
-                    Text {
+                    Tr {
                         visible: Settings.aiProvider !== "ollama"
-                        text: "About $0.30/month at 3 shots per day - less than one cafe espresso!"
+                        key: "aisettings.cost.monthly"
+                        fallback: "About $0.30/month at 3 shots per day - less than one cafe espresso!"
                         color: Theme.textSecondaryColor
                         font.pixelSize: 12
                         wrapMode: Text.WordWrap

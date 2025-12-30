@@ -38,7 +38,11 @@ Rectangle {
             font: Theme.bodyFont
 
             Accessible.role: Accessible.StaticText
-            Accessible.name: "Temperature: " + DE1Device.temperature.toFixed(1) + " degrees Celsius"
+            Accessible.name: temperatureAccessible.text + DE1Device.temperature.toFixed(1) + " " + degreesCelsiusAccessible.text
+
+            // Hidden Tr elements for accessible names
+            Tr { id: temperatureAccessible; key: "statusbar.temperature"; fallback: "Temperature: "; visible: false }
+            Tr { id: degreesCelsiusAccessible; key: "statusbar.degrees_celsius"; fallback: "degrees Celsius"; visible: false }
         }
 
         // Separator
@@ -56,7 +60,11 @@ Rectangle {
             font: Theme.bodyFont
 
             Accessible.role: Accessible.StaticText
-            Accessible.name: "Water level: " + DE1Device.waterLevel.toFixed(0) + " percent"
+            Accessible.name: waterLevelAccessible.text + DE1Device.waterLevel.toFixed(0) + " " + percentAccessible.text
+
+            // Hidden Tr elements for accessible names
+            Tr { id: waterLevelAccessible; key: "statusbar.water_level"; fallback: "Water level: "; visible: false }
+            Tr { id: percentAccessible; key: "statusbar.percent"; fallback: "percent"; visible: false }
         }
 
         // Separator
@@ -76,29 +84,37 @@ Rectangle {
             Layout.preferredWidth: scaleWarningRow.implicitWidth + Theme.spacingMedium
 
             Accessible.role: Accessible.Button
-            Accessible.name: BLEManager.scaleConnectionFailed ? "Scale not found. Tap to scan." : "Scale connecting"
+            Accessible.name: BLEManager.scaleConnectionFailed ? scaleNotFoundAccessible.text + ". " + scanAccessible.text : scaleConnectingAccessible.text
             Accessible.focusable: true
+
+            // Hidden Tr elements for accessible names
+            Tr { id: scaleNotFoundAccessible; key: "statusbar.scale_not_found"; fallback: "Scale not found"; visible: false }
+            Tr { id: scanAccessible; key: "statusbar.tap_to_scan"; fallback: "Tap to scan"; visible: false }
+            Tr { id: scaleConnectingAccessible; key: "statusbar.scale_connecting"; fallback: "Scale connecting"; visible: false }
 
             Row {
                 id: scaleWarningRow
                 anchors.centerIn: parent
                 spacing: Theme.spacingSmall
 
-                Text {
-                    text: BLEManager.scaleConnectionFailed ? "Scale not found" :
-                          (ScaleDevice && ScaleDevice.connected ? "" : "Scale...")
+                Tr {
+                    key: BLEManager.scaleConnectionFailed ? "statusbar.scale_not_found" : "statusbar.scale_ellipsis"
+                    fallback: BLEManager.scaleConnectionFailed ? "Scale not found" : "Scale..."
+                    visible: BLEManager.scaleConnectionFailed || (ScaleDevice && !ScaleDevice.connected) || !ScaleDevice
                     color: BLEManager.scaleConnectionFailed ? "white" : Theme.textSecondaryColor
                     font: Theme.bodyFont
                     anchors.verticalCenter: parent.verticalCenter
                 }
 
                 Text {
-                    text: "[Scan]"
+                    text: "[" + scanButton.text + "]"
                     color: Theme.accentColor
                     font.pixelSize: Theme.bodyFont.pixelSize
                     font.underline: true
                     visible: BLEManager.scaleConnectionFailed
                     anchors.verticalCenter: parent.verticalCenter
+
+                    Tr { id: scanButton; key: "statusbar.scan"; fallback: "Scan"; visible: false }
 
                     MouseArea {
                         anchors.fill: parent
@@ -115,7 +131,11 @@ Rectangle {
             visible: ScaleDevice && ScaleDevice.connected
 
             Accessible.role: Accessible.StaticText
-            Accessible.name: "Scale weight: " + MachineState.scaleWeight.toFixed(1) + " grams"
+            Accessible.name: scaleWeightAccessible.text + MachineState.scaleWeight.toFixed(1) + " " + gramsAccessible.text
+
+            // Hidden Tr elements for accessible names
+            Tr { id: scaleWeightAccessible; key: "statusbar.scale_weight"; fallback: "Scale weight: "; visible: false }
+            Tr { id: gramsAccessible; key: "statusbar.grams"; fallback: "grams"; visible: false }
 
             Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
@@ -145,7 +165,11 @@ Rectangle {
             spacing: Theme.spacingSmall
 
             Accessible.role: Accessible.Indicator
-            Accessible.name: DE1Device.connected ? "Machine connected" : "Machine disconnected"
+            Accessible.name: DE1Device.connected ? machineConnectedAccessible.text : machineDisconnectedAccessible.text
+
+            // Hidden Tr elements for accessible names
+            Tr { id: machineConnectedAccessible; key: "statusbar.machine_connected"; fallback: "Machine connected"; visible: false }
+            Tr { id: machineDisconnectedAccessible; key: "statusbar.machine_disconnected"; fallback: "Machine disconnected"; visible: false }
 
             Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
@@ -155,8 +179,9 @@ Rectangle {
                 color: DE1Device.connected ? Theme.successColor : Theme.errorColor
             }
 
-            Text {
-                text: DE1Device.connected ? "Online" : "Offline"
+            Tr {
+                key: DE1Device.connected ? "statusbar.online" : "statusbar.offline"
+                fallback: DE1Device.connected ? "Online" : "Offline"
                 color: DE1Device.connected ? Theme.successColor : Theme.textSecondaryColor
                 font: Theme.bodyFont
             }
