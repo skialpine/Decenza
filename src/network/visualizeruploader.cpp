@@ -410,6 +410,10 @@ QByteArray VisualizerUploader::buildShotJson(ShotDataModel* shotData,
 
     root["app"] = app;
 
+    // Also add barista at root level (Visualizer may extract from here)
+    if (!metadata.barista.isEmpty())
+        root["barista"] = metadata.barista;
+
     // Profile
     if (profile) {
         root["profile"] = buildVisualizerProfileJson(profile);
