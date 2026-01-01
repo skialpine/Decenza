@@ -78,8 +78,16 @@ ApplicationWindow {
         return closest
     }
 
-    // Put machine and scale to sleep when closing the app
+    // Handle app close: save geometry, put devices to sleep
     onClosing: function(close) {
+        // Save window geometry on desktop
+        if (Qt.platform.os !== "android" && Qt.platform.os !== "ios") {
+            Settings.setValue("mainWindow/x", root.x)
+            Settings.setValue("mainWindow/y", root.y)
+            Settings.setValue("mainWindow/width", root.width)
+            Settings.setValue("mainWindow/height", root.height)
+        }
+
         // Send scale sleep first (it's faster/simpler)
         if (ScaleDevice && ScaleDevice.connected) {
             console.log("Sending scale to sleep on app close")
@@ -174,6 +182,20 @@ ApplicationWindow {
     onWidthChanged: updateScale()
     onHeightChanged: updateScale()
     Component.onCompleted: {
+        // Restore window geometry on desktop
+        if (Qt.platform.os !== "android" && Qt.platform.os !== "ios") {
+            var savedX = Settings.value("mainWindow/x", -1)
+            var savedY = Settings.value("mainWindow/y", -1)
+            var savedW = Settings.value("mainWindow/width", 960)
+            var savedH = Settings.value("mainWindow/height", 600)
+            if (savedX >= 0 && savedY >= 0) {
+                root.x = savedX
+                root.y = savedY
+            }
+            root.width = savedW
+            root.height = savedH
+        }
+
         updateScale()
 
         // Check for first run and show welcome dialog or start scanning
@@ -708,6 +730,74 @@ ApplicationWindow {
         completionTimer.start()
     }
 
+    // Espresso stop reason overlay (shown on top of any page)
+    property string stopReason: ""  // "manual", "weight", "machine", ""
+    property bool stopOverlayVisible: false
+
+    function getStopReasonText() {
+        switch (stopReason) {
+            case "manual": return "Stopped manually"
+            case "weight": return "Target weight reached"
+            case "machine": return "Profile complete"
+            default: return "Shot ended"
+        }
+    }
+
+    Rectangle {
+        id: stopReasonOverlay
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Theme.scaled(120)  // Above the info bar
+        anchors.horizontalCenter: parent.horizontalCenter
+        z: 500
+
+        width: stopReasonText.width + Theme.spacingLarge * 2
+        height: Theme.scaled(44)
+        radius: Theme.scaled(22)
+        color: Qt.rgba(0, 0, 0, 0.7)
+
+        opacity: stopOverlayVisible ? 1 : 0
+        visible: opacity > 0
+
+        Behavior on opacity {
+            NumberAnimation { duration: 2000 }
+        }
+
+        Text {
+            id: stopReasonText
+            anchors.centerIn: parent
+            text: getStopReasonText()
+            color: "white"
+            font: Theme.bodyFont
+        }
+    }
+
+    Timer {
+        id: stopOverlayTimer
+        interval: 3000
+        onTriggered: stopOverlayVisible = false
+    }
+
+    Connections {
+        target: MachineState
+        function onTargetWeightReached() {
+            root.stopReason = "weight"
+        }
+        function onShotStarted() {
+            root.stopReason = ""
+            root.stopOverlayVisible = false
+            stopOverlayTimer.stop()
+        }
+        function onShotEnded() {
+            // If no reason set, DE1 ended the shot (profile complete or machine-initiated)
+            if (root.stopReason === "") {
+                root.stopReason = "machine"
+            }
+            // Show the overlay
+            root.stopOverlayVisible = true
+            stopOverlayTimer.start()
+        }
+    }
+
     // First-run welcome dialog
     Popup {
         id: firstRunDialog
@@ -942,6 +1032,11 @@ ApplicationWindow {
                     showCompletion(trHotWaterComplete.text, "hotwater")
                 } else if (currentPage === "flushPage") {
                     showCompletion(trFlushComplete.text, "flush")
+                }
+
+                // Keep steam heater on when idle if setting is enabled
+                if (Settings.keepSteamHeaterOn) {
+                    MainController.applySteamSettings()
                 }
             }
         }

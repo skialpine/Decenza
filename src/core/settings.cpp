@@ -220,6 +220,17 @@ void Settings::setSteamDisabled(bool disabled) {
     }
 }
 
+bool Settings::keepSteamHeaterOn() const {
+    return m_settings.value("steam/keepHeaterOn", false).toBool();
+}
+
+void Settings::setKeepSteamHeaterOn(bool keep) {
+    if (keepSteamHeaterOn() != keep) {
+        m_settings.setValue("steam/keepHeaterOn", keep);
+        emit keepSteamHeaterOnChanged();
+    }
+}
+
 // Steam pitcher presets
 QVariantList Settings::steamPitcherPresets() const {
     QByteArray data = m_settings.value("steam/pitcherPresets").toByteArray();

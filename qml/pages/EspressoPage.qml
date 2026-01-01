@@ -77,11 +77,13 @@ Page {
 
     // Keyboard shortcuts to stop and go back
     Keys.onEscapePressed: {
+        root.stopReason = "manual"
         DE1Device.stopOperation()
         root.goToIdle()
     }
 
     Keys.onSpacePressed: {
+        root.stopReason = "manual"
         DE1Device.stopOperation()
         root.goToIdle()
     }
@@ -102,6 +104,7 @@ Page {
         }
         // Backspace also goes back
         if (event.key === Qt.Key_Backspace) {
+            root.stopReason = "manual"
             DE1Device.stopOperation()
             root.goToIdle()
             event.accepted = true
@@ -186,6 +189,7 @@ Page {
                     accessibleName: "Stop shot and go back"
                     accessibleItem: espressoBackButton
                     onAccessibleClicked: {
+                        root.stopReason = "manual"
                         DE1Device.stopOperation()
                         root.goToIdle()
                     }
@@ -441,6 +445,7 @@ Page {
 
             // Not a swipe - treat as tap to stop
             if (!swiped) {
+                root.stopReason = "manual"
                 DE1Device.stopOperation()
                 root.goToIdle()
             }

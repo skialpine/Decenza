@@ -339,86 +339,144 @@ Item {
             }
         }
 
-        // Flow Sensor Calibration
-        Rectangle {
+        // Right column: Flow Sensor Calibration and Steam Heater stacked
+        ColumnLayout {
             Layout.preferredWidth: 300
             Layout.fillHeight: true
-            color: Theme.surfaceColor
-            radius: Theme.cardRadius
+            spacing: 15
 
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 15
-                spacing: 10
+            // Flow Sensor Calibration
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 180
+                color: Theme.surfaceColor
+                radius: Theme.cardRadius
 
-                Tr {
-                    key: "settings.preferences.flowSensorCalibration"
-                    fallback: "Flow Sensor Calibration"
-                    color: Theme.textColor
-                    font.pixelSize: 16
-                    font.bold: true
-                }
-
-                Tr {
-                    Layout.fillWidth: true
-                    key: "settings.preferences.flowSensorCalibrationDesc"
-                    fallback: "Calibrate the virtual scale for users without a BLE scale"
-                    color: Theme.textSecondaryColor
-                    font.pixelSize: 12
-                    wrapMode: Text.WordWrap
-                }
-
-                Item { height: 5 }
-
-                // Current factor display
-                RowLayout {
-                    Layout.fillWidth: true
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 15
                     spacing: 10
 
                     Tr {
-                        key: "settings.preferences.currentFactor"
-                        fallback: "Current factor:"
-                        color: Theme.textSecondaryColor
-                    }
-
-                    Text {
-                        text: Settings.flowCalibrationFactor.toFixed(3)
-                        color: Theme.primaryColor
+                        key: "settings.preferences.flowSensorCalibration"
+                        fallback: "Flow Sensor Calibration"
+                        color: Theme.textColor
+                        font.pixelSize: 16
                         font.bold: true
                     }
-                }
 
-                Item { Layout.fillHeight: true }
-
-                // Calibration button
-                AccessibleButton {
-                    Layout.fillWidth: true
-                    text: "Start Calibration"
-                    accessibleName: "Start flow sensor calibration"
-                    enabled: DE1Device.connected
-                    onClicked: preferencesTab.openFlowCalibrationDialog()
-                    background: Rectangle {
-                        radius: 6
-                        color: parent.enabled ? Theme.primaryColor : Theme.backgroundColor
-                        border.color: parent.enabled ? Theme.primaryColor : Theme.textSecondaryColor
-                        border.width: 1
+                    Tr {
+                        Layout.fillWidth: true
+                        key: "settings.preferences.flowSensorCalibrationDesc"
+                        fallback: "Calibrate the virtual scale for users without a BLE scale"
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: 12
+                        wrapMode: Text.WordWrap
                     }
-                    contentItem: Text {
-                        text: parent.text
-                        color: parent.enabled ? "white" : Theme.textSecondaryColor
-                        font.pixelSize: 14
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
+
+                    // Current factor display
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+
+                        Tr {
+                            key: "settings.preferences.currentFactor"
+                            fallback: "Current factor:"
+                            color: Theme.textSecondaryColor
+                        }
+
+                        Text {
+                            text: Settings.flowCalibrationFactor.toFixed(3)
+                            color: Theme.primaryColor
+                            font.bold: true
+                        }
+                    }
+
+                    Item { Layout.fillHeight: true }
+
+                    // Calibration button
+                    AccessibleButton {
+                        Layout.fillWidth: true
+                        text: "Start Calibration"
+                        accessibleName: "Start flow sensor calibration"
+                        enabled: DE1Device.connected
+                        onClicked: preferencesTab.openFlowCalibrationDialog()
+                        background: Rectangle {
+                            radius: 6
+                            color: parent.enabled ? Theme.primaryColor : Theme.backgroundColor
+                            border.color: parent.enabled ? Theme.primaryColor : Theme.textSecondaryColor
+                            border.width: 1
+                        }
+                        contentItem: Text {
+                            text: parent.text
+                            color: parent.enabled ? "white" : Theme.textSecondaryColor
+                            font.pixelSize: 14
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
                     }
                 }
+            }
 
-                Tr {
-                    Layout.fillWidth: true
-                    key: "settings.preferences.requiresScale"
-                    fallback: "Requires a separate scale to measure water weight"
-                    color: Theme.textSecondaryColor
-                    font.pixelSize: 10
-                    wrapMode: Text.WordWrap
+            // Steam Heater Settings
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                color: Theme.surfaceColor
+                radius: Theme.cardRadius
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 15
+                    spacing: 10
+
+                    Tr {
+                        key: "settings.preferences.steamHeater"
+                        fallback: "Steam Heater"
+                        color: Theme.textColor
+                        font.pixelSize: 16
+                        font.bold: true
+                    }
+
+                    Tr {
+                        Layout.fillWidth: true
+                        key: "settings.preferences.steamHeaterDesc"
+                        fallback: "Keep the steam heater warm when machine is idle for faster steaming"
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: 12
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Item { Layout.fillHeight: true }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        Tr {
+                            key: "settings.preferences.keepSteamHeaterOn"
+                            fallback: "Keep heater on when idle"
+                            color: Theme.textColor
+                            font.pixelSize: 14
+
+                            Accessible.role: Accessible.StaticText
+                            Accessible.name: text
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        Switch {
+                            id: steamHeaterSwitch
+                            checked: Settings.keepSteamHeaterOn
+                            onClicked: {
+                                Settings.keepSteamHeaterOn = checked
+                                MainController.applySteamSettings()
+                            }
+
+                            Accessible.role: Accessible.CheckBox
+                            Accessible.name: "Keep steam heater on when idle"
+                            Accessible.checked: checked
+                        }
+                    }
                 }
             }
         }
