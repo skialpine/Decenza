@@ -18,6 +18,8 @@
         <file>icons/sleep.svg</file>
         <file>icons/sparkle.svg</file>
         <file>icons/keyboard_hide.svg</file>
+        <!-- GHC Simulator -->
+        <file>GHC_Small.png</file>
         <!-- Profiles (filenames match profile titles) -->
         <file>profiles/7g_basket.json</file>
         <file>profiles/80_s_espresso.json</file>

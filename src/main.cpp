@@ -33,6 +33,13 @@
 #include "ai/aimanager.h"
 #include "screensaver/screensavervideomanager.h"
 
+// GHC Simulator for Windows debug builds
+#if defined(Q_OS_WIN) && defined(QT_DEBUG)
+#include "simulator/ghcsimulator.h"
+#include "simulator/de1simulator.h"
+#include "simulator/simulatedscale.h"
+#endif
+
 using namespace Qt::StringLiterals;
 
 int main(int argc, char *argv[])
@@ -239,6 +246,94 @@ int main(int argc, char *argv[])
         }, Qt::QueuedConnection);
 
     engine.load(url);
+
+    // GHC Simulator window for Windows debug builds
+#if defined(Q_OS_WIN) && defined(QT_DEBUG)
+    qDebug() << "Creating DE1 Simulator and GHC window...";
+
+    // Enable simulation mode on DE1Device - this makes it appear "connected"
+    de1Device.setSimulationMode(true);
+
+    // Create the DE1 machine simulator
+    DE1Simulator de1Simulator;
+
+    // Set simulator on DE1Device so commands are relayed to it
+    de1Device.setSimulator(&de1Simulator);
+
+    // Give it the current profile from MainController
+    QObject::connect(&mainController, &MainController::currentProfileChanged, [&de1Simulator, &mainController]() {
+        de1Simulator.setProfile(mainController.currentProfileObject());
+    });
+    // Set initial profile
+    de1Simulator.setProfile(mainController.currentProfileObject());
+
+    // Connect dose from settings (affects puck resistance simulation)
+    QObject::connect(&settings, &Settings::dyeBeanWeightChanged, [&de1Simulator, &settings]() {
+        de1Simulator.setDose(settings.dyeBeanWeight());
+    });
+    // Set initial dose
+    de1Simulator.setDose(settings.dyeBeanWeight());
+
+    // Connect grind setting (finer grind = more resistance, can choke machine)
+    QObject::connect(&settings, &Settings::dyeGrinderSettingChanged, [&de1Simulator, &settings]() {
+        de1Simulator.setGrindSetting(settings.dyeGrinderSetting());
+    });
+    // Set initial grind
+    de1Simulator.setGrindSetting(settings.dyeGrinderSetting());
+
+    // Connect simulator state changes to DE1Device (which will emit to MachineState)
+    QObject::connect(&de1Simulator, &DE1Simulator::stateChanged, [&de1Simulator, &de1Device]() {
+        de1Device.setSimulatedState(de1Simulator.state(), de1Simulator.subState());
+    });
+    QObject::connect(&de1Simulator, &DE1Simulator::subStateChanged, [&de1Simulator, &de1Device]() {
+        de1Device.setSimulatedState(de1Simulator.state(), de1Simulator.subState());
+    });
+
+    // Connect simulator shot samples to DE1Device (which will emit to MainController/graphs)
+    QObject::connect(&de1Simulator, &DE1Simulator::shotSampleReceived,
+                     &de1Device, &DE1Device::emitSimulatedShotSample);
+
+    // Create SimulatedScale and connect it like a real scale
+    SimulatedScale simulatedScale;
+    simulatedScale.simulateConnection();
+
+    // Replace FlowScale with SimulatedScale for graph data
+    QObject::disconnect(&flowScale, &ScaleDevice::weightChanged,
+                        &mainController, &MainController::onScaleWeightChanged);
+    QObject::connect(&simulatedScale, &ScaleDevice::weightChanged,
+                     &mainController, &MainController::onScaleWeightChanged);
+
+    // Set SimulatedScale as the active scale for MachineState
+    machineState.setScale(&simulatedScale);
+    context->setContextProperty("ScaleDevice", &simulatedScale);
+
+    // Connect simulator scale weight to SimulatedScale
+    QObject::connect(&de1Simulator, &DE1Simulator::scaleWeightChanged,
+                     &simulatedScale, &SimulatedScale::setSimulatedWeight);
+
+    // Create GHC visual controller
+    GHCSimulator ghcSimulator;
+    ghcSimulator.setDE1Device(&de1Device);
+    ghcSimulator.setDE1Simulator(&de1Simulator);
+
+    QQmlApplicationEngine ghcEngine;
+    ghcEngine.rootContext()->setContextProperty("GHCSimulator", &ghcSimulator);
+    ghcEngine.rootContext()->setContextProperty("DE1Device", &de1Device);
+    ghcEngine.rootContext()->setContextProperty("DE1Simulator", &de1Simulator);
+    ghcEngine.rootContext()->setContextProperty("Settings", &settings);
+
+    QObject::connect(&ghcEngine, &QQmlApplicationEngine::objectCreated, &app,
+        [](QObject *obj, const QUrl &objUrl) {
+            if (!obj) {
+                qWarning() << "GHC Simulator: Failed to load" << objUrl;
+            } else {
+                qDebug() << "GHC Simulator: Window created successfully";
+            }
+        }, Qt::QueuedConnection);
+
+    const QUrl ghcUrl(u"qrc:/qt/qml/DecenzaDE1/qml/simulator/GHCSimulatorWindow.qml"_s);
+    ghcEngine.load(ghcUrl);
+#endif
 
 #ifdef Q_OS_ANDROID
     // Set landscape orientation on Android (after QML is loaded)

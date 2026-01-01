@@ -1,6 +1,7 @@
 #include "de1device.h"
 #include "protocol/binarycodec.h"
 #include "profile/profile.h"
+#include "../simulator/de1simulator.h"
 #include <QBluetoothAddress>
 #include <QDateTime>
 #include <QDebug>
@@ -100,6 +101,36 @@ void DE1Device::setIsHeadless(bool headless) {
     m_isHeadless = headless;
     qDebug() << "DE1Device: Headless mode" << (headless ? "ENABLED" : "DISABLED");
     emit isHeadlessChanged();
+}
+
+void DE1Device::setSimulatedState(DE1::State state, DE1::SubState subState) {
+    if (!m_simulationMode) return;
+
+    bool stateChanged = (m_state != state);
+    bool subStateChanged = (m_subState != subState);
+
+    m_state = state;
+    m_subState = subState;
+
+    if (stateChanged) {
+        emit this->stateChanged();
+    }
+    if (subStateChanged) {
+        emit this->subStateChanged();
+    }
+}
+
+void DE1Device::emitSimulatedShotSample(const ShotSample& sample) {
+    if (!m_simulationMode) return;
+
+    // Update internal state from sample
+    m_pressure = sample.groupPressure;
+    m_flow = sample.groupFlow;
+    m_headTemp = sample.headTemp;
+    m_mixTemp = sample.mixTemp;
+    m_steamTemp = sample.steamTemp;
+
+    emit shotSampleReceived(sample);
 }
 
 void DE1Device::connectToDevice(const QString& address) {
@@ -530,7 +561,10 @@ void DE1Device::parseMMRResponse(const QByteArray& data) {
 
 void DE1Device::writeCharacteristic(const QBluetoothUuid& uuid, const QByteArray& data) {
     if (!m_service || !m_characteristics.contains(uuid)) {
-        qWarning() << "DE1Device: Cannot write - not connected";
+        // Silently ignore in simulation mode
+        if (!m_simulationMode) {
+            qWarning() << "DE1Device: Cannot write - not connected";
+        }
         return;
     }
     m_writePending = true;
@@ -553,6 +587,39 @@ void DE1Device::processCommandQueue() {
 
 // Machine control methods
 void DE1Device::requestState(DE1::State state) {
+    // In simulation mode, relay to simulator
+    if (m_simulationMode && m_simulator) {
+        switch (state) {
+        case DE1::State::Espresso:
+            m_simulator->startEspresso();
+            break;
+        case DE1::State::Steam:
+            m_simulator->startSteam();
+            break;
+        case DE1::State::HotWater:
+            m_simulator->startHotWater();
+            break;
+        case DE1::State::HotWaterRinse:
+            m_simulator->startFlush();
+            break;
+        case DE1::State::Idle:
+            // If waking from sleep, use wakeUp; otherwise stop current operation
+            if (m_simulator->state() == DE1::State::Sleep) {
+                m_simulator->wakeUp();
+            } else {
+                m_simulator->stop();
+            }
+            break;
+        case DE1::State::Sleep:
+            m_simulator->goToSleep();
+            break;
+        default:
+            qDebug() << "DE1Device: Simulation - unhandled state request:" << static_cast<int>(state);
+            break;
+        }
+        return;
+    }
+
     QByteArray data(1, static_cast<char>(state));
     queueCommand([this, data]() {
         writeCharacteristic(DE1::Characteristic::REQUESTED_STATE, data);
@@ -592,6 +659,12 @@ void DE1Device::requestIdle() {
 }
 
 void DE1Device::goToSleep() {
+    // In simulation mode, relay to simulator
+    if (m_simulationMode && m_simulator) {
+        m_simulator->goToSleep();
+        return;
+    }
+
     // Clear pending commands - sleep takes priority
     m_commandQueue.clear();
     m_writePending = false;

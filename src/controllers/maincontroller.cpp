@@ -29,9 +29,11 @@ MainController::MainController(Settings* settings, DE1Device* device,
     , m_shotDataModel(shotDataModel)
     , m_profileStorage(profileStorage)
 {
-    // Set up delayed settings timer (5 seconds after connection)
+    // Set up delayed settings timer (1 second after connection)
+    // The initial settings from DE1Device use hardcoded values; we need to send
+    // user settings quickly to set the correct steam temperature for keepHeaterOn.
     m_settingsTimer.setSingleShot(true);
-    m_settingsTimer.setInterval(5000);
+    m_settingsTimer.setInterval(1000);
     connect(&m_settingsTimer, &QTimer::timeout, this, &MainController::applyAllSettings);
 
     // Connect to shot sample updates
@@ -1078,6 +1080,7 @@ void MainController::onEspressoCycleStarted() {
     // Clear the graph when entering espresso preheating (new cycle from idle)
     // This preserves preheating data since we only clear at cycle start
     m_shotStartTime = 0;
+    m_weightTimeOffset = 0;
     m_extractionStarted = false;
     m_lastFrameNumber = -1;
     m_tareDone = true;  // We tare immediately now, not at frame 0
@@ -1341,8 +1344,10 @@ void MainController::onShotSampleReceived(const ShotSample& sample) {
 
     if (isExtracting && !m_extractionStarted) {
         m_extractionStarted = true;
+        // Sync weight time offset NOW - MachineState timer is running at this point
+        // weight_time = machineState.shotTime() - m_weightTimeOffset should equal shot_time
+        m_weightTimeOffset = m_machineState->shotTime() - time;
         m_shotDataModel->markExtractionStart(time);
-        qDebug() << "=== EXTRACTION STARTED at" << time << "s ===";
     }
 
     // Detect frame changes and add markers with frame names from profile
@@ -1417,7 +1422,13 @@ void MainController::onScaleWeightChanged(double weight) {
 
     if (!isEspressoPhase) return;
 
-    double time = m_machineState->shotTime();
+    // Use same time base as shot samples (synced via m_weightTimeOffset)
+    // This ensures weight curve aligns with pressure/flow/temp curves
+    double time = m_machineState->shotTime() - m_weightTimeOffset;
+
+    // Don't record if we haven't synced yet (no shot samples received)
+    if (time < 0) return;
+
     m_shotDataModel->addWeightSample(time, weight, 0);
 }
 

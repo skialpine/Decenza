@@ -82,6 +82,10 @@ public:
     QString currentFrameName() const { return m_currentFrameName; }
 
     const Profile& currentProfile() const { return m_currentProfile; }
+    Profile currentProfileObject() const { return m_currentProfile; }
+
+    // For simulator integration
+    void handleShotSample(const ShotSample& sample) { onShotSampleReceived(sample); }
 
     Q_INVOKABLE QVariantMap getCurrentProfile() const;
     Q_INVOKABLE void markProfileClean();  // Called after save
@@ -163,6 +167,7 @@ private:
     QList<ProfileInfo> m_allProfiles;  // Complete list with metadata
     double m_shotStartTime = 0;
     double m_lastSampleTime = 0;  // For delta time calculation
+    double m_weightTimeOffset = 0;  // Offset to sync weight time with shot sample time
     bool m_extractionStarted = false;
     int m_lastFrameNumber = -1;
     bool m_tareDone = false;  // Track if we've tared for this shot

@@ -40,6 +40,9 @@ public slots:
     // Reset for new shot
     void reset();
 
+    // For simulator integration - set weight directly
+    void setSimulatedWeight(double weight);
+
 signals:
     void rawFlowIntegralChanged();
 

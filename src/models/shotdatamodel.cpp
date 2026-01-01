@@ -47,12 +47,16 @@ void ShotDataModel::registerSeries(QLineSeries* pressure, QLineSeries* flow, QLi
     }
 
     // Enable OpenGL for hardware acceleration on main data series
+    // Note: OpenGL can cause rendering issues on some Windows systems in debug mode
+#if !defined(Q_OS_WIN) || !defined(QT_DEBUG)
     if (m_pressureSeries) m_pressureSeries->setUseOpenGL(true);
     if (m_flowSeries) m_flowSeries->setUseOpenGL(true);
     if (m_temperatureSeries) m_temperatureSeries->setUseOpenGL(true);
     if (m_weightSeries) m_weightSeries->setUseOpenGL(true);
-
     qDebug() << "ShotDataModel: Registered series with OpenGL acceleration";
+#else
+    qDebug() << "ShotDataModel: Registered series (OpenGL disabled for Windows debug)";
+#endif
 
     // Start the flush timer
     m_flushTimer->start();
@@ -128,6 +132,17 @@ void ShotDataModel::addSample(double time, double pressure, double flow, double 
 
 void ShotDataModel::addWeightSample(double time, double weight, double flowRate) {
     Q_UNUSED(flowRate);
+
+    // Ignore near-zero weights (scale noise, tare values)
+    // Only start recording when we have actual weight
+    if (weight < 0.1) {
+        return;
+    }
+
+    // Add initial zero point when weight curve starts (so line starts from zero at correct time)
+    if (m_weightPoints.isEmpty()) {
+        m_weightPoints.append(QPointF(time, 0.0));
+    }
 
     // Scale weight to fit pressure axis (divide by 5)
     m_weightPoints.append(QPointF(time, weight / 5.0));

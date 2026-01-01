@@ -11,6 +11,7 @@
 #include "protocol/de1characteristics.h"
 
 class Profile;
+class DE1Simulator;
 
 struct ShotSample {
     qint64 timestamp = 0;
@@ -73,6 +74,11 @@ public:
     // Simulation mode for GUI development without hardware
     bool simulationMode() const { return m_simulationMode; }
     void setSimulationMode(bool enabled);
+
+    // For simulator integration - allows external code to set state and emit signals
+    void setSimulatedState(DE1::State state, DE1::SubState subState);
+    void emitSimulatedShotSample(const ShotSample& sample);
+    void setSimulator(DE1Simulator* simulator) { m_simulator = simulator; }
 
 public slots:
     void connectToDevice(const QString& address);
@@ -168,6 +174,7 @@ private:
     bool m_writePending = false;
     bool m_connecting = false;
     bool m_simulationMode = false;
+    DE1Simulator* m_simulator = nullptr;  // For simulation mode
     bool m_usbChargerOn = true;  // Default on (safe default like de1app)
     bool m_isHeadless = false;   // True if app can start operations (GHC not installed or inactive)
 

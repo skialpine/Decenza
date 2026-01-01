@@ -109,6 +109,9 @@ set(SOURCES
     src/ai/aimanager.cpp
     src/ai/aiprovider.cpp
     src/ai/shotsummarizer.cpp
+    src/simulator/ghcsimulator.cpp
+    src/simulator/de1simulator.cpp
+    src/simulator/simulatedscale.cpp
 )
 
 set(HEADERS
@@ -149,6 +152,9 @@ set(HEADERS
     src/ai/aimanager.h
     src/ai/aiprovider.h
     src/ai/shotsummarizer.h
+    src/simulator/ghcsimulator.h
+    src/simulator/de1simulator.h
+    src/simulator/simulatedscale.h
 )
 
 # Resources
@@ -235,6 +241,7 @@ set(QML_FILES
     qml/components/StyledTextField.qml
     qml/components/Tr.qml
     qml/components/AccessibleLabel.qml
+    qml/simulator/GHCSimulatorWindow.qml
 )
 
 qt_add_qml_module(Decenza_DE1

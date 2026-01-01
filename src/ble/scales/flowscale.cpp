@@ -51,3 +51,24 @@ void FlowScale::reset() {
 void FlowScale::resetWeight() {
     tare();  // Same as tare - reset accumulated weight
 }
+
+void FlowScale::setSimulatedWeight(double weight) {
+    // Directly set weight from simulator (bypasses flow integration)
+    m_accumulatedWeight = weight;
+    setWeight(weight);
+
+    // Estimate flow rate from weight change (for display)
+    // This is approximate but good enough for simulation
+    static double lastWeight = 0.0;
+    static qint64 lastTime = 0;
+    qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (lastTime > 0 && now > lastTime) {
+        double dt = (now - lastTime) / 1000.0;
+        if (dt > 0 && dt < 1.0) {
+            double flowRate = (weight - lastWeight) / dt;
+            setFlowRate(qMax(0.0, flowRate));
+        }
+    }
+    lastWeight = weight;
+    lastTime = now;
+}

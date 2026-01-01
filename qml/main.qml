@@ -178,6 +178,22 @@ ApplicationWindow {
         onTriggered: root.justWokeFromSleep = false
     }
 
+    // Periodic timer to keep steam heater on when idle
+    // The DE1 may have an internal timeout that reduces steam heater power after some idle time.
+    // This timer resends the steam settings every 60 seconds to maintain target temperature.
+    Timer {
+        id: steamHeaterTimer
+        interval: 60000  // Every 60 seconds
+        running: Settings.keepSteamHeaterOn && DE1Device.connected &&
+                 (MachineState.phase === MachineStateType.Phase.Idle ||
+                  MachineState.phase === MachineStateType.Phase.Ready)
+        repeat: true
+        onTriggered: {
+            console.log("Resending steam settings to keep heater on")
+            MainController.applySteamSettings()
+        }
+    }
+
     // Update scale factor when window resizes
     onWidthChanged: updateScale()
     onHeightChanged: updateScale()
