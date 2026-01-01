@@ -9,7 +9,7 @@ class AcaiaScale : public ScaleDevice {
     Q_OBJECT
 
 public:
-    explicit AcaiaScale(bool isPyxis = false, QObject* parent = nullptr);
+    explicit AcaiaScale(QObject* parent = nullptr);
     ~AcaiaScale() override;
 
     void connectToDevice(const QBluetoothDeviceInfo& device) override;
@@ -29,22 +29,31 @@ private slots:
     void onServiceDiscovered(const QBluetoothUuid& uuid);
     void onServiceStateChanged(QLowEnergyService::ServiceState state);
     void onCharacteristicChanged(const QLowEnergyCharacteristic& c, const QByteArray& value);
+    void onServiceDiscoveryFinished();
     void sendHeartbeat();
     void sendIdent();
     void sendConfig();
+    void enableNotifications();
 
 private:
     void parseResponse(const QByteArray& data);
     void decodeWeight(const QByteArray& payload, int payloadOffset);
     QByteArray encodePacket(uint8_t msgType, const QByteArray& payload);
     void sendCommand(const QByteArray& command);
+    void setupServiceForProtocol();
 
     QString m_name = "Acaia";
-    bool m_isPyxis;
+    bool m_isPyxis = false;  // Auto-detected during service discovery
+    bool m_protocolDetected = false;
     bool m_receivingNotifications = false;
+    bool m_weightReceived = false;  // Track if we've received weight data
     QLowEnergyCharacteristic m_statusChar;
     QLowEnergyCharacteristic m_cmdChar;
     QTimer* m_heartbeatTimer = nullptr;
+
+    // Services discovered - for auto-detection
+    QLowEnergyService* m_ipsService = nullptr;
+    QLowEnergyService* m_pyxisService = nullptr;
 
     // Message parsing state
     QByteArray m_buffer;

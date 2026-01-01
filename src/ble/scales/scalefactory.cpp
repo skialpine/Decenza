@@ -17,8 +17,8 @@ ScaleType ScaleFactory::detectScaleType(const QBluetoothDeviceInfo& device) {
 
     // Check each scale type by name pattern
     if (isDecentScale(name)) return ScaleType::DecentScale;
-    if (isAcaiaPyxis(name)) return ScaleType::AcaiaPyxis;
-    if (isAcaiaScale(name)) return ScaleType::Acaia;
+    // All Acaia scales (Lunar, Pearl, Pyxis) now use unified AcaiaScale with auto-detection
+    if (isAcaiaPyxis(name) || isAcaiaScale(name)) return ScaleType::Acaia;
     if (isFelicitaScale(name)) return ScaleType::Felicita;
     if (isSkaleScale(name)) return ScaleType::Skale;
     if (isHiroiaJimmy(name)) return ScaleType::HiroiaJimmy;
@@ -40,9 +40,9 @@ std::unique_ptr<ScaleDevice> ScaleFactory::createScale(const QBluetoothDeviceInf
         case ScaleType::DecentScale:
             return std::make_unique<DecentScale>(parent);
         case ScaleType::Acaia:
-            return std::make_unique<AcaiaScale>(false, parent);  // IPS mode
         case ScaleType::AcaiaPyxis:
-            return std::make_unique<AcaiaScale>(true, parent);   // Pyxis mode
+            // Unified AcaiaScale auto-detects IPS vs Pyxis protocol
+            return std::make_unique<AcaiaScale>(parent);
         case ScaleType::Felicita:
             return std::make_unique<FelicitaScale>(parent);
         case ScaleType::Skale:
@@ -100,9 +100,9 @@ std::unique_ptr<ScaleDevice> ScaleFactory::createScale(const QBluetoothDeviceInf
         case ScaleType::DecentScale:
             return std::make_unique<DecentScale>(parent);
         case ScaleType::Acaia:
-            return std::make_unique<AcaiaScale>(false, parent);
         case ScaleType::AcaiaPyxis:
-            return std::make_unique<AcaiaScale>(true, parent);
+            // Unified AcaiaScale auto-detects IPS vs Pyxis protocol
+            return std::make_unique<AcaiaScale>(parent);
         case ScaleType::Felicita:
             return std::make_unique<FelicitaScale>(parent);
         case ScaleType::Skale:
