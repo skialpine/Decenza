@@ -109,10 +109,16 @@ set(SOURCES
     src/ai/aimanager.cpp
     src/ai/aiprovider.cpp
     src/ai/shotsummarizer.cpp
-    src/simulator/ghcsimulator.cpp
-    src/simulator/de1simulator.cpp
-    src/simulator/simulatedscale.cpp
 )
+
+# Simulator files - Windows Debug only
+if(WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+    list(APPEND SOURCES
+        src/simulator/ghcsimulator.cpp
+        src/simulator/de1simulator.cpp
+        src/simulator/simulatedscale.cpp
+    )
+endif()
 
 set(HEADERS
     src/core/settings.h
@@ -152,10 +158,16 @@ set(HEADERS
     src/ai/aimanager.h
     src/ai/aiprovider.h
     src/ai/shotsummarizer.h
-    src/simulator/ghcsimulator.h
-    src/simulator/de1simulator.h
-    src/simulator/simulatedscale.h
 )
+
+# Simulator headers - Windows Debug only
+if(WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+    list(APPEND HEADERS
+        src/simulator/ghcsimulator.h
+        src/simulator/de1simulator.h
+        src/simulator/simulatedscale.h
+    )
+endif()
 
 # Resources
 qt_add_resources(RESOURCES resources/resources.qrc)
@@ -241,8 +253,14 @@ set(QML_FILES
     qml/components/StyledTextField.qml
     qml/components/Tr.qml
     qml/components/AccessibleLabel.qml
-    qml/simulator/GHCSimulatorWindow.qml
 )
+
+# Simulator QML - Windows Debug only
+if(WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+    list(APPEND QML_FILES
+        qml/simulator/GHCSimulatorWindow.qml
+    )
+endif()
 
 qt_add_qml_module(Decenza_DE1
     URI DecenzaDE1
