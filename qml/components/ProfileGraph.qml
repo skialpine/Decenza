@@ -9,10 +9,10 @@ ChartView {
     plotAreaColor: Qt.darker(Theme.surfaceColor, 1.3)
     legend.visible: false
 
-    margins.top: Theme.scaled(10)
-    margins.bottom: Theme.scaled(40)
-    margins.left: Theme.scaled(10)
-    margins.right: Theme.scaled(10)
+    margins.top: 0
+    margins.bottom: 0
+    margins.left: 0
+    margins.right: 0
 
     // Properties
     property var frames: []
@@ -40,7 +40,7 @@ ChartView {
         return Math.max(total, 5)  // Minimum 5 seconds
     }
 
-    // Time axis (X)
+    // Time axis (X) - title moved inside graph
     ValueAxis {
         id: timeAxis
         min: 0
@@ -50,12 +50,9 @@ ChartView {
         labelsColor: Theme.textSecondaryColor
         labelsFont.pixelSize: Theme.scaled(12)
         gridLineColor: Qt.rgba(255, 255, 255, 0.1)
-        titleText: "Time (s)"
-        titleBrush: Theme.textSecondaryColor
-        titleFont.pixelSize: Theme.scaled(12)
     }
 
-    // Pressure/Flow axis (left Y)
+    // Pressure/Flow axis (left Y) - title moved inside graph
     ValueAxis {
         id: pressureAxis
         min: 0
@@ -65,12 +62,9 @@ ChartView {
         labelsColor: Theme.textSecondaryColor
         labelsFont.pixelSize: Theme.scaled(12)
         gridLineColor: Qt.rgba(255, 255, 255, 0.1)
-        titleText: "bar / mL/s"
-        titleBrush: Theme.textSecondaryColor
-        titleFont.pixelSize: Theme.scaled(12)
     }
 
-    // Temperature axis (right Y)
+    // Temperature axis (right Y) - title moved inside graph
     ValueAxis {
         id: tempAxis
         min: 80
@@ -80,9 +74,6 @@ ChartView {
         labelsColor: Theme.temperatureColor
         labelsFont.pixelSize: Theme.scaled(12)
         gridLineColor: "transparent"
-        titleText: "°C"
-        titleBrush: Theme.temperatureColor
-        titleFont.pixelSize: Theme.scaled(12)
     }
 
     // Dynamic arrays for pressure and flow series (created on demand)
@@ -327,62 +318,46 @@ ChartView {
         updateCurves()
     }
 
-    // Legend at bottom
-    Row {
-        anchors.bottom: parent.bottom
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottomMargin: Theme.scaled(12)
-        spacing: Theme.scaled(30)
+    // Custom legend - vertical, top-left, overlaying graph
+    Rectangle {
+        id: legendBackground
+        x: chart.plotArea.x + Theme.spacingSmall
+        y: chart.plotArea.y + Theme.spacingSmall
+        width: legendColumn.width + Theme.spacingSmall * 2
+        height: legendColumn.height + Theme.spacingSmall * 2
+        color: Qt.rgba(Theme.surfaceColor.r, Theme.surfaceColor.g, Theme.surfaceColor.b, 0.85)
+        radius: Theme.scaled(4)
 
-        // Pressure
-        Row {
-            spacing: Theme.scaled(8)
-            Rectangle {
-                width: Theme.scaled(24)
-                height: Theme.scaled(3)
-                radius: Theme.scaled(1)
-                color: Theme.pressureGoalColor
-                anchors.verticalCenter: parent.verticalCenter
+        Column {
+            id: legendColumn
+            anchors.centerIn: parent
+            spacing: Theme.scaled(2)
+
+            Row {
+                spacing: Theme.spacingSmall
+                Rectangle { width: Theme.scaled(16); height: Theme.scaled(3); radius: Theme.scaled(1); color: Theme.pressureGoalColor; anchors.verticalCenter: parent.verticalCenter }
+                Text { text: "Pressure"; color: Theme.textSecondaryColor; font: Theme.captionFont }
             }
-            Text {
-                text: "Pressure"
-                color: Theme.textSecondaryColor
-                font: Theme.bodyFont
+            Row {
+                spacing: Theme.spacingSmall
+                Rectangle { width: Theme.scaled(16); height: Theme.scaled(3); radius: Theme.scaled(1); color: Theme.flowGoalColor; anchors.verticalCenter: parent.verticalCenter }
+                Text { text: "Flow"; color: Theme.textSecondaryColor; font: Theme.captionFont }
+            }
+            Row {
+                spacing: Theme.spacingSmall
+                Rectangle { width: Theme.scaled(16); height: Theme.scaled(3); radius: Theme.scaled(1); color: Theme.temperatureGoalColor; anchors.verticalCenter: parent.verticalCenter }
+                Text { text: "Temp"; color: Theme.textSecondaryColor; font: Theme.captionFont }
             }
         }
+    }
 
-        // Flow
-        Row {
-            spacing: Theme.scaled(8)
-            Rectangle {
-                width: Theme.scaled(24)
-                height: Theme.scaled(3)
-                radius: Theme.scaled(1)
-                color: Theme.flowGoalColor
-                anchors.verticalCenter: parent.verticalCenter
-            }
-            Text {
-                text: "Flow"
-                color: Theme.textSecondaryColor
-                font: Theme.bodyFont
-            }
-        }
-
-        // Temperature
-        Row {
-            spacing: Theme.scaled(8)
-            Rectangle {
-                width: Theme.scaled(24)
-                height: Theme.scaled(3)
-                radius: Theme.scaled(1)
-                color: Theme.temperatureGoalColor
-                anchors.verticalCenter: parent.verticalCenter
-            }
-            Text {
-                text: "Temp"
-                color: Theme.textSecondaryColor
-                font: Theme.bodyFont
-            }
-        }
+    // Time axis label - inside graph at bottom right
+    Text {
+        x: chart.plotArea.x + chart.plotArea.width - width - Theme.spacingSmall
+        y: chart.plotArea.y + chart.plotArea.height - height - Theme.scaled(12)
+        text: "Time (s)"
+        color: Theme.textSecondaryColor
+        font: Theme.captionFont
+        opacity: 0.7
     }
 }
