@@ -410,19 +410,18 @@ Page {
         }
     }
 
-    // Tap anywhere on chart to stop (also handles swipe for accessibility)
+    // Swipe gestures on chart for accessibility (swipe left/right to navigate values)
     MouseArea {
         id: chartTapArea
         anchors.fill: shotGraph
+        enabled: typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled
 
         property real startX: 0
         property real startY: 0
-        property bool swiped: false
 
         onPressed: function(mouse) {
             startX = mouse.x
             startY = mouse.y
-            swiped = false
         }
 
         onReleased: function(mouse) {
@@ -430,24 +429,13 @@ Page {
             var deltaY = mouse.y - startY
             var threshold = 50
 
-            // Check for swipe gesture (accessibility)
-            if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
-                if (Math.abs(deltaX) > threshold && Math.abs(deltaX) > Math.abs(deltaY)) {
-                    swiped = true
-                    if (deltaX > 0) {
-                        espressoPage.announceNextValue()
-                    } else {
-                        espressoPage.announcePreviousValue()
-                    }
-                    return
+            // Swipe gesture for accessibility navigation
+            if (Math.abs(deltaX) > threshold && Math.abs(deltaX) > Math.abs(deltaY)) {
+                if (deltaX > 0) {
+                    espressoPage.announceNextValue()
+                } else {
+                    espressoPage.announcePreviousValue()
                 }
-            }
-
-            // Not a swipe - treat as tap to stop
-            if (!swiped) {
-                root.stopReason = "manual"
-                DE1Device.stopOperation()
-                root.goToIdle()
             }
         }
     }
