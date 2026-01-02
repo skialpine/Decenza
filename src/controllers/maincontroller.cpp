@@ -1101,7 +1101,7 @@ void MainController::onShotEnded() {
         return;
     }
 
-    double duration = m_shotDataModel->maxTime();
+    double duration = m_shotDataModel->rawTime();  // Use rawTime, not maxTime (which is for graph axis)
 
     // Get final weight from shot data
     const auto& weightData = m_shotDataModel->weightData();

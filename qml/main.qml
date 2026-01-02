@@ -764,7 +764,7 @@ ApplicationWindow {
         switch (stopReason) {
             case "manual": return "Stopped manually"
             case "weight": return "Target weight reached"
-            case "machine": return "Profile complete"
+            case "machine": return "Profile complete - DE1 stopped the shot"
             default: return "Shot ended"
         }
     }
@@ -779,20 +779,46 @@ ApplicationWindow {
         width: stopReasonText.width + Theme.spacingLarge * 2
         height: Theme.scaled(44)
         radius: Theme.scaled(22)
-        color: Qt.rgba(0, 0, 0, 0.7)
+        color: Theme.warningColor
 
+        visible: stopOverlayVisible || fadeOutAnim.running
         opacity: stopOverlayVisible ? 1 : 0
-        visible: opacity > 0
+        scale: 1.0
 
+        // Pop-in animation (punch effect: 100% → 110% → 100%)
+        SequentialAnimation {
+            id: popInAnim
+            NumberAnimation {
+                target: stopReasonOverlay
+                property: "scale"
+                from: 1.0
+                to: 1.10
+                duration: 150
+                easing.type: Easing.OutBack
+                easing.overshoot: 1.5
+            }
+            NumberAnimation {
+                target: stopReasonOverlay
+                property: "scale"
+                from: 1.10
+                to: 1.0
+                duration: 350
+                easing.type: Easing.OutBack
+                easing.overshoot: 1.5
+            }
+        }
+
+        // Fade-out animation only (pop-in is instant)
         Behavior on opacity {
-            NumberAnimation { duration: 2000 }
+            enabled: stopOverlayVisible  // Only animate when hiding
+            NumberAnimation { id: fadeOutAnim; duration: 2000 }
         }
 
         Text {
             id: stopReasonText
             anchors.centerIn: parent
             text: getStopReasonText()
-            color: "white"
+            color: "black"
             font: Theme.bodyFont
         }
     }
@@ -818,9 +844,11 @@ ApplicationWindow {
             if (root.stopReason === "") {
                 root.stopReason = "machine"
             }
-            // Show the overlay
+            // Show the overlay with pop-in animation
             root.stopOverlayVisible = true
+            popInAnim.start()
             stopOverlayTimer.start()
+            console.log("Stop overlay:", getStopReasonText())
         }
     }
 
@@ -1262,6 +1290,8 @@ ApplicationWindow {
             console.log("Shot ended, showing metadata page")
             // Record the shot timestamp
             Settings.dyeShotDateTime = Qt.formatDateTime(new Date(), "yyyy-MM-dd hh:mm")
+            // Restart timer to ensure overlay survives page change
+            stopOverlayTimer.restart()
             goToShotMetadata(true)
         }
     }
