@@ -355,7 +355,6 @@ void DE1Simulator::executeFrame()
         m_mixTemp = m_groupTemp - 1.0 - fractalNoise(shotTime * 0.5, 2) * 0.5;
 
         // VALVE IS CLOSED - pump pushes water into plumbing, building pressure
-        // Flow ramps up from 0 to target over time (longer ramp for higher pressure)
         // Target pressure from first profile frame (or default 4 bar for preinfusion)
         double targetPreheatPressure = 4.0;
         if (!m_profile.steps().isEmpty()) {
@@ -364,23 +363,26 @@ void DE1Simulator::executeFrame()
         }
         targetPreheatPressure = qBound(2.0, targetPreheatPressure, 9.0);
 
-        // Ramp time: ~1 second per 4 bar of target pressure
-        double rampTime = targetPreheatPressure / 4.0;
-        double flowRamp = qBound(0.0, shotTime / rampTime, 1.0);
+        // Pump spin-up: takes ~1.5 seconds to get up to speed (starts at 0)
+        // Use smooth ease-in curve: t^2 for natural acceleration
+        double pumpSpinUpTime = 1.5;
+        double spinUpProgress = qBound(0.0, shotTime / pumpSpinUpTime, 1.0);
+        double pumpSpeedFactor = spinUpProgress * spinUpProgress;  // Ease-in (slow start)
 
-        // Flow accelerates from 0 to max, then maintains until target pressure reached
-        double targetFlow = PREHEAT_PUMP_FLOW * flowRamp;
-        m_flow = targetFlow * (1.0 + fractalNoise(shotTime * 2.0, 2) * 0.1);
+        // Flow increases as pump spins up
+        double targetFlow = PREHEAT_PUMP_FLOW * pumpSpeedFactor;
+
+        // Once we reach target pressure, pump backs off
+        if (m_plumbingPressure >= targetPreheatPressure) {
+            targetFlow = 0.0;  // Target reached, hold pressure
+        }
+
+        m_flow = targetFlow * (1.0 + fractalNoise(shotTime * 2.0, 2) * 0.05);
         m_plumbingVolume += m_flow * dt;
 
         // Pressure builds based on accumulated volume and plumbing compliance
         // P = V / compliance (like a spring: more water = more pressure)
         m_plumbingPressure = m_plumbingVolume / PLUMBING_COMPLIANCE;
-
-        // Once we reach target pressure, reduce flow (pump backs off)
-        if (m_plumbingPressure >= targetPreheatPressure) {
-            m_flow = 0.0;  // Target reached, hold pressure
-        }
 
         // Pump can only push so hard - pressure is limited
         if (m_plumbingPressure > MAX_PRESSURE * 0.8) {
