@@ -62,6 +62,7 @@ int main(int argc, char *argv[])
     TranslationManager translationManager(&settings);
     BLEManager bleManager;
     DE1Device de1Device;
+    de1Device.setSettings(&settings);  // For water level auto-calibration
     std::unique_ptr<ScaleDevice> physicalScale;  // Physical BLE scale (when connected)
     FlowScale flowScale;  // Virtual scale using DE1 flow data (fallback when no BLE scale)
     ShotDataModel shotDataModel;

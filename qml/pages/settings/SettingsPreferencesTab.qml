@@ -479,6 +479,84 @@ Item {
                     }
                 }
             }
+
+            // Water Level Calibration
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 160
+                color: Theme.surfaceColor
+                radius: Theme.cardRadius
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 15
+                    spacing: 10
+
+                    Tr {
+                        key: "settings.preferences.waterLevelCalibration"
+                        fallback: "Water Level Sensor"
+                        color: Theme.textColor
+                        font.pixelSize: 16
+                        font.bold: true
+                    }
+
+                    Tr {
+                        Layout.fillWidth: true
+                        key: "settings.preferences.waterLevelCalibrationDesc"
+                        fallback: "Auto-calibrates when you refill (captures low point) and when tank is full (captures high point)"
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: 12
+                        wrapMode: Text.WordWrap
+                    }
+
+                    // Current calibration values
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 20
+
+                        Text {
+                            text: "Min: " + Settings.waterLevelMinMm.toFixed(0) + "mm"
+                            color: Theme.textSecondaryColor
+                            font.pixelSize: 12
+                        }
+
+                        Text {
+                            text: "Max: " + Settings.waterLevelMaxMm.toFixed(0) + "mm"
+                            color: Theme.textSecondaryColor
+                            font.pixelSize: 12
+                        }
+
+                        Text {
+                            text: "Now: " + DE1Device.waterLevelMm.toFixed(0) + "mm (" + DE1Device.waterLevel.toFixed(0) + "%)"
+                            color: Theme.primaryColor
+                            font.pixelSize: 12
+                        }
+                    }
+
+                    Item { Layout.fillHeight: true }
+
+                    // Reset button
+                    AccessibleButton {
+                        Layout.fillWidth: true
+                        text: "Reset Calibration"
+                        accessibleName: "Reset water level calibration to default values"
+                        background: Rectangle {
+                            radius: 6
+                            color: Theme.backgroundColor
+                            border.color: Theme.textSecondaryColor
+                            border.width: 1
+                        }
+                        contentItem: Text {
+                            text: parent.text
+                            color: Theme.textColor
+                            font.pixelSize: 12
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        onClicked: Settings.resetWaterLevelCalibration()
+                    }
+                }
+            }
         }
 
         // Spacer

@@ -2,6 +2,7 @@
 #include "protocol/binarycodec.h"
 #include "profile/profile.h"
 #include "../simulator/de1simulator.h"
+#include "../core/settings.h"
 #include <QBluetoothAddress>
 #include <QDateTime>
 #include <QDebug>
@@ -101,6 +102,10 @@ void DE1Device::setIsHeadless(bool headless) {
     m_isHeadless = headless;
     qDebug() << "DE1Device: Headless mode" << (headless ? "ENABLED" : "DISABLED");
     emit isHeadlessChanged();
+}
+
+void DE1Device::setSettings(Settings* settings) {
+    m_settings = settings;
 }
 
 void DE1Device::setSimulatedState(DE1::State state, DE1::SubState subState) {
@@ -390,6 +395,17 @@ void DE1Device::parseStateInfo(const QByteArray& data) {
                  << "/" << DE1::subStateToString(newSubState);
     }
 
+    // Auto-calibrate min water level when machine requests refill
+    // This captures the actual low point for this user's setup
+    if (stateChanged && newState == DE1::State::Refill && m_settings) {
+        double currentMin = m_settings->waterLevelMinMm();
+        // Only update if we have a valid reading and it's different
+        if (m_waterLevelMm > 0 && qAbs(m_waterLevelMm - currentMin) > 1.0) {
+            m_settings->setWaterLevelMinMm(m_waterLevelMm);
+            qDebug() << "DE1Device: Auto-calibrated water level min to" << m_waterLevelMm << "mm (refill triggered)";
+        }
+    }
+
     m_state = newState;
     m_subState = newSubState;
 
@@ -496,13 +512,35 @@ void DE1Device::parseShotSample(const QByteArray& data) {
 void DE1Device::parseWaterLevel(const QByteArray& data) {
     if (data.size() < 2) return;
 
-    // Convert raw sensor reading to percentage
+    // Convert raw sensor reading to mm
     // Raw value is U16P8 format (divide by 256 to get mm)
     double rawMm = BinaryCodec::decodeU16P8(BinaryCodec::decodeShortBE(data, 0));
     // Apply sensor offset correction (sensor is mounted 5mm above water intake)
-    double correctedMm = rawMm + 5.0;
-    // Convert to percentage (40mm = 100% full per de1app calibration)
-    m_waterLevel = qBound(0.0, (correctedMm / 40.0) * 100.0, 100.0);
+    // This matches de1app's water_level_mm_correction = 5
+    m_waterLevelMm = rawMm + 5.0;
+
+    // Get calibration values (with sensible defaults)
+    double minMm = m_settings ? m_settings->waterLevelMinMm() : 5.0;
+    double maxMm = m_settings ? m_settings->waterLevelMaxMm() : 50.0;
+
+    // Auto-calibrate max: if we see a higher value, update the max
+    if (m_settings && m_waterLevelMm > maxMm) {
+        m_settings->setWaterLevelMaxMm(m_waterLevelMm);
+        maxMm = m_waterLevelMm;
+        qDebug() << "DE1Device: Auto-calibrated water level max to" << maxMm << "mm";
+    }
+
+    // Auto-calibrate min: if machine requests refill, this is the low point
+    // (handled via onStateChanged when state becomes Refill)
+
+    // Calculate percentage based on calibrated min/max range
+    double range = maxMm - minMm;
+    if (range > 0.1) {  // Avoid division by zero
+        m_waterLevel = qBound(0.0, ((m_waterLevelMm - minMm) / range) * 100.0, 100.0);
+    } else {
+        m_waterLevel = 50.0;  // Fallback if range is too small
+    }
+
     emit waterLevelChanged();
 }
 

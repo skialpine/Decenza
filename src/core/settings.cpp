@@ -1523,6 +1523,39 @@ void Settings::setDyeBarista(const QString& value) {
     }
 }
 
+// Water tank calibration
+double Settings::waterLevelMinMm() const {
+    // Default 5mm matches de1app's water_level_mm_correction (sensor offset)
+    return m_settings.value("waterTank/minMm", 5.0).toDouble();
+}
+
+void Settings::setWaterLevelMinMm(double mm) {
+    if (!qFuzzyCompare(1.0 + waterLevelMinMm(), 1.0 + mm)) {
+        m_settings.setValue("waterTank/minMm", mm);
+        emit waterLevelMinMmChanged();
+    }
+}
+
+double Settings::waterLevelMaxMm() const {
+    // Default 50mm is a reasonable starting point (~1400mL)
+    // Will auto-calibrate higher when user fills tank
+    return m_settings.value("waterTank/maxMm", 50.0).toDouble();
+}
+
+void Settings::setWaterLevelMaxMm(double mm) {
+    if (!qFuzzyCompare(1.0 + waterLevelMaxMm(), 1.0 + mm)) {
+        m_settings.setValue("waterTank/maxMm", mm);
+        emit waterLevelMaxMmChanged();
+    }
+}
+
+void Settings::resetWaterLevelCalibration() {
+    m_settings.remove("waterTank/minMm");
+    m_settings.remove("waterTank/maxMm");
+    emit waterLevelMinMmChanged();
+    emit waterLevelMaxMmChanged();
+}
+
 // Generic settings access
 QVariant Settings::value(const QString& key, const QVariant& defaultValue) const {
     return m_settings.value(key, defaultValue);

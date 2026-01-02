@@ -12,6 +12,7 @@
 
 class Profile;
 class DE1Simulator;
+class Settings;
 
 struct ShotSample {
     qint64 timestamp = 0;
@@ -42,6 +43,7 @@ class DE1Device : public QObject {
     Q_PROPERTY(double temperature READ temperature NOTIFY shotSampleReceived)
     Q_PROPERTY(double steamTemperature READ steamTemperature NOTIFY shotSampleReceived)
     Q_PROPERTY(double waterLevel READ waterLevel NOTIFY waterLevelChanged)
+    Q_PROPERTY(double waterLevelMm READ waterLevelMm NOTIFY waterLevelChanged)
     Q_PROPERTY(QString firmwareVersion READ firmwareVersion NOTIFY firmwareVersionChanged)
     Q_PROPERTY(bool usbChargerOn READ usbChargerOn NOTIFY usbChargerOnChanged)
     Q_PROPERTY(bool isHeadless READ isHeadless WRITE setIsHeadless NOTIFY isHeadlessChanged)
@@ -66,6 +68,7 @@ public:
     double mixTemperature() const { return m_mixTemp; }
     double steamTemperature() const { return m_steamTemp; }
     double waterLevel() const { return m_waterLevel; }
+    double waterLevelMm() const { return m_waterLevelMm; }
     QString firmwareVersion() const { return m_firmwareVersion; }
     bool usbChargerOn() const { return m_usbChargerOn; }
     bool isHeadless() const { return m_isHeadless; }
@@ -79,6 +82,9 @@ public:
     void setSimulatedState(DE1::State state, DE1::SubState subState);
     void emitSimulatedShotSample(const ShotSample& sample);
     void setSimulator(DE1Simulator* simulator) { m_simulator = simulator; }
+
+    // Settings for water level calibration persistence
+    void setSettings(Settings* settings);
 
 public slots:
     void connectToDevice(const QString& address);
@@ -167,6 +173,7 @@ private:
     double m_headTemp = 0.0;
     double m_steamTemp = 0.0;
     double m_waterLevel = 0.0;
+    double m_waterLevelMm = 0.0;  // Raw mm value (with sensor offset applied)
     QString m_firmwareVersion;
 
     QQueue<std::function<void()>> m_commandQueue;
@@ -175,6 +182,7 @@ private:
     bool m_connecting = false;
     bool m_simulationMode = false;
     DE1Simulator* m_simulator = nullptr;  // For simulation mode
+    Settings* m_settings = nullptr;       // For water level calibration persistence
     bool m_usbChargerOn = true;  // Default on (safe default like de1app)
     bool m_isHeadless = false;   // True if app can start operations (GHC not installed or inactive)
 

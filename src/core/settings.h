@@ -99,6 +99,10 @@ class Settings : public QObject {
     Q_PROPERTY(QString dyeEspressoNotes READ dyeEspressoNotes WRITE setDyeEspressoNotes NOTIFY dyeEspressoNotesChanged)
     Q_PROPERTY(QString dyeBarista READ dyeBarista WRITE setDyeBarista NOTIFY dyeBaristaChanged)
 
+    // Water tank level calibration (auto-calibrated)
+    Q_PROPERTY(double waterLevelMinMm READ waterLevelMinMm WRITE setWaterLevelMinMm NOTIFY waterLevelMinMmChanged)
+    Q_PROPERTY(double waterLevelMaxMm READ waterLevelMaxMm WRITE setWaterLevelMaxMm NOTIFY waterLevelMaxMmChanged)
+
 public:
     explicit Settings(QObject* parent = nullptr);
 
@@ -316,6 +320,13 @@ public:
     QString dyeBarista() const;
     void setDyeBarista(const QString& value);
 
+    // Water tank calibration (auto-calibrated, persisted)
+    double waterLevelMinMm() const;
+    void setWaterLevelMinMm(double mm);
+    double waterLevelMaxMm() const;
+    void setWaterLevelMaxMm(double mm);
+    Q_INVOKABLE void resetWaterLevelCalibration();
+
     // Generic settings access (for extensibility)
     Q_INVOKABLE QVariant value(const QString& key, const QVariant& defaultValue = QVariant()) const;
     Q_INVOKABLE void setValue(const QString& key, const QVariant& value);
@@ -376,6 +387,8 @@ signals:
     void dyeEspressoEnjoymentChanged();
     void dyeEspressoNotesChanged();
     void dyeBaristaChanged();
+    void waterLevelMinMmChanged();
+    void waterLevelMaxMmChanged();
     void valueChanged(const QString& key);
 
 private:
