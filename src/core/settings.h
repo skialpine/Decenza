@@ -393,4 +393,5 @@ signals:
 
 private:
     QSettings m_settings;
+    bool m_steamDisabled = false;  // Session-only, not persisted (for descaling)
 };

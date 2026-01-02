@@ -532,6 +532,13 @@ Item {
 
                     Item { Layout.fillHeight: true }
 
+                    Text {
+                        property real temp: typeof DE1Device.steamTemperature === 'number' ? DE1Device.steamTemperature : 0
+                        text: "Current: " + temp.toFixed(0) + "°C"
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: 12
+                    }
+
                     RowLayout {
                         Layout.fillWidth: true
 

@@ -210,12 +210,12 @@ void Settings::setSteamFlow(int flow) {
 }
 
 bool Settings::steamDisabled() const {
-    return m_settings.value("steam/disabled", false).toBool();
+    return m_steamDisabled;
 }
 
 void Settings::setSteamDisabled(bool disabled) {
-    if (steamDisabled() != disabled) {
-        m_settings.setValue("steam/disabled", disabled);
+    if (m_steamDisabled != disabled) {
+        m_steamDisabled = disabled;
         emit steamDisabledChanged();
     }
 }

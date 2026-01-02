@@ -12,8 +12,11 @@ Page {
     Component.onCompleted: root.currentPageTitle = TranslationManager.translate("descaling.title", "Descaling")
     StackView.onActivated: root.currentPageTitle = TranslationManager.translate("descaling.title", "Descaling")
 
-    // Restore espresso profile when leaving descale page
-    Component.onDestruction: MainController.uploadCurrentProfile()
+    // Restore normal operation when leaving descale page
+    Component.onDestruction: {
+        Settings.steamDisabled = false
+        MainController.uploadCurrentProfile()
+    }
 
     property bool isDescaling: MachineState.phase === MachineStateType.Phase.Descaling
     property bool showRinseInstructions: false

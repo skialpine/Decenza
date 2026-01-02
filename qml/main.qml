@@ -182,7 +182,8 @@ ApplicationWindow {
     Timer {
         id: steamHeaterTimer
         interval: 60000  // Every 60 seconds
-        running: Settings.keepSteamHeaterOn && DE1Device.connected &&
+        running: Settings.keepSteamHeaterOn && !Settings.steamDisabled &&
+                 DE1Device.connected &&
                  (MachineState.phase === MachineStateType.Phase.Idle ||
                   MachineState.phase === MachineStateType.Phase.Ready)
         repeat: true
@@ -1059,8 +1060,8 @@ ApplicationWindow {
                     showCompletion(trFlushComplete.text, "flush")
                 }
 
-                // Keep steam heater on when idle if setting is enabled
-                if (Settings.keepSteamHeaterOn) {
+                // Keep steam heater on when idle if setting is enabled (but not during descaling)
+                if (Settings.keepSteamHeaterOn && !Settings.steamDisabled) {
                     MainController.applySteamSettings()
                 }
             }
