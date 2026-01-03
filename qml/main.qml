@@ -871,6 +871,7 @@ ApplicationWindow {
     // Espresso stop reason overlay (shown on top of any page)
     property string stopReason: ""  // "manual", "weight", "machine", ""
     property bool stopOverlayVisible: false
+    property bool wasEspressoOperation: false  // Track if the operation that just ended was espresso
 
     function getStopReasonText() {
         switch (stopReason) {
@@ -947,11 +948,21 @@ ApplicationWindow {
             root.stopReason = "weight"
         }
         function onShotStarted() {
+            // Track if this is an espresso operation (check current phase)
+            var phase = MachineState.phase
+            root.wasEspressoOperation = (phase === MachineStateType.Phase.EspressoPreheating ||
+                                         phase === MachineStateType.Phase.Preinfusion ||
+                                         phase === MachineStateType.Phase.Pouring)
             root.stopReason = ""
             root.stopOverlayVisible = false
             stopOverlayTimer.stop()
         }
         function onShotEnded() {
+            // Only show stop overlay for espresso operations, not steam/hot water/flush
+            if (!root.wasEspressoOperation) {
+                return
+            }
+
             // If no reason set, DE1 ended the shot (profile complete or machine-initiated)
             if (root.stopReason === "") {
                 root.stopReason = "machine"
@@ -961,6 +972,9 @@ ApplicationWindow {
             popInAnim.start()
             stopOverlayTimer.start()
             console.log("Stop overlay:", getStopReasonText())
+
+            // Reset for next operation
+            root.wasEspressoOperation = false
         }
     }
 
@@ -1153,6 +1167,9 @@ ApplicationWindow {
         visible: !screensaverActive
     }
 
+    // Track previous phase to detect operation starts
+    property int previousPhase: MachineStateType.Phase.Disconnected
+
     // Connection state handler - auto navigate based on machine state
     Connections {
         target: MachineState
@@ -1160,6 +1177,25 @@ ApplicationWindow {
         function onPhaseChanged() {
             let phase = MachineState.phase
             let currentPage = pageStack.currentItem ? pageStack.currentItem.objectName : ""
+            let wasIdle = (root.previousPhase === MachineStateType.Phase.Idle ||
+                          root.previousPhase === MachineStateType.Phase.Ready ||
+                          root.previousPhase === MachineStateType.Phase.Heating)
+
+            // Apply settings when entering operations (to handle GHC-initiated starts)
+            if (phase === MachineStateType.Phase.Steaming && wasIdle) {
+                // Apply steam settings immediately when entering steam (from GHC button)
+                MainController.applySteamSettings()
+                console.log("Applied steam settings on phase change to Steaming")
+            } else if (phase === MachineStateType.Phase.HotWater && wasIdle) {
+                MainController.applyHotWaterSettings()
+                console.log("Applied hot water settings on phase change")
+            } else if (phase === MachineStateType.Phase.Flushing && wasIdle) {
+                MainController.applyFlushSettings()
+                console.log("Applied flush settings on phase change")
+            }
+
+            // Update previous phase tracking
+            root.previousPhase = phase
 
             // Navigate to active operation pages (skip during calibration mode or page transition)
             if (phase === MachineStateType.Phase.EspressoPreheating ||
@@ -1200,8 +1236,15 @@ ApplicationWindow {
                     showCompletion(trFlushComplete.text, "flush")
                 }
 
-                // Keep steam heater on when idle if setting is enabled (but not during descaling)
-                if (Settings.keepSteamHeaterOn && !Settings.steamDisabled) {
+                // Pre-load all operation settings when machine is Ready
+                // This ensures GHC-initiated operations use correct settings immediately
+                if (phase === MachineStateType.Phase.Ready) {
+                    MainController.applySteamSettings()
+                    MainController.applyHotWaterSettings()
+                    MainController.applyFlushSettings()
+                    console.log("Pre-loaded steam/hot water/flush settings for Ready state")
+                } else if (Settings.keepSteamHeaterOn && !Settings.steamDisabled) {
+                    // Keep steam heater on when idle if setting is enabled
                     MainController.applySteamSettings()
                 }
             }

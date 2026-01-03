@@ -1231,8 +1231,9 @@ void MainController::onShotEnded() {
         m_visualizer->uploadShot(m_shotDataModel, &m_currentProfile, duration, finalWeight, doseWeight, metadata);
     }
 
-    // Note: Don't reset m_extractionStarted here - it's reset in onEspressoCycleStarted
-    // Resetting here causes duplicate "extraction started" markers when entering Ending phase
+    // Reset extraction flag so that subsequent Steam/HotWater/Flush operations
+    // don't incorrectly trigger shot metadata page or upload
+    m_extractionStarted = false;
 }
 
 void MainController::uploadPendingShot() {
