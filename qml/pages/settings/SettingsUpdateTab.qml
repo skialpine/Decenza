@@ -13,7 +13,7 @@ Item {
 
         // Left column: Current version info
         Rectangle {
-            Layout.preferredWidth: 300
+            Layout.preferredWidth: 280
             Layout.fillHeight: true
             color: Theme.surfaceColor
             radius: Theme.cardRadius
@@ -21,75 +21,65 @@ Item {
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 15
-                spacing: 12
+                spacing: 10
 
                 Tr {
                     key: "settings.update.currentversion"
                     fallback: "Current Version"
                     color: Theme.textColor
-                    font.pixelSize: 16
+                    font.pixelSize: 14
                     font.bold: true
                 }
 
-                Text {
-                    Layout.fillWidth: true
-                    text: "Decenza DE1"
-                    color: Theme.textSecondaryColor
-                    font.pixelSize: 12
-                }
-
-                Item { height: 5 }
-
                 Rectangle {
                     Layout.fillWidth: true
-                    height: 80
+                    height: 60
                     color: Theme.backgroundColor
                     radius: 8
 
                     ColumnLayout {
                         anchors.centerIn: parent
-                        spacing: 4
+                        spacing: 2
 
                         Text {
                             Layout.alignment: Qt.AlignHCenter
                             text: MainController.updateChecker ? MainController.updateChecker.currentVersion : "Unknown"
                             color: Theme.primaryColor
-                            font.pixelSize: 28
+                            font.pixelSize: 24
                             font.bold: true
                         }
 
-                        Tr {
+                        Text {
                             Layout.alignment: Qt.AlignHCenter
-                            key: "settings.update.installed"
-                            fallback: "Installed"
+                            text: "Decenza DE1"
                             color: Theme.textSecondaryColor
-                            font.pixelSize: 12
+                            font.pixelSize: 11
                         }
                     }
                 }
 
-                Item { height: 10 }
+                Item { height: 5 }
 
                 // Auto-check toggle
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 10
+                    spacing: 8
 
                     ColumnLayout {
-                        spacing: 2
+                        spacing: 1
 
                         Tr {
                             key: "settings.update.autocheck"
                             fallback: "Auto-check for updates"
                             color: Theme.textColor
-                            font.pixelSize: 14
+                            font.pixelSize: 13
                         }
 
                         Tr {
                             key: "settings.update.checkeveryhour"
                             fallback: "Check every hour"
                             color: Theme.textSecondaryColor
-                            font.pixelSize: 12
+                            font.pixelSize: 11
                         }
                     }
 
@@ -115,51 +105,40 @@ Item {
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 15
-                spacing: 12
+                spacing: 10
 
                 Tr {
                     key: "settings.update.softwareupdates"
                     fallback: "Software Updates"
                     color: Theme.textColor
-                    font.pixelSize: 16
+                    font.pixelSize: 14
                     font.bold: true
                 }
 
-                Tr {
-                    Layout.fillWidth: true
-                    key: "settings.update.checkongithub"
-                    fallback: "Check for new versions on GitHub"
-                    color: Theme.textSecondaryColor
-                    font.pixelSize: 12
-                    wrapMode: Text.WordWrap
-                }
-
-                Item { height: 5 }
-
-                // Check button or status
+                // Status area
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: contentColumn.height + 30
+                    Layout.preferredHeight: statusColumn.height + 20
                     color: Theme.backgroundColor
                     radius: 8
 
                     ColumnLayout {
-                        id: contentColumn
+                        id: statusColumn
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: parent.top
-                        anchors.margins: 15
-                        spacing: 12
+                        anchors.margins: 10
+                        spacing: 8
 
                         // Status row
                         RowLayout {
-                            spacing: 10
+                            spacing: 8
                             visible: !MainController.updateChecker.checking && !MainController.updateChecker.downloading
 
                             Rectangle {
-                                width: 12
-                                height: 12
-                                radius: 6
+                                width: 10
+                                height: 10
+                                radius: 5
                                 color: MainController.updateChecker.updateAvailable ? Theme.primaryColor : Theme.successColor
                             }
 
@@ -174,51 +153,55 @@ Item {
                                     }
                                 }
                                 color: Theme.textColor
-                                font.pixelSize: 14
+                                font.pixelSize: 13
                             }
                         }
 
                         // Checking indicator
                         RowLayout {
-                            spacing: 10
+                            spacing: 8
                             visible: MainController.updateChecker.checking
 
                             BusyIndicator {
                                 running: true
-                                Layout.preferredWidth: 24
-                                Layout.preferredHeight: 24
+                                Layout.preferredWidth: 20
+                                Layout.preferredHeight: 20
                             }
 
                             Tr {
                                 key: "settings.update.checking"
                                 fallback: "Checking for updates..."
                                 color: Theme.textColor
-                                font.pixelSize: 14
+                                font.pixelSize: 13
                             }
                         }
 
                         // Download progress
                         ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: 8
+                            spacing: 6
                             visible: MainController.updateChecker.downloading
 
-                            Tr {
-                                key: "settings.update.downloading"
-                                fallback: "Downloading update..."
-                                color: Theme.textColor
-                                font.pixelSize: 14
+                            RowLayout {
+                                spacing: 8
+
+                                Tr {
+                                    key: "settings.update.downloading"
+                                    fallback: "Downloading update..."
+                                    color: Theme.textColor
+                                    font.pixelSize: 13
+                                }
+
+                                Text {
+                                    text: MainController.updateChecker.downloadProgress + "%"
+                                    color: Theme.textSecondaryColor
+                                    font.pixelSize: 12
+                                }
                             }
 
                             ProgressBar {
                                 Layout.fillWidth: true
                                 value: MainController.updateChecker.downloadProgress / 100
-                            }
-
-                            Text {
-                                text: MainController.updateChecker.downloadProgress + "%"
-                                color: Theme.textSecondaryColor
-                                font.pixelSize: 12
                             }
                         }
 
@@ -228,71 +211,183 @@ Item {
                             visible: MainController.updateChecker.errorMessage !== ""
                             text: MainController.updateChecker.errorMessage
                             color: Theme.errorColor
-                            font.pixelSize: 12
+                            font.pixelSize: 11
                             wrapMode: Text.WordWrap
                         }
-
-                        // Action buttons
-                        RowLayout {
-                            spacing: 10
-                            visible: !MainController.updateChecker.checking && !MainController.updateChecker.downloading
-
-                            ActionButton {
-                                translationKey: "settings.update.checknow"
-                                translationFallback: "Check Now"
-                                enabled: !MainController.updateChecker.checking
-                                onClicked: MainController.updateChecker.checkForUpdates()
-                            }
-
-                            ActionButton {
-                                translationKey: "settings.update.downloadinstall"
-                                translationFallback: "Download & Install"
-                                visible: MainController.updateChecker.updateAvailable
-                                onClicked: MainController.updateChecker.downloadAndInstall()
-                            }
-                        }
                     }
                 }
 
-                // Release notes
-                Rectangle {
+                // Action buttons row
+                RowLayout {
                     Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    color: Theme.backgroundColor
-                    radius: 8
-                    visible: MainController.updateChecker.releaseNotes !== ""
+                    spacing: 10
+                    visible: !MainController.updateChecker.checking && !MainController.updateChecker.downloading
 
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 15
-                        spacing: 8
+                    Button {
+                        text: TranslationManager.translate("settings.update.checknow", "Check Now")
+                        enabled: !MainController.updateChecker.checking
+                        onClicked: MainController.updateChecker.checkForUpdates()
 
-                        Tr {
-                            key: "settings.update.releasenotes"
-                            fallback: "Release Notes"
-                            color: Theme.textSecondaryColor
+                        contentItem: Text {
+                            text: parent.text
                             font.pixelSize: 12
-                            font.bold: true
+                            color: parent.enabled ? Theme.textColor : Theme.textSecondaryColor
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
                         }
 
-                        ScrollView {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            clip: true
+                        background: Rectangle {
+                            implicitWidth: 100
+                            implicitHeight: 32
+                            color: parent.down ? Qt.darker(Theme.surfaceColor, 1.1) : Theme.surfaceColor
+                            border.color: Theme.borderColor
+                            border.width: 1
+                            radius: 6
+                        }
+                    }
 
-                            TextArea {
-                                readOnly: true
-                                text: MainController.updateChecker.releaseNotes
-                                color: Theme.textColor
-                                font.pixelSize: 12
-                                wrapMode: Text.WordWrap
-                                background: null
-                            }
+                    Button {
+                        text: TranslationManager.translate("settings.update.downloadinstall", "Download & Install")
+                        visible: MainController.updateChecker.updateAvailable
+                        onClicked: MainController.updateChecker.downloadAndInstall()
+
+                        contentItem: Text {
+                            text: parent.text
+                            font.pixelSize: 12
+                            color: "white"
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        background: Rectangle {
+                            implicitWidth: 120
+                            implicitHeight: 32
+                            color: parent.down ? Qt.darker(Theme.primaryColor, 1.1) : Theme.primaryColor
+                            radius: 6
+                        }
+                    }
+
+                    Button {
+                        text: TranslationManager.translate("settings.update.whatsnew", "What's New?")
+                        visible: MainController.updateChecker.releaseNotes !== ""
+                        onClicked: releaseNotesPopup.open()
+
+                        contentItem: Text {
+                            text: parent.text
+                            font.pixelSize: 12
+                            color: Theme.primaryColor
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        background: Rectangle {
+                            implicitWidth: 100
+                            implicitHeight: 32
+                            color: parent.down ? Qt.darker(Theme.surfaceColor, 1.1) : Theme.surfaceColor
+                            border.color: Theme.primaryColor
+                            border.width: 1
+                            radius: 6
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+                }
+
+                Item { Layout.fillHeight: true }
+            }
+        }
+    }
+
+    // Release notes popup
+    Popup {
+        id: releaseNotesPopup
+        modal: true
+        dim: true
+        anchors.centerIn: parent
+        width: Math.min(600, updateTab.width - 40)
+        height: Math.min(400, updateTab.height - 40)
+        padding: 0
+
+        background: Rectangle {
+            color: Theme.surfaceColor
+            radius: Theme.cardRadius
+            border.width: 1
+            border.color: Theme.borderColor
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 0
+
+            // Header
+            Rectangle {
+                Layout.fillWidth: true
+                height: 44
+                color: Theme.backgroundColor
+                radius: Theme.cardRadius
+
+                // Square off bottom corners
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    height: Theme.cardRadius
+                    color: Theme.backgroundColor
+                }
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 15
+                    anchors.rightMargin: 10
+
+                    Text {
+                        text: TranslationManager.translate("settings.update.whatsnew", "What's New?") +
+                              (MainController.updateChecker.latestVersion ? " - v" + MainController.updateChecker.latestVersion : "")
+                        color: Theme.textColor
+                        font.pixelSize: 14
+                        font.bold: true
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    Button {
+                        text: "X"
+                        onClicked: releaseNotesPopup.close()
+
+                        contentItem: Text {
+                            text: parent.text
+                            font.pixelSize: 14
+                            font.bold: true
+                            color: Theme.textSecondaryColor
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        background: Rectangle {
+                            implicitWidth: 28
+                            implicitHeight: 28
+                            color: parent.hovered ? Theme.surfaceColor : "transparent"
+                            radius: 4
                         }
                     }
                 }
+            }
 
-                Item { Layout.fillHeight: true; visible: MainController.updateChecker.releaseNotes === "" }
+            // Scrollable content
+            ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.margins: 15
+                clip: true
+
+                TextArea {
+                    readOnly: true
+                    text: MainController.updateChecker.releaseNotes
+                    color: Theme.textColor
+                    font.pixelSize: 13
+                    wrapMode: Text.WordWrap
+                    background: null
+                    selectByMouse: true
+                }
             }
         }
     }
