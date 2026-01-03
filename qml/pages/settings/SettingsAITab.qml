@@ -100,6 +100,24 @@ Item {
             }
         }
 
+        // Claude recommendation note
+        Rectangle {
+            Layout.fillWidth: true
+            color: Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.15)
+            radius: Theme.cardRadius
+            height: recommendationText.implicitHeight + 16
+
+            Text {
+                id: recommendationText
+                anchors.fill: parent
+                anchors.margins: 8
+                text: "For shot analysis, we recommend Claude (Anthropic). In our testing, Claude better understands espresso extraction dynamics and gives more accurate dial-in advice. Other providers work for translation and general tasks."
+                wrapMode: Text.WordWrap
+                color: Theme.textSecondaryColor
+                font.pixelSize: 11
+            }
+        }
+
         // API Key / Ollama settings
         Rectangle {
             Layout.fillWidth: true
@@ -129,7 +147,6 @@ Item {
                     StyledTextField {
                         Layout.fillWidth: true
                         echoMode: TextInput.Password
-                        placeholderText: "Paste your API key here"
                         inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
                         text: {
                             switch(Settings.aiProvider) {

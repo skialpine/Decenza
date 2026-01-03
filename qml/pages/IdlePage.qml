@@ -590,9 +590,12 @@ Page {
                     id: sleepMouseArea
                     anchors.fill: parent
                     enabled: sleepButton.enabled
+                    supportLongPress: true
+                    longPressInterval: 1000
                     accessibleName: TranslationManager.translate("idle.accessible.sleep", "Sleep") + ". " + TranslationManager.translate("idle.accessible.sleep.description", "Put the machine to sleep")
                     accessibleItem: sleepButton
                     onAccessibleClicked: sleepButton.doSleep()
+                    onAccessibleLongPressed: Qt.quit()
                 }
             }
 

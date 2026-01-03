@@ -16,6 +16,7 @@ struct PhaseSummary {
     double startTime = 0;
     double endTime = 0;
     double duration = 0;
+    bool isFlowMode = false;  // True if flow-controlled, false if pressure-controlled
 
     // Pressure metrics (bar)
     double avgPressure = 0;

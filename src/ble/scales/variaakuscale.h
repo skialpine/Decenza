@@ -24,6 +24,7 @@ private slots:
     void onControllerError(QLowEnergyController::Error error);
     void onServiceDiscovered(const QBluetoothUuid& uuid);
     void onServiceStateChanged(QLowEnergyService::ServiceState state);
+    void onServiceError(QLowEnergyService::ServiceError error);
     void onCharacteristicChanged(const QLowEnergyCharacteristic& c, const QByteArray& value);
     void onWatchdogTimeout();
     void onTickleTimeout();
