@@ -8,7 +8,7 @@
 #include <QGuiApplication>
 #include <QDebug>
 #include <memory>
-#include "buildinfo.h"
+#include "version.h"
 
 #ifdef Q_OS_ANDROID
 #include <QJniObject>
@@ -54,12 +54,12 @@ int main(int argc, char *argv[])
     app.setOrganizationName("DecentEspresso");
     app.setOrganizationDomain("decentespresso.com");
     app.setApplicationName("Decenza DE1");
-    app.setApplicationVersion("1.1.0");
+    app.setApplicationVersion(VERSION_STRING);
 
     // Set Qt Quick Controls style (must be before QML engine creation)
     QQuickStyle::setStyle("Material");
 
-    qDebug() << "App started - build" << BUILD_NUMBER_STRING;
+    qDebug() << "App started - version" << VERSION_STRING;
 
     // Create core objects
     Settings settings;
@@ -243,7 +243,7 @@ int main(int argc, char *argv[])
     context->setContextProperty("BatteryDrainer", &batteryDrainer);
     context->setContextProperty("AccessibilityManager", &accessibilityManager);
     context->setContextProperty("ProfileStorage", &profileStorage);
-    context->setContextProperty("BuildNumber", BUILD_NUMBER_STRING);
+    context->setContextProperty("AppVersion", VERSION_STRING);
 #ifdef QT_DEBUG
     context->setContextProperty("IsDebugBuild", true);
 #else

@@ -106,7 +106,7 @@ Item {
                     }
 
                     Text {
-                        text: "Build #" + BuildNumber
+                        text: "v" + AppVersion
                         color: Theme.accentColor
                         font.pixelSize: 18
                         font.bold: true

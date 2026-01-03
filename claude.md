@@ -270,10 +270,17 @@ Each operation page (Steam, HotWater, Flush) has:
 **Problem**: Early `return` in `onPhaseChanged` can skip completion handling
 **Solution**: Only check `pageStack.busy` before `replace()` calls, not at handler start
 
+## Versioning
+
+- **Display version** (versionName): Set in `CMakeLists.txt` line 2: `project(Decenza_DE1 VERSION x.y.z)`
+- **Version code** (versionCode): Auto-increments in `versioncode.txt` on every build (never reset)
+- **version.h**: Auto-generated from `src/version.h.in` with VERSION_STRING macro
+- To release a new version: Update VERSION in CMakeLists.txt, build, commit, push
+
 ## Git Workflow
 
 - **IMPORTANT**: Always push with tags: `git push && git push --tags`
-- Build numbers auto-increment and create `build-N` tags
-- Tags allow users to reference exact versions by build number
-- **Build numbers are global** across all platforms (Android, iOS, Desktop) - a build on any platform increments the shared counter in `buildnumber.txt`
-- **IMPORTANT**: Always include build number files in every commit if they've changed: `buildnumber.txt`, `android/AndroidManifest.xml`, `installer/version.iss`. Never leave these unstaged.
+- Version codes auto-increment and create `build-N` tags
+- Tags allow users to reference exact builds by version code
+- **Version codes are global** across all platforms (Android, iOS, Desktop) - a build on any platform increments the shared counter in `versioncode.txt`
+- **IMPORTANT**: Always include version files in every commit if they've changed: `versioncode.txt`, `android/AndroidManifest.xml`, `installer/version.iss`. Never leave these unstaged.

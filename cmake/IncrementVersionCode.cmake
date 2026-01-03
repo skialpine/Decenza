@@ -1,0 +1,39 @@
+# Read current version code
+file(READ "${VERSION_CODE_FILE}" VERSION_CODE)
+string(STRIP "${VERSION_CODE}" VERSION_CODE)
+
+# Increment
+math(EXPR VERSION_CODE "${VERSION_CODE} + 1")
+
+# Write back
+file(WRITE "${VERSION_CODE_FILE}" "${VERSION_CODE}\n")
+
+# Update AndroidManifest.xml
+if(DEFINED MANIFEST_FILE AND EXISTS "${MANIFEST_FILE}")
+    file(READ "${MANIFEST_FILE}" MANIFEST_CONTENT)
+
+    # Update versionCode (always incrementing integer)
+    string(REGEX REPLACE "android:versionCode=\"[0-9]+\""
+           "android:versionCode=\"${VERSION_CODE}\""
+           MANIFEST_CONTENT "${MANIFEST_CONTENT}")
+
+    # Update versionName to display version from CMake
+    string(REGEX REPLACE "android:versionName=\"[^\"]+\""
+           "android:versionName=\"${VERSION_STRING}\""
+           MANIFEST_CONTENT "${MANIFEST_CONTENT}")
+
+    file(WRITE "${MANIFEST_FILE}" "${MANIFEST_CONTENT}")
+endif()
+
+# Create git tag for this version code
+find_program(GIT_EXECUTABLE git)
+if(GIT_EXECUTABLE)
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} tag -f "build-${VERSION_CODE}"
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_QUIET
+        ERROR_QUIET
+    )
+endif()
+
+message(STATUS "Version: ${VERSION_STRING} (code: ${VERSION_CODE})")

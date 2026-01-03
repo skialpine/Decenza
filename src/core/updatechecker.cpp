@@ -1,6 +1,6 @@
 #include "updatechecker.h"
 #include "settings.h"
-#include "buildinfo.h"
+#include "version.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -57,7 +57,7 @@ UpdateChecker::~UpdateChecker()
 
 QString UpdateChecker::currentVersion() const
 {
-    return QString("1.1.%1").arg(BUILD_NUMBER);
+    return VERSION_STRING;
 }
 
 void UpdateChecker::checkForUpdates()

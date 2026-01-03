@@ -2,6 +2,7 @@
 #include "../models/shotdatamodel.h"
 #include "../core/settings.h"
 #include "../profile/profile.h"
+#include "version.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -373,7 +374,7 @@ QByteArray VisualizerUploader::buildShotJson(ShotDataModel* shotData,
     // App info with settings (Visualizer extracts metadata from app.data.settings)
     QJsonObject app;
     app["app_name"] = "Decenza DE1";
-    app["app_version"] = "1.1.0";
+    app["app_version"] = VERSION_STRING;
 
     // Build settings object with all metadata (de1app field names)
     QJsonObject settings;

@@ -3,21 +3,22 @@ project(Decenza_DE1 VERSION 1.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# Build number - increment on every build
-set(BUILD_NUMBER_FILE "${CMAKE_SOURCE_DIR}/buildnumber.txt")
-set(BUILD_INFO_HEADER "${CMAKE_BINARY_DIR}/buildinfo.h")
+# Version code - always increments for Android (separate from display version)
+set(VERSION_CODE_FILE "${CMAKE_SOURCE_DIR}/versioncode.txt")
+set(VERSION_HEADER "${CMAKE_BINARY_DIR}/version.h")
 
-# Read build number at configure time
-file(READ "${BUILD_NUMBER_FILE}" CURRENT_BUILD_NUMBER)
-string(STRIP "${CURRENT_BUILD_NUMBER}" CURRENT_BUILD_NUMBER)
-# Build target will increment, so compute next build number for Android version
-math(EXPR NEXT_BUILD_NUMBER "${CURRENT_BUILD_NUMBER} + 1")
+# Read version code at configure time
+file(READ "${VERSION_CODE_FILE}" CURRENT_VERSION_CODE)
+string(STRIP "${CURRENT_VERSION_CODE}" CURRENT_VERSION_CODE)
+# Build will increment, so compute next version code for Android
+math(EXPR NEXT_VERSION_CODE "${CURRENT_VERSION_CODE} + 1")
 
-# Generate initial header at configure time (without incrementing)
-if(NOT EXISTS "${BUILD_INFO_HEADER}")
-    file(WRITE "${BUILD_INFO_HEADER}"
-        "#pragma once\n// Auto-generated - do not edit\n#define BUILD_NUMBER ${CURRENT_BUILD_NUMBER}\n#define BUILD_NUMBER_STRING \"${CURRENT_BUILD_NUMBER}\"\n")
-endif()
+# Configure version.h from template
+configure_file(
+    "${CMAKE_SOURCE_DIR}/src/version.h.in"
+    "${VERSION_HEADER}"
+    @ONLY
+)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -212,7 +213,7 @@ target_link_libraries(Decenza_DE1 PRIVATE
 # Include directories
 target_include_directories(Decenza_DE1 PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_BINARY_DIR}  # For buildinfo.h
+    ${CMAKE_BINARY_DIR}  # For version.h
 )
 
 # QML module - mark Theme.qml as singleton
@@ -289,19 +290,17 @@ qt_add_qml_module(Decenza_DE1
     QML_FILES ${QML_FILES}
 )
 
-# Increment build number on every build
-add_custom_target(increment_build_number ALL
+# Increment version code on every build
+add_custom_target(increment_version_code ALL
     COMMAND ${CMAKE_COMMAND}
-        -DBUILD_NUMBER_FILE=${BUILD_NUMBER_FILE}
-        -DOUTPUT_HEADER=${BUILD_INFO_HEADER}
+        -DVERSION_CODE_FILE=${VERSION_CODE_FILE}
         -DMANIFEST_FILE=${CMAKE_SOURCE_DIR}/android/AndroidManifest.xml
+        -DVERSION_STRING=${PROJECT_VERSION}
         -DCMAKE_SOURCE_DIR=${CMAKE_SOURCE_DIR}
-        -P ${CMAKE_SOURCE_DIR}/cmake/IncrementBuildNumber.cmake
-    BYPRODUCTS ${BUILD_INFO_HEADER}
-    COMMENT "Incrementing build number..."
+        -P ${CMAKE_SOURCE_DIR}/cmake/IncrementVersionCode.cmake
+    COMMENT "Incrementing version code..."
 )
-add_dependencies(Decenza_DE1 increment_build_number)
-set_source_files_properties(src/main.cpp PROPERTIES OBJECT_DEPENDS ${BUILD_INFO_HEADER})
+add_dependencies(Decenza_DE1 increment_version_code)
 
 # Force QML resource rebuild when source files change
 # Delete the compiled resource file to force rcc regeneration
@@ -320,8 +319,8 @@ set_property(TARGET Decenza_DE1 APPEND PROPERTY SOURCES ${QML_FILES})
 if(ANDROID)
     set_target_properties(Decenza_DE1 PROPERTIES
         QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android"
-        QT_ANDROID_VERSION_CODE "${NEXT_BUILD_NUMBER}"
-        QT_ANDROID_VERSION_NAME "1.1.${NEXT_BUILD_NUMBER}"
+        QT_ANDROID_VERSION_CODE "${NEXT_VERSION_CODE}"
+        QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}"
     )
     # Add OpenSSL libraries for HTTPS support
     add_android_openssl_libraries(Decenza_DE1)
