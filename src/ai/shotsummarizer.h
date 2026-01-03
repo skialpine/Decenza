@@ -62,6 +62,11 @@ struct ShotSummary {
     QVector<QPointF> tempCurve;
     QVector<QPointF> weightCurve;
 
+    // Target/goal curves (what the profile intended)
+    QVector<QPointF> pressureGoalCurve;
+    QVector<QPointF> flowGoalCurve;
+    QVector<QPointF> tempGoalCurve;
+
     // Extraction indicators
     double timeToFirstDrip = 0;  // When flow > 0.5 mL/s
     double preinfusionDuration = 0;
@@ -109,5 +114,5 @@ private:
     double calculateMin(const QVector<QPointF>& data, double startTime, double endTime) const;
     double calculateStdDev(const QVector<QPointF>& data, double startTime, double endTime) const;
     double findTimeToFirstDrip(const QVector<QPointF>& flowData) const;
-    bool detectChanneling(const QVector<QPointF>& flowData) const;
+    bool detectChanneling(const QVector<QPointF>& flowData, double afterTime) const;
 };

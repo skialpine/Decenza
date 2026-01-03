@@ -45,6 +45,11 @@ ShotSummary ShotSummarizer::summarize(const ShotDataModel* shotData,
     summary.tempCurve = tempData;
     summary.weightCurve = weightData;
 
+    // Store target/goal curves (what the profile intended)
+    summary.pressureGoalCurve = shotData->pressureGoalData();
+    summary.flowGoalCurve = shotData->flowGoalData();
+    summary.tempGoalCurve = shotData->temperatureGoalData();
+
     // Overall metrics
     summary.totalDuration = pressureData.last().x();
     summary.doseWeight = doseWeight;
@@ -63,11 +68,29 @@ ShotSummary ShotSummarizer::summarize(const ShotDataModel* shotData,
 
     // Extraction indicators
     summary.timeToFirstDrip = findTimeToFirstDrip(flowData);
-    summary.channelingDetected = detectChanneling(flowData);
+    // Channeling detection will be done after phase processing (see below)
 
-    // Temperature stability check
-    double tempStdDev = calculateStdDev(tempData, 0, summary.totalDuration);
-    summary.temperatureUnstable = tempStdDev > 2.0;
+    // Temperature stability check - compare actual vs TARGET (not just variance)
+    // A declining temperature profile is intentional, not "unstable"
+    const auto& tempGoalData = shotData->temperatureGoalData();
+    if (!tempGoalData.isEmpty()) {
+        // Calculate average deviation from target
+        double deviationSum = 0;
+        int count = 0;
+        for (const auto& point : tempData) {
+            double target = findValueAtTime(tempGoalData, point.x());
+            if (target > 0) {
+                deviationSum += std::abs(point.y() - target);
+                count++;
+            }
+        }
+        double avgDeviation = count > 0 ? deviationSum / count : 0;
+        summary.temperatureUnstable = avgDeviation > 2.0;  // >2°C average deviation from target
+    } else {
+        // No target data - fall back to variance check
+        double tempStdDev = calculateStdDev(tempData, 0, summary.totalDuration);
+        summary.temperatureUnstable = tempStdDev > 2.0;
+    }
 
     // Get phase markers from shot data
     QVariantList markers = shotData->phaseMarkersVariant();
@@ -95,7 +118,7 @@ ShotSummary ShotSummarizer::summarize(const ShotDataModel* shotData,
         phase.flowAtEnd = findValueAtTime(flowData, summary.totalDuration);
 
         phase.avgTemperature = calculateAverage(tempData, 0, summary.totalDuration);
-        phase.tempStability = tempStdDev;
+        phase.tempStability = calculateStdDev(tempData, 0, summary.totalDuration);
 
         double startWeight = findValueAtTime(weightData, 0);
         double endWeight = findValueAtTime(weightData, summary.totalDuration);
@@ -157,6 +180,20 @@ ShotSummary ShotSummarizer::summarize(const ShotDataModel* shotData,
         }
     }
 
+    // Now detect channeling - find actual extraction phase start time
+    // Look for phases named "Extraction", "Pour", "Hold" etc.
+    double extractionStartTime = summary.timeToFirstDrip + 3.0;  // Default fallback
+    for (const auto& phase : summary.phases) {
+        QString lowerName = phase.name.toLower();
+        // Skip preparatory phases - only check during actual extraction
+        if (lowerName.contains("extract") || lowerName.contains("pour") ||
+            lowerName.contains("hold") || lowerName == "main") {
+            extractionStartTime = phase.startTime;
+            break;
+        }
+    }
+    summary.channelingDetected = detectChanneling(flowData, extractionStartTime);
+
     return summary;
 }
 
@@ -196,22 +233,66 @@ QString ShotSummarizer::buildUserPrompt(const ShotSummary& summary) const
         out << "\n";
     }
 
-    // Curve data - sampled every 2 seconds for AI analysis
-    out << "### Curve Data (sampled every 2s)\n";
-    out << "Format: time(s) | pressure(bar) | flow(ml/s) | temp(°C) | weight(g)\n\n";
+    // Curve data - sampled every 0.5 seconds for AI analysis
+    out << "### Curve Data (sampled every 0.5s)\n";
+    out << "Format: time | actual pressure (target/limit) | actual flow (target/limit) | actual temp (target) | weight | phase\n";
+    out << "CONTROL MODE: If flow target is high (6-8 ml/s), machine controls FLOW and pressure is just a result.\n";
+    out << "If pressure target is high (6-11 bar), machine controls PRESSURE and flow is just a result.\n";
+    out << "The non-controlled parameter's 'target' is actually a LIMITER (max allowed), not a goal!\n";
+    out << "PHASES: The phase column shows ACTUAL PROFILE PHASE NAMES - these are intentional stages, not problems!\n\n";
 
     double maxTime = summary.totalDuration;
-    for (double t = 0; t <= maxTime; t += 2.0) {
+
+    for (double t = 0; t <= maxTime; t += 0.5) {
         double pressure = findValueAtTime(summary.pressureCurve, t);
         double flow = findValueAtTime(summary.flowCurve, t);
         double temp = findValueAtTime(summary.tempCurve, t);
         double weight = findValueAtTime(summary.weightCurve, t);
 
-        out << QString::number(t, 'f', 0) << "s | "
-            << QString::number(pressure, 'f', 1) << " bar | "
-            << QString::number(flow, 'f', 1) << " ml/s | "
-            << QString::number(temp, 'f', 1) << "°C | "
-            << QString::number(weight, 'f', 1) << "g\n";
+        // Get target values (what the profile intended)
+        double pressureTarget = findValueAtTime(summary.pressureGoalCurve, t);
+        double flowTarget = findValueAtTime(summary.flowGoalCurve, t);
+        double tempTarget = findValueAtTime(summary.tempGoalCurve, t);
+
+        // Find the actual phase name at this time from phase markers
+        QString phase = "unknown";
+        for (const auto& p : summary.phases) {
+            if (t >= p.startTime && t < p.endTime) {
+                phase = p.name;
+                break;
+            }
+        }
+        // Handle last phase (t == endTime)
+        if (phase == "unknown" && !summary.phases.isEmpty()) {
+            phase = summary.phases.last().name;
+        }
+
+        // Format: show actual with target in parentheses if target exists
+        out << QString::number(t, 'f', 1) << "s | ";
+
+        // Pressure: show target if available, indicate which mode is active
+        if (pressureTarget > 0.1) {
+            out << QString::number(pressure, 'f', 1) << " (" << QString::number(pressureTarget, 'f', 1) << ") bar | ";
+        } else {
+            out << QString::number(pressure, 'f', 1) << " bar | ";
+        }
+
+        // Flow: show target if available
+        if (flowTarget > 0.1) {
+            out << QString::number(flow, 'f', 1) << " (" << QString::number(flowTarget, 'f', 1) << ") ml/s | ";
+        } else {
+            out << QString::number(flow, 'f', 1) << " ml/s | ";
+        }
+
+        // Temperature: always show target (profiles always have temp target)
+        if (tempTarget > 0) {
+            out << QString::number(temp, 'f', 1) << " (" << QString::number(tempTarget, 'f', 1) << ") °C | ";
+        } else {
+            out << QString::number(temp, 'f', 1) << "°C | ";
+        }
+
+        out << QString::number(weight, 'f', 1) << "g | "
+            << phase << "\n";
     }
     out << "\n";
 
@@ -236,12 +317,12 @@ QString ShotSummarizer::buildUserPrompt(const ShotSummary& summary) const
     out << "- Average flow during extraction: " << QString::number(avgFlow, 'f', 1) << " ml/s\n";
     out << "- Flow range: " << QString::number(minFlow, 'f', 1) << " - " << QString::number(maxFlow, 'f', 1) << " ml/s\n";
 
-    // Detect concerning patterns
+    // Detect concerning patterns (only during main extraction, not preinfusion)
     if (summary.channelingDetected) {
-        out << "- ⚠️ CHANNELING DETECTED: Erratic flow pattern observed\n";
+        out << "- ⚠️ CHANNELING DETECTED: Sudden flow spike during main extraction phase\n";
     }
     if (summary.temperatureUnstable) {
-        out << "- ⚠️ TEMPERATURE UNSTABLE: >2°C variation during shot\n";
+        out << "- ⚠️ TEMPERATURE DEVIATION: Actual temp deviates >2°C from target profile\n";
     }
     if (avgFlow > 3.0) {
         out << "- ⚠️ HIGH FLOW: Averaging >" << QString::number(avgFlow, 'f', 1) << " ml/s may indicate low resistance\n";
@@ -308,6 +389,79 @@ The DE1 is a profiling machine that can control either pressure OR flow (not bot
 - In PRESSURE PROFILES: The machine sets pressure, flow is determined by grind/puck
 - In FLOW PROFILES: The machine sets flow rate, pressure is determined by grind/puck
 - The relationship between set value and resulting value reveals puck resistance
+
+## CRITICAL: Reading Target Values Correctly
+
+The curve data shows BOTH pressure and flow targets, but only ONE is the ACTIVE CONTROL at any time:
+
+### How to identify the control mode:
+- **If flow target is high (6-8+ ml/s) and pressure target is low (1-4 bar)**: This is FLOW-CONTROLLED
+  - The machine pushes water at the target flow rate
+  - Pressure is a RESULT of puck resistance (will be high if grind is fine)
+  - High actual pressure with flow target = fine grind/high resistance (NORMAL)
+- **If pressure target is high (6-11 bar) and flow target is declining**: This is likely PRESSURE-CONTROLLED
+  - The machine maintains target pressure
+  - Flow is a RESULT of puck resistance
+- **If both targets are shown**: The non-controlling target is usually a LIMITER (max allowed value)
+  - e.g., "11 bar" might be the maximum allowed, not what the machine is trying to achieve
+  - Look at which actual value is CLOSER to its target - that's the controlled parameter
+
+### Common misinterpretation:
+- "Pressure reached 12 bar but target was 3 bar" during a FLOW-CONTROLLED fill phase = NORMAL
+  - The machine was pushing 8 ml/s flow, pressure built due to resistance
+  - This is the puck resisting flow, not a problem
+- "Pressure only reached 4 bar but target was 11 bar" during FLOW-CONTROLLED extraction = NORMAL
+  - The 11 bar is a LIMITER, machine is controlling FLOW at 3.5 ml/s
+  - Low pressure means low resistance, achieved flow target easily
+
+## CRITICAL: Preinfusion vs Main Extraction
+
+Most profiles have distinct phases - DO NOT confuse preinfusion behavior with extraction problems:
+
+### Preinfusion Phase (typically first 5-15+ seconds)
+- **Low pressure is INTENTIONAL** (often 1-4 bar) - this saturates the puck gently
+- **Variable/ramping flow is NORMAL** - flow increases as water penetrates the puck
+- **Flow ranging from 0.5 to 3+ ml/s during this phase is EXPECTED**
+- **This is NOT channeling** - it's the puck absorbing water and flow establishing
+- Blooming profiles may have 20-30s+ of intentionally low pressure
+
+### Main Extraction Phase (after preinfusion)
+- Flow should STABILIZE here - look for erratic behavior only in THIS phase
+- Sudden flow spikes HERE (not during preinfusion) may indicate channeling
+- Pressure reaches target profile values
+
+### Common Misdiagnosis to Avoid
+- "Flow ranging from 0.8 to 3.4 ml/s" across entire shot = NORMAL (preinfusion ramp + extraction)
+- "Low pressure of 2 bar" during first 10s = NORMAL preinfusion, not under-extraction
+- "Fast first drip" = Profile design choice, not necessarily channeling
+- Long shot times (60-90s) with blooming profiles = INTENTIONAL, not a problem
+- Pressure/flow spikes during phase transitions = NORMAL machine behavior
+- Declining temperature during shot = Often INTENTIONAL profile design (see below)
+
+## CRITICAL: Understanding Profile Phases
+
+DE1 profiles have NAMED PHASES that execute sequentially. Common phase names include:
+- **Prefill/Fill**: Initial water contact, expect pressure/flow ramp-up
+- **Preinfusion/Preinfuse**: Low-pressure saturation, variable flow is normal
+- **Compressing/Compression**: Puck compression phase, flow drops as puck compacts
+- **Dripping**: Waiting for first drops, low flow expected
+- **Pressurize/Ramp**: INTENTIONAL pressure increase - spikes here are BY DESIGN
+- **Extraction/Pour/Hold**: Main extraction at target pressure/flow
+- **Decline/Taper**: Intentional pressure reduction toward end
+
+### Phase Transition Behavior
+When the profile transitions between phases, you will see:
+- Sudden pressure changes (ramping up or down) - THIS IS INTENTIONAL
+- Flow spikes or drops as the machine adjusts - NOT channeling
+- These transitions are the profile working correctly
+
+### Declining Temperature Profiles
+Many advanced profiles INTENTIONALLY reduce temperature during extraction:
+- Start high (92-96°C) for initial extraction
+- Decline to lower temp (86-90°C) by end of shot
+- This is DESIGNED behavior to balance extraction of different compounds
+- A 5-7°C drop over the shot can be INTENTIONAL - check if actual follows target
+- Only flag temperature as "unstable" if it deviates significantly FROM THE TARGET
 
 ## Reading the Curves - What They Tell You
 
@@ -391,9 +545,13 @@ The DE1 is a profiling machine that can control either pressure OR flow (not bot
 - Rising pressure during shot can indicate fines migration
 
 ### Blooming/Saturating Profiles
-- Long low-pressure preinfusion is intentional
+- Long low-pressure preinfusion (20-40s at 1-3 bar) is INTENTIONAL
+- Total shot time of 60-90+ seconds is EXPECTED
 - Don't mistake slow start for "too fine"
-- Focus on main extraction phase for diagnosis
+- Don't mistake flow variations during bloom for "channeling"
+- Focus ONLY on main extraction phase (after bloom) for diagnosis
+- Low flow during bloom = puck absorbing water (good!)
+- Flow increase after bloom = saturation complete, extraction starting
 
 ## Roast Level Considerations
 
@@ -532,15 +690,20 @@ double ShotSummarizer::findTimeToFirstDrip(const QVector<QPointF>& flowData) con
     return 0;
 }
 
-bool ShotSummarizer::detectChanneling(const QVector<QPointF>& flowData) const
+bool ShotSummarizer::detectChanneling(const QVector<QPointF>& flowData, double afterTime) const
 {
     if (flowData.size() < 10) return false;
 
-    // Look for sudden flow spikes (>50% increase in 0.5s)
+    // Look for sudden flow spikes (>50% increase in 0.5s) AFTER preinfusion
+    // During preinfusion, flow naturally ramps up as water saturates the puck - this is normal
     for (int i = 5; i < flowData.size() - 5; i++) {
+        // Skip preinfusion phase - flow variations are expected there
+        if (flowData[i].x() < afterTime) continue;
+
         double prevFlow = flowData[i - 5].y();
         double currFlow = flowData[i].y();
 
+        // Only flag channeling if we see sudden spikes during main extraction
         if (prevFlow > 0.5 && currFlow > prevFlow * 1.5) {
             return true;
         }
