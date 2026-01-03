@@ -355,13 +355,46 @@ void ShotServer::sendFile(QTcpSocket* socket, const QString& path, const QString
 
 QString ShotServer::getLocalIpAddress() const
 {
-    const QList<QHostAddress> addresses = QNetworkInterface::allAddresses();
-    for (const QHostAddress& address : addresses) {
-        if (address.protocol() == QAbstractSocket::IPv4Protocol && !address.isLoopback()) {
-            return address.toString();
+    QString fallbackAddress;
+
+    const auto interfaces = QNetworkInterface::allInterfaces();
+    for (const QNetworkInterface& iface : interfaces) {
+        // Skip down, loopback, or virtual interfaces
+        if (!(iface.flags() & QNetworkInterface::IsUp) ||
+            !(iface.flags() & QNetworkInterface::IsRunning) ||
+            (iface.flags() & QNetworkInterface::IsLoopBack)) {
+            continue;
+        }
+
+        // Skip known virtual interface names (WSL, Docker, Hyper-V, VirtualBox, VMware)
+        QString name = iface.name().toLower() + iface.humanReadableName().toLower();
+        if (name.contains("wsl") || name.contains("docker") || name.contains("vethernet") ||
+            name.contains("virtualbox") || name.contains("vmware") || name.contains("vmnet") ||
+            name.contains("hyper-v") || name.contains("vbox")) {
+            continue;
+        }
+
+        for (const QNetworkAddressEntry& entry : iface.addressEntries()) {
+            QHostAddress addr = entry.ip();
+            if (addr.protocol() != QAbstractSocket::IPv4Protocol || addr.isLoopback()) {
+                continue;
+            }
+
+            QString ip = addr.toString();
+
+            // Prefer 192.168.x.x and 10.x.x.x (typical home/office LANs)
+            if (ip.startsWith("192.168.") || ip.startsWith("10.")) {
+                return ip;
+            }
+
+            // Keep 172.x.x.x as fallback (could be legitimate but often virtual)
+            if (fallbackAddress.isEmpty()) {
+                fallbackAddress = ip;
+            }
         }
     }
-    return "127.0.0.1";
+
+    return fallbackAddress.isEmpty() ? "127.0.0.1" : fallbackAddress;
 }
 
 QString ShotServer::generateIndexPage() const
