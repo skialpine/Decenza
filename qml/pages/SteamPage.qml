@@ -96,7 +96,7 @@ Page {
                         radius: Theme.scaled(18)
                         color: index === Settings.selectedSteamPitcher ? Theme.primaryColor : Theme.surfaceColor
                         border.color: index === Settings.selectedSteamPitcher ? Theme.primaryColor : Theme.textSecondaryColor
-                        border.width: Theme.scaled(1)
+                        border.width: 1
 
                         Text {
                             id: livePitcherText
@@ -140,7 +140,7 @@ Page {
                         radius: Theme.cardRadius
                         color: decreaseMouseArea.pressed ? Qt.darker(Theme.surfaceColor, 1.2) : Theme.surfaceColor
                         border.color: "white"
-                        border.width: Theme.scaled(1)
+                        border.width: 1
 
                         Text {
                             anchors.centerIn: parent
@@ -176,7 +176,7 @@ Page {
                         radius: Theme.cardRadius
                         color: increaseMouseArea.pressed ? Qt.darker(Theme.surfaceColor, 1.2) : Theme.surfaceColor
                         border.color: "white"
-                        border.width: Theme.scaled(1)
+                        border.width: 1
 
                         Text {
                             anchors.centerIn: parent
@@ -355,7 +355,7 @@ Page {
                                     radius: Theme.scaled(18)
                                     color: pitcherDelegate.pitcherIndex === Settings.selectedSteamPitcher ? Theme.primaryColor : Theme.backgroundColor
                                     border.color: pitcherDelegate.pitcherIndex === Settings.selectedSteamPitcher ? Theme.primaryColor : Theme.textSecondaryColor
-                                    border.width: Theme.scaled(1)
+                                    border.width: 1
                                     opacity: dragArea.drag.active ? 0.8 : 1.0
 
                                     Drag.active: dragArea.drag.active
@@ -459,7 +459,7 @@ Page {
                             radius: Theme.scaled(18)
                             color: Theme.backgroundColor
                             border.color: Theme.textSecondaryColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
 
                             Text {
                                 anchors.centerIn: parent
@@ -691,7 +691,7 @@ Page {
             color: Theme.surfaceColor
             radius: Theme.scaled(10)
             border.color: Theme.textSecondaryColor
-            border.width: Theme.scaled(1)
+            border.width: 1
         }
 
         contentItem: ColumnLayout {
@@ -711,7 +711,7 @@ Page {
                 Layout.preferredHeight: Theme.scaled(44)
                 color: Theme.backgroundColor
                 border.color: Theme.textSecondaryColor
-                border.width: Theme.scaled(1)
+                border.width: 1
                 radius: Theme.scaled(4)
 
                 TextInput {
@@ -841,7 +841,7 @@ Page {
             color: Theme.surfaceColor
             radius: Theme.scaled(10)
             border.color: Theme.textSecondaryColor
-            border.width: Theme.scaled(1)
+            border.width: 1
         }
 
         contentItem: ColumnLayout {
@@ -863,7 +863,7 @@ Page {
                 Layout.preferredHeight: Theme.scaled(44)
                 color: Theme.backgroundColor
                 border.color: Theme.textSecondaryColor
-                border.width: Theme.scaled(1)
+                border.width: 1
                 radius: Theme.scaled(4)
 
                 TextInput {

@@ -217,7 +217,7 @@ Item {
                     radius: Theme.scaled(6)
                     color: Qt.rgba(Theme.warningColor.r, Theme.warningColor.g, Theme.warningColor.b, 0.15)
                     border.color: Theme.warningColor
-                    border.width: Theme.scaled(1)
+                    border.width: 1
                     visible: ScaleDevice && (ScaleDevice.name === "Flow Scale" || ScaleDevice.name === "Simulated Scale")
 
                     Text {

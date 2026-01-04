@@ -93,7 +93,7 @@ Item {
         anchors.fill: parent
         radius: Theme.scaled(12)
         color: Theme.surfaceColor
-        border.width: Theme.scaled(1)
+        border.width: 1
         border.color: Theme.textSecondaryColor
 
         RowLayout {
@@ -387,7 +387,7 @@ Item {
                 height: Theme.scaled(80)
                 radius: Theme.scaled(16)
                 color: Theme.surfaceColor
-                border.width: Theme.scaled(1)
+                border.width: 1
                 border.color: Theme.textSecondaryColor
 
                 RowLayout {

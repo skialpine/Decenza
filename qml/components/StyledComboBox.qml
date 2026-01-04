@@ -49,7 +49,7 @@ ComboBox {
             color: Theme.surfaceColor
             radius: Theme.scaled(6)
             border.color: Theme.borderColor
-            border.width: Theme.scaled(1)
+            border.width: 1
         }
     }
 

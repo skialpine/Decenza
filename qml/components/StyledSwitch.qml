@@ -16,7 +16,7 @@ Switch {
         radius: height / 2
         color: control.checked ? Theme.primaryColor : Theme.backgroundColor
         border.color: control.checked ? Theme.primaryColor : Theme.textSecondaryColor
-        border.width: Theme.scaled(1)
+        border.width: 1
 
         Rectangle {
             x: control.checked ? parent.width - width - Theme.scaled(3) : Theme.scaled(3)

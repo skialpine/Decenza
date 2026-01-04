@@ -122,7 +122,7 @@ Item {
                             color: Theme.backgroundColor
                             radius: Theme.scaled(4)
                             border.color: usernameField.activeFocus ? Theme.primaryColor : Theme.textSecondaryColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
                         }
                         onTextChanged: Settings.visualizerUsername = text
                         onAccepted: passwordField.forceActiveFocus()
@@ -161,7 +161,7 @@ Item {
                             color: Theme.backgroundColor
                             radius: Theme.scaled(4)
                             border.color: passwordField.activeFocus ? Theme.primaryColor : Theme.textSecondaryColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
                         }
                         onTextChanged: Settings.visualizerPassword = text
                         onAccepted: {
@@ -195,7 +195,7 @@ Item {
                             radius: Theme.scaled(6)
                             color: parent.enabled ? Theme.primaryColor : Theme.backgroundColor
                             border.color: parent.enabled ? Theme.primaryColor : Theme.textSecondaryColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
                         }
                         contentItem: Text {
                             text: parent.text

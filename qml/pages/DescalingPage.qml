@@ -349,7 +349,7 @@ Page {
                     color: Qt.rgba(Theme.warningColor.r, Theme.warningColor.g, Theme.warningColor.b, 0.15)
                     radius: Theme.cardRadius
                     border.color: Theme.warningColor
-                    border.width: Theme.scaled(1)
+                    border.width: 1
 
                     ColumnLayout {
                         id: warningContent

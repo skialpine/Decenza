@@ -144,7 +144,7 @@ Page {
                         background: Rectangle {
                             color: Theme.surfaceColor
                             border.color: shareCodeInput.activeFocus ? Theme.primaryColor : Theme.textSecondaryColor
-                            border.width: Theme.scaled(2)
+                            border.width: 2
                             radius: Theme.scaled(8)
                         }
 
@@ -379,7 +379,7 @@ Page {
                                 radius: Theme.scaled(4)
                                 color: Theme.surfaceColor
                                 border.color: Theme.textSecondaryColor
-                                border.width: Theme.scaled(1)
+                                border.width: 1
                             }
                             contentItem: Text {
                                 text: trCancel.text
@@ -461,7 +461,7 @@ Page {
                         background: Rectangle {
                             color: Theme.surfaceColor
                             border.color: newNameInput.activeFocus ? Theme.primaryColor : Theme.textSecondaryColor
-                            border.width: Theme.scaled(2)
+                            border.width: 2
                             radius: Theme.scaled(4)
                         }
 
@@ -504,7 +504,7 @@ Page {
                                 radius: Theme.scaled(4)
                                 color: Theme.surfaceColor
                                 border.color: Theme.textSecondaryColor
-                                border.width: Theme.scaled(1)
+                                border.width: 1
                             }
                             contentItem: Text {
                                 text: trBack.text

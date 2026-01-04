@@ -223,7 +223,7 @@ Item {
                             background: Rectangle {
                                 color: Theme.backgroundColor
                                 border.color: Theme.textSecondaryColor
-                                border.width: Theme.scaled(1)
+                                border.width: 1
                                 radius: Theme.scaled(4)
                             }
 

@@ -90,7 +90,7 @@ Page {
                 height: width
                 radius: width / 2
                 color: "transparent"
-                border.width: Theme.scaled(3)
+                border.width: 3
                 border.color: Qt.hsla(index / 50.0, 1, 0.5, 0.7)
 
                 SequentialAnimation on scale {
@@ -670,7 +670,7 @@ Page {
             color: Theme.surfaceColor
             radius: Theme.cardRadius
             border.color: Theme.textSecondaryColor
-            border.width: Theme.scaled(1)
+            border.width: 1
         }
 
         header: Text {
@@ -756,7 +756,7 @@ Page {
                         radius: Theme.scaled(15)
                         color: index <= flowCalibrationDialog.currentStep ? Theme.primaryColor : Theme.surfaceColor
                         border.color: Theme.primaryColor
-                        border.width: Theme.scaled(1)
+                        border.width: 1
 
                         Text {
                             anchors.centerIn: parent
@@ -842,7 +842,7 @@ Page {
                             radius: Theme.scaled(75)
                             color: "transparent"
                             border.color: flowCalibrationDialog.isDispensing ? Theme.primaryColor : Theme.surfaceColor
-                            border.width: Theme.scaled(4)
+                            border.width: 4
                             visible: flowCalibrationDialog.currentStep === testStep.testIndex + 1
 
                             Text {
@@ -1013,7 +1013,7 @@ Page {
                         radius: Theme.scaled(8)
                         color: Theme.backgroundColor
                         border.color: flowCalibrationDialog.isDispensing ? Theme.primaryColor : Theme.surfaceColor
-                        border.width: Theme.scaled(2)
+                        border.width: 2
                         visible: flowCalibrationDialog.isDispensing || flowCalibrationDialog.verificationComplete
 
                         Text {
@@ -1167,7 +1167,7 @@ Page {
             color: Theme.surfaceColor
             radius: Theme.cardRadius
             border.color: Theme.borderColor
-            border.width: Theme.scaled(1)
+            border.width: 1
         }
 
         onOpened: {
@@ -1205,7 +1205,7 @@ Page {
                     color: Theme.backgroundColor
                     radius: Theme.buttonRadius
                     border.color: themeNameInput.activeFocus ? Theme.primaryColor : Theme.borderColor
-                    border.width: Theme.scaled(1)
+                    border.width: 1
                 }
                 onTextChanged: saveThemeDialog.themeName = text
                 onAccepted: {
@@ -1230,7 +1230,7 @@ Page {
                         color: Theme.surfaceColor
                         radius: Theme.buttonRadius
                         border.color: Theme.borderColor
-                        border.width: Theme.scaled(1)
+                        border.width: 1
                     }
                     contentItem: Text {
                         text: parent.buttonText

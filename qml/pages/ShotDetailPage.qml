@@ -335,7 +335,7 @@ Page {
                         color: "transparent"
                         radius: Theme.buttonRadius
                         border.color: Theme.borderColor
-                        border.width: Theme.scaled(1)
+                        border.width: 1
                     }
                     contentItem: Text {
                         text: parent.text
@@ -355,7 +355,7 @@ Page {
                         color: "transparent"
                         radius: Theme.buttonRadius
                         border.color: Theme.errorColor
-                        border.width: Theme.scaled(1)
+                        border.width: 1
                     }
                     contentItem: Text {
                         text: parent.text

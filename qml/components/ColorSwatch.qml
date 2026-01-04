@@ -27,7 +27,7 @@ Rectangle {
             radius: Theme.scaled(6)
             color: root.colorValue
             border.color: Theme.borderColor
-            border.width: Theme.scaled(1)
+            border.width: 1
             anchors.verticalCenter: parent.verticalCenter
         }
 

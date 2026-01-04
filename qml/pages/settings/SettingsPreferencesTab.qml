@@ -181,7 +181,7 @@ Item {
                             radius: Theme.scaled(2)
                             color: "transparent"
                             border.color: Theme.textSecondaryColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
 
                             Rectangle {
                                 x: 2
@@ -239,13 +239,13 @@ Item {
                             delegate: Rectangle {
                                 id: chargingModeButton
                                 Layout.fillWidth: true
-                                height: Theme.scaled(50)
+                                Layout.fillHeight: true
                                 radius: Theme.scaled(6)
                                 color: BatteryManager.chargingMode === modelData.value ?
                                        Theme.primaryColor : Theme.backgroundColor
                                 border.color: BatteryManager.chargingMode === modelData.value ?
                                               Theme.primaryColor : Theme.textSecondaryColor
-                                border.width: Theme.scaled(1)
+                                border.width: 1
 
                                 ColumnLayout {
                                     anchors.centerIn: parent
@@ -326,7 +326,7 @@ Item {
                             radius: Theme.scaled(6)
                             color: BatteryDrainer.running ? Theme.errorColor : Theme.backgroundColor
                             border.color: Theme.errorColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
                         }
                         contentItem: Text {
                             text: parent.text
@@ -402,7 +402,7 @@ Item {
                             radius: Theme.scaled(6)
                             color: Theme.backgroundColor
                             border.color: Theme.textSecondaryColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
                         }
                         contentItem: Text {
                             text: parent.text
@@ -483,7 +483,7 @@ Item {
                             radius: Theme.scaled(6)
                             color: parent.enabled ? Theme.primaryColor : Theme.backgroundColor
                             border.color: parent.enabled ? Theme.primaryColor : Theme.textSecondaryColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
                         }
                         contentItem: Text {
                             text: parent.text

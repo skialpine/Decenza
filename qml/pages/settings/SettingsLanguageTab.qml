@@ -433,7 +433,7 @@ Item {
         background: Rectangle {
             color: Theme.surfaceColor
             radius: Theme.cardRadius
-            border.width: Theme.scaled(2)
+            border.width: 2
             border.color: Theme.warningColor
         }
 
@@ -470,7 +470,7 @@ Item {
                         implicitHeight: Theme.scaled(40)
                         color: parent.down ? Qt.darker(Theme.surfaceColor, 1.2) : Theme.surfaceColor
                         radius: Theme.buttonRadius
-                        border.width: Theme.scaled(1)
+                        border.width: 1
                         border.color: Theme.borderColor
                     }
 
@@ -559,7 +559,7 @@ Item {
         background: Rectangle {
             color: Theme.surfaceColor
             radius: Theme.cardRadius
-            border.width: Theme.scaled(2)
+            border.width: 2
             border.color: submitResultPopup.isSuccess ? Theme.successColor : Theme.warningColor
         }
 

@@ -19,6 +19,6 @@ TextField {
         color: Theme.backgroundColor
         radius: Theme.scaled(4)
         border.color: control.activeFocus ? Theme.primaryColor : Theme.textSecondaryColor
-        border.width: Theme.scaled(1)
+        border.width: 1
     }
 }

@@ -102,7 +102,7 @@ Page {
                     anchors.margins: Theme.scaled(6)
                     radius: Theme.buttonRadius
                     color: langMouseArea.pressed ? Theme.primaryColor : Theme.surfaceColor
-                    border.width: Theme.scaled(1)
+                    border.width: 1
                     border.color: Qt.rgba(1, 1, 1, 0.3)
 
                     Accessible.role: Accessible.Button

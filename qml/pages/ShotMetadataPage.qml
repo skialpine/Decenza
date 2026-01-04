@@ -202,7 +202,7 @@ Page {
                         color: Theme.backgroundColor
                         radius: Theme.scaled(4)
                         border.color: Theme.textSecondaryColor
-                        border.width: Theme.scaled(1)
+                        border.width: 1
 
                         Text {
                             anchors.fill: parent
@@ -244,7 +244,7 @@ Page {
                         color: Theme.backgroundColor
                         radius: Theme.scaled(4)
                         border.color: Theme.textSecondaryColor
-                        border.width: Theme.scaled(1)
+                        border.width: 1
 
                         Text {
                             anchors.fill: parent
@@ -486,7 +486,7 @@ Page {
                             color: Theme.backgroundColor
                             radius: Theme.scaled(4)
                             border.color: notesField.activeFocus ? Theme.primaryColor : Theme.textSecondaryColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
                         }
                         onTextChanged: Settings.dyeEspressoNotes = text
 
@@ -820,7 +820,7 @@ Page {
                 color: Theme.backgroundColor
                 radius: Theme.scaled(4)
                 border.color: combo.activeFocus ? Theme.primaryColor : Theme.textSecondaryColor
-                border.width: Theme.scaled(1)
+                border.width: 1
             }
 
             contentItem: Text {

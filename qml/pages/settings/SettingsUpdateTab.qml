@@ -249,7 +249,7 @@ Item {
                             implicitHeight: Theme.scaled(32)
                             color: parent.down ? Qt.darker(Theme.surfaceColor, 1.1) : Theme.surfaceColor
                             border.color: Theme.borderColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
                             radius: Theme.scaled(6)
                         }
                     }
@@ -293,7 +293,7 @@ Item {
                             implicitHeight: Theme.scaled(32)
                             color: parent.down ? Qt.darker(Theme.surfaceColor, 1.1) : Theme.surfaceColor
                             border.color: Theme.primaryColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
                             radius: Theme.scaled(6)
                         }
                     }
@@ -319,7 +319,7 @@ Item {
         background: Rectangle {
             color: Theme.surfaceColor
             radius: Theme.cardRadius
-            border.width: Theme.scaled(1)
+            border.width: 1
             border.color: Theme.borderColor
         }
 

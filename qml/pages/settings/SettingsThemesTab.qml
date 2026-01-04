@@ -206,7 +206,7 @@ Item {
                                 color: modelData.primaryColor
                                 radius: Theme.buttonRadius
                                 border.color: Settings.activeThemeName === modelData.name ? "white" : "transparent"
-                                border.width: Theme.scaled(2)
+                                border.width: 2
 
                                 Row {
                                     id: presetRow
@@ -268,7 +268,7 @@ Item {
                             color: Theme.surfaceColor
                             radius: Theme.buttonRadius
                             border.color: Theme.borderColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
 
                             Text {
                                 id: saveText

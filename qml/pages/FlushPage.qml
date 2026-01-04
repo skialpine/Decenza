@@ -74,7 +74,7 @@ Page {
                         radius: Theme.scaled(18)
                         color: index === Settings.selectedFlushPreset ? Theme.primaryColor : Theme.surfaceColor
                         border.color: index === Settings.selectedFlushPreset ? Theme.primaryColor : Theme.textSecondaryColor
-                        border.width: Theme.scaled(1)
+                        border.width: 1
 
                         Text {
                             id: livePresetText
@@ -221,7 +221,7 @@ Page {
                                     radius: Theme.scaled(18)
                                     color: presetDelegate.presetIndex === Settings.selectedFlushPreset ? Theme.primaryColor : Theme.backgroundColor
                                     border.color: presetDelegate.presetIndex === Settings.selectedFlushPreset ? Theme.primaryColor : Theme.textSecondaryColor
-                                    border.width: Theme.scaled(1)
+                                    border.width: 1
                                     opacity: dragArea.drag.active ? 0.8 : 1.0
 
                                     Drag.active: dragArea.drag.active
@@ -324,7 +324,7 @@ Page {
                             radius: Theme.scaled(18)
                             color: Theme.backgroundColor
                             border.color: Theme.textSecondaryColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
 
                             Text {
                                 anchors.centerIn: parent
@@ -491,7 +491,7 @@ Page {
             color: Theme.surfaceColor
             radius: Theme.cardRadius
             border.color: Theme.textSecondaryColor
-            border.width: Theme.scaled(1)
+            border.width: 1
         }
 
         contentItem: ColumnLayout {
@@ -509,7 +509,7 @@ Page {
                 Layout.preferredHeight: Theme.scaled(44)
                 color: Theme.backgroundColor
                 border.color: Theme.textSecondaryColor
-                border.width: Theme.scaled(1)
+                border.width: 1
                 radius: Theme.scaled(4)
 
                 TextInput {
@@ -635,7 +635,7 @@ Page {
             color: Theme.surfaceColor
             radius: Theme.cardRadius
             border.color: Theme.textSecondaryColor
-            border.width: Theme.scaled(1)
+            border.width: 1
         }
 
         contentItem: ColumnLayout {
@@ -653,7 +653,7 @@ Page {
                 Layout.preferredHeight: Theme.scaled(44)
                 color: Theme.backgroundColor
                 border.color: Theme.textSecondaryColor
-                border.width: Theme.scaled(1)
+                border.width: 1
                 radius: Theme.scaled(4)
 
                 TextInput {

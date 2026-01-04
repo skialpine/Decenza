@@ -171,7 +171,7 @@ Item {
                             color: Theme.backgroundColor
                             radius: Theme.scaled(4)
                             border.color: portField.activeFocus ? Theme.primaryColor : Theme.textSecondaryColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
                         }
 
                         onEditingFinished: {
@@ -231,7 +231,7 @@ Item {
                             color: Theme.surfaceColor
                             radius: Theme.scaled(4)
                             border.color: Theme.primaryColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
 
                             RowLayout {
                                 anchors.fill: parent
@@ -253,7 +253,7 @@ Item {
                                     radius: Theme.scaled(4)
                                     color: copyArea.pressed ? Theme.primaryColor : "transparent"
                                     border.color: Theme.primaryColor
-                                    border.width: Theme.scaled(1)
+                                    border.width: 1
 
                                     Text {
                                         anchors.centerIn: parent

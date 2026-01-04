@@ -53,7 +53,7 @@ Page {
                             radius: Theme.scaled(6)
                             color: Theme.surfaceColor
                             border.color: Theme.borderColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
                         }
 
                         contentItem: Text {
@@ -87,7 +87,7 @@ Page {
                             background: Rectangle {
                                 color: Theme.surfaceColor
                                 border.color: Theme.borderColor
-                                border.width: Theme.scaled(1)
+                                border.width: 1
                                 radius: Theme.scaled(6)
                             }
                         }
@@ -129,7 +129,7 @@ Page {
                             radius: Theme.scaled(4)
                             color: Theme.surfaceColor
                             border.color: Theme.primaryColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
                         }
                         contentItem: Text {
                             text: parent.text
@@ -547,7 +547,7 @@ Page {
                             color: index === Settings.selectedFavoriteProfile ?
                                    Theme.primaryColor : Theme.backgroundColor
                             border.color: Theme.textSecondaryColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
 
                             RowLayout {
                                 anchors.fill: parent

@@ -112,7 +112,7 @@ Page {
                         radius: Theme.scaled(6)
                         color: Theme.surfaceColor
                         border.color: Theme.borderColor
-                        border.width: Theme.scaled(1)
+                        border.width: 1
                     }
                     contentItem: Tr {
                         key: "dialingassistant.button.goback"
@@ -196,7 +196,7 @@ Page {
                     radius: Theme.scaled(6)
                     color: Theme.surfaceColor
                     border.color: Theme.borderColor
-                    border.width: Theme.scaled(1)
+                    border.width: 1
                 }
                 contentItem: Tr {
                     key: "dialingassistant.button.copy"

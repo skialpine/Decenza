@@ -60,7 +60,7 @@ Item {
                 }
 
                 border.color: Theme.borderColor
-                border.width: Theme.scaled(1)
+                border.width: 1
 
                 Rectangle {
                     width: Theme.scaled(28)
@@ -68,7 +68,7 @@ Item {
                     radius: Theme.scaled(14)
                     color: root.color
                     border.color: "white"
-                    border.width: Theme.scaled(2)
+                    border.width: 2
                     x: (root.saturation / 100) * (parent.width - width)
                     y: (parent.height - height) / 2
                 }
@@ -101,7 +101,7 @@ Item {
                 }
 
                 border.color: Theme.borderColor
-                border.width: Theme.scaled(1)
+                border.width: 1
 
                 Rectangle {
                     width: Theme.scaled(28)
@@ -109,7 +109,7 @@ Item {
                     radius: Theme.scaled(14)
                     color: root.color
                     border.color: "white"
-                    border.width: Theme.scaled(2)
+                    border.width: 2
                     x: (root.lightness / 100) * (parent.width - width)
                     y: (parent.height - height) / 2
                 }
@@ -141,7 +141,7 @@ Item {
                 }
 
                 border.color: Theme.borderColor
-                border.width: Theme.scaled(1)
+                border.width: 1
 
                 Rectangle {
                     width: Theme.scaled(28)
@@ -149,7 +149,7 @@ Item {
                     radius: Theme.scaled(14)
                     color: Qt.rgba(Settings.screenBrightness, Settings.screenBrightness, Settings.screenBrightness, 1.0)
                     border.color: "white"
-                    border.width: Theme.scaled(2)
+                    border.width: 2
                     x: Settings.screenBrightness * (parent.width - width)
                     y: (parent.height - height) / 2
                 }

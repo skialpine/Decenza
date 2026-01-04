@@ -223,7 +223,7 @@ Page {
                     radius: Theme.scaled(6)
                     color: Theme.surfaceColor
                     border.color: refreshButton.enabled ? Theme.primaryColor : Theme.textSecondaryColor
-                    border.width: Theme.scaled(1)
+                    border.width: 1
                 }
 
                 contentItem: Text {
@@ -286,7 +286,7 @@ Page {
                         background: Rectangle {
                             color: Theme.surfaceColor
                             border.color: codeInput.activeFocus ? Theme.primaryColor : Theme.textSecondaryColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
                             radius: Theme.scaled(4)
                         }
 
@@ -877,7 +877,7 @@ Page {
                 background: Rectangle {
                     color: Theme.backgroundColor
                     border.color: renameInput.activeFocus ? Theme.primaryColor : Theme.textSecondaryColor
-                    border.width: Theme.scaled(2)
+                    border.width: 2
                     radius: Theme.scaled(4)
                 }
 
@@ -935,7 +935,7 @@ Page {
                     radius: Theme.scaled(6)
                     color: Theme.backgroundColor
                     border.color: Theme.textSecondaryColor
-                    border.width: Theme.scaled(1)
+                    border.width: 1
                 }
 
                 contentItem: Text {

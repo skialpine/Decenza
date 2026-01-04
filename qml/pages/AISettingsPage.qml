@@ -61,7 +61,7 @@ Page {
                     radius: Theme.buttonRadius
                     color: Settings.aiProvider === modelData.id ? Theme.primaryColor : Theme.surfaceColor
                     border.color: Settings.aiProvider === modelData.id ? Theme.primaryColor : Theme.borderColor
-                    border.width: Theme.scaled(1)
+                    border.width: 1
 
                     RowLayout {
                         anchors.fill: parent
@@ -94,7 +94,7 @@ Page {
                             visible: Settings.aiProvider === modelData.id
                             color: "transparent"
                             border.color: Theme.textColor
-                            border.width: Theme.scaled(2)
+                            border.width: 2
 
                             Rectangle {
                                 anchors.centerIn: parent
@@ -196,7 +196,7 @@ Page {
                             color: Theme.backgroundColor
                             radius: Theme.scaled(4)
                             border.color: ollamaModelCombo.activeFocus ? Theme.primaryColor : Theme.borderColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
                         }
 
                         contentItem: Text {
@@ -222,7 +222,7 @@ Page {
                             radius: Theme.scaled(6)
                             color: Theme.surfaceColor
                             border.color: Theme.borderColor
-                            border.width: Theme.scaled(1)
+                            border.width: 1
                         }
                         contentItem: Text {
                             text: parent.text
@@ -256,7 +256,7 @@ Page {
                         radius: Theme.scaled(6)
                         color: parent.enabled ? Theme.primaryColor : Theme.surfaceColor
                         border.color: parent.enabled ? Theme.primaryColor : Theme.borderColor
-                        border.width: Theme.scaled(1)
+                        border.width: 1
                     }
                     contentItem: Text {
                         text: parent.text

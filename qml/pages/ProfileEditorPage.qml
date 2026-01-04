@@ -294,7 +294,7 @@ Page {
                         background: Rectangle {
                             color: parent.down ? Qt.darker(Theme.surfaceColor, 1.2) : Qt.rgba(255, 255, 255, 0.05)
                             radius: Theme.scaled(8)
-                            border.width: Theme.scaled(1)
+                            border.width: 1
                             border.color: Theme.textSecondaryColor
                         }
                         contentItem: Text {
@@ -330,7 +330,7 @@ Page {
         background: Rectangle {
             color: Theme.surfaceColor
             radius: Theme.scaled(12)
-            border.width: Theme.scaled(1)
+            border.width: 1
             border.color: Theme.textSecondaryColor
         }
 
@@ -534,7 +534,7 @@ Page {
                     color: Theme.backgroundColor
                     radius: Theme.scaled(4)
                     border.color: saveAsTitleField.activeFocus ? Theme.primaryColor : Theme.textSecondaryColor
-                    border.width: Theme.scaled(1)
+                    border.width: 1
                 }
                 onAccepted: saveAsDialog.accept()
             }
@@ -1189,7 +1189,7 @@ Page {
                 color: Theme.backgroundColor
                 radius: Theme.scaled(4)
                 border.color: nameField.activeFocus ? Theme.primaryColor : Theme.textSecondaryColor
-                border.width: Theme.scaled(1)
+                border.width: 1
             }
         }
 

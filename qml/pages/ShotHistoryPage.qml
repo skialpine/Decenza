@@ -120,7 +120,7 @@ Page {
                     color: "transparent"
                     radius: Theme.buttonRadius
                     border.color: Theme.borderColor
-                    border.width: Theme.scaled(1)
+                    border.width: 1
                 }
                 contentItem: Text {
                     text: parent.text
@@ -165,7 +165,7 @@ Page {
                     color: Theme.surfaceColor
                     radius: Theme.buttonRadius
                     border.color: Theme.borderColor
-                    border.width: Theme.scaled(1)
+                    border.width: 1
                 }
                 contentItem: Text {
                     text: profileFilter.displayText
@@ -186,7 +186,7 @@ Page {
                     color: Theme.surfaceColor
                     radius: Theme.buttonRadius
                     border.color: Theme.borderColor
-                    border.width: Theme.scaled(1)
+                    border.width: 1
                 }
                 contentItem: Text {
                     text: beanFilter.displayText
@@ -258,7 +258,7 @@ Page {
                             radius: Theme.scaled(4)
                             color: parent.checked ? Theme.primaryColor : "transparent"
                             border.color: parent.checked ? Theme.primaryColor : Theme.borderColor
-                            border.width: Theme.scaled(2)
+                            border.width: 2
 
                             Text {
                                 anchors.centerIn: parent
