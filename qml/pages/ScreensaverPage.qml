@@ -223,7 +223,7 @@ Page {
         anchors.fill: parent
         visible: isPipesMode
         running: isPipesMode && screensaverPage.visible
-        z: 1
+        z: 0
     }
 
     // Fallback: show a subtle animation while no cached media (videos mode only)

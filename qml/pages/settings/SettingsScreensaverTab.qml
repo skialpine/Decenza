@@ -133,14 +133,65 @@ Item {
                         id: typeComboBox
                         Layout.preferredWidth: Theme.scaled(180)
                         model: [
-                            { value: "videos", text: TranslationManager.translate("settings.screensaver.type.videos", "Videos & Images") },
-                            { value: "pipes", text: TranslationManager.translate("settings.screensaver.type.pipes", "3D Pipes") }
+                            TranslationManager.translate("settings.screensaver.type.videos", "Videos & Images"),
+                            TranslationManager.translate("settings.screensaver.type.pipes", "3D Pipes")
                         ]
-                        textRole: "text"
-                        valueRole: "value"
                         currentIndex: ScreensaverManager.screensaverType === "pipes" ? 1 : 0
                         onActivated: {
-                            ScreensaverManager.screensaverType = model[currentIndex].value
+                            ScreensaverManager.screensaverType = (currentIndex === 1) ? "pipes" : "videos"
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+                }
+
+                // Pipes settings (pipes mode only)
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.scaled(30)
+                    visible: ScreensaverManager.screensaverType === "pipes"
+
+                    RowLayout {
+                        spacing: Theme.scaled(10)
+
+                        Tr {
+                            key: "settings.screensaver.pipesSpeed"
+                            fallback: "Speed"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(14)
+                        }
+
+                        ValueInput {
+                            id: pipesSpeedInput
+                            value: ScreensaverManager.pipesSpeed
+                            suffix: "x"
+                            from: 0.1
+                            to: 2.0
+                            stepSize: 0.1
+                            decimals: 1
+                            onValueModified: function(newValue) { ScreensaverManager.pipesSpeed = newValue }
+                        }
+                    }
+
+                    RowLayout {
+                        spacing: Theme.scaled(10)
+
+                        Tr {
+                            key: "settings.screensaver.cameraSpeed"
+                            fallback: "Camera rotation"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(14)
+                        }
+
+                        ValueInput {
+                            id: cameraSpeedInput
+                            value: ScreensaverManager.pipesCameraSpeed
+                            suffix: "s"
+                            from: 10
+                            to: 300
+                            stepSize: 1
+                            decimals: 0
+                            onValueModified: function(newValue) { ScreensaverManager.pipesCameraSpeed = newValue }
                         }
                     }
 

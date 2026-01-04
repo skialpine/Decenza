@@ -107,6 +107,7 @@ set(SOURCES
     src/controllers/maincontroller.cpp
     src/controllers/directcontroller.cpp
     src/screensaver/screensavervideomanager.cpp
+    src/screensaver/pipegeometry.cpp
     src/network/visualizeruploader.cpp
     src/network/visualizerimporter.cpp
     src/ai/aimanager.cpp
@@ -161,6 +162,7 @@ set(HEADERS
     src/controllers/maincontroller.h
     src/controllers/directcontroller.h
     src/screensaver/screensavervideomanager.h
+    src/screensaver/pipegeometry.h
     src/network/visualizeruploader.h
     src/network/visualizerimporter.h
     src/ai/aimanager.h

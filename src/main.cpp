@@ -31,6 +31,7 @@
 #include "controllers/maincontroller.h"
 #include "ai/aimanager.h"
 #include "screensaver/screensavervideomanager.h"
+#include "screensaver/pipegeometry.h"
 #include "network/webdebuglogger.h"
 
 // GHC Simulator for Windows debug builds
@@ -257,6 +258,12 @@ int main(int argc, char *argv[])
         "DE1Device is created in C++");
     qmlRegisterUncreatableType<MachineState>("DecenzaDE1", 1, 0, "MachineStateType",
         "MachineState is created in C++");
+
+    // Register pipe geometry types for 3D pipes screensaver
+    qmlRegisterType<PipeCylinderGeometry>("DecenzaDE1", 1, 0, "PipeCylinderGeometry");
+    qmlRegisterType<PipeElbowGeometry>("DecenzaDE1", 1, 0, "PipeElbowGeometry");
+    qmlRegisterType<PipeCapGeometry>("DecenzaDE1", 1, 0, "PipeCapGeometry");
+    qmlRegisterType<PipeSphereGeometry>("DecenzaDE1", 1, 0, "PipeSphereGeometry");
 
     // Load main QML file (QTP0001 NEW policy uses /qt/qml/ prefix)
     const QUrl url(u"qrc:/qt/qml/DecenzaDE1/qml/main.qml"_s);

@@ -60,6 +60,8 @@ ScreensaverVideoManager::ScreensaverVideoManager(Settings* settings, ProfileStor
     m_imageDisplayDuration = m_settings->value("screensaver/imageDisplayDuration", 10).toInt();
     m_showDateOnPersonal = m_settings->value("screensaver/showDateOnPersonal", false).toBool();
     m_screensaverType = m_settings->value("screensaver/type", "videos").toString();
+    m_pipesSpeed = m_settings->value("screensaver/pipesSpeed", 0.5).toDouble();
+    m_pipesCameraSpeed = m_settings->value("screensaver/pipesCameraSpeed", 60.0).toDouble();
 
     // Load cache index and personal catalog
     loadCacheIndex();
@@ -240,6 +242,26 @@ void ScreensaverVideoManager::setScreensaverType(const QString& type)
         m_screensaverType = type;
         m_settings->setValue("screensaver/type", type);
         emit screensaverTypeChanged();
+    }
+}
+
+void ScreensaverVideoManager::setPipesSpeed(double speed)
+{
+    speed = qBound(0.1, speed, 2.0);  // Clamp between 0.1 and 2.0
+    if (!qFuzzyCompare(m_pipesSpeed, speed)) {
+        m_pipesSpeed = speed;
+        m_settings->setValue("screensaver/pipesSpeed", speed);
+        emit pipesSpeedChanged();
+    }
+}
+
+void ScreensaverVideoManager::setPipesCameraSpeed(double speed)
+{
+    speed = qBound(10.0, speed, 300.0);  // Clamp between 10 and 300 seconds
+    if (!qFuzzyCompare(m_pipesCameraSpeed, speed)) {
+        m_pipesCameraSpeed = speed;
+        m_settings->setValue("screensaver/pipesCameraSpeed", speed);
+        emit pipesCameraSpeedChanged();
     }
 }
 

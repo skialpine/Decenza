@@ -102,6 +102,8 @@ class ScreensaverVideoManager : public QObject {
     // Screensaver type (videos, pipes, etc.)
     Q_PROPERTY(QString screensaverType READ screensaverType WRITE setScreensaverType NOTIFY screensaverTypeChanged)
     Q_PROPERTY(QStringList availableScreensaverTypes READ availableScreensaverTypes CONSTANT)
+    Q_PROPERTY(double pipesSpeed READ pipesSpeed WRITE setPipesSpeed NOTIFY pipesSpeedChanged)
+    Q_PROPERTY(double pipesCameraSpeed READ pipesCameraSpeed WRITE setPipesCameraSpeed NOTIFY pipesCameraSpeedChanged)
 
 public:
     explicit ScreensaverVideoManager(Settings* settings, ProfileStorage* profileStorage, QObject* parent = nullptr);
@@ -145,6 +147,8 @@ public:
     // Screensaver type
     QString screensaverType() const { return m_screensaverType; }
     QStringList availableScreensaverTypes() const { return {"videos", "pipes"}; }
+    double pipesSpeed() const { return m_pipesSpeed; }
+    double pipesCameraSpeed() const { return m_pipesCameraSpeed; }
 
     // Property setters
     void setEnabled(bool enabled);
@@ -156,6 +160,8 @@ public:
     void setImageDisplayDuration(int seconds);
     void setShowDateOnPersonal(bool show);
     void setScreensaverType(const QString& type);
+    void setPipesSpeed(double speed);
+    void setPipesCameraSpeed(double speed);
 
 public slots:
     // Screen wake lock (prevents screen from turning off)
@@ -211,6 +217,8 @@ signals:
     void personalMediaChanged();
     void showDateOnPersonalChanged();
     void screensaverTypeChanged();
+    void pipesSpeedChanged();
+    void pipesCameraSpeedChanged();
 
 private slots:
     void onCategoriesReplyFinished();
@@ -312,6 +320,8 @@ private:
 
     // Screensaver type
     QString m_screensaverType = "videos";
+    double m_pipesSpeed = 0.5;  // Default to slower speed
+    double m_pipesCameraSpeed = 60.0;  // Seconds for full rotation (default 60s)
 
     // Constants
     static const QString BASE_URL;
