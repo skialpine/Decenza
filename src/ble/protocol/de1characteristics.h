@@ -234,7 +234,7 @@ namespace Skale {
 
 // Bookoo
 namespace Bookoo {
-    const QBluetoothUuid SERVICE(QString("0000FF00-0000-1000-8000-00805F9B34FB"));
+    const QBluetoothUuid SERVICE(QString("00000FFE-0000-1000-8000-00805F9B34FB"));
     const QBluetoothUuid STATUS(QString("0000FF11-0000-1000-8000-00805F9B34FB"));
     const QBluetoothUuid CMD(QString("0000FF12-0000-1000-8000-00805F9B34FB"));
 }

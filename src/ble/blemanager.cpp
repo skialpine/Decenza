@@ -95,6 +95,18 @@ QString BLEManager::getScaleType(const QString& address) const {
     return QString();
 }
 
+void BLEManager::connectToScale(const QString& address) {
+    QBluetoothAddress addr(address);
+    for (const auto& pair : m_scales) {
+        if (pair.first.address() == addr) {
+            emit scaleLogMessage(QString("Connecting to %1...").arg(pair.first.name()));
+            emit scaleDiscovered(pair.first, pair.second);
+            return;
+        }
+    }
+    qWarning() << "Scale not found in discovered list:" << address;
+}
+
 void BLEManager::startScan() {
     if (m_disabled) {
         qDebug() << "BLEManager: Scan request ignored (simulator mode)";

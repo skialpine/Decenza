@@ -34,6 +34,7 @@ public:
 
     Q_INVOKABLE QBluetoothDeviceInfo getScaleDeviceInfo(const QString& address) const;
     Q_INVOKABLE QString getScaleType(const QString& address) const;
+    Q_INVOKABLE void connectToScale(const QString& address);  // Manual scale selection
 
     void setScaleDevice(ScaleDevice* scale);
 

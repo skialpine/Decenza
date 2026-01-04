@@ -317,7 +317,7 @@ Item {
                             radius: Theme.scaled(4)
                         }
                         onClicked: {
-                            console.log("Connect to scale:", modelData.name, modelData.type)
+                            BLEManager.connectToScale(modelData.address)
                         }
                     }
 

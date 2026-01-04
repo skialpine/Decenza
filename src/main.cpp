@@ -139,14 +139,20 @@ int main(int argc, char *argv[])
             return;
         }
 
-        // If we already have a scale object, just reconnect to it
+        // If we already have a scale object, check if it's the same type
         if (physicalScale) {
-            flowScaleFallbackTimer.stop();  // Stop timer - we found a scale
-            // Re-wire to use physical scale
-            machineState.setScale(physicalScale.get());
-            engine.rootContext()->setContextProperty("ScaleDevice", physicalScale.get());
-            physicalScale->connectToDevice(device);
-            return;
+            // Compare types (case-insensitive) - if different, we need to create a new scale
+            if (physicalScale->type().compare(type, Qt::CaseInsensitive) != 0) {
+                qDebug() << "Scale type changed from" << physicalScale->type() << "to" << type << "- creating new scale";
+                physicalScale.reset();  // Delete old scale, fall through to create new one
+            } else {
+                flowScaleFallbackTimer.stop();  // Stop timer - we found a scale
+                // Re-wire to use physical scale
+                machineState.setScale(physicalScale.get());
+                engine.rootContext()->setContextProperty("ScaleDevice", physicalScale.get());
+                physicalScale->connectToDevice(device);
+                return;
+            }
         }
 
         // Create new scale object
