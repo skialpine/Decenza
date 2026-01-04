@@ -77,7 +77,6 @@ set(SOURCES
     src/main.cpp
     src/core/settings.cpp
     src/core/batterymanager.cpp
-    src/core/batterydrainer.cpp
     src/core/accessibilitymanager.cpp
     src/core/profilestorage.cpp
     src/core/translationmanager.cpp
@@ -131,7 +130,6 @@ endif()
 set(HEADERS
     src/core/settings.h
     src/core/batterymanager.h
-    src/core/batterydrainer.h
     src/core/accessibilitymanager.h
     src/core/profilestorage.h
     src/core/translationmanager.h

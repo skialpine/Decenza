@@ -31,8 +31,7 @@ src/
 │   └── shotdatamodel.*     # Shot data for graphing
 ├── core/
 │   ├── settings.*          # QSettings persistence
-│   ├── batterymanager.*    # Smart charging control
-│   └── batterydrainer.*    # Battery drain test utility
+│   └── batterymanager.*    # Smart charging control
 ├── network/
 │   ├── visualizeruploader.*  # Upload shots to visualizer.coffee
 │   └── visualizerimporter.*  # Import profiles from visualizer.coffee
@@ -163,12 +162,6 @@ Supported metadata fields:
 - **On** (default): Maintains 55-65% charge
 - **Night**: Maintains 90-95% charge
 - Commands sent every 60 seconds with `force=true` to overcome DE1 timeout
-
-### Battery Drainer (testing utility)
-- Spawns CPU workers on all cores (heavy math: primes, trig, matrix ops)
-- Enables max screen brightness and flashlight (Android JNI)
-- Real CPU usage from `/proc/stat`, GPU usage from sysfs (device-specific)
-- Full-screen overlay with tap-to-stop
 
 ## Platforms
 

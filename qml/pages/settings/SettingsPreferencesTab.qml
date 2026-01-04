@@ -317,26 +317,6 @@ Item {
                         }
                     }
 
-                    // Battery drain button for testing
-                    AccessibleButton {
-                        Layout.fillWidth: true
-                        text: BatteryDrainer.running ? TranslationManager.translate("settings.preferences.draining", "DRAINING... (tap to stop)") : TranslationManager.translate("settings.preferences.drainBattery", "Drain Battery (Test)")
-                        accessibleName: BatteryDrainer.running ? "Stop battery drain test" : "Start battery drain test"
-                        background: Rectangle {
-                            radius: Theme.scaled(6)
-                            color: BatteryDrainer.running ? Theme.errorColor : Theme.backgroundColor
-                            border.color: Theme.errorColor
-                            border.width: 1
-                        }
-                        contentItem: Text {
-                            text: parent.text
-                            color: BatteryDrainer.running ? "white" : Theme.errorColor
-                            font.pixelSize: Theme.scaled(12)
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                        onClicked: BatteryDrainer.toggle()
-                    }
                 }
             }
 

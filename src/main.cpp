@@ -19,7 +19,6 @@
 #include "core/settings.h"
 #include "core/translationmanager.h"
 #include "core/batterymanager.h"
-#include "core/batterydrainer.h"
 #include "core/accessibilitymanager.h"
 #include "core/profilestorage.h"
 #include "ble/blemanager.h"
@@ -99,7 +98,6 @@ int main(int argc, char *argv[])
     BatteryManager batteryManager;
     batteryManager.setDE1Device(&de1Device);
     batteryManager.setSettings(&settings);
-    BatteryDrainer batteryDrainer;
     AccessibilityManager accessibilityManager;
     accessibilityManager.setTranslationManager(&translationManager);
 
@@ -240,7 +238,6 @@ int main(int argc, char *argv[])
     context->setContextProperty("MainController", &mainController);
     context->setContextProperty("ScreensaverManager", &screensaverManager);
     context->setContextProperty("BatteryManager", &batteryManager);
-    context->setContextProperty("BatteryDrainer", &batteryDrainer);
     context->setContextProperty("AccessibilityManager", &accessibilityManager);
     context->setContextProperty("ProfileStorage", &profileStorage);
     context->setContextProperty("AppVersion", VERSION_STRING);

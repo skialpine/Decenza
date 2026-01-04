@@ -95,63 +95,6 @@ Item {
                 }
             }
 
-            // Battery Drainer section (Android only)
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: Theme.scaled(150)
-                color: Theme.surfaceColor
-                radius: Theme.cardRadius
-                visible: Qt.platform.os === "android"
-
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: Theme.scaled(15)
-                    spacing: Theme.scaled(12)
-
-                    Tr {
-                        key: "settings.debug.batteryDrainTest"
-                        fallback: "Battery Drain Test"
-                        color: Theme.textColor
-                        font.pixelSize: Theme.scaled(16)
-                        font.bold: true
-                    }
-
-                    Tr {
-                        Layout.fillWidth: true
-                        key: "settings.debug.batteryDrainTestDesc"
-                        fallback: "Drains battery by maxing CPU, GPU, screen brightness and flashlight. Useful for testing smart charging."
-                        color: Theme.textSecondaryColor
-                        font.pixelSize: Theme.scaled(12)
-                        wrapMode: Text.Wrap
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: Theme.scaled(20)
-
-                        Text {
-                            text: BatteryDrainer.running ? "Draining... Tap overlay to stop" : "Battery: " + BatteryManager.batteryPercent + "%"
-                            color: BatteryDrainer.running ? Theme.warningColor : Theme.textColor
-                            font.pixelSize: Theme.scaled(14)
-                        }
-
-                        Item { Layout.fillWidth: true }
-
-                        AccessibleButton {
-                            text: BatteryDrainer.running ? "Stop" : "Start Drain"
-                            accessibleName: BatteryDrainer.running ? "Stop battery drain" : "Start battery drain test"
-                            onClicked: {
-                                if (BatteryDrainer.running) {
-                                    BatteryDrainer.stop()
-                                } else {
-                                    BatteryDrainer.start()
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
             // Window Resolution section (Windows/desktop only)
             Rectangle {
                 id: resolutionSection
