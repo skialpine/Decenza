@@ -231,7 +231,7 @@ Item {
                     spacing: Theme.scaled(10)
                     visible: !MainController.updateChecker.checking && !MainController.updateChecker.downloading
 
-                    Button {
+                    StyledButton {
                         text: TranslationManager.translate("settings.update.checknow", "Check Now")
                         enabled: !MainController.updateChecker.checking
                         onClicked: MainController.updateChecker.checkForUpdates()
@@ -254,7 +254,7 @@ Item {
                         }
                     }
 
-                    Button {
+                    StyledButton {
                         text: TranslationManager.translate("settings.update.downloadinstall", "Download & Install")
                         visible: MainController.updateChecker.updateAvailable
                         onClicked: MainController.updateChecker.downloadAndInstall()
@@ -275,7 +275,7 @@ Item {
                         }
                     }
 
-                    Button {
+                    StyledButton {
                         text: TranslationManager.translate("settings.update.whatsnew", "What's New?")
                         visible: MainController.updateChecker.releaseNotes !== ""
                         onClicked: releaseNotesPopup.open()
@@ -357,7 +357,7 @@ Item {
 
                     Item { Layout.fillWidth: true }
 
-                    Button {
+                    StyledButton {
                         text: "X"
                         onClicked: releaseNotesPopup.close()
 

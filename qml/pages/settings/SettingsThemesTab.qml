@@ -132,7 +132,7 @@ Item {
                     Layout.fillWidth: true
                     spacing: Theme.spacingSmall
 
-                    Button {
+                    StyledButton {
                         text: TranslationManager.translate("settings.themes.reset", "Reset")
                         onClicked: Settings.resetThemeToDefault()
                         background: Rectangle {
@@ -287,7 +287,7 @@ Item {
                 }
 
                 // Random theme button
-                Button {
+                StyledButton {
                     Layout.fillWidth: true
                     property string buttonText: TranslationManager.translate("settings.themes.randomTheme", "Random Theme")
                     text: buttonText

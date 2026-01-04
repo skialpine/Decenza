@@ -172,7 +172,7 @@ Page {
                         spacing: Theme.spacingMedium
 
                         // Import Profile button (requires 4-char code)
-                        Button {
+                        StyledButton {
                             id: importButton
                             enabled: shareCodeInput.text.length === 4 && !MainController.visualizerImporter.importing
                             width: Theme.scaled(160)
@@ -199,7 +199,7 @@ Page {
                         }
 
                         // Import Shared button (opens multi-import page)
-                        Button {
+                        StyledButton {
                             id: importSharedButton
                             height: Theme.scaled(50)
 
@@ -327,7 +327,7 @@ Page {
                         spacing: Theme.spacingMedium
                         anchors.horizontalCenter: parent.horizontalCenter
 
-                        Button {
+                        StyledButton {
                             id: overwriteButton
                             Tr { id: trOverwrite; key: "visualizer.button.overwrite"; fallback: "Overwrite"; visible: false }
                             onClicked: {
@@ -349,7 +349,7 @@ Page {
                             }
                         }
 
-                        Button {
+                        StyledButton {
                             id: saveAsNewButton
                             Tr { id: trSaveAsNew; key: "visualizer.button.saveAsNew"; fallback: "Save as New"; visible: false }
                             onClicked: {
@@ -371,7 +371,7 @@ Page {
                             }
                         }
 
-                        Button {
+                        StyledButton {
                             id: cancelButton
                             Tr { id: trCancel; key: "visualizer.button.cancel"; fallback: "Cancel"; visible: false }
                             onClicked: hideDuplicateDialog()
@@ -473,7 +473,7 @@ Page {
                         spacing: Theme.spacingMedium
                         anchors.horizontalCenter: parent.horizontalCenter
 
-                        Button {
+                        StyledButton {
                             id: saveButton
                             Tr { id: trSave; key: "visualizer.button.save"; fallback: "Save"; visible: false }
                             enabled: newNameInput.text.trim().length > 0
@@ -496,7 +496,7 @@ Page {
                             }
                         }
 
-                        Button {
+                        StyledButton {
                             id: backButton
                             Tr { id: trBack; key: "visualizer.button.back"; fallback: "Back"; visible: false }
                             onClicked: showingNameInput = false

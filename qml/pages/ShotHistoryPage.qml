@@ -112,7 +112,7 @@ Page {
                 Layout.fillWidth: true
             }
 
-            Button {
+            StyledButton {
                 text: TranslationManager.translate("shothistory.clear", "Clear")
                 onClicked: clearSelection()
 
@@ -131,7 +131,7 @@ Page {
                 }
             }
 
-            Button {
+            StyledButton {
                 text: TranslationManager.translate("shothistory.compare", "Compare")
                 enabled: selectedShots.length >= 2
                 onClicked: openComparison()

@@ -326,7 +326,7 @@ Page {
                 Layout.fillWidth: true
                 spacing: Theme.spacingMedium
 
-                Button {
+                StyledButton {
                     text: TranslationManager.translate("shotdetail.viewdebuglog", "View Debug Log")
                     Layout.fillWidth: true
                     onClicked: debugLogDialog.open()
@@ -346,7 +346,7 @@ Page {
                     }
                 }
 
-                Button {
+                StyledButton {
                     text: TranslationManager.translate("shotdetail.deleteshot", "Delete Shot")
                     Layout.fillWidth: true
                     onClicked: deleteConfirmDialog.open()

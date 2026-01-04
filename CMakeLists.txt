@@ -277,6 +277,7 @@ set(QML_FILES
     qml/components/HistoryShotGraph.qml
     qml/components/StyledSwitch.qml
     qml/components/StyledComboBox.qml
+    qml/components/StyledButton.qml
 )
 
 # Simulator QML - Windows Debug only

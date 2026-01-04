@@ -1221,7 +1221,7 @@ Page {
                 Layout.fillWidth: true
                 spacing: Theme.spacingSmall
 
-                Button {
+                StyledButton {
                     Layout.fillWidth: true
                     property string buttonText: TranslationManager.translate("common.cancel", "Cancel")
                     text: buttonText
@@ -1240,7 +1240,7 @@ Page {
                     }
                 }
 
-                Button {
+                StyledButton {
                     Layout.fillWidth: true
                     property string buttonText: TranslationManager.translate("common.save", "Save")
                     text: buttonText

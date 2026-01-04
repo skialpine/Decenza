@@ -154,7 +154,7 @@ Item {
                     Layout.fillWidth: true
                     spacing: Theme.spacingSmall
 
-                    Button {
+                    StyledButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: Theme.scaled(48)
                         text: "Add..."
@@ -181,7 +181,7 @@ Item {
                     }
 
                     // Delete button - temporarily visible
-                    Button {
+                    StyledButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: Theme.scaled(48)
                         visible: true
@@ -210,7 +210,7 @@ Item {
                         }
                     }
 
-                    Button {
+                    StyledButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: Theme.scaled(48)
                         text: TranslationManager.downloading ? "..." : "Update"
@@ -361,7 +361,7 @@ Item {
                 }
 
                 // Browse strings button
-                Button {
+                StyledButton {
                     Layout.fillWidth: true
                     text: TranslationManager.currentLanguage === "en" ? "Browse & Customize Strings..." : "Browse & Translate Strings..."
 
@@ -389,7 +389,7 @@ Item {
                 Item { Layout.fillHeight: true }
 
                 // Submit to community button (not for English, developer mode only)
-                Button {
+                StyledButton {
                     Layout.fillWidth: true
                     text: TranslationManager.uploading ? "Uploading..." : "Submit to Community"
                     visible: TranslationManager.currentLanguage !== "en" && Settings.developerTranslationUpload
@@ -462,7 +462,7 @@ Item {
                 width: parent.width
                 spacing: Theme.spacingSmall
 
-                Button {
+                StyledButton {
                     width: (parent.width - Theme.spacingSmall) / 2
                     text: "Cancel"
 
@@ -485,7 +485,7 @@ Item {
                     onClicked: deleteConfirmPopup.close()
                 }
 
-                Button {
+                StyledButton {
                     width: (parent.width - Theme.spacingSmall) / 2
                     text: "Delete"
 
@@ -584,7 +584,7 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
             }
 
-            Button {
+            StyledButton {
                 width: parent.width
                 text: "OK"
 

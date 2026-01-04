@@ -209,7 +209,7 @@ Page {
             Item { Layout.fillWidth: true }
 
             // Refresh button
-            Button {
+            StyledButton {
                 id: refreshButton
                 Layout.preferredWidth: Theme.scaled(100)
                 Layout.preferredHeight: Theme.scaled(40)
@@ -240,7 +240,7 @@ Page {
                 spacing: Theme.spacingSmall
                 visible: !MainController.visualizerImporter.fetching
 
-                Button {
+                StyledButton {
                     id: addByCodeButton
                     width: Theme.scaled(120)
                     height: Theme.scaled(40)
@@ -304,7 +304,7 @@ Page {
                         Keys.onEscapePressed: showCodeInput = false
                     }
 
-                    Button {
+                    StyledButton {
                         width: Theme.scaled(60)
                         height: Theme.scaled(40)
                         enabled: codeInput.text.length === 4
@@ -328,7 +328,7 @@ Page {
                         }
                     }
 
-                    Button {
+                    StyledButton {
                         width: Theme.scaled(60)
                         height: Theme.scaled(40)
 
@@ -895,7 +895,7 @@ Page {
                 }
             }
 
-            Button {
+            StyledButton {
                 Layout.preferredWidth: Theme.scaled(80)
                 Layout.preferredHeight: Theme.scaled(44)
                 enabled: renameInput.text.trim().length > 0
@@ -921,7 +921,7 @@ Page {
                 }
             }
 
-            Button {
+            StyledButton {
                 Layout.preferredWidth: Theme.scaled(80)
                 Layout.preferredHeight: Theme.scaled(44)
 

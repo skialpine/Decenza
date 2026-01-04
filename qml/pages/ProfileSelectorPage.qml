@@ -119,7 +119,7 @@ Page {
 
                     Item { Layout.fillWidth: true }
 
-                    Button {
+                    StyledButton {
                         visible: viewFilter.currentIndex === 1  // Cleaning/Descale view
                         text: TranslationManager.translate("profileselector.button.descaling_wizard", "Descaling Wizard")
                         Layout.preferredHeight: Theme.scaled(44)
@@ -142,7 +142,7 @@ Page {
                         }
                     }
 
-                    Button {
+                    StyledButton {
                         text: TranslationManager.translate("profileselector.button.import_visualizer", "Import from Visualizer")
                         Layout.preferredHeight: Theme.scaled(44)
                         onClicked: root.goToVisualizerBrowser()
@@ -723,7 +723,7 @@ Page {
                 Layout.fillWidth: true
                 spacing: Theme.scaled(10)
 
-                Button {
+                StyledButton {
                     Layout.fillWidth: true
                     text: TranslationManager.translate("profileselector.button.cancel", "Cancel")
                     onClicked: deleteDialog.close()
@@ -742,7 +742,7 @@ Page {
                     }
                 }
 
-                Button {
+                StyledButton {
                     Layout.fillWidth: true
                     text: TranslationManager.translate("profileselector.button.delete", "Delete")
                     onClicked: {

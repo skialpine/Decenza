@@ -733,7 +733,7 @@ ApplicationWindow {
                 spacing: Theme.spacingMedium
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                Button {
+                StyledButton {
                     text: TranslationManager.translate("update.later", "Later")
                     onClicked: {
                         if (MainController.updateChecker) {
@@ -755,7 +755,7 @@ ApplicationWindow {
                     }
                 }
 
-                Button {
+                StyledButton {
                     text: TranslationManager.translate("update.updatenow", "Update Now")
                     onClicked: {
                         if (MainController.updateChecker) {
