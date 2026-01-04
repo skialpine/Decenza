@@ -31,6 +31,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     Widgets
     Qml
     Quick
+    Quick3D
     QuickControls2
     Bluetooth
     Charts
@@ -198,6 +199,7 @@ target_link_libraries(Decenza_DE1 PRIVATE
     Qt6::Widgets
     Qt6::Qml
     Qt6::Quick
+    Qt6::Quick3D
     Qt6::QuickControls2
     Qt6::Bluetooth
     Qt6::Charts
@@ -276,6 +278,7 @@ set(QML_FILES
     qml/components/StyledSwitch.qml
     qml/components/StyledComboBox.qml
     qml/components/StyledButton.qml
+    qml/components/PipesScreensaver.qml
 )
 
 # Simulator QML - Windows Debug only

@@ -210,6 +210,7 @@ signals:
     void imageDisplayDurationChanged();
     void personalMediaChanged();
     void showDateOnPersonalChanged();
+    void screensaverTypeChanged();
 
 private slots:
     void onCategoriesReplyFinished();
@@ -308,6 +309,9 @@ private:
     // Personal media state
     QList<VideoItem> m_personalCatalog;
     bool m_showDateOnPersonal = false;
+
+    // Screensaver type
+    QString m_screensaverType = "videos";
 
     // Constants
     static const QString BASE_URL;

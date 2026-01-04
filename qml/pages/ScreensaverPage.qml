@@ -4,10 +4,19 @@ import QtMultimedia
 import DecenzaDE1
 import "../components"
 
+// Screensaver mode enum
+// "videos" - Video/image slideshow from catalog
+// "pipes" - Classic 3D pipes animation
+
 Page {
     id: screensaverPage
     objectName: "screensaverPage"
     background: Rectangle { color: "black" }
+
+    // Current screensaver mode
+    property string screensaverType: ScreensaverManager.screensaverType
+    property bool isVideosMode: screensaverType === "videos"
+    property bool isPipesMode: screensaverType === "pipes"
 
     property int videoFailCount: 0
     property bool mediaPlaying: false
@@ -19,7 +28,9 @@ Page {
     Component.onCompleted: {
         // Keep screen on while screensaver is active
         ScreensaverManager.setKeepScreenOn(true)
-        playNextMedia()
+        if (isVideosMode) {
+            playNextMedia()
+        }
     }
 
     // Listen for new media becoming available (downloaded)
@@ -157,14 +168,14 @@ Page {
         id: videoOutput
         anchors.fill: parent
         fillMode: VideoOutput.PreserveAspectCrop
-        visible: mediaPlaying && !isCurrentItemImage
+        visible: isVideosMode && mediaPlaying && !isCurrentItemImage
     }
 
     // Image display with cross-fade transition
     Item {
         id: imageContainer
         anchors.fill: parent
-        visible: mediaPlaying && isCurrentItemImage
+        visible: isVideosMode && mediaPlaying && isCurrentItemImage
 
         // Two images for cross-fade effect (2 second dissolve)
         Image {
@@ -206,11 +217,20 @@ Page {
         }
     }
 
-    // Fallback: show a subtle animation while no cached media
+    // 3D Pipes screensaver
+    PipesScreensaver {
+        id: pipesScreensaver
+        anchors.fill: parent
+        visible: isPipesMode
+        running: isPipesMode && screensaverPage.visible
+        z: 1
+    }
+
+    // Fallback: show a subtle animation while no cached media (videos mode only)
     Rectangle {
         id: fallbackBackground
         anchors.fill: parent
-        visible: !mediaPlaying || (!isCurrentItemImage && mediaPlayer.playbackState !== MediaPlayer.PlayingState)
+        visible: isVideosMode && (!mediaPlaying || (!isCurrentItemImage && mediaPlayer.playbackState !== MediaPlayer.PlayingState))
         z: 1
 
         Rectangle {
@@ -252,7 +272,8 @@ Page {
                                ScreensaverManager.showDateOnPersonal &&
                                ScreensaverManager.currentMediaDate.length > 0
 
-        visible: (showDate || ScreensaverManager.currentVideoAuthor.length > 0) &&
+        visible: isVideosMode &&
+                 (showDate || ScreensaverManager.currentVideoAuthor.length > 0) &&
                  (mediaPlayer.playbackState === MediaPlayer.PlayingState ||
                   (isCurrentItemImage && mediaPlaying))
 
@@ -298,7 +319,7 @@ Page {
         }
     }
 
-    // Download progress indicator (subtle)
+    // Download progress indicator (subtle, videos mode only)
     Rectangle {
         z: 2
         anchors.top: parent.top
@@ -306,7 +327,7 @@ Page {
         anchors.right: parent.right
         height: Theme.scaled(3)
         color: "transparent"
-        visible: ScreensaverManager.isDownloading
+        visible: isVideosMode && ScreensaverManager.isDownloading
 
         Rectangle {
             anchors.left: parent.left

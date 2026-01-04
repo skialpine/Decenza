@@ -1,61 +1,60 @@
 import QtQuick
+import QtQuick3D
+import QtQuick3D.Helpers
 
 Item {
     id: root
 
-    property int pipeCount: 3
+    property int pipeCount: 4
     property real speed: 1.0
     property bool running: true
 
-    // 3D scene parameters
-    readonly property real fov: 400  // Field of view for perspective
-    readonly property real cameraZ: -500
-    readonly property vector3d sceneCenter: Qt.vector3d(width / 2, height / 2, 300)
-
-    // Pipe colors - classic Windows screensaver palette
+    // Pipe colors - metallic materials
     readonly property var pipeColors: [
         "#C0C0C0",  // Silver
         "#FFD700",  // Gold
-        "#CD7F32",  // Bronze/Copper
+        "#CD7F32",  // Bronze
         "#4169E1",  // Royal Blue
         "#DC143C",  // Crimson
         "#228B22",  // Forest Green
         "#9932CC",  // Dark Orchid
-        "#FF6347"   // Tomato
+        "#00CED1"   // Dark Turquoise
     ]
 
-    // Active pipes data
+    // Scene bounds
+    readonly property real sceneSize: 400
+    readonly property real pipeRadius: 8
+    readonly property real jointRadius: 12
+    readonly property real segmentLength: 60
+
+    // Pipe data storage
     property var pipes: []
-    property int segmentCounter: 0
+    property var segmentNodes: []
 
     Component.onCompleted: {
         initializePipes()
     }
 
     function initializePipes() {
-        pipes = []
-        for (var i = 0; i < pipeCount; i++) {
-            pipes.push(createNewPipe(i))
+        // Clear existing segments
+        for (var i = 0; i < segmentNodes.length; i++) {
+            segmentNodes[i].destroy()
         }
-        segmentCounter = 0
-    }
+        segmentNodes = []
+        pipes = []
 
-    function createNewPipe(index) {
-        var colorIndex = index % pipeColors.length
-        return {
-            segments: [],
-            currentPos: Qt.vector3d(
-                Math.random() * width * 0.6 + width * 0.2,
-                Math.random() * height * 0.6 + height * 0.2,
-                Math.random() * 400 + 100
-            ),
-            direction: randomDirection(),
-            color: pipeColors[colorIndex],
-            pipeRadius: 12 + Math.random() * 8,
-            segmentLength: 40 + Math.random() * 30,
-            turnsUntilChange: Math.floor(Math.random() * 5) + 2,
-            moveCounter: 0,
-            active: true
+        for (var p = 0; p < pipeCount; p++) {
+            pipes.push({
+                pos: Qt.vector3d(
+                    (Math.random() - 0.5) * sceneSize * 0.6,
+                    (Math.random() - 0.5) * sceneSize * 0.6,
+                    (Math.random() - 0.5) * sceneSize * 0.6
+                ),
+                dir: randomDirection(),
+                colorIndex: p % pipeColors.length,
+                turnsLeft: Math.floor(Math.random() * 4) + 2,
+                segmentCount: 0
+            })
         }
     }
 
@@ -68,246 +67,257 @@ Item {
         return dirs[Math.floor(Math.random() * dirs.length)]
     }
 
-    function getPerpendicularDirection(current) {
+    function perpendicularDirection(current) {
         var options = []
         if (Math.abs(current.x) > 0.5) {
-            options = [
-                Qt.vector3d(0, 1, 0), Qt.vector3d(0, -1, 0),
-                Qt.vector3d(0, 0, 1), Qt.vector3d(0, 0, -1)
-            ]
+            options = [Qt.vector3d(0, 1, 0), Qt.vector3d(0, -1, 0),
+                       Qt.vector3d(0, 0, 1), Qt.vector3d(0, 0, -1)]
         } else if (Math.abs(current.y) > 0.5) {
-            options = [
-                Qt.vector3d(1, 0, 0), Qt.vector3d(-1, 0, 0),
-                Qt.vector3d(0, 0, 1), Qt.vector3d(0, 0, -1)
-            ]
+            options = [Qt.vector3d(1, 0, 0), Qt.vector3d(-1, 0, 0),
+                       Qt.vector3d(0, 0, 1), Qt.vector3d(0, 0, -1)]
         } else {
-            options = [
-                Qt.vector3d(1, 0, 0), Qt.vector3d(-1, 0, 0),
-                Qt.vector3d(0, 1, 0), Qt.vector3d(0, -1, 0)
-            ]
+            options = [Qt.vector3d(1, 0, 0), Qt.vector3d(-1, 0, 0),
+                       Qt.vector3d(0, 1, 0), Qt.vector3d(0, -1, 0)]
         }
         return options[Math.floor(Math.random() * options.length)]
     }
 
-    function project3Dto2D(pos3d) {
-        var z = pos3d.z - cameraZ
-        if (z <= 0) z = 1
-        var scale = fov / z
-        return {
-            x: sceneCenter.x + (pos3d.x - sceneCenter.x) * scale,
-            y: sceneCenter.y + (pos3d.y - sceneCenter.y) * scale,
-            scale: scale,
-            z: pos3d.z
+    function isOutOfBounds(pos) {
+        var limit = sceneSize * 0.45
+        return Math.abs(pos.x) > limit || Math.abs(pos.y) > limit || Math.abs(pos.z) > limit
+    }
+
+    function directionToRotation(dir) {
+        // Cylinder default orientation is along Y axis
+        // We need to rotate it to align with the direction
+        if (Math.abs(dir.y) > 0.5) {
+            // Already along Y
+            return Qt.vector3d(0, 0, 0)
+        } else if (Math.abs(dir.x) > 0.5) {
+            // Along X - rotate 90 degrees around Z
+            return Qt.vector3d(0, 0, 90)
+        } else {
+            // Along Z - rotate 90 degrees around X
+            return Qt.vector3d(90, 0, 0)
         }
     }
 
-    function isOutOfBounds(pos) {
-        var margin = 100
-        return pos.x < -margin || pos.x > width + margin ||
-               pos.y < -margin || pos.y > height + margin ||
-               pos.z < -100 || pos.z > 800
+    function addPipeSegment(pipeIndex) {
+        var pipe = pipes[pipeIndex]
+        var startPos = pipe.pos
+        var endPos = Qt.vector3d(
+            startPos.x + pipe.dir.x * segmentLength,
+            startPos.y + pipe.dir.y * segmentLength,
+            startPos.z + pipe.dir.z * segmentLength
+        )
+
+        // Calculate midpoint for cylinder position
+        var midPoint = Qt.vector3d(
+            (startPos.x + endPos.x) / 2,
+            (startPos.y + endPos.y) / 2,
+            (startPos.z + endPos.z) / 2
+        )
+
+        var rotation = directionToRotation(pipe.dir)
+        var color = pipeColors[pipe.colorIndex]
+
+        // Create cylinder segment
+        var cylinder = cylinderComponent.createObject(sceneRoot, {
+            "position": midPoint,
+            "eulerRotation": rotation,
+            "pipeColor": color,
+            "segmentLength": segmentLength
+        })
+        segmentNodes.push(cylinder)
+
+        // Create joint sphere at the end
+        var joint = jointComponent.createObject(sceneRoot, {
+            "position": endPos,
+            "pipeColor": color
+        })
+        segmentNodes.push(joint)
+
+        // Update pipe state
+        pipe.pos = endPos
+        pipe.turnsLeft--
+        pipe.segmentCount++
+
+        // Change direction if needed
+        if (pipe.turnsLeft <= 0) {
+            pipe.dir = perpendicularDirection(pipe.dir)
+            pipe.turnsLeft = Math.floor(Math.random() * 5) + 2
+        }
+
+        // Reset pipe if out of bounds or too long
+        if (isOutOfBounds(endPos) || pipe.segmentCount > 25) {
+            pipe.pos = Qt.vector3d(
+                (Math.random() - 0.5) * sceneSize * 0.5,
+                (Math.random() - 0.5) * sceneSize * 0.5,
+                (Math.random() - 0.5) * sceneSize * 0.5
+            )
+            pipe.dir = randomDirection()
+            pipe.colorIndex = (pipe.colorIndex + 1) % pipeColors.length
+            pipe.turnsLeft = Math.floor(Math.random() * 4) + 2
+            pipe.segmentCount = 0
+        }
+
+        // Limit total segments to prevent memory growth
+        while (segmentNodes.length > 300) {
+            var old = segmentNodes.shift()
+            old.destroy()
+        }
     }
 
     Timer {
-        id: animationTimer
-        interval: 50
+        id: growTimer
+        interval: 80 / speed
         running: root.running && root.visible
         repeat: true
         onTriggered: {
-            updatePipes()
-            canvas.requestPaint()
-        }
-    }
-
-    function updatePipes() {
-        for (var i = 0; i < pipes.length; i++) {
-            var pipe = pipes[i]
-            if (!pipe.active) continue
-
-            pipe.moveCounter++
-
-            // Add segment at regular intervals
-            if (pipe.moveCounter >= 3) {
-                pipe.moveCounter = 0
-
-                var startPos = pipe.currentPos
-                var endPos = Qt.vector3d(
-                    startPos.x + pipe.direction.x * pipe.segmentLength,
-                    startPos.y + pipe.direction.y * pipe.segmentLength,
-                    startPos.z + pipe.direction.z * pipe.segmentLength
-                )
-
-                // Add segment with joint info
-                var hasJoint = pipe.turnsUntilChange <= 0
-                pipe.segments.push({
-                    start: startPos,
-                    end: endPos,
-                    hasJoint: hasJoint,
-                    radius: pipe.pipeRadius
-                })
-
-                pipe.currentPos = endPos
-                pipe.turnsUntilChange--
-
-                // Change direction
-                if (pipe.turnsUntilChange <= 0) {
-                    pipe.direction = getPerpendicularDirection(pipe.direction)
-                    pipe.turnsUntilChange = Math.floor(Math.random() * 6) + 2
-                }
-
-                // Check bounds and reset if needed
-                if (isOutOfBounds(endPos)) {
-                    // Reset this pipe
-                    pipes[i] = createNewPipe(i)
-                }
-
-                // Limit segment count per pipe
-                if (pipe.segments.length > 100) {
-                    pipe.segments.shift()
-                }
-            }
-        }
-
-        segmentCounter++
-
-        // Periodically reset all pipes to prevent infinite growth
-        if (segmentCounter > 500) {
-            initializePipes()
-        }
-    }
-
-    Canvas {
-        id: canvas
-        anchors.fill: parent
-
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.reset()
-
-            // Dark background with slight gradient
-            var bgGrad = ctx.createLinearGradient(0, 0, 0, height)
-            bgGrad.addColorStop(0, "#0a0a1a")
-            bgGrad.addColorStop(1, "#000008")
-            ctx.fillStyle = bgGrad
-            ctx.fillRect(0, 0, width, height)
-
-            // Collect all segments with their depth for sorting
-            var allSegments = []
-
             for (var i = 0; i < pipes.length; i++) {
-                var pipe = pipes[i]
-                for (var j = 0; j < pipe.segments.length; j++) {
-                    var seg = pipe.segments[j]
-                    var avgZ = (seg.start.z + seg.end.z) / 2
-                    allSegments.push({
-                        segment: seg,
-                        color: pipe.color,
-                        depth: avgZ
-                    })
-                }
+                addPipeSegment(i)
             }
-
-            // Sort by depth (back to front)
-            allSegments.sort(function(a, b) { return a.depth - b.depth })
-
-            // Draw segments
-            for (var k = 0; k < allSegments.length; k++) {
-                drawPipeSegment(ctx, allSegments[k].segment, allSegments[k].color)
-            }
-        }
-
-        function drawPipeSegment(ctx, seg, color) {
-            var start2d = project3Dto2D(seg.start)
-            var end2d = project3Dto2D(seg.end)
-
-            var avgScale = (start2d.scale + end2d.scale) / 2
-            var lineWidth = seg.radius * avgScale * 2
-
-            if (lineWidth < 1) return  // Skip very small segments
-
-            // Calculate pipe gradient for 3D effect
-            var dx = end2d.x - start2d.x
-            var dy = end2d.y - start2d.y
-            var len = Math.sqrt(dx * dx + dy * dy)
-
-            if (len < 0.5) {
-                // Draw joint ball
-                drawJoint(ctx, start2d, seg.radius * avgScale, color)
-                return
-            }
-
-            // Perpendicular direction for gradient
-            var perpX = -dy / len
-            var perpY = dx / len
-            var gradOffset = lineWidth / 2
-
-            var midX = (start2d.x + end2d.x) / 2
-            var midY = (start2d.y + end2d.y) / 2
-
-            // Create gradient across the pipe for 3D cylinder look
-            var grad = ctx.createLinearGradient(
-                midX - perpX * gradOffset, midY - perpY * gradOffset,
-                midX + perpX * gradOffset, midY + perpY * gradOffset
-            )
-
-            var baseColor = Qt.darker(color, 1.5)
-            var highlightColor = Qt.lighter(color, 1.4)
-            var midColor = color
-
-            grad.addColorStop(0, baseColor.toString())
-            grad.addColorStop(0.3, highlightColor.toString())
-            grad.addColorStop(0.5, midColor.toString())
-            grad.addColorStop(0.7, midColor.toString())
-            grad.addColorStop(1, baseColor.toString())
-
-            ctx.strokeStyle = grad
-            ctx.lineWidth = lineWidth
-            ctx.lineCap = "round"
-            ctx.lineJoin = "round"
-
-            ctx.beginPath()
-            ctx.moveTo(start2d.x, start2d.y)
-            ctx.lineTo(end2d.x, end2d.y)
-            ctx.stroke()
-
-            // Draw joint if this segment has one
-            if (seg.hasJoint) {
-                drawJoint(ctx, end2d, seg.radius * avgScale * 1.3, color)
-            }
-        }
-
-        function drawJoint(ctx, pos, radius, color) {
-            if (radius < 2) return
-
-            // Draw a spherical joint with 3D shading
-            var grad = ctx.createRadialGradient(
-                pos.x - radius * 0.3, pos.y - radius * 0.3, 0,
-                pos.x, pos.y, radius
-            )
-
-            var highlightColor = Qt.lighter(color, 1.5)
-            var baseColor = Qt.darker(color, 1.3)
-
-            grad.addColorStop(0, highlightColor.toString())
-            grad.addColorStop(0.5, color.toString())
-            grad.addColorStop(1, baseColor.toString())
-
-            ctx.fillStyle = grad
-            ctx.beginPath()
-            ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2)
-            ctx.fill()
         }
     }
 
-    // Reset button (hidden, for programmatic reset)
+    // Slow camera orbit
+    property real cameraAngle: 0
+    NumberAnimation on cameraAngle {
+        from: 0
+        to: 360
+        duration: 60000
+        loops: Animation.Infinite
+        running: root.running && root.visible
+    }
+
+    View3D {
+        id: view3d
+        anchors.fill: parent
+        environment: sceneEnvironment
+
+        SceneEnvironment {
+            id: sceneEnvironment
+            clearColor: "#050510"
+            backgroundMode: SceneEnvironment.Color
+            antialiasingMode: SceneEnvironment.MSAA
+            antialiasingQuality: SceneEnvironment.High
+            temporalAAEnabled: true
+            temporalAAStrength: 1.0
+        }
+
+        // Orbiting camera
+        PerspectiveCamera {
+            id: camera
+            position: Qt.vector3d(
+                Math.cos(cameraAngle * Math.PI / 180) * 600,
+                150 + Math.sin(cameraAngle * 0.5 * Math.PI / 180) * 100,
+                Math.sin(cameraAngle * Math.PI / 180) * 600
+            )
+            eulerRotation.y: -cameraAngle
+            eulerRotation.x: -10
+            clipNear: 10
+            clipFar: 2000
+            fieldOfView: 50
+        }
+
+        // Lighting
+        DirectionalLight {
+            eulerRotation.x: -45
+            eulerRotation.y: -45
+            brightness: 1.0
+            ambientColor: Qt.rgba(0.2, 0.2, 0.25, 1.0)
+            color: "white"
+            castsShadow: true
+            shadowMapQuality: Light.ShadowMapQualityMedium
+        }
+
+        DirectionalLight {
+            eulerRotation.x: 30
+            eulerRotation.y: 135
+            brightness: 0.4
+            color: "#aaccff"
+        }
+
+        PointLight {
+            position: Qt.vector3d(0, 200, 0)
+            brightness: 0.3
+            color: "#ffffee"
+        }
+
+        // Root node for all pipe segments
+        Node {
+            id: sceneRoot
+        }
+    }
+
+    // Cylinder segment component
+    Component {
+        id: cylinderComponent
+
+        Model {
+            id: cylinderModel
+            property color pipeColor: "silver"
+            property real segmentLength: 60
+
+            source: "#Cylinder"
+            scale: Qt.vector3d(pipeRadius / 50, segmentLength / 100, pipeRadius / 50)
+
+            materials: [
+                PrincipledMaterial {
+                    baseColor: cylinderModel.pipeColor
+                    metalness: 0.9
+                    roughness: 0.25
+                    specularAmount: 1.0
+                }
+            ]
+
+            // Fade in animation
+            opacity: 0
+            NumberAnimation on opacity {
+                from: 0
+                to: 1
+                duration: 200
+                running: true
+            }
+        }
+    }
+
+    // Joint sphere component
+    Component {
+        id: jointComponent
+
+        Model {
+            id: jointModel
+            property color pipeColor: "silver"
+
+            source: "#Sphere"
+            scale: Qt.vector3d(jointRadius / 50, jointRadius / 50, jointRadius / 50)
+
+            materials: [
+                PrincipledMaterial {
+                    baseColor: jointModel.pipeColor
+                    metalness: 0.9
+                    roughness: 0.2
+                    specularAmount: 1.0
+                }
+            ]
+
+            opacity: 0
+            NumberAnimation on opacity {
+                from: 0
+                to: 1
+                duration: 200
+                running: true
+            }
+        }
+    }
+
     function reset() {
         initializePipes()
-        canvas.requestPaint()
     }
 
-    // Adjust pipe count
     function setPipeCount(count) {
-        pipeCount = Math.max(1, Math.min(10, count))
+        pipeCount = Math.max(1, Math.min(8, count))
         initializePipes()
     }
 }

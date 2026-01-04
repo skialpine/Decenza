@@ -11,12 +11,13 @@ Item {
         anchors.fill: parent
         spacing: Theme.scaled(15)
 
-        // Category selector
+        // Category selector (videos mode only)
         Rectangle {
             Layout.preferredWidth: Theme.scaled(250)
             Layout.fillHeight: true
             color: Theme.surfaceColor
             radius: Theme.cardRadius
+            visible: ScreensaverManager.screensaverType === "videos"
 
             ColumnLayout {
                 anchors.fill: parent
@@ -116,10 +117,41 @@ Item {
                     font.bold: true
                 }
 
-                // Status row
+                // Screensaver type selector
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.scaled(15)
+
+                    Tr {
+                        key: "settings.screensaver.type"
+                        fallback: "Type"
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(14)
+                    }
+
+                    StyledComboBox {
+                        id: typeComboBox
+                        Layout.preferredWidth: Theme.scaled(180)
+                        model: [
+                            { value: "videos", text: TranslationManager.translate("settings.screensaver.type.videos", "Videos & Images") },
+                            { value: "pipes", text: TranslationManager.translate("settings.screensaver.type.pipes", "3D Pipes") }
+                        ]
+                        textRole: "text"
+                        valueRole: "value"
+                        currentIndex: ScreensaverManager.screensaverType === "pipes" ? 1 : 0
+                        onActivated: {
+                            ScreensaverManager.screensaverType = model[currentIndex].value
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+                }
+
+                // Status row (only visible for videos mode)
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Theme.scaled(20)
+                    visible: ScreensaverManager.screensaverType === "videos"
 
                     ColumnLayout {
                         spacing: Theme.scaled(4)
@@ -177,13 +209,13 @@ Item {
                     Item { Layout.fillWidth: true }
                 }
 
-                // Download progress
+                // Download progress (videos mode only)
                 Rectangle {
                     Layout.fillWidth: true
                     height: Theme.scaled(6)
                     radius: Theme.scaled(3)
                     color: Qt.darker(Theme.surfaceColor, 1.3)
-                    visible: ScreensaverManager.isDownloading
+                    visible: ScreensaverManager.screensaverType === "videos" && ScreensaverManager.isDownloading
 
                     Rectangle {
                         width: parent.width * ScreensaverManager.downloadProgress
@@ -216,8 +248,10 @@ Item {
                         }
                     }
 
+                    // Cache toggle - videos mode only
                     RowLayout {
                         spacing: Theme.scaled(10)
+                        visible: ScreensaverManager.screensaverType === "videos"
 
                         Tr {
                             key: "settings.screensaver.cacheVideos"
@@ -232,10 +266,10 @@ Item {
                         }
                     }
 
-                    // Show date toggle - only visible for Personal category
+                    // Show date toggle - only visible for Personal category in videos mode
                     RowLayout {
                         spacing: Theme.scaled(10)
-                        visible: ScreensaverManager.isPersonalCategory
+                        visible: ScreensaverManager.screensaverType === "videos" && ScreensaverManager.isPersonalCategory
 
                         Tr {
                             key: "settings.screensaver.showDate"
@@ -255,10 +289,11 @@ Item {
 
                 Item { Layout.fillHeight: true }
 
-                // Action buttons
+                // Action buttons (videos mode only)
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Theme.scaled(10)
+                    visible: ScreensaverManager.screensaverType === "videos"
 
                     AccessibleButton {
                         text: TranslationManager.translate("settings.screensaver.refreshVideos", "Refresh Videos")

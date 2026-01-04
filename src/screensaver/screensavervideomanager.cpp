@@ -59,6 +59,7 @@ ScreensaverVideoManager::ScreensaverVideoManager(Settings* settings, ProfileStor
     m_selectedCategoryId = m_settings->value("screensaver/categoryId", DEFAULT_CATEGORY_ID).toString();
     m_imageDisplayDuration = m_settings->value("screensaver/imageDisplayDuration", 10).toInt();
     m_showDateOnPersonal = m_settings->value("screensaver/showDateOnPersonal", false).toBool();
+    m_screensaverType = m_settings->value("screensaver/type", "videos").toString();
 
     // Load cache index and personal catalog
     loadCacheIndex();
@@ -230,6 +231,15 @@ void ScreensaverVideoManager::setShowDateOnPersonal(bool show)
         m_showDateOnPersonal = show;
         m_settings->setValue("screensaver/showDateOnPersonal", show);
         emit showDateOnPersonalChanged();
+    }
+}
+
+void ScreensaverVideoManager::setScreensaverType(const QString& type)
+{
+    if (m_screensaverType != type && availableScreensaverTypes().contains(type)) {
+        m_screensaverType = type;
+        m_settings->setValue("screensaver/type", type);
+        emit screensaverTypeChanged();
     }
 }
 

@@ -58,7 +58,13 @@ ComboBox {
         height: Theme.scaled(36)
 
         contentItem: Text {
-            text: control.textRole ? model[control.textRole] : modelData
+            text: {
+                if (control.textRole && model[control.textRole] !== undefined)
+                    return model[control.textRole]
+                if (modelData !== undefined)
+                    return modelData
+                return ""
+            }
             font: Theme.bodyFont
             color: Theme.textColor
             verticalAlignment: Text.AlignVCenter
