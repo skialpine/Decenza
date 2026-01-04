@@ -99,6 +99,10 @@ class ScreensaverVideoManager : public QObject {
     Q_PROPERTY(bool isPersonalCategory READ isPersonalCategory NOTIFY selectedCategoryIdChanged)
     Q_PROPERTY(bool showDateOnPersonal READ showDateOnPersonal WRITE setShowDateOnPersonal NOTIFY showDateOnPersonalChanged)
 
+    // Screensaver type (videos, pipes, etc.)
+    Q_PROPERTY(QString screensaverType READ screensaverType WRITE setScreensaverType NOTIFY screensaverTypeChanged)
+    Q_PROPERTY(QStringList availableScreensaverTypes READ availableScreensaverTypes CONSTANT)
+
 public:
     explicit ScreensaverVideoManager(Settings* settings, ProfileStorage* profileStorage, QObject* parent = nullptr);
     ~ScreensaverVideoManager();
@@ -138,6 +142,10 @@ public:
     bool isPersonalCategory() const { return m_selectedCategoryId == "personal"; }
     bool showDateOnPersonal() const { return m_showDateOnPersonal; }
 
+    // Screensaver type
+    QString screensaverType() const { return m_screensaverType; }
+    QStringList availableScreensaverTypes() const { return {"videos", "pipes"}; }
+
     // Property setters
     void setEnabled(bool enabled);
     void setCatalogUrl(const QString& url);
@@ -147,6 +155,7 @@ public:
     void setSelectedCategoryId(const QString& categoryId);
     void setImageDisplayDuration(int seconds);
     void setShowDateOnPersonal(bool show);
+    void setScreensaverType(const QString& type);
 
 public slots:
     // Screen wake lock (prevents screen from turning off)
