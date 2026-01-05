@@ -315,25 +315,14 @@ Page {
 
                         // === Bloom Phase (Optional) ===
                         RecipeSection {
+                            id: bloomSection
                             title: qsTr("Bloom")
                             Layout.fillWidth: true
-
-                            CheckBox {
-                                id: bloomEnabledCheck
-                                text: qsTr("Enable bloom pause")
-                                checked: recipe.bloomEnabled || false
-                                onToggled: updateRecipe("bloomEnabled", checked)
-                                contentItem: Text {
-                                    text: parent.text
-                                    font: Theme.captionFont
-                                    color: Theme.textColor
-                                    leftPadding: parent.indicator.width + parent.spacing
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-                            }
+                            canEnable: true
+                            enabled: recipe.bloomEnabled || false
+                            onEnabledChanged: function(enabled) { updateRecipe("bloomEnabled", enabled) }
 
                             RecipeRow {
-                                visible: bloomEnabledCheck.checked
                                 label: qsTr("Time")
                                 ValueInput {
                                     Layout.fillWidth: true
@@ -348,7 +337,6 @@ Page {
                             }
 
                             Text {
-                                visible: bloomEnabledCheck.checked
                                 text: qsTr("Zero-flow pause for CO2 release")
                                 font: Theme.captionFont
                                 color: Theme.textSecondaryColor
@@ -359,25 +347,14 @@ Page {
 
                         // === Infuse Phase ===
                         RecipeSection {
+                            id: infuseSection
                             title: qsTr("Infuse")
                             Layout.fillWidth: true
-
-                            CheckBox {
-                                id: infuseEnabledCheck
-                                text: qsTr("Enable infuse/soak phase")
-                                checked: recipe.infuseEnabled !== false  // Default true
-                                onToggled: updateRecipe("infuseEnabled", checked)
-                                contentItem: Text {
-                                    text: parent.text
-                                    font: Theme.captionFont
-                                    color: Theme.textColor
-                                    leftPadding: parent.indicator.width + parent.spacing
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-                            }
+                            canEnable: true
+                            enabled: recipe.infuseEnabled !== false  // Default true
+                            onEnabledChanged: function(enabled) { updateRecipe("infuseEnabled", enabled) }
 
                             RecipeRow {
-                                visible: infuseEnabledCheck.checked
                                 label: qsTr("Pressure")
                                 ValueInput {
                                     Layout.fillWidth: true
@@ -394,7 +371,7 @@ Page {
 
                             RecipeRow {
                                 label: qsTr("Time")
-                                visible: infuseEnabledCheck.checked && !recipe.infuseByWeight
+                                visible: !recipe.infuseByWeight
                                 ValueInput {
                                     Layout.fillWidth: true
                                     value: recipe.infuseTime || 20
@@ -408,7 +385,6 @@ Page {
                             }
 
                             RowLayout {
-                                visible: infuseEnabledCheck.checked
                                 Layout.fillWidth: true
                                 spacing: Theme.scaled(8)
 
@@ -441,7 +417,6 @@ Page {
                             }
 
                             RecipeRow {
-                                visible: infuseEnabledCheck.checked
                                 label: qsTr("Volume")
                                 ValueInput {
                                     Layout.fillWidth: true
@@ -599,26 +574,15 @@ Page {
 
                         // === Decline Phase ===
                         RecipeSection {
+                            id: declineSection
                             title: qsTr("Decline")
                             Layout.fillWidth: true
                             visible: (recipe.pourStyle || "pressure") === "pressure"
-
-                            CheckBox {
-                                id: declineEnabledCheck
-                                text: qsTr("Enable pressure decline")
-                                checked: recipe.declineEnabled || false
-                                onToggled: updateRecipe("declineEnabled", checked)
-                                contentItem: Text {
-                                    text: parent.text
-                                    font: Theme.captionFont
-                                    color: Theme.textColor
-                                    leftPadding: parent.indicator.width + parent.spacing
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-                            }
+                            canEnable: true
+                            enabled: recipe.declineEnabled || false
+                            onEnabledChanged: function(enabled) { updateRecipe("declineEnabled", enabled) }
 
                             RecipeRow {
-                                visible: declineEnabledCheck.checked
                                 label: qsTr("To")
                                 ValueInput {
                                     Layout.fillWidth: true
@@ -634,7 +598,6 @@ Page {
                             }
 
                             RecipeRow {
-                                visible: declineEnabledCheck.checked
                                 label: qsTr("Over")
                                 ValueInput {
                                     Layout.fillWidth: true
