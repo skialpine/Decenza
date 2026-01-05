@@ -11,10 +11,10 @@ Item {
 
     property string title: ""
     property bool canEnable: false      // Show checkbox in header
-    property bool enabled: true         // Section enabled state (when canEnable is true)
+    property bool sectionEnabled: true  // Section enabled state (when canEnable is true)
     default property alias content: contentColumn.children
 
-    signal enabledChanged(bool enabled)
+    signal sectionToggled(bool enabled)
 
     implicitHeight: contentColumn.implicitHeight + (title ? headerRow.height + Theme.scaled(8) : 0)
 
@@ -39,8 +39,8 @@ Item {
         CheckBox {
             id: enableCheckbox
             visible: root.canEnable
-            checked: root.enabled
-            onToggled: root.enabledChanged(checked)
+            checked: root.sectionEnabled
+            onToggled: root.sectionToggled(checked)
             width: visible ? implicitWidth : 0
             anchors.verticalCenter: parent.verticalCenter
             padding: 0
@@ -70,7 +70,7 @@ Item {
             font.family: Theme.captionFont.family
             font.pixelSize: Theme.captionFont.pixelSize
             font.bold: true
-            color: (root.canEnable && !root.enabled) ? Theme.textSecondaryColor : Theme.textColor
+            color: (root.canEnable && !root.sectionEnabled) ? Theme.textSecondaryColor : Theme.textColor
             anchors.verticalCenter: parent.verticalCenter
         }
 
@@ -93,7 +93,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         spacing: Theme.scaled(10)
-        opacity: (root.canEnable && !root.enabled) ? 0.4 : 1.0
-        enabled: !root.canEnable || root.enabled
+        opacity: (root.canEnable && !root.sectionEnabled) ? 0.4 : 1.0
+        enabled: !root.canEnable || root.sectionEnabled
     }
 }
