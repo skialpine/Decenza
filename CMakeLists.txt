@@ -293,6 +293,7 @@ set(QML_FILES
     qml/components/StyledButton.qml
     qml/components/PipesScreensaver.qml
     qml/components/FlipClockScreensaver.qml
+    qml/components/UnsavedChangesDialog.qml
 )
 
 # Simulator QML - Windows Debug only
