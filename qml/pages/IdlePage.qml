@@ -162,7 +162,7 @@ Page {
                     translationKey: "idle.button.espresso"
                     translationFallback: "Espresso"
                     iconSource: "qrc:/icons/espresso.svg"
-                    enabled: DE1Device.connected
+                    enabled: DE1Device.guiEnabled
                     onClicked: {
                         activePresetFunction = (activePresetFunction === "espresso") ? "" : "espresso"
                     }
@@ -182,7 +182,7 @@ Page {
                     translationKey: "idle.button.steam"
                     translationFallback: "Steam"
                     iconSource: "qrc:/icons/steam.svg"
-                    enabled: DE1Device.connected
+                    enabled: DE1Device.guiEnabled
                     onClicked: {
                         activePresetFunction = (activePresetFunction === "steam") ? "" : "steam"
                     }
@@ -203,7 +203,7 @@ Page {
                     translationKey: "idle.button.hotwater"
                     translationFallback: "Hot Water"
                     iconSource: "qrc:/icons/water.svg"
-                    enabled: DE1Device.connected
+                    enabled: DE1Device.guiEnabled
                     onClicked: {
                         activePresetFunction = (activePresetFunction === "hotwater") ? "" : "hotwater"
                     }
@@ -224,7 +224,7 @@ Page {
                     translationKey: "idle.button.flush"
                     translationFallback: "Flush"
                     iconSource: "qrc:/icons/flush.svg"
-                    enabled: DE1Device.connected
+                    enabled: DE1Device.guiEnabled
                     onClicked: {
                         activePresetFunction = (activePresetFunction === "flush") ? "" : "flush"
                     }
@@ -248,7 +248,7 @@ Page {
                     iconSize: Theme.scaled(43)
                     backgroundColor: Theme.primaryColor
                     visible: Settings.visualizerExtendedMetadata
-                    enabled: DE1Device.connected
+                    enabled: DE1Device.guiEnabled
                     onClicked: root.goToShotMetadata(false)
 
                     KeyNavigation.left: flushButton
@@ -609,7 +609,7 @@ Page {
                 Layout.bottomMargin: Theme.spacingSmall
                 activeFocusOnTab: true
 
-                property bool enabled: DE1Device.connected
+                property bool enabled: DE1Device.guiEnabled
 
                 Accessible.role: Accessible.Button
                 Accessible.name: TranslationManager.translate("idle.accessible.sleep", "Sleep")

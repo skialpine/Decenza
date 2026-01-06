@@ -157,9 +157,10 @@ Item {
                 radius: Theme.cardRadius
 
                 ColumnLayout {
+                    id: batteryContent
                     anchors.fill: parent
                     anchors.margins: Theme.scaled(15)
-                    spacing: Theme.scaled(10)
+                    spacing: Theme.scaled(8)
 
                     Tr {
                         key: "settings.preferences.batteryCharging"
@@ -169,16 +170,7 @@ Item {
                         font.bold: true
                     }
 
-                    Tr {
-                        Layout.fillWidth: true
-                        key: "settings.preferences.batteryChargingDesc"
-                        fallback: "Control the USB charger output from the DE1"
-                        color: Theme.textSecondaryColor
-                        font.pixelSize: Theme.scaled(12)
-                        wrapMode: Text.WordWrap
-                    }
-
-                    Item { height: 5 }
+                    Item { Layout.fillHeight: true }
 
                     // Battery status
                     RowLayout {
@@ -239,7 +231,7 @@ Item {
                         }
                     }
 
-                    Item { height: 10 }
+                    Item { Layout.fillHeight: true }
 
                     // Smart charging mode selector
                     Tr {
@@ -305,7 +297,7 @@ Item {
                         }
                     }
 
-                    Item { height: 5 }
+                    Item { Layout.fillHeight: true }
 
                     // Explanation text
                     Text {
@@ -342,6 +334,66 @@ Item {
                         }
                     }
 
+                }
+            }
+
+            // Spacer to push Offline Mode to bottom
+            Item { Layout.fillHeight: true }
+
+            // Unlock GUI without DE1 connection
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: offlineContent.implicitHeight + Theme.scaled(30)
+                color: Theme.surfaceColor
+                radius: Theme.cardRadius
+
+                ColumnLayout {
+                    id: offlineContent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: Theme.scaled(15)
+                    spacing: Theme.scaled(8)
+
+                    Tr {
+                        key: "settings.preferences.offlineMode"
+                        fallback: "Offline Mode"
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(16)
+                        font.bold: true
+                    }
+
+                    Tr {
+                        Layout.fillWidth: true
+                        key: "settings.preferences.offlineModeDesc"
+                        fallback: "Use the app without a connected DE1 machine"
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: Theme.scaled(12)
+                        wrapMode: Text.WordWrap
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        Tr {
+                            key: "settings.preferences.unlockGui"
+                            fallback: "Unlock GUI"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(14)
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        StyledSwitch {
+                            checked: DE1Device.simulationMode
+                            onToggled: {
+                                DE1Device.simulationMode = checked
+                                if (ScaleDevice) {
+                                    ScaleDevice.simulationMode = checked
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -410,7 +462,7 @@ Item {
                             Layout.fillWidth: true
                             text: TranslationManager.translate("settings.preferences.startCalibration", "Start Calibration")
                             accessibleName: "Start flow sensor calibration"
-                            enabled: DE1Device.connected
+                            enabled: DE1Device.guiEnabled
                             onClicked: preferencesTab.openFlowCalibrationDialog()
                             background: Rectangle {
                                 radius: Theme.scaled(6)

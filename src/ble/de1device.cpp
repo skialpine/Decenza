@@ -56,15 +56,16 @@ DE1Device::~DE1Device() {
 }
 
 bool DE1Device::isConnected() const {
-    // Simulation mode always reports connected
-    if (m_simulationMode) {
-        return true;
-    }
     // After service discovery, controller is in DiscoveredState, not ConnectedState
     return m_controller &&
            (m_controller->state() == QLowEnergyController::ConnectedState ||
             m_controller->state() == QLowEnergyController::DiscoveredState) &&
            m_service != nullptr;
+}
+
+bool DE1Device::isGuiEnabled() const {
+    // GUI is enabled when connected OR in simulation/offline mode
+    return isConnected() || m_simulationMode;
 }
 
 bool DE1Device::isConnecting() const {
@@ -96,6 +97,7 @@ void DE1Device::setSimulationMode(bool enabled) {
 
     emit simulationModeChanged();
     emit connectedChanged();
+    emit guiEnabledChanged();
 }
 
 void DE1Device::setSettings(Settings* settings) {
@@ -195,6 +197,7 @@ void DE1Device::disconnect() {
     m_connecting = false;
     emit connectingChanged();
     emit connectedChanged();
+    emit guiEnabledChanged();
 }
 
 void DE1Device::onControllerConnected() {
@@ -205,6 +208,7 @@ void DE1Device::onControllerDisconnected() {
     m_connecting = false;
     emit connectingChanged();
     emit connectedChanged();
+    emit guiEnabledChanged();
 }
 
 void DE1Device::onControllerError(QLowEnergyController::Error error) {
@@ -303,6 +307,7 @@ void DE1Device::onServiceStateChanged(QLowEnergyService::ServiceState state) {
         qDebug() << "DE1Device: Connected";
         emit connectingChanged();
         emit connectedChanged();
+        emit guiEnabledChanged();
     }
 }
 

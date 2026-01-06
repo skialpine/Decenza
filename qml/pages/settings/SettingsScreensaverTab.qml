@@ -253,7 +253,7 @@ Item {
 
                     StyledComboBox {
                         id: typeComboBox
-                        Layout.preferredWidth: Theme.scaled(180)
+                        Layout.preferredWidth: Theme.scaled(220)
                         model: [
                             TranslationManager.translate("settings.screensaver.type.disabled", "Turn Screen Off"),
                             TranslationManager.translate("settings.screensaver.type.videos", "Videos & Images"),

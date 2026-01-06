@@ -37,6 +37,7 @@ class DE1Device : public QObject {
     Q_PROPERTY(bool connected READ isConnected NOTIFY connectedChanged)
     Q_PROPERTY(bool connecting READ isConnecting NOTIFY connectingChanged)
     Q_PROPERTY(bool simulationMode READ simulationMode WRITE setSimulationMode NOTIFY simulationModeChanged)
+    Q_PROPERTY(bool guiEnabled READ isGuiEnabled NOTIFY guiEnabledChanged)
     Q_PROPERTY(int state READ stateInt NOTIFY stateChanged)
     Q_PROPERTY(int subState READ subStateInt NOTIFY subStateChanged)
     Q_PROPERTY(QString stateString READ stateString NOTIFY stateChanged)
@@ -57,6 +58,7 @@ public:
 
     bool isConnected() const;
     bool isConnecting() const;
+    bool isGuiEnabled() const;
 
     DE1::State state() const { return m_state; }
     DE1::SubState subState() const { return m_subState; }
@@ -139,6 +141,7 @@ signals:
     void initialSettingsComplete();
     void errorOccurred(const QString& error);
     void simulationModeChanged();
+    void guiEnabledChanged();
     void usbChargerOnChanged();
     void isHeadlessChanged();
     void logMessage(const QString& message);

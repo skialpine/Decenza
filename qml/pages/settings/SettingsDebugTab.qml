@@ -13,67 +13,11 @@ Item {
         anchors.fill: parent
         spacing: Theme.scaled(15)
 
-        // Left column: Simulation and Window Resolution
+        // Left column: Window Resolution
         ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
             spacing: Theme.scaled(15)
-
-            // Simulation section
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: Theme.scaled(180)
-                color: Theme.surfaceColor
-                radius: Theme.cardRadius
-
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: Theme.scaled(15)
-                    spacing: Theme.scaled(12)
-
-                    Tr {
-                        key: "settings.debug.simulation"
-                        fallback: "Simulation"
-                        color: Theme.textColor
-                        font.pixelSize: Theme.scaled(16)
-                        font.bold: true
-                    }
-
-                    Tr {
-                        Layout.fillWidth: true
-                        key: "settings.debug.simulationDesc"
-                        fallback: "Enable these options to test the app without hardware connected."
-                        color: Theme.textSecondaryColor
-                        font.pixelSize: Theme.scaled(12)
-                        wrapMode: Text.Wrap
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: Theme.scaled(20)
-
-                        Tr {
-                            key: "settings.debug.simulateMachine"
-                            fallback: "Simulate machine connection"
-                            color: Theme.textColor
-                            font.pixelSize: Theme.scaled(14)
-                        }
-
-                        Item { Layout.fillWidth: true }
-
-                        StyledSwitch {
-                            checked: DE1Device.simulationMode
-                            onToggled: {
-                                DE1Device.simulationMode = checked
-                                if (ScaleDevice) {
-                                    ScaleDevice.simulationMode = checked
-                                }
-                            }
-                        }
-                    }
-
-                }
-            }
 
             // Window Resolution section (Windows/desktop only)
             Rectangle {
