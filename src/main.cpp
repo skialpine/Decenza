@@ -32,6 +32,7 @@
 #include "ai/aimanager.h"
 #include "screensaver/screensavervideomanager.h"
 #include "screensaver/pipegeometry.h"
+#include "screensaver/strangeattractorrenderer.h"
 #include "network/webdebuglogger.h"
 
 // GHC Simulator for Windows debug builds
@@ -274,6 +275,9 @@ int main(int argc, char *argv[])
     qmlRegisterType<PipeElbowGeometry>("DecenzaDE1", 1, 0, "PipeElbowGeometry");
     qmlRegisterType<PipeCapGeometry>("DecenzaDE1", 1, 0, "PipeCapGeometry");
     qmlRegisterType<PipeSphereGeometry>("DecenzaDE1", 1, 0, "PipeSphereGeometry");
+
+    // Register strange attractor renderer for attractor screensaver
+    qmlRegisterType<StrangeAttractorRenderer>("DecenzaDE1", 1, 0, "StrangeAttractorRenderer");
 
     // Load main QML file (QTP0001 NEW policy uses /qt/qml/ prefix)
     const QUrl url(u"qrc:/qt/qml/DecenzaDE1/qml/main.qml"_s);

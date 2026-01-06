@@ -100,6 +100,7 @@ set(SOURCES
     src/ble/scales/atomhearteclairscale.cpp
     src/ble/scales/variaakuscale.cpp
     src/ble/scales/flowscale.cpp
+    src/ble/transport/qtscalebletransport.cpp
     src/machine/machinestate.cpp
     src/profile/profile.cpp
     src/profile/profileframe.cpp
@@ -111,6 +112,7 @@ set(SOURCES
     src/controllers/directcontroller.cpp
     src/screensaver/screensavervideomanager.cpp
     src/screensaver/pipegeometry.cpp
+    src/screensaver/strangeattractorrenderer.cpp
     src/network/visualizeruploader.cpp
     src/network/visualizerimporter.cpp
     src/ai/aimanager.cpp
@@ -129,6 +131,13 @@ if(WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Debug")
         src/simulator/ghcsimulator.cpp
         src/simulator/de1simulator.cpp
         src/simulator/simulatedscale.cpp
+    )
+endif()
+
+# Android-specific native BLE transport
+if(ANDROID)
+    list(APPEND SOURCES
+        src/ble/transport/androidscalebletransport.cpp
     )
 endif()
 
@@ -158,6 +167,8 @@ set(HEADERS
     src/ble/scales/atomhearteclairscale.h
     src/ble/scales/variaakuscale.h
     src/ble/scales/flowscale.h
+    src/ble/transport/scalebletransport.h
+    src/ble/transport/qtscalebletransport.h
     src/machine/machinestate.h
     src/profile/profile.h
     src/profile/profileframe.h
@@ -169,6 +180,7 @@ set(HEADERS
     src/controllers/directcontroller.h
     src/screensaver/screensavervideomanager.h
     src/screensaver/pipegeometry.h
+    src/screensaver/strangeattractorrenderer.h
     src/network/visualizeruploader.h
     src/network/visualizerimporter.h
     src/ai/aimanager.h
@@ -187,6 +199,13 @@ if(WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Debug")
         src/simulator/ghcsimulator.h
         src/simulator/de1simulator.h
         src/simulator/simulatedscale.h
+    )
+endif()
+
+# Android-specific native BLE transport header
+if(ANDROID)
+    list(APPEND HEADERS
+        src/ble/transport/androidscalebletransport.h
     )
 endif()
 
@@ -293,6 +312,7 @@ set(QML_FILES
     qml/components/StyledButton.qml
     qml/components/PipesScreensaver.qml
     qml/components/FlipClockScreensaver.qml
+    qml/components/StrangeAttractorScreensaver.qml
     qml/components/UnsavedChangesDialog.qml
 )
 

@@ -124,7 +124,8 @@ Item {
             // User cancelled - revert combobox to current type
             typeComboBox.currentIndex = ScreensaverManager.screensaverType === "videos" ? 1 :
                                         ScreensaverManager.screensaverType === "pipes" ? 2 :
-                                        ScreensaverManager.screensaverType === "flipclock" ? 3 : 0
+                                        ScreensaverManager.screensaverType === "flipclock" ? 3 :
+                                        ScreensaverManager.screensaverType === "attractor" ? 4 : 0
         }
     }
 
@@ -257,13 +258,15 @@ Item {
                             TranslationManager.translate("settings.screensaver.type.disabled", "Turn Screen Off"),
                             TranslationManager.translate("settings.screensaver.type.videos", "Videos & Images"),
                             TranslationManager.translate("settings.screensaver.type.pipes", "3D Pipes"),
-                            TranslationManager.translate("settings.screensaver.type.flipclock", "Flip Clock")
+                            TranslationManager.translate("settings.screensaver.type.flipclock", "Flip Clock"),
+                            TranslationManager.translate("settings.screensaver.type.attractor", "Strange Attractors")
                         ]
                         currentIndex: ScreensaverManager.screensaverType === "videos" ? 1 :
                                       ScreensaverManager.screensaverType === "pipes" ? 2 :
-                                      ScreensaverManager.screensaverType === "flipclock" ? 3 : 0
+                                      ScreensaverManager.screensaverType === "flipclock" ? 3 :
+                                      ScreensaverManager.screensaverType === "attractor" ? 4 : 0
                         onActivated: {
-                            var types = ["disabled", "videos", "pipes", "flipclock"]
+                            var types = ["disabled", "videos", "pipes", "flipclock", "attractor"]
                             var newType = types[currentIndex]
 
                             // If switching away from videos and we have cached videos, offer to clear

@@ -19,6 +19,7 @@ Page {
     property bool isVideosMode: screensaverType === "videos"
     property bool isPipesMode: screensaverType === "pipes"
     property bool isFlipClockMode: screensaverType === "flipclock"
+    property bool isAttractorMode: screensaverType === "attractor"
 
     property int videoFailCount: 0
     property bool mediaPlaying: false
@@ -239,6 +240,15 @@ Page {
         z: 0
     }
 
+    // Strange Attractor screensaver
+    StrangeAttractorScreensaver {
+        id: attractorScreensaver
+        anchors.fill: parent
+        visible: isAttractorMode
+        running: isAttractorMode && screensaverPage.visible
+        z: 0
+    }
+
     // Fallback: show a subtle animation while no cached media (videos mode only)
     Rectangle {
         id: fallbackBackground
@@ -309,10 +319,10 @@ Page {
         }
     }
 
-    // Clock display (hidden in flip clock mode since it shows its own time)
+    // Clock display (hidden in flip clock and attractor modes)
     Text {
         z: 2
-        visible: !isFlipClockMode
+        visible: !isFlipClockMode && !isAttractorMode
         anchors.bottom: parent.bottom
         anchors.right: parent.right
         anchors.margins: Theme.scaled(50)
@@ -327,7 +337,7 @@ Page {
 
         Timer {
             interval: 1000
-            running: !isFlipClockMode
+            running: !isFlipClockMode && !isAttractorMode
             repeat: true
             onTriggered: parent.currentTime = new Date()
         }

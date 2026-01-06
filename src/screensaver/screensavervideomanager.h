@@ -152,7 +152,7 @@ public:
 
     // Screensaver type
     QString screensaverType() const { return m_screensaverType; }
-    QStringList availableScreensaverTypes() const { return {"disabled", "videos", "pipes", "flipclock"}; }
+    QStringList availableScreensaverTypes() const { return {"disabled", "videos", "pipes", "flipclock", "attractor"}; }
     double pipesSpeed() const { return m_pipesSpeed; }
     double pipesCameraSpeed() const { return m_pipesCameraSpeed; }
     bool flipClockUse24Hour() const { return m_flipClockUse24Hour; }
