@@ -68,6 +68,13 @@ bool ShotHistoryStorage::initialize(const QString& dbPath)
         return false;
     }
 
+    // Checkpoint any existing WAL data from previous sessions
+    // This ensures all data is in the main .db file
+    QSqlQuery walQuery(m_db);
+    if (walQuery.exec("PRAGMA wal_checkpoint(TRUNCATE)")) {
+        qDebug() << "ShotHistoryStorage: Startup WAL checkpoint completed";
+    }
+
     updateTotalShots();
 
     m_ready = true;
@@ -401,6 +408,11 @@ qint64 ShotHistoryStorage::saveShot(ShotDataModel* shotData,
 
     m_lastSavedShotId = shotId;
     updateTotalShots();
+
+    // Checkpoint WAL to main database file after each shot
+    // This ensures data is persisted to the .db file and not just in .db-wal
+    QSqlQuery walQuery(m_db);
+    walQuery.exec("PRAGMA wal_checkpoint(PASSIVE)");
 
     qDebug() << "ShotHistoryStorage: Saved shot" << shotId
              << "- Profile:" << profileName
@@ -1025,14 +1037,56 @@ QString ShotHistoryStorage::exportDatabase()
 
 void ShotHistoryStorage::checkpoint()
 {
-    if (!m_db.isOpen()) return;
+    if (!m_db.isOpen()) {
+        qWarning() << "ShotHistoryStorage::checkpoint: Database not open";
+        return;
+    }
+
+    qDebug() << "ShotHistoryStorage: Starting checkpoint, dbPath:" << m_dbPath;
+    qDebug() << "ShotHistoryStorage: Total shots:" << m_totalShots;
 
     QSqlQuery query(m_db);
-    // TRUNCATE mode: checkpoint and truncate WAL file to zero bytes
-    if (query.exec("PRAGMA wal_checkpoint(TRUNCATE)")) {
-        qDebug() << "ShotHistoryStorage: WAL checkpoint completed";
+
+    // First, try FULL checkpoint which waits for writers to finish
+    if (query.exec("PRAGMA wal_checkpoint(FULL)")) {
+        if (query.next()) {
+            int busy = query.value(0).toInt();
+            int log = query.value(1).toInt();
+            int checkpointed = query.value(2).toInt();
+            qDebug() << "ShotHistoryStorage: FULL checkpoint - busy:" << busy
+                     << "log:" << log << "checkpointed:" << checkpointed;
+        }
     } else {
-        qWarning() << "ShotHistoryStorage: WAL checkpoint failed:" << query.lastError().text();
+        qWarning() << "ShotHistoryStorage: FULL checkpoint failed:" << query.lastError().text();
+    }
+
+    // Then TRUNCATE to clean up WAL file
+    if (query.exec("PRAGMA wal_checkpoint(TRUNCATE)")) {
+        if (query.next()) {
+            int busy = query.value(0).toInt();
+            int log = query.value(1).toInt();
+            int checkpointed = query.value(2).toInt();
+            qDebug() << "ShotHistoryStorage: TRUNCATE checkpoint - busy:" << busy
+                     << "log:" << log << "checkpointed:" << checkpointed;
+        }
+    } else {
+        qWarning() << "ShotHistoryStorage: TRUNCATE checkpoint failed:" << query.lastError().text();
+    }
+
+    // Verify file size after checkpoint
+    QFile dbFile(m_dbPath);
+    if (dbFile.exists()) {
+        qDebug() << "ShotHistoryStorage: Database file size after checkpoint:" << dbFile.size() << "bytes";
+    } else {
+        qWarning() << "ShotHistoryStorage: Database file does not exist at:" << m_dbPath;
+    }
+
+    // Check WAL file
+    QFile walFile(m_dbPath + "-wal");
+    if (walFile.exists()) {
+        qDebug() << "ShotHistoryStorage: WAL file size:" << walFile.size() << "bytes";
+    } else {
+        qDebug() << "ShotHistoryStorage: No WAL file (expected after successful checkpoint)";
     }
 }
 
@@ -1071,17 +1125,32 @@ bool ShotHistoryStorage::importDatabase(const QString& filePath, bool merge)
     }
 
     // Verify source has shots table
-    QSqlQuery srcCheck(srcDb);
-    if (!srcCheck.exec("SELECT COUNT(*) FROM shots")) {
-        QString error = "Import file is not a valid shots database";
+    int sourceCount = 0;
+    {
+        QSqlQuery srcCheck(srcDb);
+        if (!srcCheck.exec("SELECT COUNT(*) FROM shots")) {
+            QString error = "Import file is not a valid shots database (no 'shots' table found)";
+            qWarning() << "ShotHistoryStorage:" << error;
+            emit errorOccurred(error);
+            srcCheck.finish();  // Release query before closing connection
+            srcDb.close();
+            QSqlDatabase::removeDatabase("import_connection");
+            return false;
+        }
+        srcCheck.next();
+        sourceCount = srcCheck.value(0).toInt();
+        srcCheck.finish();  // Release query before we might close connection
+    }  // srcCheck destroyed here
+
+    if (sourceCount == 0) {
+        QString error = "Import file contains no shots (database is empty)";
         qWarning() << "ShotHistoryStorage:" << error;
         emit errorOccurred(error);
         srcDb.close();
         QSqlDatabase::removeDatabase("import_connection");
         return false;
     }
-    srcCheck.next();
-    int sourceCount = srcCheck.value(0).toInt();
+
     qDebug() << "ShotHistoryStorage: Source has" << sourceCount << "shots";
 
     // Begin transaction on destination

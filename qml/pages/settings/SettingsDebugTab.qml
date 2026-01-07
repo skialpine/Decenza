@@ -240,8 +240,71 @@ Item {
                         var success = MainController.shotHistory.importDatabase(selectedFile, mergeMode)
                         if (success) {
                             console.log("Database import successful")
+                            importResultDialog.title = "Import Successful"
+                            importResultDialog.message = "Database imported successfully.\nTotal shots: " + MainController.shotHistory.totalShots
+                            importResultDialog.isError = false
+                            importResultDialog.open()
                         }
+                        // Errors are handled via errorOccurred signal
                     }
+                }
+            }
+
+            // Import result feedback dialog
+            Popup {
+                id: importResultDialog
+                modal: true
+                dim: true
+                anchors.centerIn: Overlay.overlay
+                padding: Theme.scaled(24)
+
+                property string title: ""
+                property string message: ""
+                property bool isError: false
+
+                background: Rectangle {
+                    color: Theme.surfaceColor
+                    radius: Theme.cardRadius
+                    border.width: 2
+                    border.color: importResultDialog.isError ? Theme.dangerColor : Theme.primaryColor
+                }
+
+                contentItem: Column {
+                    spacing: Theme.spacingMedium
+                    width: Theme.scaled(300)
+
+                    Text {
+                        text: importResultDialog.title
+                        font: Theme.subtitleFont
+                        color: importResultDialog.isError ? Theme.dangerColor : Theme.textColor
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+
+                    Text {
+                        text: importResultDialog.message
+                        wrapMode: Text.Wrap
+                        width: parent.width
+                        font: Theme.bodyFont
+                        color: Theme.textColor
+                    }
+
+                    AccessibleButton {
+                        text: "OK"
+                        accessibleName: "Dismiss dialog"
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        onClicked: importResultDialog.close()
+                    }
+                }
+            }
+
+            // Handle import errors
+            Connections {
+                target: MainController.shotHistory
+                function onErrorOccurred(message) {
+                    importResultDialog.title = "Import Failed"
+                    importResultDialog.message = message
+                    importResultDialog.isError = true
+                    importResultDialog.open()
                 }
             }
 
