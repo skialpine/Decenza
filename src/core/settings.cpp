@@ -140,6 +140,17 @@ void Settings::setScaleType(const QString& type) {
     }
 }
 
+QString Settings::scaleName() const {
+    return m_settings.value("scale/name", "").toString();
+}
+
+void Settings::setScaleName(const QString& name) {
+    if (scaleName() != name) {
+        m_settings.setValue("scale/name", name);
+        emit scaleNameChanged();
+    }
+}
+
 // Flow sensor calibration
 double Settings::flowCalibrationFactor() const {
     return m_settings.value("flow/calibrationFactor", 1.29).toDouble();

@@ -66,12 +66,19 @@ private:
         QString profileName;
         QString beanBrand;
         QString beanType;
+        QString roastDate;
+        QString roastLevel;
+        QString grinderModel;
+        QString grinderSetting;
         double duration = 0;
         double doseWeight = 0;
         double finalWeight = 0;
+        double drinkTds = 0;
+        double drinkEy = 0;
         int enjoyment = 0;
         qint64 timestamp = 0;
         QString notes;
+        QString barista;
 
         QVector<QPointF> pressure;
         QVector<QPointF> flow;

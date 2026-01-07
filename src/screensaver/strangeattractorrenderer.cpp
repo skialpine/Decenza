@@ -539,7 +539,9 @@ StrangeAttractorRenderer::StrangeAttractorRenderer(QQuickItem* parent)
     : QQuickPaintedItem(parent)
     , m_rng(QRandomGenerator::global()->generate())
 {
-    setRenderTarget(QQuickPaintedItem::FramebufferObject);
+    // Use Image render target instead of FramebufferObject for better compatibility
+    // with buggy GPU drivers (e.g., PowerVR on some Android devices)
+    setRenderTarget(QQuickPaintedItem::Image);
     setAntialiasing(false);  // Not needed for density rendering
 
     m_timer = new QTimer(this);
@@ -977,6 +979,9 @@ void StrangeAttractorRenderer::updateImage() {
 }
 
 void StrangeAttractorRenderer::paint(QPainter* painter) {
+    // Safety check: don't render if we have no valid size
+    if (width() <= 0 || height() <= 0) return;
+
     QMutexLocker locker(&m_imageMutex);
     if (m_frontBuffer.isNull()) return;
     painter->drawImage(0, 0, m_frontBuffer);

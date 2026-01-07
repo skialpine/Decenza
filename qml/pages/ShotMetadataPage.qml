@@ -9,12 +9,82 @@ Page {
     objectName: "shotMetadataPage"
     background: Rectangle { color: Theme.backgroundColor }
 
-    Component.onCompleted: root.currentPageTitle = TranslationManager.translate("shotmetadata.title", "Shot Info")
+    Component.onCompleted: {
+        root.currentPageTitle = TranslationManager.translate("shotmetadata.title", "Shot Info")
+        if (editShotId > 0) {
+            loadShotForEditing()
+        }
+    }
     StackView.onActivated: root.currentPageTitle = TranslationManager.translate("shotmetadata.title", "Shot Info")
 
     property bool hasPendingShot: false  // Set to true by goToShotMetadata() after a shot
+    property int editShotId: 0  // Set > 0 to edit existing shot from history
+    property var editShotData: ({})  // Loaded shot data when editing
+    property bool isEditMode: editShotId > 0
     property bool keyboardVisible: Qt.inputMethod.visible
     property Item focusedField: null
+
+    // Persisted graph height (like ShotComparisonPage)
+    property real graphHeight: Settings.value("shotMetadata/graphHeight", Theme.scaled(200))
+
+    // Load shot data for editing
+    function loadShotForEditing() {
+        if (editShotId <= 0) return
+        editShotData = MainController.shotHistory.getShot(editShotId)
+        if (editShotData.id) {
+            // Populate editing fields
+            editBeanBrand = editShotData.beanBrand || ""
+            editBeanType = editShotData.beanType || ""
+            editRoastDate = editShotData.roastDate || ""
+            editRoastLevel = editShotData.roastLevel || ""
+            editGrinderModel = editShotData.grinderModel || ""
+            editGrinderSetting = editShotData.grinderSetting || ""
+            editBarista = editShotData.barista || ""
+            editDoseWeight = editShotData.doseWeight || 0
+            editDrinkWeight = editShotData.finalWeight || 0
+            editDrinkTds = editShotData.drinkTds || 0
+            editDrinkEy = editShotData.drinkEy || 0
+            editEnjoyment = editShotData.enjoyment || 75
+            editNotes = editShotData.espressoNotes || ""
+        }
+    }
+
+    // Editing fields (separate from Settings.dye* to avoid polluting current session)
+    property string editBeanBrand: ""
+    property string editBeanType: ""
+    property string editRoastDate: ""
+    property string editRoastLevel: ""
+    property string editGrinderModel: ""
+    property string editGrinderSetting: ""
+    property string editBarista: ""
+    property double editDoseWeight: 0
+    property double editDrinkWeight: 0
+    property double editDrinkTds: 0
+    property double editDrinkEy: 0
+    property int editEnjoyment: 75
+    property string editNotes: ""
+
+    // Save edited shot back to history
+    function saveEditedShot() {
+        if (editShotId <= 0) return
+        var metadata = {
+            "beanBrand": editBeanBrand,
+            "beanType": editBeanType,
+            "roastDate": editRoastDate,
+            "roastLevel": editRoastLevel,
+            "grinderModel": editGrinderModel,
+            "grinderSetting": editGrinderSetting,
+            "barista": editBarista,
+            "doseWeight": editDoseWeight,
+            "finalWeight": editDrinkWeight,
+            "drinkTds": editDrinkTds,
+            "drinkEy": editDrinkEy,
+            "enjoyment": editEnjoyment,
+            "espressoNotes": editNotes
+        }
+        MainController.shotHistory.updateShotMetadata(editShotId, metadata)
+        root.goBack()
+    }
 
     function scrollToFocusedField() {
         if (!focusedField) return
@@ -111,6 +181,96 @@ Page {
             width: parent.width
             spacing: Theme.scaled(6)
 
+            // Resizable Graph (visible when we have shot data)
+            Rectangle {
+                id: graphCard
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.max(Theme.scaled(100), Math.min(Theme.scaled(400), shotMetadataPage.graphHeight))
+                color: Theme.surfaceColor
+                radius: Theme.cardRadius
+                visible: isEditMode ? (editShotData.pressure && editShotData.pressure.length > 0) :
+                         (MainController.shotDataModel && MainController.shotDataModel.maxTime > 0)
+
+                HistoryShotGraph {
+                    anchors.fill: parent
+                    anchors.margins: Theme.spacingSmall
+                    anchors.bottomMargin: Theme.spacingSmall + resizeHandle.height
+                    pressureData: isEditMode ? (editShotData.pressure || []) : []
+                    flowData: isEditMode ? (editShotData.flow || []) : []
+                    temperatureData: isEditMode ? (editShotData.temperature || []) : []
+                    weightData: isEditMode ? (editShotData.weight || []) : []
+                    phaseMarkers: isEditMode ? (editShotData.phases || []) : []
+                    maxTime: isEditMode ? (editShotData.duration || 60) : (MainController.shotDataModel ? MainController.shotDataModel.maxTime : 60)
+                    visible: isEditMode
+                }
+
+                // Live graph for current shot (non-edit mode)
+                ShotGraph {
+                    anchors.fill: parent
+                    anchors.margins: Theme.spacingSmall
+                    anchors.bottomMargin: Theme.spacingSmall + resizeHandle.height
+                    visible: !isEditMode && MainController.shotDataModel && MainController.shotDataModel.maxTime > 0
+                }
+
+                // Resize handle at bottom
+                Rectangle {
+                    id: resizeHandle
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: Theme.scaled(16)
+                    color: "transparent"
+
+                    // Visual indicator (three lines)
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: Theme.scaled(2)
+
+                        Repeater {
+                            model: 3
+                            Rectangle {
+                                width: Theme.scaled(30)
+                                height: 1
+                                color: Theme.textSecondaryColor
+                                opacity: resizeMouseArea.containsMouse || resizeMouseArea.pressed ? 0.8 : 0.4
+                            }
+                        }
+                    }
+
+                    MouseArea {
+                        id: resizeMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.SizeVerCursor
+                        preventStealing: true
+
+                        property real startY: 0
+                        property real startHeight: 0
+
+                        onPressed: function(mouse) {
+                            startY = mouse.y + resizeHandle.mapToItem(shotMetadataPage, 0, 0).y
+                            startHeight = graphCard.Layout.preferredHeight
+                        }
+
+                        onPositionChanged: function(mouse) {
+                            if (pressed) {
+                                var currentY = mouse.y + resizeHandle.mapToItem(shotMetadataPage, 0, 0).y
+                                var delta = currentY - startY
+                                var newHeight = startHeight + delta
+                                // Clamp between min and max
+                                newHeight = Math.max(Theme.scaled(100), Math.min(Theme.scaled(400), newHeight))
+                                shotMetadataPage.graphHeight = newHeight
+                            }
+                        }
+
+                        onReleased: {
+                            // Save the height
+                            Settings.setValue("shotMetadata/graphHeight", shotMetadataPage.graphHeight)
+                        }
+                    }
+                }
+            }
+
             // 3-column grid for all fields
             GridLayout {
                 Layout.fillWidth: true
@@ -122,24 +282,24 @@ Page {
                 LabeledField {
                     Layout.fillWidth: true
                     label: TranslationManager.translate("shotmetadata.label.roaster", "Roaster")
-                    text: Settings.dyeBeanBrand
-                    onTextEdited: function(t) { Settings.dyeBeanBrand = t }
+                    text: isEditMode ? editBeanBrand : Settings.dyeBeanBrand
+                    onTextEdited: function(t) { isEditMode ? editBeanBrand = t : Settings.dyeBeanBrand = t }
                 }
 
                 LabeledField {
                     Layout.fillWidth: true
                     label: TranslationManager.translate("shotmetadata.label.coffee", "Coffee")
-                    text: Settings.dyeBeanType
-                    onTextEdited: function(t) { Settings.dyeBeanType = t }
+                    text: isEditMode ? editBeanType : Settings.dyeBeanType
+                    onTextEdited: function(t) { isEditMode ? editBeanType = t : Settings.dyeBeanType = t }
                 }
 
                 LabeledField {
                     Layout.fillWidth: true
                     label: TranslationManager.translate("shotmetadata.label.roastdate", "Roast date (yyyy-mm-dd)")
-                    text: Settings.dyeRoastDate
+                    text: isEditMode ? editRoastDate : Settings.dyeRoastDate
                     inputHints: Qt.ImhDate
                     inputMask: "9999-99-99"
-                    onTextEdited: function(t) { Settings.dyeRoastDate = t }
+                    onTextEdited: function(t) { isEditMode ? editRoastDate = t : Settings.dyeRoastDate = t }
                 }
 
                 // === ROW 2: Roast level, Grinder ===
@@ -152,30 +312,30 @@ Page {
                         TranslationManager.translate("shotmetadata.roastlevel.medium", "Medium"),
                         TranslationManager.translate("shotmetadata.roastlevel.mediumdark", "Medium-Dark"),
                         TranslationManager.translate("shotmetadata.roastlevel.dark", "Dark")]
-                    currentValue: Settings.dyeRoastLevel
-                    onValueChanged: function(v) { Settings.dyeRoastLevel = v }
+                    currentValue: isEditMode ? editRoastLevel : Settings.dyeRoastLevel
+                    onValueChanged: function(v) { isEditMode ? editRoastLevel = v : Settings.dyeRoastLevel = v }
                 }
 
                 LabeledField {
                     Layout.fillWidth: true
                     label: TranslationManager.translate("shotmetadata.label.grinder", "Grinder")
-                    text: Settings.dyeGrinderModel
-                    onTextEdited: function(t) { Settings.dyeGrinderModel = t }
+                    text: isEditMode ? editGrinderModel : Settings.dyeGrinderModel
+                    onTextEdited: function(t) { isEditMode ? editGrinderModel = t : Settings.dyeGrinderModel = t }
                 }
 
                 LabeledField {
                     Layout.fillWidth: true
                     label: TranslationManager.translate("shotmetadata.label.setting", "Setting")
-                    text: Settings.dyeGrinderSetting
-                    onTextEdited: function(t) { Settings.dyeGrinderSetting = t }
+                    text: isEditMode ? editGrinderSetting : Settings.dyeGrinderSetting
+                    onTextEdited: function(t) { isEditMode ? editGrinderSetting = t : Settings.dyeGrinderSetting = t }
                 }
 
                 // === ROW 3: Barista, Preset, Shot Date ===
                 LabeledField {
                     Layout.fillWidth: true
                     label: TranslationManager.translate("shotmetadata.label.barista", "Barista")
-                    text: Settings.dyeBarista
-                    onTextEdited: function(t) { Settings.dyeBarista = t }
+                    text: isEditMode ? editBarista : Settings.dyeBarista
+                    onTextEdited: function(t) { isEditMode ? editBarista = t : Settings.dyeBarista = t }
                 }
 
                 // Preset (read-only display)
@@ -208,7 +368,7 @@ Page {
                             anchors.fill: parent
                             anchors.leftMargin: Theme.scaled(12)
                             anchors.rightMargin: Theme.scaled(12)
-                            text: MainController.currentProfileName || ""
+                            text: isEditMode ? (editShotData.profileName || "") : (MainController.currentProfileName || "")
                             color: Theme.textColor
                             font.pixelSize: Theme.scaled(14)
                             verticalAlignment: Text.AlignVCenter
@@ -216,7 +376,7 @@ Page {
                         }
 
                         Accessible.role: Accessible.StaticText
-                        Accessible.name: TranslationManager.translate("shotmetadata.label.preset", "Preset") + ": " + MainController.currentProfileName
+                        Accessible.name: TranslationManager.translate("shotmetadata.label.preset", "Preset") + ": " + (isEditMode ? editShotData.profileName : MainController.currentProfileName)
                     }
                 }
 
@@ -250,7 +410,7 @@ Page {
                             anchors.fill: parent
                             anchors.leftMargin: Theme.scaled(12)
                             anchors.rightMargin: Theme.scaled(12)
-                            text: Settings.dyeShotDateTime || ""
+                            text: isEditMode ? (editShotData.dateTime || "") : (Settings.dyeShotDateTime || "")
                             color: Theme.textColor
                             font.pixelSize: Theme.scaled(14)
                             verticalAlignment: Text.AlignVCenter
@@ -258,7 +418,7 @@ Page {
                         }
 
                         Accessible.role: Accessible.StaticText
-                        Accessible.name: TranslationManager.translate("shotmetadata.label.shotdate", "Shot date") + ": " + Settings.dyeShotDateTime
+                        Accessible.name: TranslationManager.translate("shotmetadata.label.shotdate", "Shot date") + ": " + (isEditMode ? editShotData.dateTime : Settings.dyeShotDateTime)
                     }
                 }
 
@@ -306,11 +466,12 @@ Page {
                                 decimals: 1
                                 suffix: "g"
                                 valueColor: Theme.dyeDoseColor
-                                value: Settings.dyeBeanWeight
+                                value: isEditMode ? editDoseWeight : Settings.dyeBeanWeight
                                 accessibleName: TranslationManager.translate("shotmetadata.label.dose", "Dose") + " " + value + " " + TranslationManager.translate("shotmetadata.unit.grams", "grams")
                                 onValueModified: function(newValue) {
                                     doseInput.value = newValue
-                                    Settings.dyeBeanWeight = newValue
+                                    if (isEditMode) editDoseWeight = newValue
+                                    else Settings.dyeBeanWeight = newValue
                                 }
                                 onActiveFocusChanged: if (activeFocus) hideKeyboard()
                             }
@@ -336,11 +497,12 @@ Page {
                                 decimals: 1
                                 suffix: "g"
                                 valueColor: Theme.dyeOutputColor
-                                value: Settings.dyeDrinkWeight
+                                value: isEditMode ? editDrinkWeight : Settings.dyeDrinkWeight
                                 accessibleName: TranslationManager.translate("shotmetadata.accessible.output", "Output") + " " + value + " " + TranslationManager.translate("shotmetadata.unit.grams", "grams")
                                 onValueModified: function(newValue) {
                                     outInput.value = newValue
-                                    Settings.dyeDrinkWeight = newValue
+                                    if (isEditMode) editDrinkWeight = newValue
+                                    else Settings.dyeDrinkWeight = newValue
                                 }
                                 onActiveFocusChanged: if (activeFocus) hideKeyboard()
                             }
@@ -366,11 +528,12 @@ Page {
                                 decimals: 2
                                 suffix: "%"
                                 valueColor: Theme.dyeTdsColor
-                                value: Settings.dyeDrinkTds
+                                value: isEditMode ? editDrinkTds : Settings.dyeDrinkTds
                                 accessibleName: TranslationManager.translate("shotmetadata.label.tds", "TDS") + " " + value + " " + TranslationManager.translate("shotmetadata.unit.percent", "percent")
                                 onValueModified: function(newValue) {
                                     tdsInput.value = newValue
-                                    Settings.dyeDrinkTds = newValue
+                                    if (isEditMode) editDrinkTds = newValue
+                                    else Settings.dyeDrinkTds = newValue
                                 }
                                 onActiveFocusChanged: if (activeFocus) hideKeyboard()
                             }
@@ -396,11 +559,12 @@ Page {
                                 decimals: 1
                                 suffix: "%"
                                 valueColor: Theme.dyeEyColor
-                                value: Settings.dyeDrinkEy
+                                value: isEditMode ? editDrinkEy : Settings.dyeDrinkEy
                                 accessibleName: TranslationManager.translate("shotmetadata.accessible.extractionyield", "Extraction yield") + " " + value + " " + TranslationManager.translate("shotmetadata.unit.percent", "percent")
                                 onValueModified: function(newValue) {
                                     eyInput.value = newValue
-                                    Settings.dyeDrinkEy = newValue
+                                    if (isEditMode) editDrinkEy = newValue
+                                    else Settings.dyeDrinkEy = newValue
                                 }
                                 onActiveFocusChanged: if (activeFocus) hideKeyboard()
                             }
@@ -438,11 +602,12 @@ Page {
                         decimals: 0
                         suffix: " %"
                         valueColor: Theme.primaryColor  // Blue (default accent)
-                        value: Settings.dyeEspressoEnjoyment > 0 ? Settings.dyeEspressoEnjoyment : 75
+                        value: isEditMode ? editEnjoyment : (Settings.dyeEspressoEnjoyment > 0 ? Settings.dyeEspressoEnjoyment : 75)
                         accessibleName: TranslationManager.translate("shotmetadata.label.rating", "Rating") + " " + value + " " + TranslationManager.translate("shotmetadata.unit.percent", "percent")
                         onValueModified: function(newValue) {
                             ratingInput.value = newValue
-                            Settings.dyeEspressoEnjoyment = newValue
+                            if (isEditMode) editEnjoyment = newValue
+                            else Settings.dyeEspressoEnjoyment = newValue
                         }
                         onActiveFocusChanged: {
                             if (activeFocus) {
@@ -476,7 +641,7 @@ Page {
                         anchors.topMargin: Theme.scaled(2)
                         // Size to content with minimum height of 100px
                         height: Math.max(100, contentHeight + topPadding + bottomPadding)
-                        text: Settings.dyeEspressoNotes
+                        text: isEditMode ? editNotes : Settings.dyeEspressoNotes
                         font: Theme.bodyFont
                         color: Theme.textColor
                         placeholderTextColor: Theme.textSecondaryColor
@@ -488,7 +653,10 @@ Page {
                             border.color: notesField.activeFocus ? Theme.primaryColor : Theme.textSecondaryColor
                             border.width: 1
                         }
-                        onTextChanged: Settings.dyeEspressoNotes = text
+                        onTextChanged: {
+                            if (isEditMode) editNotes = text
+                            else Settings.dyeEspressoNotes = text
+                        }
 
                         Accessible.role: Accessible.EditableText
                         Accessible.name: TranslationManager.translate("shotmetadata.label.notes", "Notes")
@@ -555,17 +723,59 @@ Page {
         onBackClicked: root.goBack()
 
         Tr {
-            visible: MainController.visualizer.uploading
+            visible: MainController.visualizer.uploading && !isEditMode
             key: "shotmetadata.status.uploading"
             fallback: "Uploading..."
             color: Theme.textSecondaryColor
             font: Theme.labelFont
         }
 
-        // AI Advice button - visible whenever we have shot data (not just pending)
+        // Save button - visible in edit mode
+        Rectangle {
+            id: saveButton
+            visible: isEditMode
+            Layout.preferredWidth: saveButtonContent.width + 40
+            Layout.preferredHeight: Theme.scaled(44)
+            radius: Theme.scaled(8)
+            color: saveArea.pressed ? Qt.darker("#2E7D32", 1.2) : "#2E7D32"  // Dark green
+
+            Accessible.role: Accessible.Button
+            Accessible.name: TranslationManager.translate("shotmetadata.button.save", "Save Changes")
+            Accessible.onPressAction: saveArea.clicked(null)
+
+            Row {
+                id: saveButtonContent
+                anchors.centerIn: parent
+                spacing: Theme.scaled(6)
+
+                Text {
+                    text: "\u2713"  // Checkmark
+                    font.pixelSize: Theme.scaled(18)
+                    font.bold: true
+                    color: "white"
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Tr {
+                    key: "shotmetadata.button.save"
+                    fallback: "Save Changes"
+                    color: "white"
+                    font: Theme.bodyFont
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+
+            MouseArea {
+                id: saveArea
+                anchors.fill: parent
+                onClicked: saveEditedShot()
+            }
+        }
+
+        // AI Advice button - visible whenever we have shot data (not just pending) and not in edit mode
         Rectangle {
             id: aiAdviceButton
-            visible: MainController.aiManager && MainController.shotDataModel && MainController.shotDataModel.maxTime > 0
+            visible: !isEditMode && MainController.aiManager && MainController.shotDataModel && MainController.shotDataModel.maxTime > 0
             Layout.preferredWidth: aiAdviceContent.width + 32
             Layout.preferredHeight: Theme.scaled(44)
             radius: Theme.scaled(8)
@@ -634,7 +844,7 @@ Page {
         // Email Prompt button - fallback for users without API keys
         Rectangle {
             id: emailPromptButton
-            visible: MainController.aiManager && !MainController.aiManager.isConfigured && MainController.shotDataModel && MainController.shotDataModel.maxTime > 0
+            visible: !isEditMode && MainController.aiManager && !MainController.aiManager.isConfigured && MainController.shotDataModel && MainController.shotDataModel.maxTime > 0
             Layout.preferredWidth: emailPromptContent.width + 32
             Layout.preferredHeight: Theme.scaled(44)
             radius: Theme.scaled(8)
@@ -696,7 +906,7 @@ Page {
 
         Rectangle {
             id: uploadButton
-            visible: hasPendingShot && !MainController.visualizer.uploading
+            visible: !isEditMode && hasPendingShot && !MainController.visualizer.uploading
             Layout.preferredWidth: uploadText.width + 40
             Layout.preferredHeight: Theme.scaled(44)
             radius: Theme.scaled(8)

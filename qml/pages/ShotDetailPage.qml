@@ -289,6 +289,37 @@ Page {
                 }
             }
 
+            // Barista
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: baristaRow.height + Theme.spacingLarge
+                color: Theme.surfaceColor
+                radius: Theme.cardRadius
+                visible: shotData.barista && shotData.barista !== ""
+
+                RowLayout {
+                    id: baristaRow
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: Theme.spacingMedium
+                    spacing: Theme.spacingSmall
+
+                    Tr {
+                        key: "shotdetail.barista"
+                        fallback: "Barista:"
+                        font: Theme.labelFont
+                        color: Theme.textSecondaryColor
+                    }
+
+                    Text {
+                        text: shotData.barista || ""
+                        font: Theme.labelFont
+                        color: Theme.textColor
+                    }
+                }
+            }
+
             // Notes
             Rectangle {
                 Layout.fillWidth: true

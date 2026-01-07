@@ -275,6 +275,60 @@ Page {
                                     elide: Text.ElideRight
                                     Layout.fillWidth: true
                                 }
+
+                                Tr { key: "comparison.grinder"; fallback: "Grinder"; font: Theme.captionFont; color: Theme.textSecondaryColor }
+                                Text {
+                                    text: {
+                                        var info = comparisonModel.getShotInfo(index)
+                                        var parts = []
+                                        if (info.grinderModel) parts.push(info.grinderModel)
+                                        if (info.grinderSetting) parts.push("@ " + info.grinderSetting)
+                                        return parts.length > 0 ? parts.join(" ") : "-"
+                                    }
+                                    font: Theme.labelFont
+                                    color: Theme.textColor
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
+
+                                Tr { key: "comparison.roast"; fallback: "Roast"; font: Theme.captionFont; color: Theme.textSecondaryColor }
+                                Text {
+                                    text: {
+                                        var info = comparisonModel.getShotInfo(index)
+                                        var parts = []
+                                        if (info.roastLevel) parts.push(info.roastLevel)
+                                        if (info.roastDate) parts.push(info.roastDate)
+                                        return parts.length > 0 ? parts.join(", ") : "-"
+                                    }
+                                    font: Theme.labelFont
+                                    color: Theme.textColor
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
+
+                                Tr { key: "comparison.tdsEy"; fallback: "TDS/EY"; font: Theme.captionFont; color: Theme.textSecondaryColor; visible: comparisonModel.getShotInfo(index).drinkTds > 0 || comparisonModel.getShotInfo(index).drinkEy > 0 }
+                                Text {
+                                    visible: comparisonModel.getShotInfo(index).drinkTds > 0 || comparisonModel.getShotInfo(index).drinkEy > 0
+                                    text: {
+                                        var info = comparisonModel.getShotInfo(index)
+                                        var parts = []
+                                        if (info.drinkTds > 0) parts.push(info.drinkTds.toFixed(2) + "%")
+                                        if (info.drinkEy > 0) parts.push(info.drinkEy.toFixed(1) + "%")
+                                        return parts.join(" / ")
+                                    }
+                                    font: Theme.labelFont
+                                    color: Theme.textColor
+                                }
+
+                                Tr { key: "comparison.barista"; fallback: "Barista"; font: Theme.captionFont; color: Theme.textSecondaryColor; visible: comparisonModel.getShotInfo(index).barista !== "" }
+                                Text {
+                                    visible: comparisonModel.getShotInfo(index).barista !== ""
+                                    text: comparisonModel.getShotInfo(index).barista || ""
+                                    font: Theme.labelFont
+                                    color: Theme.textColor
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
                             }
 
                             // Separator

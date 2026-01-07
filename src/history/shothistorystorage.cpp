@@ -788,6 +788,54 @@ bool ShotHistoryStorage::deleteShot(qint64 shotId)
     return true;
 }
 
+bool ShotHistoryStorage::updateShotMetadata(qint64 shotId, const QVariantMap& metadata)
+{
+    if (!m_ready) return false;
+
+    QSqlQuery query(m_db);
+    query.prepare(R"(
+        UPDATE shots SET
+            bean_brand = :bean_brand,
+            bean_type = :bean_type,
+            roast_date = :roast_date,
+            roast_level = :roast_level,
+            grinder_model = :grinder_model,
+            grinder_setting = :grinder_setting,
+            drink_tds = :drink_tds,
+            drink_ey = :drink_ey,
+            enjoyment = :enjoyment,
+            espresso_notes = :espresso_notes,
+            barista = :barista,
+            dose_weight = :dose_weight,
+            final_weight = :final_weight,
+            updated_at = strftime('%s', 'now')
+        WHERE id = :id
+    )");
+
+    query.bindValue(":bean_brand", metadata.value("beanBrand").toString());
+    query.bindValue(":bean_type", metadata.value("beanType").toString());
+    query.bindValue(":roast_date", metadata.value("roastDate").toString());
+    query.bindValue(":roast_level", metadata.value("roastLevel").toString());
+    query.bindValue(":grinder_model", metadata.value("grinderModel").toString());
+    query.bindValue(":grinder_setting", metadata.value("grinderSetting").toString());
+    query.bindValue(":drink_tds", metadata.value("drinkTds").toDouble());
+    query.bindValue(":drink_ey", metadata.value("drinkEy").toDouble());
+    query.bindValue(":enjoyment", metadata.value("enjoyment").toInt());
+    query.bindValue(":espresso_notes", metadata.value("espressoNotes").toString());
+    query.bindValue(":barista", metadata.value("barista").toString());
+    query.bindValue(":dose_weight", metadata.value("doseWeight").toDouble());
+    query.bindValue(":final_weight", metadata.value("finalWeight").toDouble());
+    query.bindValue(":id", shotId);
+
+    if (!query.exec()) {
+        qWarning() << "ShotHistoryStorage: Failed to update shot metadata:" << query.lastError().text();
+        return false;
+    }
+
+    qDebug() << "ShotHistoryStorage: Updated metadata for shot" << shotId;
+    return true;
+}
+
 QStringList ShotHistoryStorage::getDistinctProfiles()
 {
     QStringList results;

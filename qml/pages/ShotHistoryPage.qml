@@ -338,6 +338,29 @@ Page {
                         }
                     }
 
+                    // Edit button (green circle with E)
+                    Rectangle {
+                        width: Theme.scaled(40)
+                        height: Theme.scaled(40)
+                        radius: Theme.scaled(20)
+                        color: "#2E7D32"  // Dark green
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "E"
+                            font.pixelSize: Theme.scaled(18)
+                            font.bold: true
+                            color: "white"
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: {
+                                pageStack.push(Qt.resolvedUrl("ShotMetadataPage.qml"), { editShotId: model.id })
+                            }
+                        }
+                    }
+
                     // Detail arrow
                     Rectangle {
                         width: Theme.scaled(40)

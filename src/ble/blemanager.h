@@ -41,7 +41,7 @@ public:
     void setScaleDevice(ScaleDevice* scale);
 
     // Scale address management
-    void setSavedScaleAddress(const QString& address, const QString& type);
+    void setSavedScaleAddress(const QString& address, const QString& type, const QString& name);
     Q_INVOKABLE void clearSavedScale();
     Q_INVOKABLE void openLocationSettings();
 
@@ -100,6 +100,7 @@ private:
     // Saved scale for direct wake connection
     QString m_savedScaleAddress;
     QString m_savedScaleType;
+    QString m_savedScaleName;
 
     // Simulator mode - disable all BLE operations
     bool m_disabled = false;

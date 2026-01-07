@@ -348,14 +348,16 @@ void BLEManager::onScaleConnectionTimeout() {
     }
 }
 
-void BLEManager::setSavedScaleAddress(const QString& address, const QString& type) {
+void BLEManager::setSavedScaleAddress(const QString& address, const QString& type, const QString& name) {
     m_savedScaleAddress = address;
     m_savedScaleType = type;
+    m_savedScaleName = name;
 }
 
 void BLEManager::clearSavedScale() {
     m_savedScaleAddress.clear();
     m_savedScaleType.clear();
+    m_savedScaleName.clear();
     m_scaleConnectionFailed = false;
     emit scaleConnectionFailedChanged();
 }
@@ -385,14 +387,17 @@ void BLEManager::scanForScales() {
 
 void BLEManager::tryDirectConnectToScale() {
     if (m_disabled) {
+        qDebug() << "BLEManager: tryDirectConnectToScale - disabled (simulator mode)";
         return;
     }
 
     if (m_savedScaleAddress.isEmpty() || m_savedScaleType.isEmpty()) {
+        qDebug() << "BLEManager: tryDirectConnectToScale - no saved scale address/type";
         return;
     }
 
     if (m_scaleDevice && m_scaleDevice->isConnected()) {
+        qDebug() << "BLEManager: tryDirectConnectToScale - scale already connected";
         return;
     }
 
@@ -400,7 +405,11 @@ void BLEManager::tryDirectConnectToScale() {
     // connect directly to a sleeping scale without scanning. The BLE connection
     // request itself will wake the scale (this is how the official de1app works).
     QBluetoothAddress address(m_savedScaleAddress);
-    QBluetoothDeviceInfo deviceInfo(address, m_savedScaleType, QBluetoothDeviceInfo::LowEnergyCoreConfiguration);
+    QString deviceName = m_savedScaleName.isEmpty() ? m_savedScaleType : m_savedScaleName;
+    QBluetoothDeviceInfo deviceInfo(address, deviceName, QBluetoothDeviceInfo::LowEnergyCoreConfiguration);
+
+    qDebug() << "BLEManager: Attempting direct connect to scale" << deviceName << "at" << m_savedScaleAddress;
+    appendScaleLog(QString("Direct wake: connecting to %1 at %2").arg(deviceName, m_savedScaleAddress));
 
     // Start timeout timer
     m_scaleConnectionTimer->start();

@@ -98,12 +98,19 @@ void ShotComparisonModel::loadShotData()
         shot.profileName = record.summary.profileName;
         shot.beanBrand = record.summary.beanBrand;
         shot.beanType = record.summary.beanType;
+        shot.roastDate = record.roastDate;
+        shot.roastLevel = record.roastLevel;
+        shot.grinderModel = record.grinderModel;
+        shot.grinderSetting = record.grinderSetting;
         shot.duration = record.summary.duration;
         shot.doseWeight = record.summary.doseWeight;
         shot.finalWeight = record.summary.finalWeight;
+        shot.drinkTds = record.drinkTds;
+        shot.drinkEy = record.drinkEy;
         shot.enjoyment = record.summary.enjoyment;
         shot.timestamp = record.summary.timestamp;
         shot.notes = record.espressoNotes;
+        shot.barista = record.barista;
 
         shot.pressure = record.pressure;
         shot.flow = record.flow;
@@ -219,12 +226,19 @@ QVariantMap ShotComparisonModel::getShotInfo(int index) const
     result["profileName"] = shot.profileName;
     result["beanBrand"] = shot.beanBrand;
     result["beanType"] = shot.beanType;
+    result["roastDate"] = shot.roastDate;
+    result["roastLevel"] = shot.roastLevel;
+    result["grinderModel"] = shot.grinderModel;
+    result["grinderSetting"] = shot.grinderSetting;
     result["duration"] = shot.duration;
     result["doseWeight"] = shot.doseWeight;
     result["finalWeight"] = shot.finalWeight;
+    result["drinkTds"] = shot.drinkTds;
+    result["drinkEy"] = shot.drinkEy;
     result["enjoyment"] = shot.enjoyment;
     result["timestamp"] = shot.timestamp;
     result["notes"] = shot.notes;
+    result["barista"] = shot.barista;
 
     // Format date
     QDateTime dt = QDateTime::fromSecsSinceEpoch(shot.timestamp);

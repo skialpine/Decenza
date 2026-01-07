@@ -14,6 +14,7 @@ class Settings : public QObject {
     Q_PROPERTY(QString machineAddress READ machineAddress WRITE setMachineAddress NOTIFY machineAddressChanged)
     Q_PROPERTY(QString scaleAddress READ scaleAddress WRITE setScaleAddress NOTIFY scaleAddressChanged)
     Q_PROPERTY(QString scaleType READ scaleType WRITE setScaleType NOTIFY scaleTypeChanged)
+    Q_PROPERTY(QString scaleName READ scaleName WRITE setScaleName NOTIFY scaleNameChanged)
 
     // Flow sensor calibration
     Q_PROPERTY(double flowCalibrationFactor READ flowCalibrationFactor WRITE setFlowCalibrationFactor NOTIFY flowCalibrationFactorChanged)
@@ -130,6 +131,9 @@ public:
 
     QString scaleType() const;
     void setScaleType(const QString& type);
+
+    QString scaleName() const;
+    void setScaleName(const QString& name);
 
     // Flow sensor calibration
     double flowCalibrationFactor() const;
@@ -373,6 +377,7 @@ signals:
     void machineAddressChanged();
     void scaleAddressChanged();
     void scaleTypeChanged();
+    void scaleNameChanged();
     void flowCalibrationFactorChanged();
     void espressoTemperatureChanged();
     void targetWeightChanged();

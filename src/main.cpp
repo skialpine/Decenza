@@ -179,6 +179,7 @@ int main(int argc, char *argv[])
         // Save scale address for future direct wake connections
         settings.setScaleAddress(device.address().toString());
         settings.setScaleType(type);
+        settings.setScaleName(device.name());
 
         // Switch MachineState to use physical scale instead of FlowScale
         machineState.setScale(physicalScale.get());
@@ -246,8 +247,9 @@ int main(int argc, char *argv[])
     // Load saved scale address for direct wake connection
     QString savedScaleAddr = settings.scaleAddress();
     QString savedScaleType = settings.scaleType();
+    QString savedScaleName = settings.scaleName();
     if (!savedScaleAddr.isEmpty() && !savedScaleType.isEmpty()) {
-        bleManager.setSavedScaleAddress(savedScaleAddr, savedScaleType);
+        bleManager.setSavedScaleAddress(savedScaleAddr, savedScaleType, savedScaleName);
     }
 
     // BLE scanning is now started from QML after first-run dialog is dismissed

@@ -128,6 +128,9 @@ public:
     // Delete shot
     Q_INVOKABLE bool deleteShot(qint64 shotId);
 
+    // Update shot metadata (for editing existing shots)
+    Q_INVOKABLE bool updateShotMetadata(qint64 shotId, const QVariantMap& metadata);
+
     // Get filter options (for dropdowns)
     Q_INVOKABLE QStringList getDistinctProfiles();
     Q_INVOKABLE QStringList getDistinctBeanBrands();
