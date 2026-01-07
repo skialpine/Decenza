@@ -303,12 +303,32 @@ inline constexpr const char* WEB_REMOTE_PAGE = R"HTML(
 
         function copyCommand(elementId) {
             var text = document.getElementById(elementId).textContent;
-            navigator.clipboard.writeText(text).then(function() {
-                event.target.textContent = 'Copied!';
-                setTimeout(function() {
-                    event.target.textContent = 'Copy';
-                }, 1500);
-            });
+            var btn = event.target;
+
+            // Try modern clipboard API first (requires HTTPS)
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(function() {
+                    btn.textContent = 'Copied!';
+                    setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
+                });
+            } else {
+                // Fallback for HTTP: use legacy execCommand
+                var textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    btn.textContent = 'Copied!';
+                    setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
+                } catch (err) {
+                    btn.textContent = 'Failed';
+                    setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
+                }
+                document.body.removeChild(textarea);
+            }
         }
     </script>
 </body>
