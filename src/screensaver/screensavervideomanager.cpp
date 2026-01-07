@@ -64,6 +64,9 @@ ScreensaverVideoManager::ScreensaverVideoManager(Settings* settings, ProfileStor
     m_pipesCameraSpeed = m_settings->value("screensaver/pipesCameraSpeed", 60.0).toDouble();
     m_flipClockUse24Hour = m_settings->value("screensaver/flipClockUse24Hour", true).toBool();
     m_flipClockUse3D = m_settings->value("screensaver/flipClockUse3D", true).toBool();
+    m_videosShowClock = m_settings->value("screensaver/videosShowClock", true).toBool();
+    m_pipesShowClock = m_settings->value("screensaver/pipesShowClock", true).toBool();
+    m_attractorShowClock = m_settings->value("screensaver/attractorShowClock", false).toBool();
 
     // Load rate limit state
     QString rateLimitStr = m_settings->value("screensaver/rateLimitedUntil", "").toString();
@@ -350,6 +353,33 @@ void ScreensaverVideoManager::setFlipClockUse3D(bool use3D)
         m_flipClockUse3D = use3D;
         m_settings->setValue("screensaver/flipClockUse3D", use3D);
         emit flipClockUse3DChanged();
+    }
+}
+
+void ScreensaverVideoManager::setVideosShowClock(bool show)
+{
+    if (m_videosShowClock != show) {
+        m_videosShowClock = show;
+        m_settings->setValue("screensaver/videosShowClock", show);
+        emit videosShowClockChanged();
+    }
+}
+
+void ScreensaverVideoManager::setPipesShowClock(bool show)
+{
+    if (m_pipesShowClock != show) {
+        m_pipesShowClock = show;
+        m_settings->setValue("screensaver/pipesShowClock", show);
+        emit pipesShowClockChanged();
+    }
+}
+
+void ScreensaverVideoManager::setAttractorShowClock(bool show)
+{
+    if (m_attractorShowClock != show) {
+        m_attractorShowClock = show;
+        m_settings->setValue("screensaver/attractorShowClock", show);
+        emit attractorShowClockChanged();
     }
 }
 

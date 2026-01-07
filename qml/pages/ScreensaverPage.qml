@@ -324,10 +324,15 @@ Page {
         }
     }
 
-    // Clock display (hidden in flip clock, attractor, and disabled modes)
+    // Clock display (controlled per-screensaver type via settings)
     Text {
+        id: clockDisplay
         z: 2
-        visible: !isFlipClockMode && !isAttractorMode && !isDisabledMode
+        // Show clock based on screensaver type and user preference
+        // Flip clock and disabled modes never show the clock
+        visible: (isVideosMode && ScreensaverManager.videosShowClock) ||
+                 (isPipesMode && ScreensaverManager.pipesShowClock) ||
+                 (isAttractorMode && ScreensaverManager.attractorShowClock)
         anchors.bottom: parent.bottom
         anchors.right: parent.right
         anchors.margins: Theme.scaled(50)
@@ -342,7 +347,7 @@ Page {
 
         Timer {
             interval: 1000
-            running: !isFlipClockMode && !isAttractorMode && !isDisabledMode
+            running: clockDisplay.visible
             repeat: true
             onTriggered: parent.currentTime = new Date()
         }

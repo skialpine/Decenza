@@ -334,6 +334,22 @@ Item {
                         }
                     }
 
+                    RowLayout {
+                        spacing: Theme.scaled(10)
+
+                        Tr {
+                            key: "settings.screensaver.showClock"
+                            fallback: "Show Clock"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(14)
+                        }
+
+                        StyledSwitch {
+                            checked: ScreensaverManager.pipesShowClock
+                            onCheckedChanged: ScreensaverManager.pipesShowClock = checked
+                        }
+                    }
+
                     Item { Layout.fillWidth: true }
                 }
 
@@ -372,6 +388,31 @@ Item {
                         StyledSwitch {
                             checked: ScreensaverManager.flipClockUse3D
                             onCheckedChanged: ScreensaverManager.flipClockUse3D = checked
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+                }
+
+                // Strange Attractor settings (attractor mode only)
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.scaled(30)
+                    visible: ScreensaverManager.screensaverType === "attractor"
+
+                    RowLayout {
+                        spacing: Theme.scaled(10)
+
+                        Tr {
+                            key: "settings.screensaver.showClock"
+                            fallback: "Show Clock"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(14)
+                        }
+
+                        StyledSwitch {
+                            checked: ScreensaverManager.attractorShowClock
+                            onCheckedChanged: ScreensaverManager.attractorShowClock = checked
                         }
                     }
 
@@ -497,6 +538,23 @@ Item {
                         StyledSwitch {
                             checked: ScreensaverManager.cacheEnabled
                             onCheckedChanged: ScreensaverManager.cacheEnabled = checked
+                        }
+                    }
+
+                    // Show clock toggle
+                    RowLayout {
+                        spacing: Theme.scaled(10)
+
+                        Tr {
+                            key: "settings.screensaver.showClock"
+                            fallback: "Show Clock"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(14)
+                        }
+
+                        StyledSwitch {
+                            checked: ScreensaverManager.videosShowClock
+                            onCheckedChanged: ScreensaverManager.videosShowClock = checked
                         }
                     }
 

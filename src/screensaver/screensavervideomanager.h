@@ -108,6 +108,11 @@ class ScreensaverVideoManager : public QObject {
     Q_PROPERTY(bool flipClockUse24Hour READ flipClockUse24Hour WRITE setFlipClockUse24Hour NOTIFY flipClockUse24HourChanged)
     Q_PROPERTY(bool flipClockUse3D READ flipClockUse3D WRITE setFlipClockUse3D NOTIFY flipClockUse3DChanged)
 
+    // Show clock settings (per screensaver type)
+    Q_PROPERTY(bool videosShowClock READ videosShowClock WRITE setVideosShowClock NOTIFY videosShowClockChanged)
+    Q_PROPERTY(bool pipesShowClock READ pipesShowClock WRITE setPipesShowClock NOTIFY pipesShowClockChanged)
+    Q_PROPERTY(bool attractorShowClock READ attractorShowClock WRITE setAttractorShowClock NOTIFY attractorShowClockChanged)
+
     // Rate limiting (after cache clear)
     Q_PROPERTY(bool isRateLimited READ isRateLimited NOTIFY rateLimitedChanged)
     Q_PROPERTY(int rateLimitMinutesRemaining READ rateLimitMinutesRemaining NOTIFY rateLimitedChanged)
@@ -157,6 +162,9 @@ public:
     double pipesCameraSpeed() const { return m_pipesCameraSpeed; }
     bool flipClockUse24Hour() const { return m_flipClockUse24Hour; }
     bool flipClockUse3D() const { return m_flipClockUse3D; }
+    bool videosShowClock() const { return m_videosShowClock; }
+    bool pipesShowClock() const { return m_pipesShowClock; }
+    bool attractorShowClock() const { return m_attractorShowClock; }
 
     // Rate limiting
     bool isRateLimited() const;
@@ -175,6 +183,9 @@ public:
     void setPipesCameraSpeed(double speed);
     void setFlipClockUse24Hour(bool use24Hour);
     void setFlipClockUse3D(bool use3D);
+    void setVideosShowClock(bool show);
+    void setPipesShowClock(bool show);
+    void setAttractorShowClock(bool show);
 
 public slots:
     // Screen wake lock (prevents screen from turning off)
@@ -240,6 +251,9 @@ signals:
     void pipesCameraSpeedChanged();
     void flipClockUse24HourChanged();
     void flipClockUse3DChanged();
+    void videosShowClockChanged();
+    void pipesShowClockChanged();
+    void attractorShowClockChanged();
     void rateLimitedChanged();
 
 private slots:
@@ -344,6 +358,9 @@ private:
     double m_pipesCameraSpeed = 60.0;  // Seconds for full rotation (default 60s)
     bool m_flipClockUse24Hour = true;  // Default to 24-hour format
     bool m_flipClockUse3D = true;  // Default to 3D (perspective) mode
+    bool m_videosShowClock = true;  // Default to showing clock on videos
+    bool m_pipesShowClock = true;  // Default to showing clock on pipes
+    bool m_attractorShowClock = false;  // Default to NOT showing clock on attractors (matches current behavior)
 
     // Rate limiting (after cache clear to prevent S3 abuse)
     QDateTime m_rateLimitedUntil;  // Rate limit active until this time
