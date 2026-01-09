@@ -123,10 +123,24 @@ ApplicationWindow {
         return (val === undefined || val === null) ? 60 : parseInt(val)
     }
 
+    // Active operation phases that should prevent auto-sleep
+    property bool operationActive: {
+        var phase = MachineState.phase
+        return phase === MachineStateType.Phase.EspressoPreheating ||
+               phase === MachineStateType.Phase.Preinfusion ||
+               phase === MachineStateType.Phase.Pouring ||
+               phase === MachineStateType.Phase.Ending ||
+               phase === MachineStateType.Phase.Steaming ||
+               phase === MachineStateType.Phase.HotWater ||
+               phase === MachineStateType.Phase.Flushing ||
+               phase === MachineStateType.Phase.Descaling ||
+               phase === MachineStateType.Phase.Cleaning
+    }
+
     Timer {
         id: inactivityTimer
         interval: root.autoSleepMinutes * 60 * 1000  // Convert minutes to ms
-        running: root.autoSleepMinutes > 0 && !screensaverActive
+        running: root.autoSleepMinutes > 0 && !screensaverActive && !root.operationActive
         repeat: false
         onTriggered: {
             console.log("Auto-sleep triggered after", root.autoSleepMinutes, "minutes of inactivity")
@@ -155,6 +169,16 @@ ApplicationWindow {
     function resetInactivityTimer() {
         if (root.autoSleepMinutes > 0) {
             inactivityTimer.restart()
+        }
+    }
+
+    // Reset timer on any phase change - indicates user activity
+    Connections {
+        target: MachineState
+        function onPhaseChanged() {
+            if (!screensaverActive) {
+                resetInactivityTimer()
+            }
         }
     }
 
@@ -1477,6 +1501,9 @@ ApplicationWindow {
         screensaverActive = false
         // Restore screen brightness in case disabled mode dimmed it
         ScreensaverManager.restoreScreenBrightness()
+        // Reset the inactivity timer - critical! QML timers resume from pause point,
+        // they don't restart. Also handles wake via DE1 button which bypasses MouseArea.
+        resetInactivityTimer()
         pageStack.replace(idlePage)
     }
 
