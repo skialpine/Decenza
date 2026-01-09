@@ -20,6 +20,10 @@
         <file>icons/keyboard_hide.svg</file>
         <!-- GHC Simulator -->
         <file>GHC_Small.png</file>
+        <!-- Shot Map Screensaver -->
+        <file>maps/earth_night.png</file>
+        <file>maps/earth_day.jpg</file>
+        <file>maps/earth_bright.png</file>
         <!-- About page -->
         <file alias="qrcode.png">../logo/qrcode.png</file>
         <!-- Profiles (filenames match profile titles) -->

@@ -311,11 +311,131 @@ Item {
                     // Location status (only when enabled)
                     Text {
                         visible: MainController.shotReporter && MainController.shotReporter.enabled
-                        text: MainController.shotReporter && MainController.shotReporter.hasLocation
-                            ? "Location: " + MainController.shotReporter.currentCity() + (MainController.shotReporter.currentCountryCode() ? ", " + MainController.shotReporter.currentCountryCode() : "")
-                            : "Waiting for location..."
+                        text: {
+                            if (!MainController.shotReporter) return ""
+                            if (MainController.shotReporter.hasLocation) {
+                                var city = MainController.shotReporter.currentCity()
+                                var country = MainController.shotReporter.currentCountryCode()
+                                var prefix = MainController.shotReporter.usingManualCity ? "Manual: " : "GPS: "
+                                var lat = MainController.shotReporter.latitude.toFixed(1)
+                                var lon = MainController.shotReporter.longitude.toFixed(1)
+                                return prefix + city + (country ? ", " + country : "") + " (" + lat + ", " + lon + ")"
+                            }
+                            return "Waiting for GPS..."
+                        }
                         color: MainController.shotReporter && MainController.shotReporter.hasLocation ? Theme.textColor : Theme.textSecondaryColor
                         font.pixelSize: Theme.scaled(12)
+                    }
+
+                    // Manual city input (shown when enabled)
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        visible: MainController.shotReporter && MainController.shotReporter.enabled
+                        spacing: Theme.scaled(5)
+
+                        Text {
+                            text: "Manual city (fallback if GPS unavailable):"
+                            color: Theme.textSecondaryColor
+                            font.pixelSize: Theme.scaled(11)
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.scaled(8)
+
+                            StyledTextField {
+                                id: manualCityField
+                                Layout.fillWidth: true
+                                placeholderText: "e.g. Copenhagen, Denmark"
+                                text: MainController.shotReporter ? MainController.shotReporter.manualCity : ""
+                                onEditingFinished: {
+                                    if (MainController.shotReporter) {
+                                        MainController.shotReporter.manualCity = text
+                                    }
+                                }
+                            }
+
+                            StyledButton {
+                                text: "Test"
+                                enabled: MainController.shotReporter && MainController.shotReporter.hasLocation
+                                onClicked: mapTestPopup.open()
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Map Test Popup
+            Popup {
+                id: mapTestPopup
+                parent: Overlay.overlay
+                anchors.centerIn: parent
+                width: Math.min(parent.width * 0.9, Theme.scaled(800))
+                height: Math.min(parent.height * 0.8, Theme.scaled(500))
+                modal: true
+                closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+                background: Rectangle {
+                    color: Theme.backgroundColor
+                    radius: Theme.cardRadius
+                    border.color: Theme.borderColor
+                    border.width: 1
+                }
+
+                contentItem: ColumnLayout {
+                    spacing: Theme.scaled(10)
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        Text {
+                            text: "Your location on the Shot Map"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(16)
+                            font.bold: true
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        StyledButton {
+                            text: "Close"
+                            onClicked: mapTestPopup.close()
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        color: "#1a1a2e"
+                        radius: Theme.cardRadius
+                        clip: true
+
+                        Loader {
+                            id: mapLoader
+                            anchors.fill: parent
+                            active: mapTestPopup.visible
+                            sourceComponent: Component {
+                                ShotMapScreensaver {
+                                    testMode: true
+                                    testLatitude: MainController.shotReporter ? MainController.shotReporter.latitude : 0
+                                    testLongitude: MainController.shotReporter ? MainController.shotReporter.longitude : 0
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: {
+                            if (!MainController.shotReporter) return ""
+                            var lat = MainController.shotReporter.latitude.toFixed(1)
+                            var lon = MainController.shotReporter.longitude.toFixed(1)
+                            var city = MainController.shotReporter.currentCity()
+                            return "Location: " + city + " at coordinates " + lat + ", " + lon
+                        }
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: Theme.scaled(12)
+                        horizontalAlignment: Text.AlignHCenter
                     }
                 }
             }

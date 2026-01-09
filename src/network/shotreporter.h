@@ -25,6 +25,10 @@ class ShotReporter : public QObject {
     Q_PROPERTY(bool enabled READ isEnabled WRITE setEnabled NOTIFY enabledChanged)
     Q_PROPERTY(bool hasLocation READ hasLocation NOTIFY locationStatusChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
+    Q_PROPERTY(QString manualCity READ manualCity WRITE setManualCity NOTIFY manualCityChanged)
+    Q_PROPERTY(bool usingManualCity READ usingManualCity NOTIFY locationStatusChanged)
+    Q_PROPERTY(double latitude READ latitude NOTIFY locationStatusChanged)
+    Q_PROPERTY(double longitude READ longitude NOTIFY locationStatusChanged)
 
 public:
     explicit ShotReporter(Settings* settings, LocationProvider* locationProvider,
@@ -47,7 +51,17 @@ public:
     Q_INVOKABLE QString currentCity() const;
     Q_INVOKABLE QString currentCountryCode() const;
 
+    // Manual city fallback
+    QString manualCity() const;
+    void setManualCity(const QString& city);
+    bool usingManualCity() const;
+
+    // Get current coordinates (GPS or manual)
+    double latitude() const;
+    double longitude() const;
+
 signals:
+    void manualCityChanged();
     void enabledChanged();
     void locationStatusChanged();
     void lastErrorChanged();

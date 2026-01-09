@@ -109,7 +109,10 @@ class ScreensaverVideoManager : public QObject {
     Q_PROPERTY(bool flipClockUse3D READ flipClockUse3D WRITE setFlipClockUse3D NOTIFY flipClockUse3DChanged)
 
     // Shot map settings
-    Q_PROPERTY(QString shotMapStyle READ shotMapStyle WRITE setShotMapStyle NOTIFY shotMapStyleChanged)
+    Q_PROPERTY(QString shotMapShape READ shotMapShape WRITE setShotMapShape NOTIFY shotMapShapeChanged)
+    Q_PROPERTY(QString shotMapTexture READ shotMapTexture WRITE setShotMapTexture NOTIFY shotMapTextureChanged)
+    Q_PROPERTY(bool shotMapShowClock READ shotMapShowClock WRITE setShotMapShowClock NOTIFY shotMapShowClockChanged)
+    Q_PROPERTY(bool shotMapShowProfiles READ shotMapShowProfiles WRITE setShotMapShowProfiles NOTIFY shotMapShowProfilesChanged)
 
     // Show clock settings (per screensaver type)
     Q_PROPERTY(bool videosShowClock READ videosShowClock WRITE setVideosShowClock NOTIFY videosShowClockChanged)
@@ -168,7 +171,10 @@ public:
     bool videosShowClock() const { return m_videosShowClock; }
     bool pipesShowClock() const { return m_pipesShowClock; }
     bool attractorShowClock() const { return m_attractorShowClock; }
-    QString shotMapStyle() const { return m_shotMapStyle; }
+    QString shotMapShape() const { return m_shotMapShape; }
+    QString shotMapTexture() const { return m_shotMapTexture; }
+    bool shotMapShowClock() const { return m_shotMapShowClock; }
+    bool shotMapShowProfiles() const { return m_shotMapShowProfiles; }
 
     // Rate limiting
     bool isRateLimited() const;
@@ -190,7 +196,10 @@ public:
     void setVideosShowClock(bool show);
     void setPipesShowClock(bool show);
     void setAttractorShowClock(bool show);
-    void setShotMapStyle(const QString& style);
+    void setShotMapShape(const QString& shape);
+    void setShotMapTexture(const QString& texture);
+    void setShotMapShowClock(bool show);
+    void setShotMapShowProfiles(bool show);
 
 public slots:
     // Screen wake lock (prevents screen from turning off)
@@ -259,7 +268,10 @@ signals:
     void videosShowClockChanged();
     void pipesShowClockChanged();
     void attractorShowClockChanged();
-    void shotMapStyleChanged();
+    void shotMapShapeChanged();
+    void shotMapTextureChanged();
+    void shotMapShowClockChanged();
+    void shotMapShowProfilesChanged();
     void rateLimitedChanged();
 
 private slots:
@@ -367,7 +379,10 @@ private:
     bool m_videosShowClock = true;  // Default to showing clock on videos
     bool m_pipesShowClock = true;  // Default to showing clock on pipes
     bool m_attractorShowClock = false;
-    QString m_shotMapStyle = "dark";  // dark, globe, bright
+    QString m_shotMapShape = "flat";  // flat, globe
+    QString m_shotMapTexture = "dark";  // dark, bright, satellite
+    bool m_shotMapShowClock = true;
+    bool m_shotMapShowProfiles = true;
 
     // Rate limiting (after cache clear to prevent S3 abuse)
     QDateTime m_rateLimitedUntil;  // Rate limit active until this time

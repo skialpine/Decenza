@@ -425,33 +425,90 @@ Item {
                 // Shot Map settings (shotmap mode only)
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: Theme.scaled(30)
+                    spacing: Theme.scaled(20)
                     visible: ScreensaverManager.screensaverType === "shotmap"
 
                     RowLayout {
-                        spacing: Theme.scaled(10)
+                        spacing: Theme.scaled(8)
 
                         Tr {
-                            key: "settings.screensaver.shotmap.style"
-                            fallback: "Map Style"
+                            key: "settings.screensaver.shotmap.shape"
+                            fallback: "Shape"
                             color: Theme.textColor
                             font.pixelSize: Theme.scaled(14)
                         }
 
                         StyledComboBox {
-                            id: shotMapStyleCombo
-                            width: Theme.scaled(150)
+                            id: shotMapShapeCombo
+                            width: Theme.scaled(100)
+                            model: [
+                                TranslationManager.translate("settings.screensaver.shotmap.flat", "Flat"),
+                                TranslationManager.translate("settings.screensaver.shotmap.globe", "Globe")
+                            ]
+                            currentIndex: ScreensaverManager.shotMapShape === "globe" ? 1 : 0
+                            onActivated: {
+                                var shapes = ["flat", "globe"]
+                                ScreensaverManager.shotMapShape = shapes[currentIndex]
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        spacing: Theme.scaled(8)
+
+                        Tr {
+                            key: "settings.screensaver.shotmap.texture"
+                            fallback: "Map"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(14)
+                        }
+
+                        StyledComboBox {
+                            id: shotMapTextureCombo
+                            width: Theme.scaled(110)
                             model: [
                                 TranslationManager.translate("settings.screensaver.shotmap.dark", "Dark"),
-                                TranslationManager.translate("settings.screensaver.shotmap.globe", "Globe"),
-                                TranslationManager.translate("settings.screensaver.shotmap.bright", "Bright")
+                                TranslationManager.translate("settings.screensaver.shotmap.bright", "Bright"),
+                                TranslationManager.translate("settings.screensaver.shotmap.satellite", "Satellite")
                             ]
-                            currentIndex: ScreensaverManager.shotMapStyle === "globe" ? 1 :
-                                          ScreensaverManager.shotMapStyle === "bright" ? 2 : 0
+                            currentIndex: ScreensaverManager.shotMapTexture === "bright" ? 1 :
+                                          ScreensaverManager.shotMapTexture === "satellite" ? 2 : 0
                             onActivated: {
-                                var styles = ["dark", "globe", "bright"]
-                                ScreensaverManager.shotMapStyle = styles[currentIndex]
+                                var textures = ["dark", "bright", "satellite"]
+                                ScreensaverManager.shotMapTexture = textures[currentIndex]
                             }
+                        }
+                    }
+
+                    RowLayout {
+                        spacing: Theme.scaled(8)
+
+                        Tr {
+                            key: "settings.screensaver.showClock"
+                            fallback: "Clock"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(14)
+                        }
+
+                        StyledSwitch {
+                            checked: ScreensaverManager.shotMapShowClock
+                            onToggled: ScreensaverManager.shotMapShowClock = checked
+                        }
+                    }
+
+                    RowLayout {
+                        spacing: Theme.scaled(8)
+
+                        Tr {
+                            key: "settings.screensaver.shotmap.profiles"
+                            fallback: "Profiles"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(14)
+                        }
+
+                        StyledSwitch {
+                            checked: ScreensaverManager.shotMapShowProfiles
+                            onToggled: ScreensaverManager.shotMapShowProfiles = checked
                         }
                     }
 

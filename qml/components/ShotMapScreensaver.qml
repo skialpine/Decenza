@@ -1,28 +1,41 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick3D
 import DecenzaDE1
 
 Item {
     id: root
 
     property bool running: true
-    property string mapStyle: ScreensaverManager.shotMapStyle  // "dark", "globe", "bright"
+    property string mapShape: ScreensaverManager.shotMapShape  // "flat", "globe"
+    property string mapTexture: ScreensaverManager.shotMapTexture  // "dark", "bright", "satellite"
+    property bool showClock: ScreensaverManager.shotMapShowClock
+    property bool showProfiles: ScreensaverManager.shotMapShowProfiles
+
+    // Test mode - show user's location with a marker
+    property bool testMode: false
+    property real testLatitude: 0
+    property real testLongitude: 0
 
     // Shot data from API
     property var shots: []
+    property var topProfiles: []
     property int shotCount: 0
 
-    // Map bounds (Mercator projection)
-    readonly property real mapMinLat: -60
-    readonly property real mapMaxLat: 75
+    // Map bounds (Web Mercator projection stretched to 2:1)
+    readonly property real mapMinLat: -85
+    readonly property real mapMaxLat: 85
     readonly property real mapMinLon: -180
     readonly property real mapMaxLon: 180
 
     // Globe rotation
     property real globeRotation: 0
 
+    // Globe sphere radius
+    readonly property real globeRadius: 150
+
     Component.onCompleted: {
-        console.log("[ShotMapScreensaver] Started, style:", mapStyle)
+        console.log("[ShotMapScreensaver] Started, shape:", mapShape, "texture:", mapTexture)
         fetchShots()
     }
 
@@ -37,7 +50,7 @@ Item {
 
     // Globe rotation animation
     NumberAnimation on globeRotation {
-        running: root.running && root.visible && mapStyle === "globe"
+        running: root.running && root.visible && mapShape === "globe"
         from: 0
         to: 360
         duration: 120000  // 2 minutes per rotation
@@ -52,8 +65,9 @@ Item {
                     try {
                         var data = JSON.parse(xhr.responseText)
                         shots = data.shots || []
-                        shotCount = data.count || 0
-                        console.log("[ShotMapScreensaver] Loaded", shots.length, "shots")
+                        topProfiles = data.top_profiles || []
+                        shotCount = shots.length
+                        console.log("[ShotMapScreensaver] Loaded", shots.length, "shots,", topProfiles.length, "profiles")
                     } catch (e) {
                         console.log("[ShotMapScreensaver] JSON parse error:", e)
                     }
@@ -66,153 +80,414 @@ Item {
         xhr.send()
     }
 
-    // Convert lat/lon to screen coordinates (Mercator projection)
-    function latLonToXY(lat, lon) {
-        // Adjust longitude for globe rotation
-        if (mapStyle === "globe") {
-            lon = lon - globeRotation
-            // Wrap around
-            while (lon < -180) lon += 360
-            while (lon > 180) lon -= 360
-        }
+    // Convert latitude to Web Mercator Y (normalized 0-1)
+    function latToMercatorY(lat) {
+        lat = Math.max(-85, Math.min(85, lat))
+        var latRad = lat * Math.PI / 180
+        var mercN = Math.log(Math.tan(Math.PI / 4 + latRad / 2))
+        var maxMercN = Math.log(Math.tan(Math.PI / 4 + 85 * Math.PI / 180 / 2))
+        return (maxMercN - mercN) / (2 * maxMercN)
+    }
 
+    // Convert lat/lon to screen coordinates (Web Mercator projection) - for flat map
+    function latLonToXY(lat, lon) {
         var x = (lon - mapMinLon) / (mapMaxLon - mapMinLon) * width
-        var y = (mapMaxLat - lat) / (mapMaxLat - mapMinLat) * height
+        var y = latToMercatorY(lat) * height
         return { x: x, y: y, visible: true }
     }
 
-    // Calculate opacity based on shot age (fade over 24 hours)
-    function getOpacity(timestamp) {
-        var shotTime = new Date(timestamp).getTime()
-        var now = Date.now()
-        var ageHours = (now - shotTime) / (1000 * 60 * 60)
+    // Convert lat/lon to 3D sphere coordinates
+    function latLonTo3D(lat, lon, radius) {
+        var latRad = lat * Math.PI / 180
+        var lonRad = lon * Math.PI / 180
+        // Apply globe rotation
+        lonRad = lonRad + (globeRotation * Math.PI / 180)
+
+        var x = radius * Math.cos(latRad) * Math.sin(lonRad)
+        var y = radius * Math.sin(latRad)
+        var z = radius * Math.cos(latRad) * Math.cos(lonRad)
+
+        // Check if point is on visible side (z > 0 means facing camera)
+        var visible = z > 0
+
+        return { x: x, y: y, z: z, visible: visible }
+    }
+
+    // Calculate opacity based on age in hours (fade over 24 hours)
+    function getOpacityFromAge(ageHours) {
         return Math.max(0.2, 1 - (ageHours / 24))
+    }
+
+    // Get texture source based on selection
+    function getTextureSource() {
+        if (mapTexture === "dark") return "qrc:/maps/earth_night.png"
+        if (mapTexture === "satellite") return "qrc:/maps/earth_day.jpg"
+        if (mapTexture === "bright") return "qrc:/maps/earth_bright.png"
+        return "qrc:/maps/earth_night.png"
     }
 
     // Background
     Rectangle {
         anchors.fill: parent
-        color: mapStyle === "bright" ? "#1a1a2e" : "#0a0a12"
+        color: "#0a0a12"
     }
 
-    // World map outline (simplified)
-    Canvas {
-        id: mapCanvas
+    // ==================== FLAT MAP VIEW ====================
+    Item {
+        id: flatMapView
         anchors.fill: parent
-        visible: mapStyle !== "bright"
+        visible: mapShape === "flat"
 
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.reset()
-
-            // Draw grid lines
-            ctx.strokeStyle = mapStyle === "globe" ? "#1a2a3a" : "#1a1a2a"
-            ctx.lineWidth = 1
-
-            // Longitude lines
-            for (var lon = -180; lon <= 180; lon += 30) {
-                var pos = latLonToXY(0, lon)
-                ctx.beginPath()
-                ctx.moveTo(pos.x, 0)
-                ctx.lineTo(pos.x, height)
-                ctx.stroke()
-            }
-
-            // Latitude lines
-            for (var lat = -60; lat <= 75; lat += 15) {
-                var pos = latLonToXY(lat, 0)
-                ctx.beginPath()
-                ctx.moveTo(0, pos.y)
-                ctx.lineTo(width, pos.y)
-                ctx.stroke()
-            }
+        // Map image background
+        Image {
+            id: mapImage
+            anchors.fill: parent
+            fillMode: Image.Stretch
+            source: getTextureSource()
+            visible: status === Image.Ready
         }
 
-        // Redraw when globe rotates
-        Connections {
-            target: root
-            function onGlobeRotationChanged() {
-                if (mapStyle === "globe") {
-                    mapCanvas.requestPaint()
+        // Fallback grid if images not loaded
+        Canvas {
+            id: mapCanvas
+            anchors.fill: parent
+            visible: mapImage.status !== Image.Ready
+
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.reset()
+                ctx.strokeStyle = "#1a2a3a"
+                ctx.lineWidth = 1
+
+                for (var lon = -180; lon <= 180; lon += 30) {
+                    var pos = latLonToXY(0, lon)
+                    ctx.beginPath()
+                    ctx.moveTo(pos.x, 0)
+                    ctx.lineTo(pos.x, height)
+                    ctx.stroke()
+                }
+
+                for (var lat = -60; lat <= 75; lat += 15) {
+                    var pos2 = latLonToXY(lat, 0)
+                    ctx.beginPath()
+                    ctx.moveTo(0, pos2.y)
+                    ctx.lineTo(width, pos2.y)
+                    ctx.stroke()
                 }
             }
         }
-    }
 
-    // Globe overlay (circular mask effect)
-    Rectangle {
-        anchors.centerIn: parent
-        width: Math.min(parent.width, parent.height) * 0.9
-        height: width
-        radius: width / 2
-        color: "transparent"
-        border.color: mapStyle === "globe" ? "#2a4a6a" : "transparent"
-        border.width: mapStyle === "globe" ? 3 : 0
-        visible: mapStyle === "globe"
-
-        // Glow effect
+        // Dark overlay for non-bright modes to make markers pop
         Rectangle {
             anchors.fill: parent
-            anchors.margins: -10
-            radius: width / 2
-            color: "transparent"
-            border.color: "#1a3a5a"
-            border.width: 20
-            opacity: 0.3
+            color: "#000000"
+            opacity: mapTexture === "bright" ? 0 : 0.3
+            visible: mapImage.status === Image.Ready
         }
-    }
 
-    // Shot markers
-    Repeater {
-        model: shots
+        // Shot markers (flat map)
+        Repeater {
+            model: shots
 
-        Item {
-            id: shotMarker
-            property var pos: latLonToXY(modelData.lat, modelData.lon)
-            property real shotOpacity: getOpacity(modelData.ts)
-            property bool isNew: {
-                var shotTime = new Date(modelData.ts).getTime()
-                var now = Date.now()
-                return (now - shotTime) < 60000  // Less than 1 minute old
+            Item {
+                id: flatShotMarker
+                property var pos: latLonToXY(modelData.lat, modelData.lon)
+                property real ageHours: modelData.age || 0
+                property real shotOpacity: getOpacityFromAge(ageHours)
+                property bool isNew: ageHours < (1/60)
+
+                x: pos.x - width / 2
+                y: pos.y - height / 2
+                width: 20
+                height: 20
+                visible: pos.visible
+                opacity: shotOpacity
+
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: parent.width * 2
+                    height: width
+                    radius: width / 2
+                    color: mapTexture === "bright" ? "#ff6b35" : "#4a9eff"
+                    opacity: 0.3
+
+                    SequentialAnimation on scale {
+                        running: flatShotMarker.isNew
+                        loops: 3
+                        NumberAnimation { from: 1; to: 2; duration: 500; easing.type: Easing.OutQuad }
+                        NumberAnimation { from: 2; to: 1; duration: 500; easing.type: Easing.InQuad }
+                    }
+                }
+
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 8
+                    height: 8
+                    radius: 4
+                    color: mapTexture === "bright" ? "#ff8c5a" : "#7abdff"
+                }
             }
+        }
 
+        // Test mode marker (flat)
+        Item {
+            id: flatTestMarker
+            visible: testMode && testLatitude !== 0 && testLongitude !== 0
+            property var pos: latLonToXY(testLatitude, testLongitude)
             x: pos.x - width / 2
             y: pos.y - height / 2
-            width: 20
-            height: 20
-            visible: pos.visible
-            opacity: shotOpacity
+            width: 40
+            height: 40
 
-            // Outer glow
             Rectangle {
                 anchors.centerIn: parent
-                width: parent.width * 2
-                height: width
-                radius: width / 2
-                color: mapStyle === "bright" ? "#ff6b35" : "#4a9eff"
-                opacity: 0.3
+                width: 60
+                height: 60
+                radius: 30
+                color: "#22ff6b35"
+                border.color: "#ff6b35"
+                border.width: 2
 
-                // Pulse animation for new shots
                 SequentialAnimation on scale {
-                    running: shotMarker.isNew
-                    loops: 3
-                    NumberAnimation { from: 1; to: 2; duration: 500; easing.type: Easing.OutQuad }
-                    NumberAnimation { from: 2; to: 1; duration: 500; easing.type: Easing.InQuad }
+                    running: flatTestMarker.visible
+                    loops: Animation.Infinite
+                    NumberAnimation { from: 0.5; to: 1.5; duration: 1000; easing.type: Easing.OutQuad }
+                    NumberAnimation { from: 1.5; to: 0.5; duration: 1000; easing.type: Easing.InQuad }
+                }
+
+                SequentialAnimation on opacity {
+                    running: flatTestMarker.visible
+                    loops: Animation.Infinite
+                    NumberAnimation { from: 1; to: 0.3; duration: 1000 }
+                    NumberAnimation { from: 0.3; to: 1; duration: 1000 }
                 }
             }
 
-            // Inner dot
             Rectangle {
                 anchors.centerIn: parent
-                width: 8
-                height: 8
+                width: 16
+                height: 16
+                radius: 8
+                color: "#ff6b35"
+                border.color: "#ffffff"
+                border.width: 2
+            }
+
+            Rectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.bottom
+                anchors.topMargin: 5
+                width: flatYouLabel.width + 10
+                height: flatYouLabel.height + 4
                 radius: 4
-                color: mapStyle === "bright" ? "#ff8c5a" : "#7abdff"
+                color: "#ff6b35"
+
+                Text {
+                    id: flatYouLabel
+                    anchors.centerIn: parent
+                    text: "YOU"
+                    color: "#ffffff"
+                    font.pixelSize: 10
+                    font.bold: true
+                    font.family: Theme.bodyFont.family
+                }
             }
         }
     }
 
-    // Stats overlay
+    // ==================== 3D GLOBE VIEW ====================
+    Item {
+        id: globeView
+        anchors.fill: parent
+        visible: mapShape === "globe"
+
+        View3D {
+            id: view3d
+            anchors.fill: parent
+            camera: globeCamera
+            environment: globeEnvironment
+
+            SceneEnvironment {
+                id: globeEnvironment
+                clearColor: "#0a0a12"
+                backgroundMode: SceneEnvironment.Color
+                antialiasingMode: SceneEnvironment.MSAA
+                antialiasingQuality: SceneEnvironment.High
+            }
+
+            // Camera positioned to view the globe
+            PerspectiveCamera {
+                id: globeCamera
+                position: Qt.vector3d(0, 0, 400)
+                eulerRotation.x: 0
+                clipNear: 10
+                clipFar: 1000
+                fieldOfView: 45
+            }
+
+            // Ambient light for overall illumination
+            DirectionalLight {
+                eulerRotation.x: -30
+                eulerRotation.y: 30
+                brightness: 0.8
+                ambientColor: Qt.rgba(0.4, 0.4, 0.4, 1.0)
+                color: "white"
+            }
+
+            // Secondary fill light
+            DirectionalLight {
+                eulerRotation.x: 20
+                eulerRotation.y: -60
+                brightness: 0.3
+                color: "#aabbcc"
+            }
+
+            // Earth sphere
+            Model {
+                id: earthModel
+                source: "#Sphere"
+                scale: Qt.vector3d(globeRadius / 50, globeRadius / 50, globeRadius / 50)
+                eulerRotation.y: -globeRotation
+                // Tilt the earth slightly to show more northern hemisphere
+                eulerRotation.x: 15
+
+                materials: DefaultMaterial {
+                    diffuseMap: Texture {
+                        source: getTextureSource()
+                    }
+                    specularAmount: 0.1
+                    specularRoughness: 0.8
+                }
+            }
+
+            // Shot markers on globe (3D spheres)
+            Repeater3D {
+                model: shots
+
+                Model {
+                    id: globeShotMarker
+                    property var pos3d: latLonTo3D(modelData.lat, modelData.lon, globeRadius + 3)
+                    property real ageHours: modelData.age || 0
+                    property real shotOpacity: getOpacityFromAge(ageHours)
+                    property bool isNew: ageHours < (1/60)
+
+                    source: "#Sphere"
+                    position: Qt.vector3d(pos3d.x, pos3d.y, pos3d.z)
+                    scale: Qt.vector3d(0.08, 0.08, 0.08)
+                    visible: pos3d.visible
+
+                    materials: DefaultMaterial {
+                        diffuseColor: mapTexture === "bright" ? "#ff6b35" : "#4a9eff"
+                        opacity: shotOpacity
+                        specularAmount: 0.5
+                    }
+
+                    // Glow sphere behind
+                    Model {
+                        source: "#Sphere"
+                        scale: Qt.vector3d(2.5, 2.5, 2.5)
+                        materials: DefaultMaterial {
+                            diffuseColor: mapTexture === "bright" ? "#ff6b35" : "#4a9eff"
+                            opacity: 0.3 * shotOpacity
+                        }
+                    }
+                }
+            }
+
+            // Test marker on globe
+            Model {
+                id: globeTestMarker
+                visible: testMode && testLatitude !== 0 && testLongitude !== 0
+                property var pos3d: latLonTo3D(testLatitude, testLongitude, globeRadius + 5)
+
+                source: "#Sphere"
+                position: Qt.vector3d(pos3d.x, pos3d.y, pos3d.z)
+                scale: Qt.vector3d(0.15, 0.15, 0.15)
+
+                materials: DefaultMaterial {
+                    diffuseColor: "#ff6b35"
+                    specularAmount: 0.6
+                }
+
+                // Outer glow
+                Model {
+                    source: "#Sphere"
+                    scale: Qt.vector3d(2, 2, 2)
+                    materials: DefaultMaterial {
+                        diffuseColor: "#ff6b35"
+                        opacity: 0.4
+                    }
+                }
+            }
+        }
+    }
+
+    // ==================== OVERLAYS (shared for both views) ====================
+
+    // Clock display (top center)
+    Text {
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.topMargin: 30
+        text: Qt.formatTime(new Date(), "HH:mm")
+        color: mapTexture === "bright" ? "#ffffff" : "#aabbcc"
+        font.pixelSize: 48
+        font.bold: true
+        font.family: Theme.bodyFont.family
+        opacity: 0.9
+        visible: showClock && !testMode
+
+        Timer {
+            interval: 1000
+            running: showClock && root.visible
+            repeat: true
+            onTriggered: parent.text = Qt.formatTime(new Date(), "HH:mm")
+        }
+    }
+
+    // Top profiles display (top right)
+    Column {
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.margins: 30
+        spacing: 8
+        opacity: 0.85
+        visible: showProfiles && topProfiles.length > 0 && !testMode
+
+        Text {
+            text: "Top Profiles"
+            color: mapTexture === "bright" ? "#ffffff" : "#8899aa"
+            font.pixelSize: 14
+            font.bold: true
+            font.family: Theme.bodyFont.family
+        }
+
+        Repeater {
+            model: topProfiles
+
+            Row {
+                spacing: 8
+
+                Text {
+                    text: modelData.name || "Unknown"
+                    color: mapTexture === "bright" ? "#dddddd" : "#667788"
+                    font.pixelSize: 12
+                    font.family: Theme.bodyFont.family
+                    width: 150
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    text: "(" + (modelData.count || 0) + ")"
+                    color: mapTexture === "bright" ? "#aaaaaa" : "#556677"
+                    font.pixelSize: 11
+                    font.family: Theme.bodyFont.family
+                }
+            }
+        }
+    }
+
+    // Stats overlay (bottom left)
     Column {
         anchors.bottom: parent.bottom
         anchors.left: parent.left
@@ -222,46 +497,16 @@ Item {
 
         Text {
             text: shotCount + " shots in the last 24 hours"
-            color: mapStyle === "bright" ? "#ffffff" : "#8899aa"
+            color: mapTexture === "bright" ? "#ffffff" : "#8899aa"
             font.pixelSize: 16
             font.family: Theme.bodyFont.family
         }
 
         Text {
             text: "decenza.coffee"
-            color: mapStyle === "bright" ? "#aaaaaa" : "#556677"
+            color: mapTexture === "bright" ? "#aaaaaa" : "#556677"
             font.pixelSize: 12
             font.family: Theme.bodyFont.family
-        }
-    }
-
-    // Recent shots ticker
-    Column {
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.margins: 30
-        spacing: 8
-        opacity: 0.9
-
-        Text {
-            text: "Recent Shots"
-            color: mapStyle === "bright" ? "#ffffff" : "#8899aa"
-            font.pixelSize: 14
-            font.bold: true
-            font.family: Theme.bodyFont.family
-        }
-
-        Repeater {
-            model: shots.slice(0, 5)  // Show last 5 shots
-
-            Text {
-                property real shotOpacity: getOpacity(modelData.ts)
-                text: modelData.city + (modelData.profile ? " - " + modelData.profile : "")
-                color: mapStyle === "bright" ? "#cccccc" : "#667788"
-                font.pixelSize: 12
-                font.family: Theme.bodyFont.family
-                opacity: shotOpacity
-            }
         }
     }
 
@@ -274,5 +519,6 @@ Item {
         color: "#444455"
         font.pixelSize: 11
         font.family: Theme.bodyFont.family
+        visible: !testMode
     }
 }

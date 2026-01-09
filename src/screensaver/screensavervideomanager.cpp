@@ -67,7 +67,10 @@ ScreensaverVideoManager::ScreensaverVideoManager(Settings* settings, ProfileStor
     m_videosShowClock = m_settings->value("screensaver/videosShowClock", true).toBool();
     m_pipesShowClock = m_settings->value("screensaver/pipesShowClock", true).toBool();
     m_attractorShowClock = m_settings->value("screensaver/attractorShowClock", false).toBool();
-    m_shotMapStyle = m_settings->value("screensaver/shotMapStyle", "dark").toString();
+    m_shotMapShape = m_settings->value("screensaver/shotMapShape", "flat").toString();
+    m_shotMapTexture = m_settings->value("screensaver/shotMapTexture", "dark").toString();
+    m_shotMapShowClock = m_settings->value("screensaver/shotMapShowClock", true).toBool();
+    m_shotMapShowProfiles = m_settings->value("screensaver/shotMapShowProfiles", true).toBool();
 
     // Load rate limit state
     QString rateLimitStr = m_settings->value("screensaver/rateLimitedUntil", "").toString();
@@ -383,12 +386,39 @@ void ScreensaverVideoManager::setAttractorShowClock(bool show)
         emit attractorShowClockChanged();
     }
 }
-void ScreensaverVideoManager::setShotMapStyle(const QString& style)
+void ScreensaverVideoManager::setShotMapShape(const QString& shape)
 {
-    if (m_shotMapStyle != style) {
-        m_shotMapStyle = style;
-        m_settings->setValue("screensaver/shotMapStyle", style);
-        emit shotMapStyleChanged();
+    if (m_shotMapShape != shape) {
+        m_shotMapShape = shape;
+        m_settings->setValue("screensaver/shotMapShape", shape);
+        emit shotMapShapeChanged();
+    }
+}
+
+void ScreensaverVideoManager::setShotMapTexture(const QString& texture)
+{
+    if (m_shotMapTexture != texture) {
+        m_shotMapTexture = texture;
+        m_settings->setValue("screensaver/shotMapTexture", texture);
+        emit shotMapTextureChanged();
+    }
+}
+
+void ScreensaverVideoManager::setShotMapShowClock(bool show)
+{
+    if (m_shotMapShowClock != show) {
+        m_shotMapShowClock = show;
+        m_settings->setValue("screensaver/shotMapShowClock", show);
+        emit shotMapShowClockChanged();
+    }
+}
+
+void ScreensaverVideoManager::setShotMapShowProfiles(bool show)
+{
+    if (m_shotMapShowProfiles != show) {
+        m_shotMapShowProfiles = show;
+        m_settings->setValue("screensaver/shotMapShowProfiles", show);
+        emit shotMapShowProfilesChanged();
     }
 }
 

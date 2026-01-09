@@ -4,6 +4,8 @@
 #include <QNetworkReply>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
+#include <QSettings>
 #include <QDebug>
 #include <cmath>
 
@@ -11,6 +13,13 @@ LocationProvider::LocationProvider(QObject* parent)
     : QObject(parent)
     , m_networkManager(new QNetworkAccessManager(this))
 {
+    // Load saved manual city and coordinates
+    QSettings settings;
+    m_manualCity = settings.value("shotMap/manualCity", "").toString();
+    m_manualLat = settings.value("shotMap/manualLat", 0.0).toDouble();
+    m_manualLon = settings.value("shotMap/manualLon", 0.0).toDouble();
+    m_manualGeocoded = settings.value("shotMap/manualGeocoded", false).toBool();
+
     // Try to create a position source
     m_source = QGeoPositionInfoSource::createDefaultSource(this);
 
@@ -24,6 +33,11 @@ LocationProvider::LocationProvider(QObject* parent)
     } else {
         qDebug() << "LocationProvider: No GPS source available";
     }
+
+    if (!m_manualCity.isEmpty()) {
+        qDebug() << "LocationProvider: Manual city configured:" << m_manualCity
+                 << "at" << m_manualLat << m_manualLon;
+    }
 }
 
 LocationProvider::~LocationProvider()
@@ -35,14 +49,18 @@ LocationProvider::~LocationProvider()
 
 double LocationProvider::roundedLatitude() const
 {
+    // Use GPS if valid, otherwise use manual city coordinates
+    double lat = m_currentLocation.valid ? m_currentLocation.latitude : m_manualLat;
     // Round to 1 decimal place (~11km precision)
-    return std::round(m_currentLocation.latitude * 10.0) / 10.0;
+    return std::round(lat * 10.0) / 10.0;
 }
 
 double LocationProvider::roundedLongitude() const
 {
+    // Use GPS if valid, otherwise use manual city coordinates
+    double lon = m_currentLocation.valid ? m_currentLocation.longitude : m_manualLon;
     // Round to 1 decimal place (~11km precision)
-    return std::round(m_currentLocation.longitude * 10.0) / 10.0;
+    return std::round(lon * 10.0) / 10.0;
 }
 
 void LocationProvider::requestUpdate()
@@ -163,6 +181,108 @@ void LocationProvider::onReverseGeocodeFinished(QNetworkReply* reply)
     m_currentLocation.city = city;
     m_currentLocation.countryCode = countryCode;
     m_currentLocation.valid = true;
+
+    emit locationChanged();
+}
+
+QString LocationProvider::city() const
+{
+    // If GPS location is valid, use it; otherwise fall back to manual city
+    if (m_currentLocation.valid) {
+        return m_currentLocation.city;
+    }
+    return m_manualCity;
+}
+
+void LocationProvider::setManualCity(const QString& city)
+{
+    if (m_manualCity != city) {
+        m_manualCity = city;
+        m_manualGeocoded = false;
+        m_manualLat = 0.0;
+        m_manualLon = 0.0;
+
+        // Save to settings
+        QSettings settings;
+        settings.setValue("shotMap/manualCity", city);
+        settings.setValue("shotMap/manualGeocoded", false);
+        settings.setValue("shotMap/manualLat", 0.0);
+        settings.setValue("shotMap/manualLon", 0.0);
+
+        qDebug() << "LocationProvider: Manual city set to:" << city;
+
+        emit manualCityChanged();
+        emit locationChanged();
+
+        // Auto-geocode if city is not empty
+        if (!city.isEmpty()) {
+            geocodeManualCity();
+        }
+    }
+}
+
+void LocationProvider::geocodeManualCity()
+{
+    if (m_manualCity.isEmpty()) {
+        qDebug() << "LocationProvider: No manual city to geocode";
+        return;
+    }
+
+    forwardGeocode(m_manualCity);
+}
+
+void LocationProvider::forwardGeocode(const QString& city)
+{
+    // Use Nominatim for forward geocoding
+    QString encodedCity = QUrl::toPercentEncoding(city);
+    QString url = QString("https://nominatim.openstreetmap.org/search?format=json&q=%1&limit=1")
+                      .arg(encodedCity);
+
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::UserAgentHeader, "Decenza_DE1/1.0 (espresso app)");
+
+    qDebug() << "LocationProvider: Forward geocoding:" << city;
+
+    QNetworkReply* reply = m_networkManager->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        onForwardGeocodeFinished(reply);
+    });
+}
+
+void LocationProvider::onForwardGeocodeFinished(QNetworkReply* reply)
+{
+    reply->deleteLater();
+
+    if (reply->error() != QNetworkReply::NoError) {
+        qDebug() << "LocationProvider: Forward geocode failed -" << reply->errorString();
+        emit locationError("Failed to geocode city: " + reply->errorString());
+        return;
+    }
+
+    QByteArray data = reply->readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    QJsonArray results = doc.array();
+
+    if (results.isEmpty()) {
+        qDebug() << "LocationProvider: No geocoding results for" << m_manualCity;
+        emit locationError("City not found: " + m_manualCity);
+        return;
+    }
+
+    QJsonObject result = results.first().toObject();
+    m_manualLat = result["lat"].toString().toDouble();
+    m_manualLon = result["lon"].toString().toDouble();
+    m_manualGeocoded = true;
+
+    // Save to settings
+    QSettings settings;
+    settings.setValue("shotMap/manualLat", m_manualLat);
+    settings.setValue("shotMap/manualLon", m_manualLon);
+    settings.setValue("shotMap/manualGeocoded", true);
+
+    QString displayName = result["display_name"].toString();
+    qDebug() << "LocationProvider: Geocoded" << m_manualCity << "to"
+             << m_manualLat << m_manualLon << "-" << displayName;
 
     emit locationChanged();
 }

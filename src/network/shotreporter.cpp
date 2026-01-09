@@ -24,6 +24,8 @@ ShotReporter::ShotReporter(Settings* settings, LocationProvider* locationProvide
                 this, &ShotReporter::onLocationChanged);
         connect(m_locationProvider, &LocationProvider::locationError,
                 this, &ShotReporter::onLocationError);
+        connect(m_locationProvider, &LocationProvider::manualCityChanged,
+                this, &ShotReporter::manualCityChanged);
     }
 
     // Load enabled state from settings
@@ -205,4 +207,31 @@ void ShotReporter::onLocationError(const QString& error)
     qDebug() << "ShotReporter: Location error -" << error;
     m_lastError = error;
     emit lastErrorChanged();
+}
+
+QString ShotReporter::manualCity() const
+{
+    return m_locationProvider ? m_locationProvider->manualCity() : QString();
+}
+
+void ShotReporter::setManualCity(const QString& city)
+{
+    if (m_locationProvider) {
+        m_locationProvider->setManualCity(city);
+    }
+}
+
+bool ShotReporter::usingManualCity() const
+{
+    return m_locationProvider && m_locationProvider->useManualCity();
+}
+
+double ShotReporter::latitude() const
+{
+    return m_locationProvider ? m_locationProvider->roundedLatitude() : 0.0;
+}
+
+double ShotReporter::longitude() const
+{
+    return m_locationProvider ? m_locationProvider->roundedLongitude() : 0.0;
 }
