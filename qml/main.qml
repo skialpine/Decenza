@@ -18,6 +18,9 @@ ApplicationWindow {
     // Flag to prevent navigation during flow calibration
     property bool calibrationInProgress: false
 
+    // Debug flag to force live view on operation pages (for development)
+    property bool debugLiveView: false
+
     // Global accessibility: find closest Text within radius of tap
     // Use physical units: 10mm (~1cm) converted to pixels
     property real accessibilitySearchRadius: Screen.pixelDensity * 10  // 10mm in pixels
