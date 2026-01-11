@@ -174,52 +174,23 @@ Page {
                         // Import Profile button (requires 4-char code)
                         StyledButton {
                             id: importButton
+                            primary: true
                             enabled: shareCodeInput.text.length === 4 && !MainController.visualizerImporter.importing
-                            width: Theme.scaled(160)
-                            height: Theme.scaled(50)
-
-                            Tr { id: trImporting; key: "visualizer.button.importing"; fallback: "Importing..."; visible: false }
-                            Tr { id: trImportProfile; key: "visualizer.button.import"; fallback: "Import Profile"; visible: false }
-
+                            text: MainController.visualizerImporter.importing
+                                ? TranslationManager.translate("visualizer.button.importing", "Importing...")
+                                : TranslationManager.translate("visualizer.button.import", "Import Profile")
                             onClicked: {
                                 MainController.visualizerImporter.importFromShareCode(shareCodeInput.text)
-                            }
-
-                            background: Rectangle {
-                                radius: Theme.scaled(8)
-                                color: parent.enabled ? Theme.primaryColor : Theme.surfaceColor
-                            }
-                            contentItem: Text {
-                                text: MainController.visualizerImporter.importing ? trImporting.text : trImportProfile.text
-                                color: importButton.enabled ? "white" : Theme.textSecondaryColor
-                                font: Theme.bodyFont
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
                             }
                         }
 
                         // Import Shared button (opens multi-import page)
                         StyledButton {
                             id: importSharedButton
-                            height: Theme.scaled(50)
-
+                            primary: true
+                            text: TranslationManager.translate("visualizer.button.importShared", "Import profiles I shared")
                             onClicked: {
                                 pageStack.push(Qt.resolvedUrl("VisualizerMultiImportPage.qml"))
-                            }
-
-                            background: Rectangle {
-                                radius: Theme.scaled(8)
-                                color: Theme.primaryColor
-                                opacity: importSharedButton.pressed ? 0.8 : 1.0
-                            }
-                            contentItem: Text {
-                                text: "Import profiles I shared"
-                                color: "white"
-                                font: Theme.bodyFont
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                leftPadding: Theme.scaled(16)
-                                rightPadding: Theme.scaled(16)
                             }
                         }
                     }
@@ -329,67 +300,42 @@ Page {
 
                         StyledButton {
                             id: overwriteButton
-                            Tr { id: trOverwrite; key: "visualizer.button.overwrite"; fallback: "Overwrite"; visible: false }
+                            text: TranslationManager.translate("visualizer.button.overwrite", "Overwrite")
                             onClicked: {
                                 MainController.visualizerImporter.saveOverwrite()
                                 hideDuplicateDialog()
                             }
+                            // Red background for destructive action
                             background: Rectangle {
-                                radius: Theme.scaled(4)
-                                color: Theme.errorColor
+                                implicitWidth: overwriteButton.implicitWidth
+                                implicitHeight: Theme.scaled(36)
+                                radius: Theme.scaled(6)
+                                color: overwriteButton.down ? Qt.darker(Theme.errorColor, 1.1) : Theme.errorColor
                             }
                             contentItem: Text {
-                                text: trOverwrite.text
+                                text: overwriteButton.text
+                                font.pixelSize: Theme.scaled(14)
+                                font.family: Theme.bodyFont.family
                                 color: "white"
-                                font: Theme.bodyFont
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
-                                leftPadding: Theme.scaled(16)
-                                rightPadding: Theme.scaled(16)
                             }
                         }
 
                         StyledButton {
                             id: saveAsNewButton
-                            Tr { id: trSaveAsNew; key: "visualizer.button.saveAsNew"; fallback: "Save as New"; visible: false }
+                            primary: true
+                            text: TranslationManager.translate("visualizer.button.saveAsNew", "Save as New")
                             onClicked: {
                                 newNameInput.text = duplicateProfileTitle + " (copy)"
                                 showingNameInput = true
-                            }
-                            background: Rectangle {
-                                radius: Theme.scaled(4)
-                                color: Theme.primaryColor
-                            }
-                            contentItem: Text {
-                                text: trSaveAsNew.text
-                                color: "white"
-                                font: Theme.bodyFont
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                leftPadding: Theme.scaled(16)
-                                rightPadding: Theme.scaled(16)
                             }
                         }
 
                         StyledButton {
                             id: cancelButton
-                            Tr { id: trCancel; key: "visualizer.button.cancel"; fallback: "Cancel"; visible: false }
+                            text: TranslationManager.translate("visualizer.button.cancel", "Cancel")
                             onClicked: hideDuplicateDialog()
-                            background: Rectangle {
-                                radius: Theme.scaled(4)
-                                color: Theme.surfaceColor
-                                border.color: Theme.textSecondaryColor
-                                border.width: 1
-                            }
-                            contentItem: Text {
-                                text: trCancel.text
-                                color: Theme.textColor
-                                font: Theme.bodyFont
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                leftPadding: Theme.scaled(16)
-                                rightPadding: Theme.scaled(16)
-                            }
                         }
                     }
                 }
@@ -475,46 +421,19 @@ Page {
 
                         StyledButton {
                             id: saveButton
-                            Tr { id: trSave; key: "visualizer.button.save"; fallback: "Save"; visible: false }
+                            primary: true
                             enabled: newNameInput.text.trim().length > 0
+                            text: TranslationManager.translate("visualizer.button.save", "Save")
                             onClicked: {
                                 MainController.visualizerImporter.saveWithNewName(newNameInput.text.trim())
                                 hideDuplicateDialog()
-                            }
-                            background: Rectangle {
-                                radius: Theme.scaled(4)
-                                color: parent.enabled ? Theme.primaryColor : Theme.surfaceColor
-                            }
-                            contentItem: Text {
-                                text: trSave.text
-                                color: saveButton.enabled ? "white" : Theme.textSecondaryColor
-                                font: Theme.bodyFont
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                leftPadding: Theme.scaled(16)
-                                rightPadding: Theme.scaled(16)
                             }
                         }
 
                         StyledButton {
                             id: backButton
-                            Tr { id: trBack; key: "visualizer.button.back"; fallback: "Back"; visible: false }
+                            text: TranslationManager.translate("visualizer.button.back", "Back")
                             onClicked: showingNameInput = false
-                            background: Rectangle {
-                                radius: Theme.scaled(4)
-                                color: Theme.surfaceColor
-                                border.color: Theme.textSecondaryColor
-                                border.width: 1
-                            }
-                            contentItem: Text {
-                                text: trBack.text
-                                color: Theme.textColor
-                                font: Theme.bodyFont
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                leftPadding: Theme.scaled(16)
-                                rightPadding: Theme.scaled(16)
-                            }
                         }
                     }
                 }

@@ -206,111 +206,54 @@ Page {
 
                             Item { Layout.fillWidth: true }
 
-                            AccessibleButton {
+                            StyledButton {
+                                primary: true
                                 text: qsTr("+ Add")
-                                accessibleName: qsTr("Add frame")
                                 onClicked: addStep()
-                                background: Rectangle {
-                                    implicitWidth: Theme.scaled(70)
-                                    implicitHeight: Theme.scaled(26)
-                                    radius: Theme.scaled(4)
-                                    color: parent.down ? Qt.darker(Theme.accentColor, 1.2) : Theme.accentColor
-                                }
-                                contentItem: Text {
-                                    text: parent.text
-                                    font: Theme.captionFont
-                                    color: "white"
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
                             }
 
-                            AccessibleButton {
+                            StyledButton {
+                                id: deleteFrameBtn
                                 text: qsTr("Delete")
-                                accessibleName: qsTr("Delete selected frame")
                                 enabled: selectedStepIndex >= 0 && profile && profile.steps.length > 1
                                 onClicked: deleteStep(selectedStepIndex)
                                 background: Rectangle {
-                                    implicitWidth: Theme.scaled(70)
-                                    implicitHeight: Theme.scaled(26)
-                                    radius: Theme.scaled(4)
-                                    color: parent.down ? Qt.darker(Theme.errorColor, 1.2) : Theme.errorColor
-                                    opacity: parent.enabled ? 1.0 : 0.4
+                                    implicitWidth: deleteFrameBtn.implicitWidth
+                                    implicitHeight: Theme.scaled(36)
+                                    radius: Theme.scaled(6)
+                                    color: deleteFrameBtn.down ? Qt.darker(Theme.errorColor, 1.1) : Theme.errorColor
+                                    opacity: deleteFrameBtn.enabled ? 1.0 : 0.4
                                 }
                                 contentItem: Text {
-                                    text: parent.text
-                                    font: Theme.captionFont
+                                    text: deleteFrameBtn.text
+                                    font.pixelSize: Theme.scaled(14)
+                                    font.family: Theme.bodyFont.family
                                     color: "white"
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
-                                    opacity: parent.enabled ? 1.0 : 0.5
+                                    opacity: deleteFrameBtn.enabled ? 1.0 : 0.5
                                 }
                             }
 
-                            AccessibleButton {
+                            StyledButton {
+                                primary: true
                                 text: qsTr("Copy")
-                                accessibleName: qsTr("Duplicate selected frame")
                                 enabled: selectedStepIndex >= 0 && profile && profile.steps.length < 20
                                 onClicked: duplicateStep(selectedStepIndex)
-                                background: Rectangle {
-                                    implicitWidth: Theme.scaled(60)
-                                    implicitHeight: Theme.scaled(26)
-                                    radius: Theme.scaled(4)
-                                    color: parent.down ? Qt.darker(Theme.primaryColor, 1.2) : Theme.primaryColor
-                                    opacity: parent.enabled ? 1.0 : 0.4
-                                }
-                                contentItem: Text {
-                                    text: parent.text
-                                    font: Theme.captionFont
-                                    color: "white"
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    opacity: parent.enabled ? 1.0 : 0.5
-                                }
                             }
 
-                            AccessibleButton {
+                            StyledIconButton {
                                 text: "\u2190"
                                 accessibleName: qsTr("Move frame left")
                                 enabled: selectedStepIndex > 0
                                 onClicked: moveStep(selectedStepIndex, selectedStepIndex - 1)
-                                background: Rectangle {
-                                    implicitWidth: Theme.scaled(32)
-                                    implicitHeight: Theme.scaled(26)
-                                    radius: Theme.scaled(4)
-                                    color: parent.down ? Qt.darker(Theme.primaryColor, 1.2) : Theme.primaryColor
-                                    opacity: parent.enabled ? 1.0 : 0.4
-                                }
-                                contentItem: Text {
-                                    text: parent.text
-                                    font.pixelSize: Theme.scaled(14)
-                                    color: "white"
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    opacity: parent.enabled ? 1.0 : 0.5
-                                }
                             }
 
-                            AccessibleButton {
+                            StyledIconButton {
                                 text: "\u2192"
                                 accessibleName: qsTr("Move frame right")
                                 enabled: selectedStepIndex >= 0 && selectedStepIndex < (profile ? profile.steps.length - 1 : 0)
                                 onClicked: moveStep(selectedStepIndex, selectedStepIndex + 1)
-                                background: Rectangle {
-                                    implicitWidth: Theme.scaled(32)
-                                    implicitHeight: Theme.scaled(26)
-                                    radius: Theme.scaled(4)
-                                    color: parent.down ? Qt.darker(Theme.primaryColor, 1.2) : Theme.primaryColor
-                                    opacity: parent.enabled ? 1.0 : 0.4
-                                }
-                                contentItem: Text {
-                                    text: parent.text
-                                    font.pixelSize: Theme.scaled(14)
-                                    color: "white"
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    opacity: parent.enabled ? 1.0 : 0.5
-                                }
                             }
                         }
                     }
@@ -533,9 +476,8 @@ Page {
             color: "white"
             font: Theme.bodyFont
         }
-        AccessibleButton {
+        StyledButton {
             text: qsTr("Done")
-            accessibleName: profileModified ? qsTr("Done. Unsaved changes") : qsTr("Done")
             onClicked: {
                 if (profileModified) {
                     exitDialog.open()
@@ -543,15 +485,18 @@ Page {
                     root.goBack()
                 }
             }
+            // White button with primary text for bottom bar
             background: Rectangle {
-                implicitWidth: Theme.scaled(100)
-                implicitHeight: Theme.scaled(40)
-                radius: Theme.scaled(8)
-                color: parent.down ? Qt.darker("white", 1.2) : "white"
+                implicitWidth: Math.max(Theme.scaled(80), doneText.implicitWidth + Theme.scaled(32))
+                implicitHeight: Theme.scaled(36)
+                radius: Theme.scaled(6)
+                color: parent.down ? Qt.darker("white", 1.1) : "white"
             }
             contentItem: Text {
+                id: doneText
                 text: parent.text
-                font: Theme.bodyFont
+                font.pixelSize: Theme.scaled(14)
+                font.family: Theme.bodyFont.family
                 color: Theme.primaryColor
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
