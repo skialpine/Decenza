@@ -2,6 +2,8 @@
 #include "aimanager.h"
 
 #include <QDebug>
+#include <QSettings>
+#include <QJsonDocument>
 
 AIConversation::AIConversation(AIManager* aiManager, QObject* parent)
     : QObject(parent)
@@ -131,6 +133,9 @@ void AIConversation::onAnalysisComplete(const QString& response)
     // Add assistant response to history
     addAssistantMessage(response);
 
+    // Auto-save so conversation can be continued later
+    saveToStorage();
+
     emit busyChanged();
     emit historyChanged();
     emit responseReceived(response);
@@ -169,11 +174,132 @@ QString AIConversation::getConversationText() const
         if (i > 0) text += "\n\n---\n\n";
 
         if (role == "user") {
-            text += "You: " + content;
+            // Check if this is a shot data message
+            if (content.contains("Shot Summary") || content.contains("Here's my latest shot")) {
+                // Find the user's question after the shot data
+                // Format is: "Here's my latest shot:\n\n<shot summary>\n\n<user question>"
+                QString userQuestion;
+
+                // The shot summary contains structured data with lines like "Key: Value"
+                // Find where the shot data ends and user's question begins
+                // Look for the last double newline that separates shot data from question
+                int shotStart = content.indexOf("Here's my latest shot:");
+                if (shotStart >= 0) {
+                    // Skip past "Here's my latest shot:\n\n"
+                    int dataStart = content.indexOf("\n\n", shotStart);
+                    if (dataStart >= 0) {
+                        dataStart += 2;
+                        // Find the end of shot data (look for pattern break)
+                        // Shot data lines have format "Key: Value" or are part of structured sections
+                        // The user's question is free-form text after the data
+
+                        // Simple heuristic: find last "\n\n" and check if what follows
+                        // looks like a question (doesn't contain ":" in typical key: value pattern)
+                        int lastBreak = content.lastIndexOf("\n\n");
+                        if (lastBreak > dataStart) {
+                            QString afterBreak = content.mid(lastBreak + 2).trimmed();
+                            // If it doesn't look like shot data (no "Key:" pattern at start)
+                            if (!afterBreak.isEmpty() && !afterBreak.contains(": ") && afterBreak.length() < 500) {
+                                userQuestion = afterBreak;
+                            } else if (!afterBreak.isEmpty() && afterBreak.length() < 200) {
+                                // Short text is likely a question
+                                userQuestion = afterBreak;
+                            }
+                        }
+                    }
+                }
+
+                // Format: [Shot Data] with user's question
+                text += "**[Shot Data]**";
+                if (!userQuestion.isEmpty()) {
+                    text += "\n**You:** " + userQuestion;
+                }
+            } else {
+                text += "**You:** " + content;
+            }
         } else if (role == "assistant") {
-            text += providerName() + ": " + content;
+            text += "**" + providerName() + ":** " + content;
         }
     }
 
     return text;
+}
+
+void AIConversation::addShotContext(const QString& shotSummary)
+{
+    if (m_busy) return;
+
+    // If no existing conversation, set up the system prompt
+    if (m_systemPrompt.isEmpty()) {
+        m_systemPrompt = "You are an expert espresso consultant helping a user dial in their shots over multiple attempts. "
+                         "The user will share shot data from their Decent Espresso machine. "
+                         "Track their progress across shots and provide specific, actionable advice. "
+                         "Focus on one variable at a time. Reference previous shots when relevant.";
+    }
+
+    // Add the new shot as context
+    QString contextMessage = "Here's my latest shot:\n\n" + shotSummary +
+                            "\n\nPlease analyze this shot and provide recommendations, considering any previous shots we've discussed.";
+    addUserMessage(contextMessage);
+    sendRequest();
+
+    emit historyChanged();
+    qDebug() << "AIConversation: Added new shot context, now have" << m_messages.size() << "messages";
+}
+
+void AIConversation::saveToStorage()
+{
+    QSettings settings;
+
+    // Save system prompt
+    settings.setValue("ai/conversation/systemPrompt", m_systemPrompt);
+
+    // Save messages as JSON
+    QJsonDocument doc(m_messages);
+    settings.setValue("ai/conversation/messages", doc.toJson(QJsonDocument::Compact));
+
+    // Save timestamp
+    settings.setValue("ai/conversation/timestamp", QDateTime::currentDateTime().toString(Qt::ISODate));
+
+    emit savedConversationChanged();
+    qDebug() << "AIConversation: Saved conversation with" << m_messages.size() << "messages";
+}
+
+void AIConversation::loadFromStorage()
+{
+    QSettings settings;
+
+    // Load system prompt
+    m_systemPrompt = settings.value("ai/conversation/systemPrompt").toString();
+
+    // Load messages
+    QByteArray messagesJson = settings.value("ai/conversation/messages").toByteArray();
+    if (!messagesJson.isEmpty()) {
+        QJsonDocument doc = QJsonDocument::fromJson(messagesJson);
+        if (doc.isArray()) {
+            m_messages = doc.array();
+        }
+    }
+
+    // Update last response from the last assistant message
+    for (int i = m_messages.size() - 1; i >= 0; i--) {
+        QJsonObject msg = m_messages[i].toObject();
+        if (msg["role"].toString() == "assistant") {
+            m_lastResponse = msg["content"].toString();
+            break;
+        }
+    }
+
+    emit historyChanged();
+    qDebug() << "AIConversation: Loaded conversation with" << m_messages.size() << "messages";
+}
+
+bool AIConversation::hasSavedConversation() const
+{
+    QSettings settings;
+    QByteArray messagesJson = settings.value("ai/conversation/messages").toByteArray();
+    if (messagesJson.isEmpty()) return false;
+
+    QJsonDocument doc = QJsonDocument::fromJson(messagesJson);
+    return doc.isArray() && !doc.array().isEmpty();
 }

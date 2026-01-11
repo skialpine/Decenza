@@ -22,6 +22,7 @@ class AIConversation : public QObject {
 
     Q_PROPERTY(bool busy READ isBusy NOTIFY busyChanged)
     Q_PROPERTY(bool hasHistory READ hasHistory NOTIFY historyChanged)
+    Q_PROPERTY(bool hasSavedConversation READ hasSavedConversation NOTIFY savedConversationChanged)
     Q_PROPERTY(QString lastResponse READ lastResponse NOTIFY responseReceived)
     Q_PROPERTY(QString providerName READ providerName NOTIFY providerChanged)
     Q_PROPERTY(int messageCount READ messageCount NOTIFY historyChanged)
@@ -59,12 +60,34 @@ public:
      */
     Q_INVOKABLE QString getConversationText() const;
 
+    /**
+     * Add new shot context to existing conversation (for multi-shot dialing)
+     * This appends shot data as a new user message without clearing history
+     */
+    Q_INVOKABLE void addShotContext(const QString& shotSummary);
+
+    /**
+     * Save conversation history to persistent storage
+     */
+    Q_INVOKABLE void saveToStorage();
+
+    /**
+     * Load conversation history from persistent storage
+     */
+    Q_INVOKABLE void loadFromStorage();
+
+    /**
+     * Check if there's a saved conversation
+     */
+    Q_INVOKABLE bool hasSavedConversation() const;
+
 signals:
     void responseReceived(const QString& response);
     void errorOccurred(const QString& error);
     void busyChanged();
     void historyChanged();
     void providerChanged();
+    void savedConversationChanged();
 
 private slots:
     void onAnalysisComplete(const QString& response);

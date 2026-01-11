@@ -75,6 +75,13 @@ public:
                                              double finalWeight,
                                              const QVariantMap& metadata);
 
+    // Generate shot summary text for multi-shot conversation
+    Q_INVOKABLE QString generateShotSummary(ShotDataModel* shotData,
+                                             Profile* profile,
+                                             double doseWeight,
+                                             double finalWeight,
+                                             const QVariantMap& metadata);
+
     // Provider testing
     Q_INVOKABLE void testConnection();
 

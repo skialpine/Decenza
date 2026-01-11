@@ -274,7 +274,7 @@ Page {
                     label: TranslationManager.translate("shotmetadata.label.roaster", "Roaster")
                     text: isEditMode ? editBeanBrand : Settings.dyeBeanBrand
                     suggestions: MainController.shotHistory.getDistinctBeanBrands()
-                    onTextEdited: function(t) { isEditMode ? editBeanBrand = t : Settings.dyeBeanBrand = t }
+                    onTextEdited: function(t) { if (isEditMode) editBeanBrand = t; else Settings.dyeBeanBrand = t; }
                     onInputFocused: function(field) { focusedField = field; focusResetTimer.stop() }
                 }
 
@@ -283,7 +283,7 @@ Page {
                     label: TranslationManager.translate("shotmetadata.label.coffee", "Coffee")
                     text: isEditMode ? editBeanType : Settings.dyeBeanType
                     suggestions: MainController.shotHistory.getDistinctBeanTypes()
-                    onTextEdited: function(t) { isEditMode ? editBeanType = t : Settings.dyeBeanType = t }
+                    onTextEdited: function(t) { if (isEditMode) editBeanType = t; else Settings.dyeBeanType = t; }
                     onInputFocused: function(field) { focusedField = field; focusResetTimer.stop() }
                 }
 
@@ -291,7 +291,7 @@ Page {
                     Layout.fillWidth: true
                     label: TranslationManager.translate("shotmetadata.label.roastdate", "Roast date")
                     text: isEditMode ? editRoastDate : Settings.dyeRoastDate
-                    onTextEdited: function(t) { isEditMode ? editRoastDate = t : Settings.dyeRoastDate = t }
+                    onTextEdited: function(t) { if (isEditMode) editRoastDate = t; else Settings.dyeRoastDate = t; }
                 }
 
                 // === ROW 2: Roast level, Grinder ===
@@ -305,7 +305,7 @@ Page {
                         TranslationManager.translate("shotmetadata.roastlevel.mediumdark", "Medium-Dark"),
                         TranslationManager.translate("shotmetadata.roastlevel.dark", "Dark")]
                     currentValue: isEditMode ? editRoastLevel : Settings.dyeRoastLevel
-                    onValueChanged: function(v) { isEditMode ? editRoastLevel = v : Settings.dyeRoastLevel = v }
+                    onValueChanged: function(v) { if (isEditMode) editRoastLevel = v; else Settings.dyeRoastLevel = v; }
                 }
 
                 SuggestionField {
@@ -313,7 +313,7 @@ Page {
                     label: TranslationManager.translate("shotmetadata.label.grinder", "Grinder")
                     text: isEditMode ? editGrinderModel : Settings.dyeGrinderModel
                     suggestions: MainController.shotHistory.getDistinctGrinders()
-                    onTextEdited: function(t) { isEditMode ? editGrinderModel = t : Settings.dyeGrinderModel = t }
+                    onTextEdited: function(t) { if (isEditMode) editGrinderModel = t; else Settings.dyeGrinderModel = t; }
                     onInputFocused: function(field) { focusedField = field; focusResetTimer.stop() }
                 }
 
@@ -322,7 +322,7 @@ Page {
                     label: TranslationManager.translate("shotmetadata.label.setting", "Setting")
                     text: isEditMode ? editGrinderSetting : Settings.dyeGrinderSetting
                     suggestions: MainController.shotHistory.getDistinctGrinderSettings()
-                    onTextEdited: function(t) { isEditMode ? editGrinderSetting = t : Settings.dyeGrinderSetting = t }
+                    onTextEdited: function(t) { if (isEditMode) editGrinderSetting = t; else Settings.dyeGrinderSetting = t; }
                     onInputFocused: function(field) { focusedField = field; focusResetTimer.stop() }
                 }
 
@@ -332,7 +332,7 @@ Page {
                     label: TranslationManager.translate("shotmetadata.label.barista", "Barista")
                     text: isEditMode ? editBarista : Settings.dyeBarista
                     suggestions: MainController.shotHistory.getDistinctBaristas()
-                    onTextEdited: function(t) { isEditMode ? editBarista = t : Settings.dyeBarista = t }
+                    onTextEdited: function(t) { if (isEditMode) editBarista = t; else Settings.dyeBarista = t; }
                     onInputFocused: function(field) { focusedField = field; focusResetTimer.stop() }
                 }
             }

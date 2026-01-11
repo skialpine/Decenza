@@ -17,6 +17,11 @@ ChartView {
     // Shot comparison model
     property var comparisonModel: null
 
+    // Visibility toggles for curve types
+    property bool showPressure: true
+    property bool showFlow: true
+    property bool showWeight: true
+
     // Colors for each shot
     readonly property var shotColors: ["#4CAF50", "#2196F3", "#FF9800"]
 
@@ -105,6 +110,7 @@ ChartView {
         width: Theme.graphLineWidth
         axisX: timeAxis
         axisY: pressureAxis
+        visible: chart.showPressure
     }
     LineSeries {
         id: flow1
@@ -114,6 +120,7 @@ ChartView {
         style: Qt.DashLine
         axisX: timeAxis
         axisY: pressureAxis
+        visible: chart.showFlow
     }
     LineSeries {
         id: weight1
@@ -123,6 +130,7 @@ ChartView {
         style: Qt.DotLine
         axisX: timeAxis
         axisY: weightAxis
+        visible: chart.showWeight
     }
 
     // Shot 2 series (Blue)
@@ -133,6 +141,7 @@ ChartView {
         width: Theme.graphLineWidth
         axisX: timeAxis
         axisY: pressureAxis
+        visible: chart.showPressure
     }
     LineSeries {
         id: flow2
@@ -142,6 +151,7 @@ ChartView {
         style: Qt.DashLine
         axisX: timeAxis
         axisY: pressureAxis
+        visible: chart.showFlow
     }
     LineSeries {
         id: weight2
@@ -151,6 +161,7 @@ ChartView {
         style: Qt.DotLine
         axisX: timeAxis
         axisY: weightAxis
+        visible: chart.showWeight
     }
 
     // Shot 3 series (Orange)
@@ -161,6 +172,7 @@ ChartView {
         width: Theme.graphLineWidth
         axisX: timeAxis
         axisY: pressureAxis
+        visible: chart.showPressure
     }
     LineSeries {
         id: flow3
@@ -170,6 +182,7 @@ ChartView {
         style: Qt.DashLine
         axisX: timeAxis
         axisY: pressureAxis
+        visible: chart.showFlow
     }
     LineSeries {
         id: weight3
@@ -179,5 +192,6 @@ ChartView {
         style: Qt.DotLine
         axisX: timeAxis
         axisY: weightAxis
+        visible: chart.showWeight
     }
 }

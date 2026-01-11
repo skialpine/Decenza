@@ -133,6 +133,21 @@ Text {
 }
 ```
 
+**Keyboard handling for text inputs**: Always wrap pages with text input fields in `KeyboardAwareContainer` to shift content above the keyboard on mobile:
+```qml
+KeyboardAwareContainer {
+    id: keyboardContainer
+    anchors.fill: parent
+    textFields: [myTextField1, myTextField2]  // Register all text inputs
+
+    // Your page content here
+    ColumnLayout {
+        StyledTextField { id: myTextField1 }
+        StyledTextField { id: myTextField2 }
+    }
+}
+```
+
 ## Profile System
 
 - **FrameBased mode**: Upload to machine, executes autonomously

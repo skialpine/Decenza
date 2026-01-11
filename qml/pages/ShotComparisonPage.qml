@@ -14,6 +14,11 @@ Page {
     // Persisted graph height
     property real graphHeight: Settings.value("comparison/graphHeight", Theme.scaled(280))
 
+    // Curve visibility toggles
+    property bool showPressure: true
+    property bool showFlow: true
+    property bool showWeight: true
+
     Component.onCompleted: {
         root.currentPageTitle = "Compare Shots"
     }
@@ -79,10 +84,14 @@ Page {
                 radius: Theme.cardRadius
 
                 ComparisonGraph {
+                    id: comparisonGraph
                     anchors.fill: parent
                     anchors.margins: Theme.spacingSmall
                     anchors.bottomMargin: Theme.spacingSmall + resizeHandle.height
                     comparisonModel: shotComparisonPage.comparisonModel
+                    showPressure: shotComparisonPage.showPressure
+                    showFlow: shotComparisonPage.showFlow
+                    showWeight: shotComparisonPage.showWeight
                 }
 
                 // Resize handle at bottom
@@ -144,34 +153,105 @@ Page {
                 }
             }
 
-            // Line type legend
+            // Curve type toggle buttons
             RowLayout {
                 Layout.alignment: Qt.AlignHCenter
-                spacing: Theme.spacingLarge
+                spacing: Theme.spacingMedium
 
-                RowLayout {
-                    spacing: Theme.spacingSmall
-                    Rectangle { width: Theme.scaled(20); height: 2; color: Theme.textSecondaryColor }
-                    Tr { key: "comparison.pressure"; fallback: "Pressure"; font: Theme.captionFont; color: Theme.textSecondaryColor }
-                }
-                RowLayout {
-                    spacing: Theme.spacingSmall
-                    Rectangle {
-                        width: Theme.scaled(20); height: 2; color: Theme.textSecondaryColor
-                        Rectangle { anchors.fill: parent; color: "transparent"; border.color: Theme.textSecondaryColor; border.width: 1 }
-                    }
-                    Tr { key: "comparison.flow"; fallback: "Flow"; font: Theme.captionFont; color: Theme.textSecondaryColor }
-                }
-                RowLayout {
-                    spacing: Theme.spacingSmall
-                    Row {
-                        spacing: Theme.scaled(3)
-                        Repeater {
-                            model: 4
-                            Rectangle { width: 3; height: 2; color: Theme.textSecondaryColor }
+                // Pressure toggle
+                Rectangle {
+                    width: pressureToggleContent.width + Theme.scaled(16)
+                    height: Theme.scaled(32)
+                    radius: Theme.scaled(16)
+                    color: showPressure ? Theme.surfaceColor : "transparent"
+                    border.color: showPressure ? Theme.primaryColor : Theme.borderColor
+                    border.width: 1
+                    opacity: showPressure ? 1.0 : 0.5
+
+                    RowLayout {
+                        id: pressureToggleContent
+                        anchors.centerIn: parent
+                        spacing: Theme.spacingSmall
+
+                        Rectangle { width: Theme.scaled(20); height: 2; color: showPressure ? Theme.textColor : Theme.textSecondaryColor }
+                        Text {
+                            text: TranslationManager.translate("comparison.pressure", "Pressure")
+                            font: Theme.captionFont
+                            color: showPressure ? Theme.textColor : Theme.textSecondaryColor
                         }
                     }
-                    Tr { key: "comparison.weight"; fallback: "Weight"; font: Theme.captionFont; color: Theme.textSecondaryColor }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: showPressure = !showPressure
+                    }
+                }
+
+                // Flow toggle
+                Rectangle {
+                    width: flowToggleContent.width + Theme.scaled(16)
+                    height: Theme.scaled(32)
+                    radius: Theme.scaled(16)
+                    color: showFlow ? Theme.surfaceColor : "transparent"
+                    border.color: showFlow ? Theme.primaryColor : Theme.borderColor
+                    border.width: 1
+                    opacity: showFlow ? 1.0 : 0.5
+
+                    RowLayout {
+                        id: flowToggleContent
+                        anchors.centerIn: parent
+                        spacing: Theme.spacingSmall
+
+                        Rectangle {
+                            width: Theme.scaled(20); height: 2; color: showFlow ? Theme.textColor : Theme.textSecondaryColor
+                            Rectangle { anchors.fill: parent; color: "transparent"; border.color: showFlow ? Theme.textColor : Theme.textSecondaryColor; border.width: 1 }
+                        }
+                        Text {
+                            text: TranslationManager.translate("comparison.flow", "Flow")
+                            font: Theme.captionFont
+                            color: showFlow ? Theme.textColor : Theme.textSecondaryColor
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: showFlow = !showFlow
+                    }
+                }
+
+                // Weight toggle
+                Rectangle {
+                    width: weightToggleContent.width + Theme.scaled(16)
+                    height: Theme.scaled(32)
+                    radius: Theme.scaled(16)
+                    color: showWeight ? Theme.surfaceColor : "transparent"
+                    border.color: showWeight ? Theme.primaryColor : Theme.borderColor
+                    border.width: 1
+                    opacity: showWeight ? 1.0 : 0.5
+
+                    RowLayout {
+                        id: weightToggleContent
+                        anchors.centerIn: parent
+                        spacing: Theme.spacingSmall
+
+                        Row {
+                            spacing: Theme.scaled(3)
+                            Repeater {
+                                model: 4
+                                Rectangle { width: 3; height: 2; color: showWeight ? Theme.textColor : Theme.textSecondaryColor }
+                            }
+                        }
+                        Text {
+                            text: TranslationManager.translate("comparison.weight", "Weight")
+                            font: Theme.captionFont
+                            color: showWeight ? Theme.textColor : Theme.textSecondaryColor
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: showWeight = !showWeight
+                    }
                 }
             }
 

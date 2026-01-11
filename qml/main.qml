@@ -493,6 +493,11 @@ ApplicationWindow {
             id: beanInfoPage
             BeanInfoPage {}
         }
+
+        Component {
+            id: postShotReviewPage
+            PostShotReviewPage {}
+        }
     }
 
     // Update per-page scale when navigating between pages
@@ -1463,9 +1468,9 @@ ApplicationWindow {
     }
 
     function goToShotMetadata(hasPending) {
-        announceNavigation("Bean info")
+        announceNavigation("Shot review")
         // Pass hasPendingShot as initial property so it's set before Component.onCompleted
-        pageStack.push(beanInfoPage, { hasPendingShot: hasPending || false })
+        pageStack.push(postShotReviewPage, { hasPendingShot: hasPending || false })
     }
 
     // Helper to announce page navigation for accessibility

@@ -44,7 +44,7 @@ Page {
             id: fakeShowMetadataTimer
             interval: 300
             onTriggered: {
-                pageStack.push(Qt.resolvedUrl("BeanInfoPage.qml"))
+                pageStack.push(Qt.resolvedUrl("PostShotReviewPage.qml"))
                 // Wait for page to actually load before setting property
                 fakeSetPendingTimer.start()
             }
@@ -54,7 +54,7 @@ Page {
             id: fakeSetPendingTimer
             interval: 100
             onTriggered: {
-                if (pageStack.currentItem && pageStack.currentItem.objectName === "shotMetadataPage") {
+                if (pageStack.currentItem && pageStack.currentItem.objectName === "postShotReviewPage") {
                     pageStack.currentItem.hasPendingShot = true
                     console.log("DEV: Set hasPendingShot=true")
                 }
@@ -251,7 +251,7 @@ Page {
                     backgroundColor: Theme.primaryColor
                     visible: Settings.visualizerExtendedMetadata
                     enabled: DE1Device.guiEnabled
-                    onClicked: root.goToShotMetadata(false)
+                    onClicked: pageStack.push(Qt.resolvedUrl("BeanInfoPage.qml"))
 
                     KeyNavigation.left: flushButton
                     KeyNavigation.right: historyButton.visible ? historyButton : null

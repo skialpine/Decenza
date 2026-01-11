@@ -30,6 +30,7 @@
 #include "models/shotdatamodel.h"
 #include "controllers/maincontroller.h"
 #include "ai/aimanager.h"
+#include "ai/aiconversation.h"
 #include "screensaver/screensavervideomanager.h"
 #include "screensaver/pipegeometry.h"
 #include "screensaver/strangeattractorrenderer.h"
@@ -296,6 +297,8 @@ int main(int argc, char *argv[])
         "DE1Device is created in C++");
     qmlRegisterUncreatableType<MachineState>("DecenzaDE1", 1, 0, "MachineStateType",
         "MachineState is created in C++");
+    qmlRegisterUncreatableType<AIConversation>("DecenzaDE1", 1, 0, "AIConversationType",
+        "AIConversation is created in C++");
 
     // Register pipe geometry types for 3D pipes screensaver
     qmlRegisterType<PipeCylinderGeometry>("DecenzaDE1", 1, 0, "PipeCylinderGeometry");

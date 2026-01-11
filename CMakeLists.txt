@@ -277,6 +277,7 @@ set(QML_FILES
     qml/pages/VisualizerBrowserPage.qml
     qml/pages/VisualizerMultiImportPage.qml
     qml/pages/BeanInfoPage.qml
+    qml/pages/PostShotReviewPage.qml
     qml/pages/AISettingsPage.qml
     qml/pages/DialingAssistantPage.qml
     qml/pages/ShotHistoryPage.qml

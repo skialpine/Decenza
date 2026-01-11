@@ -211,6 +211,9 @@ Item {
             model: getFilteredSuggestions()
             currentIndex: -1
 
+            // Reference to root for delegate access
+            property Item suggestionRoot: root
+
             delegate: ItemDelegate {
                 width: suggestionList.width
                 height: Theme.scaled(44)
@@ -230,11 +233,11 @@ Item {
                 }
 
                 onClicked: {
-                    justSelected = true
+                    suggestionList.suggestionRoot.justSelected = true
                     suggestionPopup.close()
                     textInput.text = modelData
-                    root.text = modelData
-                    root.textEdited(modelData)
+                    suggestionList.suggestionRoot.text = modelData
+                    suggestionList.suggestionRoot.textEdited(modelData)
                     textInput.focus = false
                     Qt.inputMethod.hide()
                 }

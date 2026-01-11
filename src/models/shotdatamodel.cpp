@@ -77,6 +77,17 @@ void ShotDataModel::registerSeries(QLineSeries* pressure, QLineSeries* flow, QLi
     qDebug() << "ShotDataModel: Registered series (OpenGL disabled for Windows debug)";
 #endif
 
+    // If we have existing data (e.g., viewing a just-completed shot on a new page),
+    // immediately populate the new series with that data
+    if (!m_pressurePoints.isEmpty() || !m_flowPoints.isEmpty() || !m_weightPoints.isEmpty()) {
+        qDebug() << "ShotDataModel: Populating new series with existing data ("
+                 << m_pressurePoints.size() << " pressure points,"
+                 << m_flowPoints.size() << " flow points,"
+                 << m_weightPoints.size() << " weight points)";
+        m_dirty = true;
+        flushToChart();
+    }
+
     // Start the flush timer
     m_flushTimer->start();
 }

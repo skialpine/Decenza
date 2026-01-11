@@ -307,7 +307,228 @@ KeyboardAwareContainer {
                         color: Theme.textSecondaryColor
                         font.pixelSize: Theme.scaled(11)
                     }
+
+                    Item { Layout.fillWidth: true }
+
+                    // Continue Conversation button
+                    Rectangle {
+                        id: continueConversationBtn
+                        property bool hasConversation: MainController.aiManager && MainController.aiManager.conversation &&
+                                                       MainController.aiManager.conversation.hasSavedConversation
+                        visible: MainController.aiManager && MainController.aiManager.isConfigured
+                        width: Math.max(Theme.scaled(100), continueText.implicitWidth + Theme.scaled(24))
+                        height: Theme.scaled(36)
+                        radius: Theme.scaled(6)
+                        color: Theme.surfaceColor
+                        border.color: continueConversationBtn.hasConversation ? Theme.primaryColor : Theme.borderColor
+                        opacity: continueConversationBtn.hasConversation ? 1.0 : 0.5
+
+                        Text {
+                            id: continueText
+                            anchors.centerIn: parent
+                            text: continueConversationBtn.hasConversation
+                                  ? TranslationManager.translate("settings.ai.continueconversation", "Continue Chat")
+                                  : TranslationManager.translate("settings.ai.noconversation", "No Chat")
+                            font.pixelSize: Theme.scaled(12)
+                            color: continueConversationBtn.hasConversation ? Theme.primaryColor : Theme.textSecondaryColor
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: continueConversationBtn.hasConversation
+                            onClicked: {
+                                MainController.aiManager.conversation.loadFromStorage()
+                                conversationOverlay.visible = true
+                            }
+                        }
+                    }
                 }
+            }
+        }
+    }
+
+    // Conversation overlay panel
+    Rectangle {
+        id: conversationOverlay
+        visible: false
+        anchors.fill: parent
+        color: Qt.rgba(0, 0, 0, 0.7)
+        z: 200
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: {
+                MainController.aiManager?.conversation?.saveToStorage()
+                conversationOverlay.visible = false
+            }
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: Theme.scaled(16)
+            color: Theme.surfaceColor
+            radius: Theme.cardRadius
+
+            MouseArea { anchors.fill: parent; onClicked: {} }
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: Theme.spacingMedium
+                spacing: Theme.spacingSmall
+
+                RowLayout {
+                    Layout.fillWidth: true
+
+                    Text {
+                        text: TranslationManager.translate("settings.ai.conversation.title", "AI Conversation")
+                        font: Theme.subtitleFont
+                        color: Theme.textColor
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    Rectangle {
+                        width: clearBtnText.width + Theme.scaled(16)
+                        height: Theme.scaled(28)
+                        radius: Theme.scaled(4)
+                        color: Theme.errorColor
+
+                        Text {
+                            id: clearBtnText
+                            anchors.centerIn: parent
+                            text: TranslationManager.translate("settings.ai.conversation.clear", "Clear")
+                            font.pixelSize: Theme.scaled(11)
+                            color: "white"
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: {
+                                MainController.aiManager?.conversation?.clearHistory()
+                                MainController.aiManager?.conversation?.saveToStorage()
+                                conversationOverlay.visible = false
+                            }
+                        }
+                    }
+
+                    Item { width: Theme.scaled(12) }
+
+                    Rectangle {
+                        width: Theme.scaled(28)
+                        height: Theme.scaled(28)
+                        radius: Theme.scaled(14)
+                        color: Theme.backgroundColor
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "\u00D7"
+                            font.pixelSize: Theme.scaled(18)
+                            color: Theme.textColor
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: {
+                                MainController.aiManager?.conversation?.saveToStorage()
+                                conversationOverlay.visible = false
+                            }
+                        }
+                    }
+                }
+
+                Flickable {
+                    id: conversationFlickable
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    contentHeight: conversationText.height
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    TextArea {
+                        id: conversationText
+                        width: parent.width
+                        text: MainController.aiManager?.conversation?.getConversationText() ?? ""
+                        textFormat: Text.MarkdownText
+                        wrapMode: TextEdit.WordWrap
+                        readOnly: true
+                        font: Theme.bodyFont
+                        color: Theme.textColor
+                        background: null
+                        padding: 0
+                    }
+                }
+
+                RowLayout {
+                    visible: MainController.aiManager?.conversation?.busy ?? false
+                    Layout.fillWidth: true
+
+                    BusyIndicator {
+                        running: true
+                        Layout.preferredWidth: Theme.scaled(20)
+                        Layout.preferredHeight: Theme.scaled(20)
+                        palette.dark: Theme.primaryColor
+                    }
+
+                    Text {
+                        text: TranslationManager.translate("settings.ai.conversation.thinking", "Thinking...")
+                        font: Theme.bodyFont
+                        color: Theme.textSecondaryColor
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingSmall
+
+                    StyledTextField {
+                        id: conversationInput
+                        Layout.fillWidth: true
+                        placeholder: TranslationManager.translate("settings.ai.conversation.placeholder", "Ask a question...")
+                        enabled: !(MainController.aiManager?.conversation?.busy ?? true)
+
+                        Keys.onReturnPressed: sendMsg()
+                        Keys.onEnterPressed: sendMsg()
+
+                        function sendMsg() {
+                            if (text.length === 0) return
+                            MainController.aiManager?.conversation?.followUp(text)
+                            text = ""
+                        }
+                    }
+
+                    Rectangle {
+                        width: Theme.scaled(50)
+                        height: Theme.scaled(36)
+                        radius: Theme.scaled(6)
+                        color: conversationInput.text.length > 0 ? Theme.primaryColor : Theme.surfaceColor
+                        border.color: conversationInput.text.length > 0 ? Theme.primaryColor : Theme.borderColor
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: TranslationManager.translate("settings.ai.conversation.send", "Send")
+                            font.pixelSize: Theme.scaled(12)
+                            color: conversationInput.text.length > 0 ? "white" : Theme.textSecondaryColor
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: conversationInput.text.length > 0 && !(MainController.aiManager?.conversation?.busy ?? true)
+                            onClicked: conversationInput.sendMsg()
+                        }
+                    }
+                }
+            }
+        }
+
+        Connections {
+            target: MainController.aiManager?.conversation ?? null
+            function onResponseReceived() {
+                Qt.callLater(function() {
+                    conversationFlickable.contentY = Math.max(0, conversationFlickable.contentHeight - conversationFlickable.height)
+                })
+            }
+            function onHistoryChanged() {
+                conversationText.text = MainController.aiManager?.conversation?.getConversationText() ?? ""
             }
         }
     }

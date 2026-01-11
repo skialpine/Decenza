@@ -12,10 +12,15 @@ Page {
     Component.onCompleted: root.currentPageTitle = TranslationManager.translate("dialingassistant.title", "AI Recommendation")
     StackView.onActivated: root.currentPageTitle = TranslationManager.translate("dialingassistant.title", "AI Recommendation")
 
-    ColumnLayout {
+    KeyboardAwareContainer {
+        id: keyboardContainer
         anchors.fill: parent
         anchors.topMargin: Theme.pageTopMargin
         anchors.bottomMargin: Theme.bottomBarHeight
+        textFields: [followUpInput]
+
+    ColumnLayout {
+        anchors.fill: parent
         anchors.leftMargin: Theme.standardMargin
         anchors.rightMargin: Theme.standardMargin
         spacing: Theme.spacingMedium
@@ -147,6 +152,16 @@ Page {
                 width: parent.width
                 text: {
                     if (!MainController.aiManager) return ""
+
+                    var conversation = MainController.aiManager.conversation
+                    var hasConversation = conversation && conversation.messageCount > 2
+
+                    // If we have a multi-turn conversation, show full history
+                    if (hasConversation) {
+                        return conversation.getConversationText()
+                    }
+
+                    // Otherwise show just the last recommendation with attribution
                     var recommendation = MainController.aiManager.lastRecommendation
                     if (recommendation.length === 0) return ""
 
@@ -169,6 +184,63 @@ Page {
                 color: Theme.textColor
                 background: null
                 padding: 0
+            }
+        }
+
+        // Follow-up conversation section (visible when we have a recommendation)
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: Theme.spacingSmall
+            visible: MainController.aiManager && !MainController.aiManager.isAnalyzing &&
+                     MainController.aiManager.lastRecommendation.length > 0
+
+            // Follow-up input row
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacingSmall
+
+                StyledTextField {
+                    id: followUpInput
+                    Layout.fillWidth: true
+                    placeholder: TranslationManager.translate("dialingassistant.followup.placeholder", "Ask a follow-up question...")
+                    enabled: MainController.aiManager && MainController.aiManager.conversation &&
+                             !MainController.aiManager.conversation.busy
+
+                    Keys.onReturnPressed: followUpButton.clicked()
+                    Keys.onEnterPressed: followUpButton.clicked()
+                }
+
+                AccessibleButton {
+                    id: followUpButton
+                    text: MainController.aiManager && MainController.aiManager.conversation &&
+                          MainController.aiManager.conversation.busy ? "..." : TranslationManager.translate("dialingassistant.followup.button", "Ask")
+                    accessibleName: "Send follow-up question"
+                    enabled: followUpInput.text.length > 0 &&
+                             MainController.aiManager && MainController.aiManager.conversation &&
+                             !MainController.aiManager.conversation.busy
+                    onClicked: {
+                        if (!MainController.aiManager || !MainController.aiManager.conversation) return
+                        if (followUpInput.text.length === 0) return
+
+                        MainController.aiManager.conversation.followUp(followUpInput.text)
+                        followUpInput.text = ""
+                    }
+                    background: Rectangle {
+                        implicitWidth: Theme.scaled(80)
+                        implicitHeight: Theme.scaled(44)
+                        radius: Theme.scaled(6)
+                        color: parent.enabled ? Theme.primaryColor : Theme.surfaceColor
+                        border.color: parent.enabled ? Theme.primaryColor : Theme.borderColor
+                        border.width: parent.enabled ? 0 : 1
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        color: parent.enabled ? "white" : Theme.textSecondaryColor
+                        font: Theme.bodyFont
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
             }
         }
 
@@ -229,6 +301,7 @@ Page {
             }
         }
     }
+    } // KeyboardAwareContainer
 
     // Copy feedback toast
     Rectangle {
@@ -272,6 +345,17 @@ Page {
         }
         function onErrorOccurred(error) {
             // Stay on this page to show the error
+        }
+    }
+
+    // Handle conversation updates (follow-ups)
+    Connections {
+        target: MainController.aiManager ? MainController.aiManager.conversation : null
+        function onResponseReceived(response) {
+            // Scroll to bottom when follow-up response arrives
+            Qt.callLater(function() {
+                recommendationFlickable.contentY = Math.max(0, recommendationFlickable.contentHeight - recommendationFlickable.height)
+            })
         }
     }
 
