@@ -2066,10 +2066,10 @@ void TranslationManager::checkForLanguageUpdate()
     }
 
     // Check if this language was downloaded (not locally created)
-    QVariantMap metadata = m_languageMetadata.value(m_currentLanguage).toMap();
-    if (metadata.isEmpty()) {
+    if (!m_languageMetadata.contains(m_currentLanguage)) {
         return;  // Language not in metadata
     }
+    QVariantMap metadata = m_languageMetadata.value(m_currentLanguage);
 
     // If it's marked as remote (not yet downloaded), don't auto-update
     if (metadata.value("isRemote", false).toBool()) {
