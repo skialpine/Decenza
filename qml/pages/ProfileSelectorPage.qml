@@ -169,13 +169,11 @@ Page {
 
                         background: Rectangle {
                             radius: Theme.scaled(4)
-                            color: Theme.surfaceColor
-                            border.color: Theme.primaryColor
-                            border.width: 1
+                            color: Theme.primaryColor
                         }
                         contentItem: Text {
                             text: parent.text
-                            color: Theme.primaryColor
+                            color: "white"
                             font: Theme.captionFont
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
