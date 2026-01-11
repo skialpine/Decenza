@@ -1485,6 +1485,10 @@ void MainController::applySteamSettings() {
 
     // Send steam flow via MMR
     m_device->writeMMR(0x803828, m_settings->steamFlow());
+
+    // Reset flush timeout MMR to high value (255 seconds) to prevent
+    // stale flush duration from affecting steam mode
+    m_device->writeMMR(0x803848, 2550);
 }
 
 void MainController::applyHotWaterSettings() {
@@ -1501,6 +1505,10 @@ void MainController::applyHotWaterSettings() {
         m_settings->waterVolume(),
         93.0  // Group temp
     );
+
+    // Reset flush timeout MMR to high value (255 seconds) to prevent
+    // stale flush duration from affecting hot water mode
+    m_device->writeMMR(0x803848, 2550);
 }
 
 void MainController::applyFlushSettings() {
