@@ -163,7 +163,7 @@ Page {
                     }
 
                     StyledButton {
-                        text: TranslationManager.translate("profileselector.button.import_tablet", "Import from Tablet")
+                        text: TranslationManager.translate("profileselector.button.import_tablet", "From Tablet")
                         Layout.preferredHeight: Theme.scaled(44)
                         onClicked: root.goToProfileImport()
 
