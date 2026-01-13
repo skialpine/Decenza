@@ -61,7 +61,7 @@ QVariantList BLEManager::discoveredDevices() const {
     for (const auto& device : m_de1Devices) {
         QVariantMap map;
         map["name"] = device.name();
-        map["address"] = device.address().toString();
+        map["address"] = getDeviceIdentifier(device);
         result.append(map);
     }
     return result;
@@ -72,7 +72,7 @@ QVariantList BLEManager::discoveredScales() const {
     for (const auto& pair : m_scales) {
         QVariantMap map;
         map["name"] = pair.first.name();
-        map["address"] = pair.first.address().toString();
+        map["address"] = getDeviceIdentifier(pair.first);
         map["type"] = pair.second;
         result.append(map);
     }
@@ -80,9 +80,8 @@ QVariantList BLEManager::discoveredScales() const {
 }
 
 QBluetoothDeviceInfo BLEManager::getScaleDeviceInfo(const QString& address) const {
-    QBluetoothAddress addr(address);
     for (const auto& pair : m_scales) {
-        if (pair.first.address() == addr) {
+        if (deviceIdentifiersMatch(pair.first, address)) {
             return pair.first;
         }
     }
@@ -90,9 +89,8 @@ QBluetoothDeviceInfo BLEManager::getScaleDeviceInfo(const QString& address) cons
 }
 
 QString BLEManager::getScaleType(const QString& address) const {
-    QBluetoothAddress addr(address);
     for (const auto& pair : m_scales) {
-        if (pair.first.address() == addr) {
+        if (deviceIdentifiersMatch(pair.first, address)) {
             return pair.second;
         }
     }
@@ -100,9 +98,8 @@ QString BLEManager::getScaleType(const QString& address) const {
 }
 
 void BLEManager::connectToScale(const QString& address) {
-    QBluetoothAddress addr(address);
     for (const auto& pair : m_scales) {
-        if (pair.first.address() == addr) {
+        if (deviceIdentifiersMatch(pair.first, address)) {
             appendScaleLog(QString("Connecting to %1...").arg(pair.first.name()));
             emit scaleDiscovered(pair.first, pair.second);
             return;
@@ -126,9 +123,10 @@ void BLEManager::startScan() {
 }
 
 void BLEManager::requestBluetoothPermission() {
-#ifdef Q_OS_ANDROID
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
     emit de1LogMessage("Checking permissions...");
 
+#ifdef Q_OS_ANDROID
     // First check/request location permission (required for BLE scanning on Android)
     QLocationPermission locationPermission;
     locationPermission.setAccuracy(QLocationPermission::Precise);
@@ -150,8 +148,9 @@ void BLEManager::requestBluetoothPermission() {
         emit errorOccurred("Location permission required. Please enable in Settings.");
         return;
     }
+#endif
 
-    // Now check Bluetooth permission
+    // Check Bluetooth permission (required on both Android and iOS)
     QBluetoothPermission bluetoothPermission;
     bluetoothPermission.setCommunicationModes(QBluetoothPermission::Access);
 
@@ -213,13 +212,13 @@ void BLEManager::onDeviceDiscovered(const QBluetoothDeviceInfo& device) {
     if (isDE1Device(device)) {
         // Avoid duplicates
         for (const auto& existing : m_de1Devices) {
-            if (existing.address() == device.address()) {
+            if (getDeviceIdentifier(existing) == getDeviceIdentifier(device)) {
                 return;
             }
         }
         m_de1Devices.append(device);
         emit devicesChanged();
-        emit de1LogMessage(QString("Found DE1: %1 (%2)").arg(device.name()).arg(device.address().toString()));
+        emit de1LogMessage(QString("Found DE1: %1 (%2)").arg(device.name()).arg(getDeviceIdentifier(device)));
         emit de1Discovered(device);
         return;
     }
@@ -234,18 +233,18 @@ void BLEManager::onDeviceDiscovered(const QBluetoothDeviceInfo& device) {
     if (!scaleType.isEmpty()) {
         // Avoid duplicates
         for (const auto& pair : m_scales) {
-            if (pair.first.address() == device.address()) {
+            if (getDeviceIdentifier(pair.first) == getDeviceIdentifier(device)) {
                 return;
             }
         }
         m_scales.append({device, scaleType});
         emit scalesChanged();
-        appendScaleLog(QString("Found %1: %2 (%3)").arg(scaleType).arg(device.name()).arg(device.address().toString()));
+        appendScaleLog(QString("Found %1: %2 (%3)").arg(scaleType).arg(device.name()).arg(getDeviceIdentifier(device)));
 
         // If we're doing a direct wake and this is our saved scale found via scan,
         // log it and clear the direct connect state. The scan-discovered device has
         // proper BLE metadata which may help with connection.
-        if (m_directConnectInProgress && device.address().toString().compare(m_directConnectAddress, Qt::CaseInsensitive) == 0) {
+        if (m_directConnectInProgress && deviceIdentifiersMatch(device, m_directConnectAddress)) {
             appendScaleLog("Direct wake: found saved scale in scan, using scanned device");
             m_directConnectInProgress = false;
             m_directConnectAddress.clear();
@@ -267,6 +266,8 @@ void BLEManager::onScanFinished() {
 void BLEManager::onScanError(QBluetoothDeviceDiscoveryAgent::Error error) {
     QString errorMsg;
     switch (error) {
+        case QBluetoothDeviceDiscoveryAgent::NoError:
+            return;  // No error, nothing to do
         case QBluetoothDeviceDiscoveryAgent::PoweredOffError:
             errorMsg = "Bluetooth is powered off";
             break;
@@ -285,10 +286,14 @@ void BLEManager::onScanError(QBluetoothDeviceDiscoveryAgent::Error error) {
         case QBluetoothDeviceDiscoveryAgent::LocationServiceTurnedOffError:
             errorMsg = "Location services are turned off";
             break;
+        case QBluetoothDeviceDiscoveryAgent::MissingPermissionsError:
+            errorMsg = "Bluetooth permission denied. Please allow Bluetooth access in Settings.";
+            break;
         default:
-            errorMsg = "Unknown Bluetooth error";
+            errorMsg = QString("Bluetooth error (code %1)").arg(static_cast<int>(error));
             break;
     }
+    qWarning() << "BLEManager scan error:" << errorMsg << "code:" << static_cast<int>(error);
     emit de1LogMessage(QString("Error: %1").arg(errorMsg));
     appendScaleLog(QString("Error: %1").arg(errorMsg));
     emit errorOccurred(errorMsg);

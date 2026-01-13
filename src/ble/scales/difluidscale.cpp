@@ -57,7 +57,7 @@ void DifluidScale::connectToDevice(const QBluetoothDeviceInfo& device) {
                 .arg(device.name())
                 .arg(device.address().toString()));
 
-    m_transport->connectToDevice(device.address().toString(), device.name());
+    m_transport->connectToDevice(device);
 }
 
 void DifluidScale::onTransportConnected() {

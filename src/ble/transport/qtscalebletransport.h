@@ -20,6 +20,7 @@ public:
     ~QtScaleBleTransport() override;
 
     void connectToDevice(const QString& address, const QString& name) override;
+    void connectToDevice(const QBluetoothDeviceInfo& device) override;
     void disconnectFromDevice() override;
     void discoverServices() override;
     void discoverCharacteristics(const QBluetoothUuid& serviceUuid) override;

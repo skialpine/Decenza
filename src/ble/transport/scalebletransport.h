@@ -2,6 +2,8 @@
 
 #include <QObject>
 #include <QBluetoothUuid>
+#include <QBluetoothDeviceInfo>
+#include <QBluetoothAddress>
 #include <QByteArray>
 #include <QString>
 
@@ -32,10 +34,18 @@ public:
     virtual ~ScaleBleTransport() = default;
 
     /**
-     * Connect to a BLE device by address.
+     * Connect to a BLE device by address (for Android/desktop).
      * Emits connected() on success, error() on failure.
      */
     virtual void connectToDevice(const QString& address, const QString& name) = 0;
+
+    /**
+     * Connect to a BLE device using full device info (required for iOS).
+     * Default implementation extracts address - override for iOS support.
+     */
+    virtual void connectToDevice(const QBluetoothDeviceInfo& device) {
+        connectToDevice(device.address().toString(), device.name());
+    }
 
     /**
      * Disconnect from the current device.

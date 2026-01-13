@@ -135,7 +135,7 @@ void ShotServer::onReadyRead()
                 return;
             }
 
-            pending.headerEnd = pending.headerData.indexOf("\r\n\r\n");
+            pending.headerEnd = static_cast<int>(pending.headerData.indexOf("\r\n\r\n"));
             if (pending.headerEnd < 0) {
                 // Headers not complete yet
                 return;
@@ -524,16 +524,16 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             sendHtml(socket, generateMediaUploadPage());
         } else if (method == "POST") {
             // For small uploads that weren't streamed, save body to temp file
-            int headerEnd = request.indexOf("\r\n\r\n");
-            if (headerEnd < 0) {
+            qsizetype headerEndPos = request.indexOf("\r\n\r\n");
+            if (headerEndPos < 0) {
                 sendResponse(socket, 400, "text/plain", "Invalid request");
                 return;
             }
-            QString headers = QString::fromUtf8(request.left(headerEnd));
-            QByteArray body = request.mid(headerEnd + 4);
+            QString headers = QString::fromUtf8(request.left(headerEndPos));
+            QByteArray body = request.mid(headerEndPos + 4);
 
             qDebug() << "ShotServer: Small media upload - request size:" << request.size()
-                     << "headerEnd:" << headerEnd << "body size:" << body.size();
+                     << "headerEnd:" << headerEndPos << "body size:" << body.size();
 
             // Save to temp file
             QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
@@ -3182,14 +3182,14 @@ QString ShotServer::generateUploadPage() const
 void ShotServer::handleUpload(QTcpSocket* socket, const QByteArray& request)
 {
     // Parse headers to get filename and content
-    int headerEnd = request.indexOf("\r\n\r\n");
-    if (headerEnd < 0) {
+    qsizetype headerEndPos = request.indexOf("\r\n\r\n");
+    if (headerEndPos < 0) {
         sendResponse(socket, 400, "text/plain", "Invalid request");
         return;
     }
 
-    QString headers = QString::fromUtf8(request.left(headerEnd));
-    QByteArray body = request.mid(headerEnd + 4);
+    QString headers = QString::fromUtf8(request.left(headerEndPos));
+    QByteArray body = request.mid(headerEndPos + 4);
 
     // Get filename from X-Filename header
     QString filename = "uploaded.apk";
@@ -4042,6 +4042,15 @@ bool ShotServer::resizeImage(const QString& inputPath, const QString& outputPath
 
 bool ShotServer::resizeVideo(const QString& inputPath, const QString& outputPath, int maxWidth, int maxHeight)
 {
+#ifdef Q_OS_IOS
+    // QProcess is not available on iOS - can't run FFmpeg
+    Q_UNUSED(inputPath)
+    Q_UNUSED(outputPath)
+    Q_UNUSED(maxWidth)
+    Q_UNUSED(maxHeight)
+    qWarning() << "Video resizing not supported on iOS (no QProcess)";
+    return false;
+#else
     // Use FFmpeg for video resizing
     // FFmpeg command: ffmpeg -i input.mp4 -vf "scale='min(1920,iw)':min'(1080,ih)':force_original_aspect_ratio=decrease" -c:a copy output.mp4
 
@@ -4105,10 +4114,16 @@ bool ShotServer::resizeVideo(const QString& inputPath, const QString& outputPath
 
     qDebug() << "FFmpeg completed successfully";
     return QFile::exists(outputPath);
+#endif
 }
 
 QDateTime ShotServer::extractDateWithExiftool(const QString& filePath) const
 {
+#ifdef Q_OS_IOS
+    // QProcess is not available on iOS
+    Q_UNUSED(filePath)
+    return QDateTime();
+#else
     // Use exiftool for robust date extraction from any format
     QString exiftoolPath = "exiftool";
 
@@ -4149,6 +4164,7 @@ QDateTime ShotServer::extractDateWithExiftool(const QString& filePath) const
     }
 
     return QDateTime();
+#endif
 }
 
 QDateTime ShotServer::extractImageDate(const QString& imagePath) const
@@ -4225,6 +4241,11 @@ QDateTime ShotServer::extractImageDate(const QString& imagePath) const
 
 QDateTime ShotServer::extractVideoDate(const QString& videoPath) const
 {
+#ifdef Q_OS_IOS
+    // QProcess is not available on iOS
+    Q_UNUSED(videoPath)
+    return QDateTime();
+#else
     // Use FFprobe to extract creation_time metadata
     QString ffprobePath = "ffprobe";
 
@@ -4282,4 +4303,5 @@ QDateTime ShotServer::extractVideoDate(const QString& videoPath) const
     }
 
     return QDateTime();
+#endif
 }

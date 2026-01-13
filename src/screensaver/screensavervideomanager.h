@@ -132,7 +132,7 @@ public:
     QString catalogUrl() const { return m_catalogUrl; }
     bool isRefreshing() const { return m_isRefreshing; }
     QDateTime lastUpdatedUtc() const { return m_lastUpdatedUtc; }
-    int itemCount() const { return m_catalog.size(); }
+    int itemCount() const { return static_cast<int>(m_catalog.size()); }
 
     // Category getters
     QVariantList categories() const;
@@ -155,7 +155,7 @@ public:
     QVariantList creditsList() const;
 
     // Personal media getters
-    int personalMediaCount() const { return m_personalCatalog.size(); }
+    int personalMediaCount() const { return static_cast<int>(m_personalCatalog.size()); }
     bool hasPersonalMedia() const { return !m_personalCatalog.isEmpty(); }
     QString personalMediaDirectory() const { return m_cacheDir + "/personal"; }
     bool isPersonalCategory() const { return m_selectedCategoryId == "personal"; }

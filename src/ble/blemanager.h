@@ -12,6 +12,25 @@
 
 class ScaleDevice;
 
+// Helper to get device identifier - iOS uses UUID, others use MAC address
+inline QString getDeviceIdentifier(const QBluetoothDeviceInfo& device) {
+#ifdef Q_OS_IOS
+    // iOS doesn't expose MAC addresses, use UUID instead
+    return device.deviceUuid().toString();
+#else
+    return device.address().toString();
+#endif
+}
+
+// Helper to compare device identifiers
+inline bool deviceIdentifiersMatch(const QBluetoothDeviceInfo& device, const QString& identifier) {
+#ifdef Q_OS_IOS
+    return device.deviceUuid().toString() == identifier;
+#else
+    return device.address().toString().compare(identifier, Qt::CaseInsensitive) == 0;
+#endif
+}
+
 class BLEManager : public QObject {
     Q_OBJECT
 

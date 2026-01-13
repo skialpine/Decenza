@@ -57,7 +57,7 @@ void FelicitaScale::connectToDevice(const QBluetoothDeviceInfo& device) {
                  .arg(device.name())
                  .arg(device.address().toString()));
 
-    m_transport->connectToDevice(device.address().toString(), device.name());
+    m_transport->connectToDevice(device);
 }
 
 void FelicitaScale::onTransportConnected() {

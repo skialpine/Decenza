@@ -59,7 +59,7 @@ void BookooScale::connectToDevice(const QBluetoothDeviceInfo& device) {
                .arg(device.name())
                .arg(device.address().toString()));
 
-    m_transport->connectToDevice(device.address().toString(), device.name());
+    m_transport->connectToDevice(device);
 }
 
 void BookooScale::onTransportConnected() {

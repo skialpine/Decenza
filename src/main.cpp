@@ -16,6 +16,7 @@
 #endif
 
 
+
 #include "core/settings.h"
 #include "core/translationmanager.h"
 #include "core/batterymanager.h"

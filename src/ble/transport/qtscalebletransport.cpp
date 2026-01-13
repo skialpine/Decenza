@@ -11,16 +11,21 @@ QtScaleBleTransport::~QtScaleBleTransport() {
 }
 
 void QtScaleBleTransport::connectToDevice(const QString& address, const QString& name) {
+    // Create device info from address - works on Android/desktop, not on iOS
+    QBluetoothDeviceInfo deviceInfo(QBluetoothAddress(address), name, 0);
+    connectToDevice(deviceInfo);
+}
+
+void QtScaleBleTransport::connectToDevice(const QBluetoothDeviceInfo& device) {
     if (m_controller) {
         disconnectFromDevice();
     }
 
-    m_deviceAddress = address;
-    m_deviceName = name;
+    m_deviceAddress = device.address().toString();
+    m_deviceName = device.name();
 
-    // Create device info from address
-    QBluetoothDeviceInfo deviceInfo(QBluetoothAddress(address), name, 0);
-    m_controller = QLowEnergyController::createCentral(deviceInfo, this);
+    // Use the full device info - this is required for iOS where address is not available
+    m_controller = QLowEnergyController::createCentral(device, this);
 
     connect(m_controller, &QLowEnergyController::connected,
             this, &QtScaleBleTransport::onControllerConnected);

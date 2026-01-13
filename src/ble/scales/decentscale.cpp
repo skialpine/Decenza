@@ -53,7 +53,7 @@ void DecentScale::connectToDevice(const QBluetoothDeviceInfo& device) {
     m_serviceFound = false;
     m_characteristicsReady = false;
 
-    m_transport->connectToDevice(device.address().toString(), device.name());
+    m_transport->connectToDevice(device);
 }
 
 void DecentScale::onTransportConnected() {

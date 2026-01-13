@@ -263,6 +263,13 @@ bool ShotImporter::extractZip(const QString& zipPath, const QString& destDir)
     qDebug() << "ShotImporter: Extracted" << extractedCount << "files";
     return extractedCount > 0;
 
+#elif defined(Q_OS_IOS)
+    // QProcess is not available on iOS - zip extraction not supported
+    Q_UNUSED(zipPath)
+    Q_UNUSED(destDir)
+    qWarning() << "ShotImporter: Zip extraction not supported on iOS (no QProcess)";
+    return false;
+
 #elif defined(Q_OS_WIN)
     QProcess process;
     process.setWorkingDirectory(destDir);

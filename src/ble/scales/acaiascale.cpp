@@ -82,7 +82,7 @@ void AcaiaScale::connectToDevice(const QBluetoothDeviceInfo& device) {
     m_buffer.clear();
 
     m_name = device.name();
-    m_transport->connectToDevice(device.address().toString(), device.name());
+    m_transport->connectToDevice(device);
 }
 
 void AcaiaScale::onTransportConnected() {

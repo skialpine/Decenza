@@ -71,7 +71,21 @@ if(ANDROID)
 endif()
 
 if(IOS)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0")
+    # Qt 6.10.1 was built for iOS 17.0
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "17.0")
+    # Fix Qt/Foundation header conflict by compiling all C++ as Objective-C++
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -x objective-c++")
+    # Parallel build
+    set(CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf")
+endif()
+
+# Enable parallel builds
+if(NOT DEFINED CMAKE_BUILD_PARALLEL_LEVEL)
+    include(ProcessorCount)
+    ProcessorCount(N)
+    if(N GREATER 0)
+        set(CMAKE_BUILD_PARALLEL_LEVEL ${N})
+    endif()
 endif()
 
 # Source files
@@ -251,6 +265,13 @@ target_link_libraries(Decenza_DE1 PRIVATE
     Qt6::Sql
     Qt6::Positioning
 )
+
+# iOS: Exclude FFmpeg multimedia plugin (not available on iOS, use Darwin instead)
+if(IOS)
+    qt_import_plugins(Decenza_DE1
+        EXCLUDE_BY_TYPE multimedia Qt6::QFFmpegMediaPlugin
+    )
+endif()
 
 # Include directories
 target_include_directories(Decenza_DE1 PRIVATE
