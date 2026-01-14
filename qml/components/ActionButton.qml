@@ -61,6 +61,8 @@ Button {
                 source: control.iconSource
                 width: control.iconSize
                 height: control.iconSize
+                sourceSize.width: control.iconSize * 2
+                sourceSize.height: control.iconSize * 2
                 fillMode: Image.PreserveAspectFit
                 opacity: control.enabled ? 1.0 : 0.5
             }
