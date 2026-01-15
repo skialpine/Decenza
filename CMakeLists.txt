@@ -266,10 +266,10 @@ target_link_libraries(Decenza_DE1 PRIVATE
     Qt6::Positioning
 )
 
-# iOS: Exclude FFmpeg multimedia plugin (not available on iOS, use Darwin instead)
-if(IOS)
+# iOS/macOS: Use Darwin multimedia plugin (AVFoundation-based)
+if(IOS OR APPLE)
     qt_import_plugins(Decenza_DE1
-        EXCLUDE_BY_TYPE multimedia Qt6::QFFmpegMediaPlugin
+        INCLUDE_BY_TYPE multimedia Qt6::QDarwinMediaPlugin
     )
 endif()
 
@@ -427,6 +427,14 @@ if(IOS)
     set_source_files_properties(
         "${CMAKE_CURRENT_SOURCE_DIR}/ios/Assets.xcassets"
         PROPERTIES MACOSX_PACKAGE_LOCATION Resources
+    )
+    # Link iOS frameworks required for multimedia (AVFoundation backend)
+    target_link_libraries(Decenza_DE1 PRIVATE
+        "-framework AVFoundation"
+        "-framework CoreMedia"
+        "-framework CoreVideo"
+        "-framework CoreAudio"
+        "-framework AudioToolbox"
     )
 endif()
 
