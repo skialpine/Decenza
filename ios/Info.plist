@@ -44,6 +44,12 @@
     <string>This app uses Bluetooth to connect to your DE1 espresso machine and scales.</string>
     <key>NSBluetoothPeripheralUsageDescription</key>
     <string>This app uses Bluetooth to connect to your DE1 espresso machine and scales.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>This app does not use the camera.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>This app does not use the microphone.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>This app can import photos and videos for the screensaver.</string>
     <key>UIFileSharingEnabled</key>
     <true/>
     <key>LSSupportsOpeningDocumentsInPlace</key>

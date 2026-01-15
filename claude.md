@@ -45,6 +45,34 @@ Note: `unset CMAKE_BUILD_PARALLEL_LEVEL` avoids conflicts with `/m`. `MSYS_NO_PA
 - Release: `build/Release/Release/Decenza_DE1.exe`
 - Debug: `build/Debug/Debug/Decenza_DE1.exe`
 
+## macOS/iOS Build (on Mac)
+
+Use Qt's `qt-cmake` wrapper which handles cross-compilation correctly.
+
+**Qt paths on Mac:**
+- Qt CMake: `/Users/mic/Qt/Tools/CMake/CMake.app/Contents/bin/cmake`
+- iOS qt-cmake: `/Users/mic/Qt/6.10.1/ios/bin/qt-cmake`
+- macOS qt-cmake: `/Users/mic/Qt/6.10.1/macos/bin/qt-cmake`
+
+**Configure iOS (generates Xcode project):**
+```bash
+rm -rf build/Qt_6_10_1_for_iOS && mkdir -p build/Qt_6_10_1_for_iOS && cd build/Qt_6_10_1_for_iOS && /Users/mic/Qt/6.10.1/ios/bin/qt-cmake ../.. -G Xcode
+```
+
+**Configure macOS (generates Xcode project):**
+```bash
+rm -rf build/Qt_6_10_1_for_macOS && mkdir -p build/Qt_6_10_1_for_macOS && cd build/Qt_6_10_1_for_macOS && /Users/mic/Qt/6.10.1/macos/bin/qt-cmake ../.. -G Xcode
+```
+
+**Open in Xcode:**
+```bash
+open build/Qt_6_10_1_for_iOS/Decenza_DE1.xcodeproj
+# or
+open build/Qt_6_10_1_for_macOS/Decenza_DE1.xcodeproj
+```
+
+Then in Xcode: Product → Archive for App Store submission.
+
 ## Project Structure
 
 ```
