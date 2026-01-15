@@ -290,7 +290,7 @@ QVector<QPointF> ShotFileParser::toPointVector(const QVector<double>& times, con
 QString ShotFileParser::extractProfileJson(const QString& content)
 {
     // The profile is stored as a JSON block after "profile {"
-    int profileStart = content.indexOf(QRegularExpression("^profile\\s+\\{", QRegularExpression::MultilineOption));
+    qsizetype profileStart = content.indexOf(QRegularExpression("^profile\\s+\\{", QRegularExpression::MultilineOption));
     if (profileStart < 0) return QString();
 
     int jsonStart = content.indexOf('{', profileStart);

@@ -23,7 +23,7 @@ bool RecipeAnalyzer::canConvertToRecipe(const Profile& profile) {
     }
 
     // Last frame (or second-to-last if decline) should be a pour frame
-    int pourIndex = steps.size() - 1;
+    int pourIndex = static_cast<int>(steps.size()) - 1;
     if (steps.size() >= 2 && isDeclineFrame(steps[pourIndex], &steps[pourIndex - 1])) {
         pourIndex--;
     }
@@ -69,7 +69,7 @@ RecipeParams RecipeAnalyzer::extractRecipeParams(const Profile& profile) {
     }
 
     // Find pour frame (last non-decline frame)
-    for (int i = steps.size() - 1; i >= 1; i--) {
+    for (int i = static_cast<int>(steps.size()) - 1; i >= 1; i--) {
         if (i > 0 && isDeclineFrame(steps[i], &steps[i - 1])) {
             declineIndex = i;
             continue;

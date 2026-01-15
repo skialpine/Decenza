@@ -775,9 +775,9 @@ QString ScreensaverVideoManager::derivePathFromLocalPath(const QString& localPat
     QString filename = localPath;
 
     // Find last separator (either / or \)
-    int lastSlash = localPath.lastIndexOf('/');
-    int lastBackslash = localPath.lastIndexOf('\\');
-    int lastSep = qMax(lastSlash, lastBackslash);
+    qsizetype lastSlash = localPath.lastIndexOf('/');
+    qsizetype lastBackslash = localPath.lastIndexOf('\\');
+    qsizetype lastSep = qMax(lastSlash, lastBackslash);
 
     if (lastSep >= 0) {
         filename = localPath.mid(lastSep + 1);
@@ -1008,7 +1008,7 @@ int ScreensaverVideoManager::rateLimitMinutesRemaining() const
         QDateTime nextAllowed = m_lastDownloadTime.addSecs(RATE_LIMIT_MINUTES * 60);
         qint64 secsRemaining = QDateTime::currentDateTimeUtc().secsTo(nextAllowed);
         if (secsRemaining > 0) {
-            return (secsRemaining + 59) / 60;  // Round up to minutes
+            return static_cast<int>((secsRemaining + 59) / 60);  // Round up to minutes
         }
     }
 
@@ -1035,7 +1035,7 @@ void ScreensaverVideoManager::startBackgroundDownload()
     qDebug() << "[Screensaver] Download queue size:" << m_downloadQueue.size();
 
     if (!m_downloadQueue.isEmpty()) {
-        m_totalToDownload = m_downloadQueue.size();
+        m_totalToDownload = static_cast<int>(m_downloadQueue.size());
         m_downloadedCount = 0;
         m_downloadProgress = 0.0;
         qDebug() << "[Screensaver] Starting background download of" << m_totalToDownload << "videos";
@@ -1124,7 +1124,7 @@ void ScreensaverVideoManager::processDownloadQueue()
             qDebug() << "[Screensaver] Rate limited for video, waiting" << (msRemaining / 1000 / 60) << "minutes";
             // Put the item back at the front of the queue
             m_downloadQueue.prepend(m_currentDownloadIndex);
-            m_rateLimitTimer->start(qMin(msRemaining, (qint64)60000));  // Check at least every minute
+            m_rateLimitTimer->start(static_cast<int>(qMin(msRemaining, (qint64)60000)));  // Check at least every minute
             emit rateLimitedChanged();
             return;
         }
@@ -1293,7 +1293,7 @@ int ScreensaverVideoManager::selectNextVideoIndex()
         if (indices.isEmpty()) {
             return -1;
         }
-        int randIndex = QRandomGenerator::global()->bounded(indices.size());
+        int randIndex = QRandomGenerator::global()->bounded(static_cast<int>(indices.size()));
         return indices[randIndex];
     }
 
@@ -1325,7 +1325,7 @@ int ScreensaverVideoManager::selectNextVideoIndex()
     }
 
     // Random selection from available videos
-    int randIndex = QRandomGenerator::global()->bounded(availableIndices.size());
+    int randIndex = QRandomGenerator::global()->bounded(static_cast<int>(availableIndices.size()));
     return availableIndices[randIndex];
 }
 
@@ -1638,7 +1638,7 @@ bool ScreensaverVideoManager::addPersonalMedia(const QString& filePath, const QS
     QString checkName = originalName.isEmpty() ? fileInfo.fileName() : originalName;
     for (const VideoItem& existing : std::as_const(m_personalCatalog)) {
         // Extract original name from stored path (format: "ID_originalname.ext")
-        int underscorePos = existing.path.indexOf('_');
+        qsizetype underscorePos = existing.path.indexOf('_');
         QString existingOriginal = underscorePos >= 0 ? existing.path.mid(underscorePos + 1) : existing.path;
         if (existingOriginal.compare(checkName, Qt::CaseInsensitive) == 0) {
             qDebug() << "[Screensaver] Skipping duplicate:" << checkName;
@@ -1701,7 +1701,7 @@ bool ScreensaverVideoManager::hasPersonalMediaWithName(const QString& originalNa
 {
     for (const VideoItem& existing : std::as_const(m_personalCatalog)) {
         // Extract original name from stored path (format: "ID_originalname.ext")
-        int underscorePos = existing.path.indexOf('_');
+        qsizetype underscorePos = existing.path.indexOf('_');
         QString existingOriginal = underscorePos >= 0 ? existing.path.mid(underscorePos + 1) : existing.path;
         if (existingOriginal.compare(originalName, Qt::CaseInsensitive) == 0) {
             return true;

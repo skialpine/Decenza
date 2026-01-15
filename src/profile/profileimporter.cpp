@@ -107,7 +107,7 @@ void ProfileImporter::scanProfilesFromPath(const QString& path)
     QString jsonPath = path + "/profiles_v2";
     QDir jsonDir(jsonPath);
     if (jsonDir.exists()) {
-        int beforeCount = m_pendingFiles.size();
+        int beforeCount = static_cast<int>(m_pendingFiles.size());
         QDirIterator jsonIt(jsonPath, QStringList() << "*.json", QDir::Files);
         while (jsonIt.hasNext()) {
             m_pendingFiles.append(jsonIt.next());
@@ -115,7 +115,7 @@ void ProfileImporter::scanProfilesFromPath(const QString& path)
         qDebug() << "ProfileImporter: Found" << (m_pendingFiles.size() - beforeCount) << "JSON profiles in" << jsonPath;
     }
 
-    m_totalProfiles = m_pendingFiles.size();
+    m_totalProfiles = static_cast<int>(m_pendingFiles.size());
     emit progressChanged();
 
     if (m_pendingFiles.isEmpty()) {
@@ -149,7 +149,7 @@ void ProfileImporter::processNextScan()
 
         setStatus(QString("Found %1 profiles").arg(m_availableProfiles.size()));
         emit availableProfilesChanged();
-        emit scanComplete(m_availableProfiles.size());
+        emit scanComplete(static_cast<int>(m_availableProfiles.size()));
         return;
     }
 
@@ -648,7 +648,7 @@ void ProfileImporter::importAll(bool overwriteExisting)
         return;
     }
 
-    m_totalProfiles = m_importQueue.size();
+    m_totalProfiles = static_cast<int>(m_importQueue.size());
     m_processedProfiles = 0;
     emit progressChanged();
 

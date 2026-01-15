@@ -119,7 +119,7 @@ void WebDebugLogger::trimLogFile()
 
     // Find a newline near the trim point to keep lines intact
     qint64 trimPoint = content.size() - keepSize;
-    int newlinePos = content.indexOf('\n', trimPoint);
+    qint64 newlinePos = content.indexOf('\n', trimPoint);
     if (newlinePos == -1) {
         newlinePos = trimPoint;
     }
@@ -150,7 +150,7 @@ QStringList WebDebugLogger::getLines(int afterIndex, int* lastIndex) const
     QMutexLocker locker(&m_mutex);
 
     if (lastIndex) {
-        *lastIndex = m_lines.size();
+        *lastIndex = static_cast<int>(m_lines.size());
     }
 
     if (afterIndex >= m_lines.size()) {
@@ -188,5 +188,5 @@ void WebDebugLogger::clear(bool clearFile)
 int WebDebugLogger::lineCount() const
 {
     QMutexLocker locker(&m_mutex);
-    return m_lines.size();
+    return static_cast<int>(m_lines.size());
 }

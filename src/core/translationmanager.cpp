@@ -446,7 +446,7 @@ void TranslationManager::scanAllStrings()
             QRegularExpressionMatchIterator fallbackIt = propFallbackRegex.globalMatch(content);
             while (fallbackIt.hasNext()) {
                 QRegularExpressionMatch match = fallbackIt.next();
-                fallbackPositions[match.capturedStart()] = match.captured(1);
+                fallbackPositions[static_cast<int>(match.capturedStart())] = match.captured(1);
             }
 
             // Match keys with their nearest following fallback
@@ -1625,7 +1625,7 @@ void TranslationManager::sendNextAutoTranslateBatch()
 
     // Get next batch
     QVariantList batch;
-    int batchSize = qMin(AUTO_TRANSLATE_BATCH_SIZE, m_stringsToTranslate.size());
+    int batchSize = static_cast<int>(qMin(static_cast<qsizetype>(AUTO_TRANSLATE_BATCH_SIZE), m_stringsToTranslate.size()));
     for (int i = 0; i < batchSize; i++) {
         batch.append(m_stringsToTranslate.takeFirst());
     }

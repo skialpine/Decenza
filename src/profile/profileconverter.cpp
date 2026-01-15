@@ -84,7 +84,7 @@ bool ProfileConverter::convertProfiles(const QString& sourceDir, const QString& 
 
     m_destDir = destDir;
     m_overwriteExisting = overwriteExisting;
-    m_totalFiles = m_pendingFiles.size();
+    m_totalFiles = static_cast<int>(m_pendingFiles.size());
     m_processedFiles = 0;
     m_successCount = 0;
     m_errorCount = 0;
@@ -271,7 +271,7 @@ void ProfileConverter::updateResourcesQrc()
 
         if (it.hasNext()) {
             // Find the first and last profile entry positions
-            int firstPos = -1, lastEnd = 0;
+            qsizetype firstPos = -1, lastEnd = 0;
             while (it.hasNext()) {
                 QRegularExpressionMatch m = it.next();
                 if (firstPos < 0) firstPos = m.capturedStart();
@@ -280,8 +280,8 @@ void ProfileConverter::updateResourcesQrc()
 
             if (firstPos >= 0) {
                 // Find the line start of first entry and line end of last entry
-                int lineStart = content.lastIndexOf('\n', firstPos) + 1;
-                int lineEnd = content.indexOf('\n', lastEnd);
+                qsizetype lineStart = content.lastIndexOf('\n', firstPos) + 1;
+                qsizetype lineEnd = content.indexOf('\n', lastEnd);
                 if (lineEnd < 0) lineEnd = content.length();
 
                 // Replace the entire profiles block

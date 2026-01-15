@@ -25,7 +25,7 @@ public:
 
     void setStorage(ShotHistoryStorage* storage);
 
-    int shotCount() const { return m_shotIds.size(); }
+    int shotCount() const { return static_cast<int>(m_shotIds.size()); }
     QVariantList shotsVariant() const;
     double maxTime() const { return m_maxTime; }
     double maxPressure() const { return m_maxPressure; }

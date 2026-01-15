@@ -35,7 +35,7 @@ public:
     bool hasHistory() const { return !m_messages.isEmpty(); }
     QString lastResponse() const { return m_lastResponse; }
     QString providerName() const;
-    int messageCount() const { return m_messages.size(); }
+    int messageCount() const { return static_cast<int>(m_messages.size()); }
     QString errorMessage() const { return m_errorMessage; }
 
     /**

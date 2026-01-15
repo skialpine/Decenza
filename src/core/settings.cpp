@@ -807,7 +807,7 @@ void Settings::removeFlushPreset(int index) {
         // Adjust selected if needed
         int selected = selectedFlushPreset();
         if (selected >= arr.size() && arr.size() > 0) {
-            setSelectedFlushPreset(arr.size() - 1);
+            setSelectedFlushPreset(static_cast<int>(arr.size()) - 1);
         }
 
         emit flushPresetsChanged();
@@ -1087,7 +1087,7 @@ void Settings::saveCurrentTheme(const QString& name) {
     ).array();
 
     // Remove existing theme with same name (if any)
-    for (int i = userThemes.size() - 1; i >= 0; --i) {
+    for (int i = static_cast<int>(userThemes.size()) - 1; i >= 0; --i) {
         if (userThemes[i].toObject()["name"].toString() == name) {
             userThemes.removeAt(i);
         }
