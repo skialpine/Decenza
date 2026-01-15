@@ -75,8 +75,8 @@ if(IOS)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "17.0")
     # Fix Qt/Foundation header conflict by compiling all C++ as Objective-C++
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -x objective-c++")
-    # Parallel build
-    set(CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf")
+    # Generate dSYM files for App Store crash reports
+    set(CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym")
 endif()
 
 # Enable parallel builds
