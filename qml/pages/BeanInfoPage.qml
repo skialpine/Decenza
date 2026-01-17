@@ -22,6 +22,9 @@ Page {
     property int editPresetIndex: -1
     property string editPresetName: ""
 
+    // Keyboard offset for popups - set when popup opens, reset when it closes
+    property real popupKeyboardOffset: 0
+
     Component.onCompleted: {
         root.currentPageTitle = TranslationManager.translate("beaninfo.title", "Beans")
         if (editShotId > 0) {
@@ -802,14 +805,19 @@ Page {
     Popup {
         id: savePresetDialog
         x: (parent.width - width) / 2
-        y: (parent.height - height) / 2
+        y: (parent.height - height) / 2 - popupKeyboardOffset
         padding: 20
         modal: true
         focus: true
 
         onOpened: {
+            popupKeyboardOffset = shotMetadataPage.height * 0.25
             newBeanNameInput.text = ""
             newBeanNameInput.forceActiveFocus()
+        }
+
+        onClosed: {
+            popupKeyboardOffset = 0
         }
 
         background: Rectangle {
@@ -888,14 +896,19 @@ Page {
     Popup {
         id: editPresetDialog
         x: (parent.width - width) / 2
-        y: (parent.height - height) / 2
+        y: (parent.height - height) / 2 - popupKeyboardOffset
         padding: 20
         modal: true
         focus: true
 
         onOpened: {
+            popupKeyboardOffset = shotMetadataPage.height * 0.25
             editBeanNameInput.text = editPresetName
             editBeanNameInput.forceActiveFocus()
+        }
+
+        onClosed: {
+            popupKeyboardOffset = 0
         }
 
         background: Rectangle {
