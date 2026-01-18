@@ -1,0 +1,145 @@
+#pragma once
+
+#include <QObject>
+#include <QString>
+#include <QVariantMap>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QTemporaryDir>
+#include <QList>
+
+class Settings;
+class ProfileStorage;
+class ShotHistoryStorage;
+class ScreensaverVideoManager;
+
+/**
+ * @brief Client for importing data from another Decenza device over WiFi.
+ *
+ * Connects to a remote Decenza device running the shot server and imports
+ * settings, profiles, shot history, and personal media.
+ */
+class DataMigrationClient : public QObject {
+    Q_OBJECT
+
+    Q_PROPERTY(bool isConnecting READ isConnecting NOTIFY isConnectingChanged)
+    Q_PROPERTY(bool isImporting READ isImporting NOTIFY isImportingChanged)
+    Q_PROPERTY(double progress READ progress NOTIFY progressChanged)
+    Q_PROPERTY(QString currentOperation READ currentOperation NOTIFY currentOperationChanged)
+    Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY errorMessageChanged)
+    Q_PROPERTY(QVariantMap manifest READ manifest NOTIFY manifestChanged)
+    Q_PROPERTY(QString serverUrl READ serverUrl NOTIFY serverUrlChanged)
+
+public:
+    explicit DataMigrationClient(QObject* parent = nullptr);
+    ~DataMigrationClient();
+
+    // Dependencies (set by MainController)
+    void setSettings(Settings* settings) { m_settings = settings; }
+    void setProfileStorage(ProfileStorage* profileStorage) { m_profileStorage = profileStorage; }
+    void setShotHistoryStorage(ShotHistoryStorage* shotHistory) { m_shotHistory = shotHistory; }
+    void setScreensaverVideoManager(ScreensaverVideoManager* screensaver) { m_screensaver = screensaver; }
+
+    // Property getters
+    bool isConnecting() const { return m_connecting; }
+    bool isImporting() const { return m_importing; }
+    double progress() const { return m_progress; }
+    QString currentOperation() const { return m_currentOperation; }
+    QString errorMessage() const { return m_errorMessage; }
+    QVariantMap manifest() const { return m_manifest; }
+    QString serverUrl() const { return m_serverUrl; }
+
+    // Connect to a server and fetch its manifest
+    Q_INVOKABLE void connectToServer(const QString& serverUrl);
+
+    // Disconnect from current server
+    Q_INVOKABLE void disconnect();
+
+    // Import all data types
+    Q_INVOKABLE void importAll();
+
+    // Import individual data types
+    Q_INVOKABLE void importSettings();
+    Q_INVOKABLE void importProfiles();
+    Q_INVOKABLE void importShots();
+    Q_INVOKABLE void importMedia();
+
+    // Cancel ongoing import
+    Q_INVOKABLE void cancel();
+
+signals:
+    void isConnectingChanged();
+    void isImportingChanged();
+    void progressChanged();
+    void currentOperationChanged();
+    void errorMessageChanged();
+    void manifestChanged();
+    void serverUrlChanged();
+    void connected();
+    void connectionFailed(const QString& error);
+    void importComplete(int settingsImported, int profilesImported, int shotsImported, int mediaImported);
+    void importFailed(const QString& error);
+
+private slots:
+    void onManifestReply();
+    void onSettingsReply();
+    void onProfileListReply();
+    void onProfileFileReply();
+    void onShotsReply();
+    void onMediaListReply();
+    void onMediaFileReply();
+    void onDownloadProgress(qint64 received, qint64 total);
+
+private:
+    // Helper structs for tracking downloads
+    struct ProfileDownload {
+        QString category;
+        QString filename;
+        qint64 size;
+    };
+
+    struct MediaDownload {
+        QString filename;
+        qint64 size;
+    };
+
+    void setProgress(double progress);
+    void setCurrentOperation(const QString& operation);
+    void setError(const QString& error);
+    void startNextImport();
+    void downloadNextProfile();
+    void downloadNextMedia();
+
+    QNetworkAccessManager* m_networkManager;
+    QNetworkReply* m_currentReply = nullptr;
+    QTemporaryDir* m_tempDir = nullptr;
+
+    Settings* m_settings = nullptr;
+    ProfileStorage* m_profileStorage = nullptr;
+    ShotHistoryStorage* m_shotHistory = nullptr;
+    ScreensaverVideoManager* m_screensaver = nullptr;
+
+    QString m_serverUrl;
+    QVariantMap m_manifest;
+    bool m_connecting = false;
+    bool m_importing = false;
+    bool m_cancelled = false;
+    double m_progress = 0.0;
+    QString m_currentOperation;
+    QString m_errorMessage;
+
+    // Import queue for importAll()
+    QStringList m_importQueue;
+    int m_settingsImported = 0;
+    int m_profilesImported = 0;
+    int m_shotsImported = 0;
+    int m_mediaImported = 0;
+
+    // Pending downloads
+    QList<ProfileDownload> m_pendingProfiles;
+    QList<MediaDownload> m_pendingMedia;
+
+    // For progress calculation
+    qint64 m_totalBytes = 0;
+    qint64 m_receivedBytes = 0;
+};

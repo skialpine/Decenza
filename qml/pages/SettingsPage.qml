@@ -52,7 +52,7 @@ Page {
         onCurrentIndexChanged: {
             if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
                 // Build tab names based on which tabs are visible
-                var tabNames = ["Bluetooth", "Preferences", "Options", "Screensaver", "Visualizer", "AI", "Accessibility", "Themes", "Language", "History"]
+                var tabNames = ["Bluetooth", "Preferences", "Options", "Screensaver", "Visualizer", "AI", "Accessibility", "Themes", "Language", "History", "Data"]
                 if (MainController.updateChecker.canCheckForUpdates) tabNames.push("Update")
                 tabNames.push("About")
                 if (Settings.isDebugBuild) tabNames.push("Debug")
@@ -155,6 +155,12 @@ Page {
             id: historyTabButton
             text: TranslationManager.translate("settings.tab.history", "History")
             tabLabel: TranslationManager.translate("settings.tab.history", "History")
+        }
+
+        StyledTabButton {
+            id: dataTabButton
+            text: TranslationManager.translate("settings.tab.data", "Data")
+            tabLabel: TranslationManager.translate("settings.tab.data", "Data")
         }
 
         StyledTabButton {
@@ -284,7 +290,15 @@ Page {
             source: "settings/SettingsShotHistoryTab.qml"
         }
 
-        // Tab 10: Update - preloads async in background (not on iOS - App Store handles updates)
+        // Tab 10: Data - preloads async in background
+        Loader {
+            id: dataLoader
+            active: true
+            asynchronous: true
+            source: "settings/SettingsDataTab.qml"
+        }
+
+        // Tab 11: Update - preloads async in background (not on iOS - App Store handles updates)
         Loader {
             id: updateLoader
             active: MainController.updateChecker.canCheckForUpdates
@@ -292,7 +306,7 @@ Page {
             source: "settings/SettingsUpdateTab.qml"
         }
 
-        // Tab 11: About
+        // Tab 12: About
         Loader {
             id: aboutLoader
             active: true
@@ -300,7 +314,7 @@ Page {
             source: "settings/SettingsAboutTab.qml"
         }
 
-        // Tab 12: Debug - only in debug builds
+        // Tab 13: Debug - only in debug builds
         Loader {
             id: debugLoader
             active: Settings.isDebugBuild

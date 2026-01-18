@@ -146,6 +146,8 @@ set(SOURCES
     src/network/locationprovider.cpp
     src/network/shotreporter.cpp
     src/network/crashreporter.cpp
+    src/core/settingsserializer.cpp
+    src/core/datamigrationclient.cpp
 )
 
 # Simulator files - Windows Debug only
@@ -223,6 +225,8 @@ set(HEADERS
     src/network/locationprovider.h
     src/network/shotreporter.h
     src/network/crashreporter.h
+    src/core/settingsserializer.h
+    src/core/datamigrationclient.h
 )
 
 # Simulator headers - Windows Debug only
@@ -321,6 +325,7 @@ set(QML_FILES
     qml/pages/settings/SettingsThemesTab.qml
     qml/pages/settings/SettingsLanguageTab.qml
     qml/pages/settings/SettingsShotHistoryTab.qml
+    qml/pages/settings/SettingsDataTab.qml
     qml/pages/settings/SettingsUpdateTab.qml
     qml/pages/settings/SettingsAboutTab.qml
     qml/pages/settings/SettingsDebugTab.qml

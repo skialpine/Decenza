@@ -11,6 +11,8 @@
 class ShotHistoryStorage;
 class DE1Device;
 class ScreensaverVideoManager;
+class Settings;
+class ProfileStorage;
 
 struct PendingRequest {
     QByteArray headerData;          // Only headers stored in memory
@@ -44,6 +46,10 @@ public:
 
     // Screensaver video manager for personal media upload
     void setScreensaverVideoManager(ScreensaverVideoManager* manager) { m_screensaverManager = manager; }
+
+    // Settings and profiles for data migration
+    void setSettings(Settings* settings) { m_settings = settings; }
+    void setProfileStorage(ProfileStorage* profileStorage) { m_profileStorage = profileStorage; }
 
 signals:
     void runningChanged();
@@ -85,10 +91,20 @@ private:
     QDateTime extractDateWithExiftool(const QString& filePath) const;
     void cleanupPendingRequest(QTcpSocket* socket);
 
+    // Data migration backup API
+    void handleBackupManifest(QTcpSocket* socket);
+    void handleBackupSettings(QTcpSocket* socket, bool includeSensitive);
+    void handleBackupProfilesList(QTcpSocket* socket);
+    void handleBackupProfileFile(QTcpSocket* socket, const QString& category, const QString& filename);
+    void handleBackupMediaList(QTcpSocket* socket);
+    void handleBackupMediaFile(QTcpSocket* socket, const QString& filename);
+
     QTcpServer* m_server = nullptr;
     ShotHistoryStorage* m_storage = nullptr;
     DE1Device* m_device = nullptr;
     ScreensaverVideoManager* m_screensaverManager = nullptr;
+    Settings* m_settings = nullptr;
+    ProfileStorage* m_profileStorage = nullptr;
     QTimer* m_cleanupTimer = nullptr;
     int m_port = 8888;
     int m_activeMediaUploads = 0;

@@ -127,6 +127,8 @@ MainController::MainController(Settings* settings, DE1Device* device,
 
     // Create shot server for remote access to shot data
     m_shotServer = new ShotServer(m_shotHistory, m_device, this);
+    m_shotServer->setSettings(m_settings);
+    m_shotServer->setProfileStorage(m_profileStorage);
     if (m_settings) {
         m_shotServer->setPort(m_settings->shotServerPort());
 
@@ -166,6 +168,12 @@ MainController::MainController(Settings* settings, DE1Device* device,
 
     // Initialize update checker
     m_updateChecker = new UpdateChecker(m_settings, this);
+
+    // Create data migration client for importing from other devices
+    m_dataMigration = new DataMigrationClient(this);
+    m_dataMigration->setSettings(m_settings);
+    m_dataMigration->setProfileStorage(m_profileStorage);
+    m_dataMigration->setShotHistoryStorage(m_shotHistory);
 
     // Refresh profiles when storage permission changes (Android)
     if (m_profileStorage) {

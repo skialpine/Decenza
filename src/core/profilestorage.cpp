@@ -96,6 +96,32 @@ QString ProfileStorage::externalProfilesPath() const {
     return QString();
 }
 
+QString ProfileStorage::userProfilesPath() const {
+    QString basePath = isConfigured() ? externalProfilesPath() : fallbackPath();
+    if (basePath.isEmpty()) {
+        basePath = fallbackPath();
+    }
+    QString path = basePath + "/user";
+    QDir dir(path);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+    return path;
+}
+
+QString ProfileStorage::downloadedProfilesPath() const {
+    QString basePath = isConfigured() ? externalProfilesPath() : fallbackPath();
+    if (basePath.isEmpty()) {
+        basePath = fallbackPath();
+    }
+    QString path = basePath + "/downloaded";
+    QDir dir(path);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+    return path;
+}
+
 QStringList ProfileStorage::listProfiles() const {
     QStringList profiles;
     QStringList filters;

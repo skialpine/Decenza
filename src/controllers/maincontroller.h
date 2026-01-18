@@ -17,6 +17,7 @@
 #include "../network/shotserver.h"
 #include "../network/shotreporter.h"
 #include "../core/updatechecker.h"
+#include "../core/datamigrationclient.h"
 
 class Settings;
 class DE1Device;
@@ -74,6 +75,7 @@ class MainController : public QObject {
     Q_PROPERTY(ShotServer* shotServer READ shotServer CONSTANT)
     Q_PROPERTY(UpdateChecker* updateChecker READ updateChecker CONSTANT)
     Q_PROPERTY(ShotReporter* shotReporter READ shotReporter CONSTANT)
+    Q_PROPERTY(DataMigrationClient* dataMigration READ dataMigration CONSTANT)
     Q_PROPERTY(bool isCurrentProfileRecipe READ isCurrentProfileRecipe NOTIFY currentProfileChanged)
     Q_PROPERTY(qint64 lastSavedShotId READ lastSavedShotId NOTIFY lastSavedShotIdChanged)
     Q_PROPERTY(double profileTargetTemperature READ profileTargetTemperature NOTIFY currentProfileChanged)
@@ -119,6 +121,7 @@ public:
     ShotServer* shotServer() const { return m_shotServer; }
     UpdateChecker* updateChecker() const { return m_updateChecker; }
     ShotReporter* shotReporter() const { return m_shotReporter; }
+    DataMigrationClient* dataMigration() const { return m_dataMigration; }
     qint64 lastSavedShotId() const { return m_lastSavedShotId; }
     double profileTargetTemperature() const { return m_currentProfile.espressoTemperature(); }
 
@@ -284,5 +287,6 @@ private:
     ShotServer* m_shotServer = nullptr;
     UpdateChecker* m_updateChecker = nullptr;
     LocationProvider* m_locationProvider = nullptr;
+    DataMigrationClient* m_dataMigration = nullptr;
     ShotReporter* m_shotReporter = nullptr;
 };

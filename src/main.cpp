@@ -128,6 +128,9 @@ int main(int argc, char *argv[])
     // Connect screensaver manager to shot server for personal media upload
     mainController.shotServer()->setScreensaverVideoManager(&screensaverManager);
 
+    // Connect screensaver manager to data migration client for media import
+    mainController.dataMigration()->setScreensaverVideoManager(&screensaverManager);
+
     BatteryManager batteryManager;
     batteryManager.setDE1Device(&de1Device);
     batteryManager.setSettings(&settings);

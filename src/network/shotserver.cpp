@@ -4,10 +4,15 @@
 #include "../history/shothistorystorage.h"
 #include "../ble/de1device.h"
 #include "../screensaver/screensavervideomanager.h"
+#include "../core/settings.h"
+#include "../core/profilestorage.h"
+#include "../core/settingsserializer.h"
+#include "version.h"
 
 #include <QNetworkInterface>
 #include <QUdpSocket>
 #include <QFile>
+#include <QBuffer>
 #include <algorithm>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -605,6 +610,43 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
         } else {
             sendResponse(socket, 404, "application/json", R"({"error":"Media not found"})");
         }
+    }
+    // Data migration backup API
+    else if (path == "/api/backup/manifest") {
+        handleBackupManifest(socket);
+    }
+    else if (path == "/api/backup/settings" || path.startsWith("/api/backup/settings?")) {
+        bool includeSensitive = path.contains("includeSensitive=true");
+        handleBackupSettings(socket, includeSensitive);
+    }
+    else if (path == "/api/backup/profiles") {
+        handleBackupProfilesList(socket);
+    }
+    else if (path.startsWith("/api/backup/profile/")) {
+        // /api/backup/profile/{category}/{filename} - download individual profile
+        QString remainder = path.mid(20);  // After "/api/backup/profile/"
+        int slashIdx = remainder.indexOf('/');
+        if (slashIdx > 0) {
+            QString category = remainder.left(slashIdx);
+            QString filename = QUrl::fromPercentEncoding(remainder.mid(slashIdx + 1).toUtf8());
+            handleBackupProfileFile(socket, category, filename);
+        } else {
+            sendResponse(socket, 400, "application/json", R"({"error":"Invalid profile path"})");
+        }
+    }
+    else if (path == "/api/backup/shots") {
+        // Checkpoint WAL and send database file (reuse existing logic)
+        m_storage->checkpoint();
+        QString dbPath = m_storage->databasePath();
+        sendFile(socket, dbPath, "application/x-sqlite3");
+    }
+    else if (path == "/api/backup/media") {
+        handleBackupMediaList(socket);
+    }
+    else if (path.startsWith("/api/backup/media/")) {
+        // /api/backup/media/{filename} - download individual media file
+        QString filename = QUrl::fromPercentEncoding(path.mid(18).toUtf8());
+        handleBackupMediaFile(socket, filename);
     }
     else {
         sendResponse(socket, 404, "text/plain", "Not Found");
@@ -4357,3 +4399,236 @@ QDateTime ShotServer::extractVideoDate(const QString& videoPath) const
     return QDateTime();
 #endif
 }
+
+// ============================================================================
+// Data Migration Backup API
+// ============================================================================
+
+void ShotServer::handleBackupManifest(QTcpSocket* socket)
+{
+    QJsonObject manifest;
+
+    // Device and app info
+    manifest["deviceName"] = QSysInfo::machineHostName();
+    manifest["platform"] = QSysInfo::productType();
+    manifest["appVersion"] = QString(VERSION_STRING);
+
+    // Settings info
+    if (m_settings) {
+        manifest["hasSettings"] = true;
+        // Estimate settings size (serialized JSON)
+        QJsonObject settingsJson = SettingsSerializer::exportToJson(m_settings, false);
+        QByteArray settingsData = QJsonDocument(settingsJson).toJson(QJsonDocument::Compact);
+        manifest["settingsSize"] = settingsData.size();
+    } else {
+        manifest["hasSettings"] = false;
+        manifest["settingsSize"] = 0;
+    }
+
+    // Profiles info
+    if (m_profileStorage) {
+        QString userPath = m_profileStorage->userProfilesPath();
+        QString downloadedPath = m_profileStorage->downloadedProfilesPath();
+
+        int userProfileCount = 0;
+        qint64 userProfilesSize = 0;
+        QDir userDir(userPath);
+        if (userDir.exists()) {
+            QFileInfoList files = userDir.entryInfoList(QStringList() << "*.json", QDir::Files);
+            userProfileCount = files.size();
+            for (const QFileInfo& fi : files) {
+                userProfilesSize += fi.size();
+            }
+        }
+
+        int downloadedProfileCount = 0;
+        qint64 downloadedProfilesSize = 0;
+        QDir downloadedDir(downloadedPath);
+        if (downloadedDir.exists()) {
+            QFileInfoList files = downloadedDir.entryInfoList(QStringList() << "*.json", QDir::Files);
+            downloadedProfileCount = files.size();
+            for (const QFileInfo& fi : files) {
+                downloadedProfilesSize += fi.size();
+            }
+        }
+
+        manifest["profileCount"] = userProfileCount + downloadedProfileCount;
+        manifest["userProfileCount"] = userProfileCount;
+        manifest["downloadedProfileCount"] = downloadedProfileCount;
+        manifest["profilesSize"] = userProfilesSize + downloadedProfilesSize;
+    } else {
+        manifest["profileCount"] = 0;
+        manifest["profilesSize"] = 0;
+    }
+
+    // Shots info
+    if (m_storage) {
+        manifest["shotCount"] = m_storage->totalShots();
+        QString dbPath = m_storage->databasePath();
+        QFileInfo dbInfo(dbPath);
+        manifest["shotsSize"] = dbInfo.exists() ? dbInfo.size() : 0;
+    } else {
+        manifest["shotCount"] = 0;
+        manifest["shotsSize"] = 0;
+    }
+
+    // Personal media info
+    if (m_screensaverManager) {
+        manifest["mediaCount"] = m_screensaverManager->personalMediaCount();
+        QString mediaDir = m_screensaverManager->personalMediaDirectory();
+        qint64 mediaSize = 0;
+        QDir dir(mediaDir);
+        if (dir.exists()) {
+            QFileInfoList files = dir.entryInfoList(QDir::Files);
+            for (const QFileInfo& fi : files) {
+                if (fi.fileName() != "index.json") {
+                    mediaSize += fi.size();
+                }
+            }
+        }
+        manifest["mediaSize"] = mediaSize;
+    } else {
+        manifest["mediaCount"] = 0;
+        manifest["mediaSize"] = 0;
+    }
+
+    sendJson(socket, QJsonDocument(manifest).toJson(QJsonDocument::Compact));
+}
+
+void ShotServer::handleBackupSettings(QTcpSocket* socket, bool includeSensitive)
+{
+    if (!m_settings) {
+        sendResponse(socket, 500, "application/json", R"({"error":"Settings not available"})");
+        return;
+    }
+
+    QJsonObject settingsJson = SettingsSerializer::exportToJson(m_settings, includeSensitive);
+    sendJson(socket, QJsonDocument(settingsJson).toJson(QJsonDocument::Compact));
+}
+
+void ShotServer::handleBackupProfilesList(QTcpSocket* socket)
+{
+    if (!m_profileStorage) {
+        sendResponse(socket, 500, "application/json", R"({"error":"Profile storage not available"})");
+        return;
+    }
+
+    QJsonArray profiles;
+
+    // Add user profiles
+    QString userPath = m_profileStorage->userProfilesPath();
+    QDir userDir(userPath);
+    if (userDir.exists()) {
+        QFileInfoList files = userDir.entryInfoList(QStringList() << "*.json", QDir::Files);
+        for (const QFileInfo& fi : files) {
+            QJsonObject profile;
+            profile["category"] = "user";
+            profile["filename"] = fi.fileName();
+            profile["size"] = fi.size();
+            profiles.append(profile);
+        }
+    }
+
+    // Add downloaded profiles
+    QString downloadedPath = m_profileStorage->downloadedProfilesPath();
+    QDir downloadedDir(downloadedPath);
+    if (downloadedDir.exists()) {
+        QFileInfoList files = downloadedDir.entryInfoList(QStringList() << "*.json", QDir::Files);
+        for (const QFileInfo& fi : files) {
+            QJsonObject profile;
+            profile["category"] = "downloaded";
+            profile["filename"] = fi.fileName();
+            profile["size"] = fi.size();
+            profiles.append(profile);
+        }
+    }
+
+    QJsonDocument doc(profiles);
+    sendJson(socket, doc.toJson(QJsonDocument::Compact));
+}
+
+void ShotServer::handleBackupProfileFile(QTcpSocket* socket, const QString& category, const QString& filename)
+{
+    if (!m_profileStorage) {
+        sendResponse(socket, 500, "application/json", R"({"error":"Profile storage not available"})");
+        return;
+    }
+
+    QString basePath;
+    if (category == "user") {
+        basePath = m_profileStorage->userProfilesPath();
+    } else if (category == "downloaded") {
+        basePath = m_profileStorage->downloadedProfilesPath();
+    } else {
+        sendResponse(socket, 400, "application/json", R"({"error":"Invalid category"})");
+        return;
+    }
+
+    QString filePath = basePath + "/" + filename;
+    QFileInfo fi(filePath);
+
+    // Security check: ensure file is within expected directory
+    if (!fi.absoluteFilePath().startsWith(basePath) || !fi.exists()) {
+        sendResponse(socket, 404, "application/json", R"({"error":"Profile not found"})");
+        return;
+    }
+
+    sendFile(socket, filePath, "application/json");
+}
+
+void ShotServer::handleBackupMediaList(QTcpSocket* socket)
+{
+    if (!m_screensaverManager) {
+        sendResponse(socket, 500, "application/json", R"({"error":"Screensaver manager not available"})");
+        return;
+    }
+
+    QString mediaDir = m_screensaverManager->personalMediaDirectory();
+    QDir dir(mediaDir);
+
+    QJsonArray mediaFiles;
+
+    if (dir.exists()) {
+        QFileInfoList files = dir.entryInfoList(QDir::Files);
+        for (const QFileInfo& fi : files) {
+            QJsonObject media;
+            media["filename"] = fi.fileName();
+            media["size"] = fi.size();
+            mediaFiles.append(media);
+        }
+    }
+
+    QJsonDocument doc(mediaFiles);
+    sendJson(socket, doc.toJson(QJsonDocument::Compact));
+}
+
+void ShotServer::handleBackupMediaFile(QTcpSocket* socket, const QString& filename)
+{
+    if (!m_screensaverManager) {
+        sendResponse(socket, 500, "application/json", R"({"error":"Screensaver manager not available"})");
+        return;
+    }
+
+    QString mediaDir = m_screensaverManager->personalMediaDirectory();
+    QString filePath = mediaDir + "/" + filename;
+    QFileInfo fi(filePath);
+
+    // Security check: ensure file is within expected directory
+    if (!fi.absoluteFilePath().startsWith(mediaDir) || !fi.exists()) {
+        sendResponse(socket, 404, "application/json", R"({"error":"Media file not found"})");
+        return;
+    }
+
+    // Determine content type based on extension
+    QString ext = fi.suffix().toLower();
+    QString contentType = "application/octet-stream";
+    if (ext == "jpg" || ext == "jpeg") contentType = "image/jpeg";
+    else if (ext == "png") contentType = "image/png";
+    else if (ext == "gif") contentType = "image/gif";
+    else if (ext == "mp4") contentType = "video/mp4";
+    else if (ext == "mov") contentType = "video/quicktime";
+    else if (ext == "webm") contentType = "video/webm";
+
+    sendFile(socket, filePath, contentType);
+}
+

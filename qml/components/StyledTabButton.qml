@@ -17,7 +17,11 @@ TabButton {
     }
 
     width: implicitWidth
-    font.pixelSize: Theme.scaled(14)
+    leftPadding: Theme.scaled(8)
+    rightPadding: Theme.scaled(8)
+    topPadding: Theme.scaled(6)
+    bottomPadding: Theme.scaled(6)
+    font.pixelSize: Theme.scaled(13)
     font.bold: root.checked
 
     contentItem: Text {

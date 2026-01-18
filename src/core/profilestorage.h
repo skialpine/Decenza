@@ -52,6 +52,12 @@ public:
     // Get the external profiles path (Documents/Decenza on Android)
     QString externalProfilesPath() const;
 
+    // Get the user profiles path (for user-created profiles)
+    QString userProfilesPath() const;
+
+    // Get the downloaded profiles path (for profiles imported from Visualizer)
+    QString downloadedProfilesPath() const;
+
     // Migrate profiles from internal to external storage (call after permission granted)
     Q_INVOKABLE void migrateProfilesToExternal();
 
