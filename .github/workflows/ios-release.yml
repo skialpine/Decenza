@@ -122,7 +122,7 @@ jobs:
               <key>provisioningProfiles</key>
               <dict>
                   <key>com.kulitorum.decenza</key>
-                  <string>${PROFILE_UUID}</string>
+                  <string>Decenza App Store Manual</string>
               </dict>
           </dict>
           </plist>
