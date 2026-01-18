@@ -73,6 +73,41 @@ open build/Qt_6_10_1_for_macOS/Decenza_DE1.xcodeproj
 
 Then in Xcode: Product → Archive for App Store submission.
 
+## iOS CI/CD (Build from PC via GitHub Actions)
+
+**No Mac required!** iOS builds can be triggered from any machine using GitHub Actions.
+
+**Full documentation:** `docs/IOS_CI_FOR_CLAUDE.md`
+
+**Quick commands:**
+```bash
+# Trigger iOS build with App Store upload
+gh workflow run ios-release.yml --repo Kulitorum/de1-qt
+
+# Trigger build without upload (testing)
+gh workflow run ios-release.yml --repo Kulitorum/de1-qt -f upload_to_appstore=false
+
+# Check build status
+gh run list --repo Kulitorum/de1-qt --limit 5
+
+# Watch live logs
+gh run watch --repo Kulitorum/de1-qt
+
+# View failed logs
+gh run view --repo Kulitorum/de1-qt --log-failed
+```
+
+**How it works:**
+1. GitHub spins up a macOS VM with Xcode
+2. Qt 6.10.1 for iOS is installed (cached)
+3. Signing credentials from GitHub Secrets are used
+4. App is built, archived, and uploaded to App Store Connect
+
+**Important:**
+- iOS bundle ID is `com.kulitorum.decenza` (different from Android)
+- Signing credentials stored in GitHub Secrets (expire yearly)
+- See `docs/IOS_CI_FOR_CLAUDE.md` for troubleshooting and credential renewal
+
 ## Project Structure
 
 ```
