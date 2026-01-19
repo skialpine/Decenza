@@ -57,6 +57,7 @@ Item {
 
                     ValueInput {
                         id: sleepInput
+                        Layout.fillWidth: true
                         from: 0
                         to: 240
                         stepSize: 5
