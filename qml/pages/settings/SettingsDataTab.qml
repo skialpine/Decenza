@@ -57,15 +57,9 @@ Item {
                     Item { Layout.fillWidth: true }
 
                     StyledSwitch {
-                        checked: MainController.shotServer.running
+                        checked: Settings.shotServerEnabled
                         accessibleName: TranslationManager.translate("settings.data.serverenabled", "Data Server")
-                        onToggled: {
-                            if (checked) {
-                                MainController.shotServer.start()
-                            } else {
-                                MainController.shotServer.stop()
-                            }
-                        }
+                        onToggled: Settings.shotServerEnabled = checked
                     }
                 }
 
@@ -191,125 +185,152 @@ Item {
 
                 Item { height: Theme.scaled(5) }
 
-                // Server URL input
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: Theme.scaled(8)
-                    visible: !MainController.dataMigration.isImporting
-
-                    StyledTextField {
-                        id: serverUrlInput
-                        Layout.fillWidth: true
-                        placeholderText: "192.168.1.100:8888"
-                        text: MainController.dataMigration.serverUrl
-                        enabled: !MainController.dataMigration.isConnecting && !MainController.dataMigration.isImporting
-                    }
-
-                    StyledButton {
-                        text: MainController.dataMigration.manifest && Object.keys(MainController.dataMigration.manifest).length > 0 ?
-                              TranslationManager.translate("settings.data.disconnect", "Disconnect") :
-                              TranslationManager.translate("settings.data.connect", "Connect")
-                        enabled: !MainController.dataMigration.isConnecting && !MainController.dataMigration.isImporting &&
-                                 (serverUrlInput.text.trim().length > 0 || MainController.dataMigration.manifest)
-                        onClicked: {
-                            if (MainController.dataMigration.manifest && Object.keys(MainController.dataMigration.manifest).length > 0) {
-                                MainController.dataMigration.disconnect()
-                            } else {
-                                MainController.dataMigration.connectToServer(serverUrlInput.text.trim())
-                            }
-                        }
-                    }
-
-                    StyledButton {
-                        text: MainController.dataMigration.isSearching ?
-                              TranslationManager.translate("settings.data.searching", "Searching...") :
-                              TranslationManager.translate("settings.data.search", "Search")
-                        enabled: !MainController.dataMigration.isConnecting && !MainController.dataMigration.isImporting &&
-                                 !MainController.dataMigration.isSearching
-                        onClicked: MainController.dataMigration.startDiscovery()
-                    }
-                }
-
-                // Discovered devices list
+                // Device discovery and selection
                 ColumnLayout {
                     Layout.fillWidth: true
-                    spacing: Theme.scaled(4)
-                    visible: MainController.dataMigration.discoveredDevices.length > 0 ||
-                             MainController.dataMigration.isSearching
+                    spacing: Theme.scaled(8)
+                    visible: !MainController.dataMigration.isImporting &&
+                             !(MainController.dataMigration.manifest && MainController.dataMigration.manifest.deviceName !== undefined)
 
-                    // Searching indicator
+                    // Search button and status
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: Theme.scaled(8)
-                        visible: MainController.dataMigration.isSearching
+
+                        StyledButton {
+                            text: MainController.dataMigration.isSearching ?
+                                  TranslationManager.translate("settings.data.searching", "Searching...") :
+                                  TranslationManager.translate("settings.data.searchdevices", "Search for Devices")
+                            primary: true
+                            enabled: !MainController.dataMigration.isConnecting && !MainController.dataMigration.isImporting &&
+                                     !MainController.dataMigration.isSearching
+                            onClicked: MainController.dataMigration.startDiscovery()
+                        }
 
                         BusyIndicator {
-                            running: true
-                            Layout.preferredWidth: Theme.scaled(16)
-                            Layout.preferredHeight: Theme.scaled(16)
+                            running: MainController.dataMigration.isSearching
+                            visible: MainController.dataMigration.isSearching
+                            Layout.preferredWidth: Theme.scaled(20)
+                            Layout.preferredHeight: Theme.scaled(20)
                         }
 
-                        Text {
-                            text: TranslationManager.translate("settings.data.searchingdevices", "Searching for Decenza devices...")
-                            color: Theme.textSecondaryColor
-                            font.pixelSize: Theme.scaled(12)
-                        }
+                        Item { Layout.fillWidth: true }
                     }
 
-                    // Device list
-                    Repeater {
-                        model: MainController.dataMigration.discoveredDevices
+                    // Single device - show as clickable card
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: singleDeviceRow.height + Theme.scaled(16)
+                        color: singleDeviceMouseArea.containsMouse ? Theme.surfaceColor : Theme.backgroundColor
+                        radius: Theme.scaled(6)
+                        border.width: 1
+                        border.color: Theme.borderColor
+                        visible: MainController.dataMigration.discoveredDevices.length === 1
 
-                        Rectangle {
-                            Layout.fillWidth: true
-                            height: deviceRow.height + Theme.scaled(16)
-                            color: deviceMouseArea.containsMouse ? Theme.surfaceColor : Theme.backgroundColor
-                            radius: Theme.scaled(6)
-                            border.width: 1
-                            border.color: Theme.borderColor
+                        RowLayout {
+                            id: singleDeviceRow
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.margins: Theme.scaled(8)
+                            spacing: Theme.scaled(10)
 
-                            RowLayout {
-                                id: deviceRow
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.margins: Theme.scaled(8)
-                                spacing: Theme.scaled(10)
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: Theme.scaled(2)
 
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: Theme.scaled(2)
-
-                                    Text {
-                                        text: modelData.deviceName || "Unknown Device"
-                                        color: Theme.textColor
-                                        font.pixelSize: Theme.scaled(13)
-                                        font.bold: true
-                                    }
-
-                                    Text {
-                                        text: modelData.platform + " • v" + modelData.appVersion
-                                        color: Theme.textSecondaryColor
-                                        font.pixelSize: Theme.scaled(11)
-                                    }
+                                Text {
+                                    text: MainController.dataMigration.discoveredDevices.length > 0 ?
+                                          (MainController.dataMigration.discoveredDevices[0].deviceName || "Unknown Device") : ""
+                                    color: Theme.textColor
+                                    font.pixelSize: Theme.scaled(13)
+                                    font.bold: true
                                 }
 
                                 Text {
-                                    text: modelData.ipAddress
+                                    text: MainController.dataMigration.discoveredDevices.length > 0 ?
+                                          (MainController.dataMigration.discoveredDevices[0].platform + " • v" +
+                                           MainController.dataMigration.discoveredDevices[0].appVersion) : ""
                                     color: Theme.textSecondaryColor
                                     font.pixelSize: Theme.scaled(11)
                                 }
                             }
 
-                            MouseArea {
-                                id: deviceMouseArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                onClicked: {
-                                    MainController.dataMigration.connectToServer(modelData.serverUrl)
+                            Text {
+                                text: MainController.dataMigration.discoveredDevices.length > 0 ?
+                                      MainController.dataMigration.discoveredDevices[0].ipAddress : ""
+                                color: Theme.textSecondaryColor
+                                font.pixelSize: Theme.scaled(11)
+                            }
+                        }
+
+                        MouseArea {
+                            id: singleDeviceMouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onClicked: {
+                                if (MainController.dataMigration.discoveredDevices.length > 0) {
+                                    MainController.dataMigration.connectToServer(
+                                        MainController.dataMigration.discoveredDevices[0].serverUrl)
                                 }
                             }
                         }
+                    }
+
+                    // Multiple devices - show combobox with connect button
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.scaled(8)
+                        visible: MainController.dataMigration.discoveredDevices.length > 1
+
+                        ComboBox {
+                            id: deviceComboBox
+                            Layout.fillWidth: true
+                            model: MainController.dataMigration.discoveredDevices
+                            textRole: "deviceName"
+                            displayText: currentIndex >= 0 && model.length > 0 ?
+                                         model[currentIndex].deviceName + " (" + model[currentIndex].ipAddress + ")" :
+                                         TranslationManager.translate("settings.data.selectdevice", "Select a device")
+
+                            delegate: ItemDelegate {
+                                width: deviceComboBox.width
+                                contentItem: ColumnLayout {
+                                    spacing: 2
+                                    Text {
+                                        text: modelData.deviceName || "Unknown Device"
+                                        color: Theme.textColor
+                                        font.pixelSize: Theme.scaled(13)
+                                    }
+                                    Text {
+                                        text: modelData.platform + " • " + modelData.ipAddress
+                                        color: Theme.textSecondaryColor
+                                        font.pixelSize: Theme.scaled(11)
+                                    }
+                                }
+                                highlighted: deviceComboBox.highlightedIndex === index
+                            }
+                        }
+
+                        StyledButton {
+                            text: TranslationManager.translate("settings.data.connect", "Connect")
+                            enabled: deviceComboBox.currentIndex >= 0
+                            onClicked: {
+                                var device = MainController.dataMigration.discoveredDevices[deviceComboBox.currentIndex]
+                                MainController.dataMigration.connectToServer(device.serverUrl)
+                            }
+                        }
+                    }
+
+                    // No devices found message
+                    Text {
+                        visible: !MainController.dataMigration.isSearching &&
+                                 MainController.dataMigration.discoveredDevices.length === 0 &&
+                                 MainController.dataMigration.currentOperation === TranslationManager.translate("settings.data.nodevices", "No devices found")
+                        text: TranslationManager.translate("settings.data.nodeviceshint", "Make sure the other device has the web server enabled in Settings.")
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: Theme.scaled(11)
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
                     }
                 }
 
@@ -360,6 +381,7 @@ Item {
                         spacing: Theme.scaled(8)
 
                         RowLayout {
+                            Layout.fillWidth: true
                             spacing: Theme.scaled(8)
 
                             Rectangle {
@@ -375,65 +397,31 @@ Item {
                                 color: Theme.textColor
                                 font.pixelSize: Theme.scaled(13)
                                 font.bold: true
+                                Layout.fillWidth: true
+                            }
+
+                            StyledButton {
+                                text: TranslationManager.translate("settings.data.disconnect", "Disconnect")
+                                onClicked: MainController.dataMigration.disconnect()
                             }
                         }
 
-                        // Data available
-                        GridLayout {
+                        // Data available - compact single line
+                        Text {
                             Layout.fillWidth: true
-                            columns: 2
-                            rowSpacing: Theme.scaled(4)
-                            columnSpacing: Theme.scaled(15)
-
-                            Tr {
-                                key: "settings.data.profilecount"
-                                fallback: "Profiles:"
-                                color: Theme.textSecondaryColor
-                                font.pixelSize: Theme.scaled(12)
-                            }
-                            Text {
-                                text: MainController.dataMigration.manifest.profileCount || 0
-                                color: Theme.textColor
-                                font.pixelSize: Theme.scaled(12)
-                            }
-
-                            Tr {
-                                key: "settings.data.shotcount"
-                                fallback: "Shots:"
-                                color: Theme.textSecondaryColor
-                                font.pixelSize: Theme.scaled(12)
-                            }
-                            Text {
-                                text: MainController.dataMigration.manifest.shotCount || 0
-                                color: Theme.textColor
-                                font.pixelSize: Theme.scaled(12)
-                            }
-
-                            Tr {
-                                key: "settings.data.mediacount"
-                                fallback: "Media files:"
-                                color: Theme.textSecondaryColor
-                                font.pixelSize: Theme.scaled(12)
-                            }
-                            Text {
-                                text: MainController.dataMigration.manifest.mediaCount || 0
-                                color: Theme.textColor
-                                font.pixelSize: Theme.scaled(12)
-                            }
-
-                            Tr {
-                                key: "settings.data.settings"
-                                fallback: "Settings:"
-                                color: Theme.textSecondaryColor
-                                font.pixelSize: Theme.scaled(12)
-                            }
-                            Text {
-                                text: MainController.dataMigration.manifest.hasSettings ?
-                                      TranslationManager.translate("common.yes", "Yes") :
-                                      TranslationManager.translate("common.no", "No")
-                                color: Theme.textColor
-                                font.pixelSize: Theme.scaled(12)
-                            }
+                            text: TranslationManager.translate("settings.data.profiles", "Profiles") + ": " +
+                                  (MainController.dataMigration.manifest.profileCount || 0) + " • " +
+                                  TranslationManager.translate("settings.data.shots", "Shots") + ": " +
+                                  (MainController.dataMigration.manifest.shotCount || 0) + " • " +
+                                  TranslationManager.translate("settings.data.media", "Media") + ": " +
+                                  (MainController.dataMigration.manifest.mediaCount || 0) + " • " +
+                                  TranslationManager.translate("settings.data.settings", "Settings") + ": " +
+                                  (MainController.dataMigration.manifest.hasSettings ?
+                                   TranslationManager.translate("common.yes", "Yes") :
+                                   TranslationManager.translate("common.no", "No"))
+                            color: Theme.textSecondaryColor
+                            font.pixelSize: Theme.scaled(11)
+                            wrapMode: Text.WordWrap
                         }
                     }
                 }

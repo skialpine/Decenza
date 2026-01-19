@@ -780,6 +780,27 @@ void DataMigrationClient::onDiscoveryDatagram()
             continue;
         }
 
+        // Filter out our own device by checking if sender IP is one of our local IPs
+        QString senderIp = senderAddress.toString();
+        // Remove IPv6 prefix if present (e.g., "::ffff:192.168.1.100" -> "192.168.1.100")
+        if (senderIp.startsWith("::ffff:")) {
+            senderIp = senderIp.mid(7);
+        }
+        bool isOurself = false;
+        for (const QNetworkInterface& interface : QNetworkInterface::allInterfaces()) {
+            for (const QNetworkAddressEntry& entry : interface.addressEntries()) {
+                if (entry.ip().toString() == senderIp) {
+                    isOurself = true;
+                    break;
+                }
+            }
+            if (isOurself) break;
+        }
+        if (isOurself) {
+            qDebug() << "DataMigrationClient: Ignoring own device at" << senderIp;
+            continue;
+        }
+
         // Check if we already have this server (by URL)
         QString serverUrl = obj["serverUrl"].toString();
         bool alreadyFound = false;
