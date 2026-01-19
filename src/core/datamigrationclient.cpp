@@ -245,6 +245,12 @@ void DataMigrationClient::onSettingsReply()
     QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
     if (!reply) return;
 
+    // Safety check if cancelled while signal was queued
+    if (m_cancelled) {
+        reply->deleteLater();
+        return;
+    }
+
     if (reply->error() != QNetworkReply::NoError) {
         qWarning() << "DataMigrationClient: Failed to import settings:" << reply->errorString();
         // Continue with next import
@@ -281,6 +287,12 @@ void DataMigrationClient::onProfileListReply()
 {
     QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
     if (!reply) return;
+
+    // Safety check if cancelled while signal was queued
+    if (m_cancelled) {
+        reply->deleteLater();
+        return;
+    }
 
     if (reply->error() != QNetworkReply::NoError) {
         qWarning() << "DataMigrationClient: Failed to fetch profile list:" << reply->errorString();
@@ -351,6 +363,12 @@ void DataMigrationClient::onProfileFileReply()
     QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
     if (!reply) return;
 
+    // Safety check if cancelled while signal was queued
+    if (m_cancelled) {
+        reply->deleteLater();
+        return;
+    }
+
     QString category = reply->property("category").toString();
     QString filename = reply->property("filename").toString();
 
@@ -414,6 +432,12 @@ void DataMigrationClient::onShotsReply()
     QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
     if (!reply) return;
 
+    // Safety check if cancelled while signal was queued
+    if (m_cancelled) {
+        reply->deleteLater();
+        return;
+    }
+
     if (reply->error() != QNetworkReply::NoError) {
         qWarning() << "DataMigrationClient: Failed to import shots:" << reply->errorString();
     } else if (m_shotHistory) {
@@ -462,6 +486,12 @@ void DataMigrationClient::onMediaListReply()
 {
     QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
     if (!reply) return;
+
+    // Safety check if cancelled while signal was queued
+    if (m_cancelled) {
+        reply->deleteLater();
+        return;
+    }
 
     if (reply->error() != QNetworkReply::NoError) {
         qWarning() << "DataMigrationClient: Failed to fetch media list:" << reply->errorString();
@@ -530,6 +560,12 @@ void DataMigrationClient::onMediaFileReply()
     QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
     if (!reply) return;
 
+    // Safety check if cancelled while signal was queued
+    if (m_cancelled) {
+        reply->deleteLater();
+        return;
+    }
+
     QString filename = reply->property("filename").toString();
 
     if (reply->error() != QNetworkReply::NoError) {
@@ -565,6 +601,8 @@ void DataMigrationClient::cancel()
     m_cancelled = true;
 
     if (m_currentReply) {
+        // Disconnect all signals BEFORE aborting to prevent handlers from running
+        m_currentReply->disconnect(this);
         m_currentReply->abort();
         m_currentReply->deleteLater();
         m_currentReply = nullptr;
