@@ -176,10 +176,20 @@ Item {
                     Layout.fillWidth: true
                     Layout.preferredHeight: Theme.scaled(140)
 
-                    Component.onCompleted: setColor(themesTab.selectedColorValue)
+                    // Guard to prevent saving during initialization
+                    property bool initialized: false
+
+                    Component.onCompleted: {
+                        setColor(themesTab.selectedColorValue)
+                        // Delay enabling saves until after initial binding settles
+                        Qt.callLater(function() { initialized = true })
+                    }
 
                     onColorChanged: {
-                        themesTab.applyColorChange(colorEditor.color)
+                        // Only save when user actually changes the color, not during init
+                        if (initialized) {
+                            themesTab.applyColorChange(colorEditor.color)
+                        }
                     }
                 }
 

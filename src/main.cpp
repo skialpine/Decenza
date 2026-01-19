@@ -528,6 +528,10 @@ int main(int argc, char *argv[])
             qDebug() << "App resumed - waking scale";
             wasSuspended = false;
 
+            // Sync settings from disk to ensure we have latest values
+            // (prevents theme colors from falling back to defaults on wake)
+            settings.sync();
+
             // Try to reconnect/wake scale
             if (physicalScale && physicalScale->isConnected()) {
                 physicalScale->wake();
