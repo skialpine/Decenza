@@ -598,5 +598,11 @@ int main(int argc, char *argv[])
         accessibilityManager.shutdown();
     });
 
-    return app.exec();
+    int result = app.exec();
+
+    // Disable crash handler before cleanup - crashes during C++ runtime destruction
+    // are not actionable and shouldn't prompt users to submit bug reports
+    CrashHandler::uninstall();
+
+    return result;
 }

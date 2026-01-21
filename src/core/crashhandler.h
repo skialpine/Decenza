@@ -17,6 +17,9 @@ public:
     /// Install signal handlers. Call once at startup.
     static void install();
 
+    /// Uninstall signal handlers. Call before app exit to prevent spurious crash reports.
+    static void uninstall();
+
     /// Get the path to the crash log file
     static QString crashLogPath();
 

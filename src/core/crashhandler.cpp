@@ -262,6 +262,25 @@ void CrashHandler::install()
     std::signal(SIGILL, signalHandler);
 }
 
+void CrashHandler::uninstall()
+{
+    // Restore default signal handlers to prevent spurious crash reports during cleanup
+    // Crashes after main() returns are typically runtime cleanup issues we can't fix
+    std::signal(SIGSEGV, SIG_DFL);
+    std::signal(SIGABRT, SIG_DFL);
+#ifdef SIGBUS
+    std::signal(SIGBUS, SIG_DFL);
+#endif
+    std::signal(SIGFPE, SIG_DFL);
+    std::signal(SIGILL, SIG_DFL);
+
+    // Restore previous message handler
+    if (s_previousHandler) {
+        qInstallMessageHandler(s_previousHandler);
+        s_previousHandler = nullptr;
+    }
+}
+
 QString CrashHandler::crashLogPath()
 {
     return QString::fromUtf8(s_crashLogPath);
