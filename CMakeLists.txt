@@ -57,9 +57,11 @@ if(ENABLE_QUICK3D)
     endif()
 endif()
 
-# Silence Qt policy warnings
-qt_policy(SET QTP0001 NEW)
-qt_policy(SET QTP0004 NEW)
+# Silence Qt policy warnings (qt_policy introduced in Qt 6.5)
+if(Qt6_VERSION VERSION_GREATER_EQUAL "6.5.0")
+    qt_policy(SET QTP0001 NEW)
+    qt_policy(SET QTP0004 NEW)
+endif()
 
 # Fetch Eclipse Paho MQTT C library (industry-standard, works with FetchContent)
 include(FetchContent)
