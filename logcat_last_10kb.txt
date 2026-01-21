@@ -1,0 +1,74 @@
+1,iconGroup=IconGroup(Wi-Fi Icons),activityIn=true,activityOut=true,rssi=-58,lastModified=01-15 17:39:44,ssid="atlas",isTransient=false,statusLabel=null
+01-15 17:39:45.565   954  1254 D NetworkController.WifiSignalController: Change in state from: connected=true,enabled=true,level=4,inetCondition=1,iconGroup=IconGroup(Wi-Fi Icons),activityIn=true,activityOut=true,rssi=-55,lastModified=01-15 17:39:44,ssid="atlas",isTransient=false,statusLabel=null
+01-15 17:39:45.565   954  1254 D NetworkController.WifiSignalController: 	to: connected=true,enabled=true,level=3,inetCondition=1,iconGroup=IconGroup(Wi-Fi Icons),activityIn=true,activityOut=true,rssi=-58,lastModified=01-15 17:39:44,ssid="atlas",isTransient=false,statusLabel=null
+01-15 17:39:45.566   954  1254 D NetworkController: WifiManager.RSSI_CHANGED_ACTION mVoWifiRegistered = false
+01-15 17:39:45.566   954  1254 D NetworkController: refreshVoWiFiIndicators show = false
+01-15 17:39:45.566   954  1254 D NetworkController: wifiLev = 3
+01-15 17:39:45.566   954  1254 D NetworkController: wifiLev = 3
+01-15 17:39:45.571   954   954 D Tile.WifiTile: onWifiSignalChanged enabled=true
+01-15 17:39:45.571   954  1254 D Tile.WifiTile: handleUpdateState arg=null
+01-15 17:39:45.571   954   954 D Tile.WifiTile: onWifiSignalChanged enabled=true
+01-15 17:39:45.572   954   954 D StatusBarSignalPolicy: state.mVowifiConnected = falsestate.mVoWifiId = 2131231755
+01-15 17:39:45.572   954  1254 D Tile.WifiTile: handleUpdateState wifiConnected=truestate.icon=ResourceIcon[resId=0x7f080292]
+01-15 17:39:45.572   954  1254 D Tile.WifiTile: handleUpdateState arg=null
+01-15 17:39:45.572   954  1254 D Tile.WifiTile: handleUpdateState wifiConnected=truestate.icon=ResourceIcon[resId=0x7f080292]
+01-15 17:39:45.929   528   569 D WCND    : is_cp2_alive_ok: open polling interface: /proc/mdbg/loopcheck, fd = 13
+01-15 17:39:45.937  1292  1392 I CPVoiceAgent: select: retrun 0
+01-15 17:39:46.030   528   569 D WCND    : is_cp2_alive_ok: loop: /proc/mdbg/loopcheck is OK
+01-15 17:39:46.544   954   954 D NetworkController.WifiSignalController: Change in state from: connected=true,enabled=true,level=3,inetCondition=1,iconGroup=IconGroup(Wi-Fi Icons),activityIn=true,activityOut=true,rssi=-58,lastModified=01-15 17:39:45,ssid="atlas",isTransient=false,statusLabel=null
+01-15 17:39:46.544   954   954 D NetworkController.WifiSignalController: 	to: connected=true,enabled=true,level=3,inetCondition=1,iconGroup=IconGroup(Wi-Fi Icons),activityIn=false,activityOut=false,rssi=-58,lastModified=01-15 17:39:45,ssid="atlas",isTransient=false,statusLabel=null
+01-15 17:39:46.545   954   954 D Tile.WifiTile: onWifiSignalChanged enabled=true
+01-15 17:39:46.545   954  1254 D Tile.WifiTile: handleUpdateState arg=null
+01-15 17:39:46.545   954  1254 D Tile.WifiTile: handleUpdateState wifiConnected=truestate.icon=ResourceIcon[resId=0x7f080292]
+01-15 17:39:47.439  1292  1392 I CPVoiceAgent: select: retrun 0
+01-15 17:39:47.546   954   954 D NetworkController.WifiSignalController: Change in state from: connected=true,enabled=true,level=3,inetCondition=1,iconGroup=IconGroup(Wi-Fi Icons),activityIn=false,activityOut=false,rssi=-58,lastModified=01-15 17:39:46,ssid="atlas",isTransient=false,statusLabel=null
+01-15 17:39:47.546   954   954 D NetworkController.WifiSignalController: 	to: connected=true,enabled=true,level=3,inetCondition=1,iconGroup=IconGroup(Wi-Fi Icons),activityIn=true,activityOut=true,rssi=-58,lastModified=01-15 17:39:46,ssid="atlas",isTransient=false,statusLabel=null
+01-15 17:39:47.547   954   954 D Tile.WifiTile: onWifiSignalChanged enabled=true
+01-15 17:39:47.548   954  1254 D Tile.WifiTile: handleUpdateState arg=null
+01-15 17:39:47.548   954  1254 D Tile.WifiTile: handleUpdateState wifiConnected=truestate.icon=ResourceIcon[resId=0x7f080292]
+01-15 17:39:48.088   703   881 D DeviceStorageMonitorService: updateStateEx oldLevel = 0, newLevel = 0
+01-15 17:39:48.549   954   954 D NetworkController.WifiSignalController: Change in state from: connected=true,enabled=true,level=3,inetCondition=1,iconGroup=IconGroup(Wi-Fi Icons),activityIn=true,activityOut=true,rssi=-58,lastModified=01-15 17:39:47,ssid="atlas",isTransient=false,statusLabel=null
+01-15 17:39:48.549   954   954 D NetworkController.WifiSignalController: 	to: connected=true,enabled=true,level=3,inetCondition=1,iconGroup=IconGroup(Wi-Fi Icons),activityIn=false,activityOut=false,rssi=-58,lastModified=01-15 17:39:47,ssid="atlas",isTransient=false,statusLabel=null
+01-15 17:39:48.550   954   954 D Tile.WifiTile: onWifiSignalChanged enabled=true
+01-15 17:39:48.550   954  1254 D Tile.WifiTile: handleUpdateState arg=null
+01-15 17:39:48.550   954  1254 D Tile.WifiTile: handleUpdateState wifiConnected=truestate.icon=ResourceIcon[resId=0x7f080292]
+01-15 17:39:48.568   703   871 D WifiNetworkMonitor: EVENT_WIFI_RSSI_CHANGED
+01-15 17:39:48.568   703   871 E WifiNetworkMonitor: Not any Obervers!!!
+01-15 17:39:48.941  1292  1392 I CPVoiceAgent: select: retrun 0
+01-15 17:39:50.287  4049  4049 D ip_monitor-438: 192.168.1.207 dev wlan0 lladdr 74:56:3c:b4:6e:c9 PROBE
+01-15 17:39:50.443  1292  1392 I CPVoiceAgent: select: retrun 0
+01-15 17:39:50.604  4050  4050 D ip_monitor-438: 192.168.1.207 dev wlan0 lladdr 74:56:3c:b4:6e:c9 REACHABLE
+01-15 17:39:51.035   528   569 D WCND    : is_cp2_alive_ok: open polling interface: /proc/mdbg/loopcheck, fd = 13
+01-15 17:39:51.136   528   569 D WCND    : is_cp2_alive_ok: loop: /proc/mdbg/loopcheck is OK
+01-15 17:39:51.556   954   954 D NetworkController.WifiSignalController: Change in state from: connected=true,enabled=true,level=3,inetCondition=1,iconGroup=IconGroup(Wi-Fi Icons),activityIn=false,activityOut=false,rssi=-58,lastModified=01-15 17:39:48,ssid="atlas",isTransient=false,statusLabel=null
+01-15 17:39:51.556   954   954 D NetworkController.WifiSignalController: 	to: connected=true,enabled=true,level=3,inetCondition=1,iconGroup=IconGroup(Wi-Fi Icons),activityIn=true,activityOut=true,rssi=-58,lastModified=01-15 17:39:48,ssid="atlas",isTransient=false,statusLabel=null
+01-15 17:39:51.557   954   954 D Tile.WifiTile: onWifiSignalChanged enabled=true
+01-15 17:39:51.557   954  1254 D Tile.WifiTile: handleUpdateState arg=null
+01-15 17:39:51.557   954  1254 D Tile.WifiTile: handleUpdateState wifiConnected=truestate.icon=ResourceIcon[resId=0x7f080292]
+01-15 17:39:51.574   703   871 D WifiNetworkMonitor: EVENT_WIFI_RSSI_CHANGED
+01-15 17:39:51.575   703   871 E WifiNetworkMonitor: Not any Obervers!!!
+01-15 17:39:51.945  1292  1392 I CPVoiceAgent: select: retrun 0
+01-15 17:39:52.558   954   954 D NetworkController.WifiSignalController: Change in state from: connected=true,enabled=true,level=3,inetCondition=1,iconGroup=IconGroup(Wi-Fi Icons),activityIn=true,activityOut=true,rssi=-58,lastModified=01-15 17:39:51,ssid="atlas",isTransient=false,statusLabel=null
+01-15 17:39:52.558   954   954 D NetworkController.WifiSignalController: 	to: connected=true,enabled=true,level=3,inetCondition=1,iconGroup=IconGroup(Wi-Fi Icons),activityIn=false,activityOut=false,rssi=-58,lastModified=01-15 17:39:51,ssid="atlas",isTransient=false,statusLabel=null
+01-15 17:39:52.559   954   954 D Tile.WifiTile: onWifiSignalChanged enabled=true
+01-15 17:39:52.560   954  1254 D Tile.WifiTile: handleUpdateState arg=null
+01-15 17:39:52.560   954  1254 D Tile.WifiTile: handleUpdateState wifiConnected=truestate.icon=ResourceIcon[resId=0x7f080292]
+01-15 17:39:53.448  1292  1392 I CPVoiceAgent: select: retrun 0
+01-15 17:39:53.560   954   954 D NetworkController.WifiSignalController: Change in state from: connected=true,enabled=true,level=3,inetCondition=1,iconGroup=IconGroup(Wi-Fi Icons),activityIn=false,activityOut=false,rssi=-58,lastModified=01-15 17:39:52,ssid="atlas",isTransient=false,statusLabel=null
+01-15 17:39:53.560   954   954 D NetworkController.WifiSignalController: 	to: connected=true,enabled=true,level=3,inetCondition=1,iconGroup=IconGroup(Wi-Fi Icons),activityIn=true,activityOut=true,rssi=-58,lastModified=01-15 17:39:52,ssid="atlas",isTransient=false,statusLabel=null
+01-15 17:39:53.561   954   954 D Tile.WifiTile: onWifiSignalChanged enabled=true
+01-15 17:39:53.561   954  1254 D Tile.WifiTile: handleUpdateState arg=null
+01-15 17:39:53.561   954  1254 D Tile.WifiTile: handleUpdateState wifiConnected=truestate.icon=ResourceIcon[resId=0x7f080292]
+01-15 17:39:54.562   954   954 D NetworkController.WifiSignalController: Change in state from: connected=true,enabled=true,level=3,inetCondition=1,iconGroup=IconGroup(Wi-Fi Icons),activityIn=true,activityOut=true,rssi=-58,lastModified=01-15 17:39:53,ssid="atlas",isTransient=false,statusLabel=null
+01-15 17:39:54.562   954   954 D NetworkController.WifiSignalController: 	to: connected=true,enabled=true,level=3,inetCondition=1,iconGroup=IconGroup(Wi-Fi Icons),activityIn=false,activityOut=false,rssi=-58,lastModified=01-15 17:39:53,ssid="atlas",isTransient=false,statusLabel=null
+01-15 17:39:54.563   954   954 D Tile.WifiTile: onWifiSignalChanged enabled=true
+01-15 17:39:54.564   954  1254 D Tile.WifiTile: handleUpdateState arg=null
+01-15 17:39:54.564   954  1254 D Tile.WifiTile: handleUpdateState wifiConnected=truestate.icon=ResourceIcon[resId=0x7f080292]
+01-15 17:39:54.580   703   871 D WifiNetworkMonitor: EVENT_WIFI_RSSI_CHANGED
+01-15 17:39:54.580   703   871 E WifiNetworkMonitor: Not any Obervers!!!
+01-15 17:39:54.950  1292  1392 I CPVoiceAgent: select: retrun 0
+01-15 17:39:56.140   528   569 D WCND    : is_cp2_alive_ok: open polling interface: /proc/mdbg/loopcheck, fd = 13
+01-15 17:39:56.241   528   569 D WCND    : is_cp2_alive_ok: loop: /proc/mdbg/loopcheck is OK
+01-15 17:39:56.452  1292  1392 I CPVoiceAgent: select: retrun 0
+01-15 17:39:56.936   371   371 W IMGMemtrackHAL: hal_get_memory: memtrack cache rebuild was required
+01-15 17:39:56.936   371   371 E IMGMemtrackHAL: IonHeapBufferToRecords: Saw only garbage when skipping 'Table header' when parsing carveout_camera
