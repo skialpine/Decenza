@@ -1765,6 +1765,77 @@ ApplicationWindow {
         }
     }
 
+    // Keyboard shortcuts for machine control (like original DE1 app)
+    // E = Espresso
+    Shortcut {
+        sequence: "E"
+        onActivated: {
+            if (MachineState.isReady) {
+                console.log("[Keyboard] Starting espresso via 'E' key")
+                DE1Device.startEspresso()
+            } else {
+                console.log("[Keyboard] Cannot start espresso - machine not ready, phase:", MachineState.phase)
+            }
+        }
+    }
+
+    // S = Steam
+    Shortcut {
+        sequence: "S"
+        onActivated: {
+            if (MachineState.isReady) {
+                console.log("[Keyboard] Starting steam via 'S' key")
+                DE1Device.startSteam()
+            } else {
+                console.log("[Keyboard] Cannot start steam - machine not ready, phase:", MachineState.phase)
+            }
+        }
+    }
+
+    // W = Hot Water
+    Shortcut {
+        sequence: "W"
+        onActivated: {
+            if (MachineState.isReady) {
+                console.log("[Keyboard] Starting hot water via 'W' key")
+                DE1Device.startHotWater()
+            } else {
+                console.log("[Keyboard] Cannot start hot water - machine not ready, phase:", MachineState.phase)
+            }
+        }
+    }
+
+    // F = Flush
+    Shortcut {
+        sequence: "F"
+        onActivated: {
+            if (MachineState.isReady) {
+                console.log("[Keyboard] Starting flush via 'F' key")
+                DE1Device.startFlush()
+            } else {
+                console.log("[Keyboard] Cannot start flush - machine not ready, phase:", MachineState.phase)
+            }
+        }
+    }
+
+    // Space = Stop / Go to Idle
+    Shortcut {
+        sequence: "Space"
+        onActivated: {
+            console.log("[Keyboard] Stop/Idle via Space key, phase:", MachineState.phase)
+            DE1Device.stopOperation()
+            root.goToIdle()
+        }
+    }
+
+    // P = Sleep
+    Shortcut {
+        sequence: "P"
+        onActivated: {
+            console.log("[Keyboard] Going to sleep via 'P' key")
+            DE1Device.goToSleep()
+        }
+    }
 
     // 2-finger swipe detection for back gesture (accessibility)
     MultiPointTouchArea {
