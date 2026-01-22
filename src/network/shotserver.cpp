@@ -5052,6 +5052,7 @@ QString ShotServer::generateSettingsPage() const
                         <option value="openai">OpenAI (GPT-4)</option>
                         <option value="anthropic">Anthropic (Claude)</option>
                         <option value="gemini">Google (Gemini)</option>
+                        <option value="openrouter">OpenRouter (Multi)</option>
                         <option value="ollama">Ollama (Local)</option>
                     </select>
                 </div>
@@ -5078,6 +5079,21 @@ QString ShotServer::generateSettingsPage() const
                         <button type="button" class="password-toggle" onclick="togglePassword('geminiApiKey')">&#128065;</button>
                     </div>
                     <div class="help-text">Get your API key from <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com</a></div>
+                </div>
+                <div id="openrouterGroup" style="display:none;">
+                    <div class="form-group">
+                        <label class="form-label">OpenRouter API Key</label>
+                        <div class="password-wrapper">
+                            <input type="password" class="form-input" id="openrouterApiKey" placeholder="sk-or-...">
+                            <button type="button" class="password-toggle" onclick="togglePassword('openrouterApiKey')">&#128065;</button>
+                        </div>
+                        <div class="help-text">Get your API key from <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--accent)">openrouter.ai</a></div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Model</label>
+                        <input type="text" class="form-input" id="openrouterModel" placeholder="anthropic/claude-sonnet-4">
+                        <div class="help-text">Enter model ID from <a href="https://openrouter.ai/models" target="_blank" style="color:var(--accent)">openrouter.ai/models</a></div>
+                    </div>
                 </div>
                 <div id="ollamaGroup" style="display:none;">
                     <div class="form-row">
@@ -5183,6 +5199,8 @@ QString ShotServer::generateSettingsPage() const
                 document.getElementById('openaiApiKey').value = data.openaiApiKey || '';
                 document.getElementById('anthropicApiKey').value = data.anthropicApiKey || '';
                 document.getElementById('geminiApiKey').value = data.geminiApiKey || '';
+                document.getElementById('openrouterApiKey').value = data.openrouterApiKey || '';
+                document.getElementById('openrouterModel').value = data.openrouterModel || '';
                 document.getElementById('ollamaEndpoint').value = data.ollamaEndpoint || 'http://localhost:11434';
                 document.getElementById('ollamaModel').value = data.ollamaModel || 'llama3.2';
                 updateAiFields();
@@ -5209,6 +5227,7 @@ QString ShotServer::generateSettingsPage() const
             document.getElementById('openaiGroup').style.display = provider === 'openai' ? 'block' : 'none';
             document.getElementById('anthropicGroup').style.display = provider === 'anthropic' ? 'block' : 'none';
             document.getElementById('geminiGroup').style.display = provider === 'gemini' ? 'block' : 'none';
+            document.getElementById('openrouterGroup').style.display = provider === 'openrouter' ? 'block' : 'none';
             document.getElementById('ollamaGroup').style.display = provider === 'ollama' ? 'block' : 'none';
         }
 
@@ -5237,6 +5256,8 @@ QString ShotServer::generateSettingsPage() const
                 openaiApiKey: document.getElementById('openaiApiKey').value,
                 anthropicApiKey: document.getElementById('anthropicApiKey').value,
                 geminiApiKey: document.getElementById('geminiApiKey').value,
+                openrouterApiKey: document.getElementById('openrouterApiKey').value,
+                openrouterModel: document.getElementById('openrouterModel').value,
                 ollamaEndpoint: document.getElementById('ollamaEndpoint').value,
                 ollamaModel: document.getElementById('ollamaModel').value,
 
@@ -5305,6 +5326,8 @@ void ShotServer::handleGetSettings(QTcpSocket* socket)
     obj["openaiApiKey"] = m_settings->openaiApiKey();
     obj["anthropicApiKey"] = m_settings->anthropicApiKey();
     obj["geminiApiKey"] = m_settings->geminiApiKey();
+    obj["openrouterApiKey"] = m_settings->openrouterApiKey();
+    obj["openrouterModel"] = m_settings->openrouterModel();
     obj["ollamaEndpoint"] = m_settings->ollamaEndpoint();
     obj["ollamaModel"] = m_settings->ollamaModel();
 
@@ -5354,6 +5377,10 @@ void ShotServer::handleSaveSettings(QTcpSocket* socket, const QByteArray& body)
         m_settings->setAnthropicApiKey(obj["anthropicApiKey"].toString());
     if (obj.contains("geminiApiKey"))
         m_settings->setGeminiApiKey(obj["geminiApiKey"].toString());
+    if (obj.contains("openrouterApiKey"))
+        m_settings->setOpenrouterApiKey(obj["openrouterApiKey"].toString());
+    if (obj.contains("openrouterModel"))
+        m_settings->setOpenrouterModel(obj["openrouterModel"].toString());
     if (obj.contains("ollamaEndpoint"))
         m_settings->setOllamaEndpoint(obj["ollamaEndpoint"].toString());
     if (obj.contains("ollamaModel"))

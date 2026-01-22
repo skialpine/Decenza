@@ -723,12 +723,9 @@ Page {
             clip: true
             contentWidth: availableWidth  // Disable horizontal scroll
 
-            // Reference stepVersion to force re-evaluation when it changes
-            property var step: {
-                stepVersion  // Dependency trigger
-                return profile && selectedStepIndex >= 0 && selectedStepIndex < profile.steps.length ?
-                       profile.steps[selectedStepIndex] : null
-            }
+            // Reference stepVersion in the expression to force re-evaluation when it changes
+            property var step: (stepVersion >= 0) && profile && selectedStepIndex >= 0 && selectedStepIndex < profile.steps.length ?
+                   profile.steps[selectedStepIndex] : null
 
             ColumnLayout {
                 width: stepEditorScroll.width - Theme.scaled(10)
@@ -749,7 +746,7 @@ Page {
                     TextField {
                         Layout.fillWidth: true
                         Layout.preferredHeight: Theme.scaled(45)
-                        text: step ? step.name : ""
+                        text: { var v = stepVersion; return step ? step.name : "" }
                         font: Theme.titleFont
                         color: Theme.textColor
                         placeholderTextColor: Theme.textSecondaryColor
@@ -793,7 +790,7 @@ Page {
 
                         RadioButton {
                             text: qsTr("Pressure")
-                            checked: step && step.pump === "pressure"
+                            checked: { var v = stepVersion; return step && step.pump === "pressure" }
                             contentItem: Text {
                                 text: parent.text
                                 font: Theme.bodyFont
@@ -811,7 +808,7 @@ Page {
 
                         RadioButton {
                             text: qsTr("Flow")
-                            checked: step && step.pump === "flow"
+                            checked: { var v = stepVersion; return step && step.pump === "flow" }
                             contentItem: Text {
                                 text: parent.text
                                 font: Theme.bodyFont
@@ -846,7 +843,7 @@ Page {
                         Layout.fillWidth: true
                         from: 0
                         to: step && step.pump === "flow" ? 8 : 12
-                        value: step ? (step.pump === "flow" ? step.flow : step.pressure) : 0
+                        value: { var v = stepVersion; return step ? (step.pump === "flow" ? step.flow : step.pressure) : 0 }
                         stepSize: 0.1
                         suffix: step && step.pump === "flow" ? " mL/s" : " bar"
                         valueColor: step && step.pump === "flow" ? Theme.flowColor : Theme.pressureColor
@@ -883,7 +880,7 @@ Page {
                         Layout.fillWidth: true
                         from: 70
                         to: 100
-                        value: step ? step.temperature : 93
+                        value: { var v = stepVersion; return step ? step.temperature : 93 }
                         stepSize: 0.1
                         suffix: "\u00B0C"
                         valueColor: Theme.temperatureColor
@@ -916,7 +913,7 @@ Page {
                         Layout.fillWidth: true
                         from: 0
                         to: 120
-                        value: step ? step.seconds : 30
+                        value: { var v = stepVersion; return step ? step.seconds : 30 }
                         stepSize: 1
                         decimals: 0
                         suffix: "s"
@@ -954,7 +951,7 @@ Page {
 
                         RadioButton {
                             text: qsTr("Fast")
-                            checked: step && step.transition === "fast"
+                            checked: { var v = stepVersion; return step && step.transition === "fast" }
                             contentItem: Text {
                                 text: parent.text
                                 font: Theme.bodyFont
@@ -972,7 +969,7 @@ Page {
 
                         RadioButton {
                             text: qsTr("Smooth")
-                            checked: step && step.transition === "smooth"
+                            checked: { var v = stepVersion; return step && step.transition === "smooth" }
                             contentItem: Text {
                                 text: parent.text
                                 font: Theme.bodyFont
@@ -1014,7 +1011,7 @@ Page {
                         CheckBox {
                             id: exitIfCheck
                             text: qsTr("Enable early exit")
-                            checked: step ? step.exit_if : false
+                            checked: { var v = stepVersion; return step ? step.exit_if : false }
                             contentItem: Text {
                                 text: parent.text
                                 font: Theme.bodyFont
@@ -1075,6 +1072,7 @@ Page {
                                 highlighted: exitTypeCombo.highlightedIndex === index
                             }
                             currentIndex: {
+                                var v = stepVersion  // Force re-evaluation
                                 if (!step) return 0
                                 switch (step.exit_type) {
                                     case "pressure_over": return 0
@@ -1111,6 +1109,7 @@ Page {
                                 }
                             }
                             value: {
+                                var v = stepVersion  // Force re-evaluation
                                 if (!step) return 0
                                 switch (step.exit_type) {
                                     case "pressure_over": return step.exit_pressure_over || 0
@@ -1214,7 +1213,7 @@ Page {
 
                         RadioButton {
                             text: qsTr("Coffee")
-                            checked: step && step.sensor === "coffee"
+                            checked: { var v = stepVersion; return step && step.sensor === "coffee" }
                             contentItem: Text {
                                 text: parent.text
                                 font: Theme.bodyFont
@@ -1232,7 +1231,7 @@ Page {
 
                         RadioButton {
                             text: qsTr("Water")
-                            checked: step && step.sensor === "water"
+                            checked: { var v = stepVersion; return step && step.sensor === "water" }
                             contentItem: Text {
                                 text: parent.text
                                 font: Theme.bodyFont
@@ -1287,7 +1286,7 @@ Page {
                                 Layout.fillWidth: true
                                 from: 0
                                 to: 500
-                                value: step ? (step.volume || 0) : 0
+                                value: { var v = stepVersion; return step ? (step.volume || 0) : 0 }
                                 stepSize: 1
                                 decimals: 0
                                 suffix: " mL"
@@ -1319,7 +1318,7 @@ Page {
                                 Layout.fillWidth: true
                                 from: 0
                                 to: 100
-                                value: step ? (step.exit_weight || step.weight || 0) : 0
+                                value: { var v = stepVersion; return step ? (step.exit_weight || step.weight || 0) : 0 }
                                 stepSize: 0.5
                                 suffix: " g"
                                 valueColor: value > 0 ? Theme.weightColor : Theme.textSecondaryColor
@@ -1374,7 +1373,7 @@ Page {
                                 Layout.fillWidth: true
                                 from: 0
                                 to: step && step.pump === "flow" ? 12 : 8
-                                value: step ? (step.max_flow_or_pressure || 0) : 0
+                                value: { var v = stepVersion; return step ? (step.max_flow_or_pressure || 0) : 0 }
                                 stepSize: 0.1
                                 suffix: step && step.pump === "flow" ? " bar" : " mL/s"
                                 valueColor: value > 0 ? Theme.warningColor : Theme.textSecondaryColor
@@ -1405,7 +1404,7 @@ Page {
                                 Layout.fillWidth: true
                                 from: 0.1
                                 to: 2.0
-                                value: step ? (step.max_flow_or_pressure_range || 0.6) : 0.6
+                                value: { var v = stepVersion; return step ? (step.max_flow_or_pressure_range || 0.6) : 0.6 }
                                 stepSize: 0.1
                                 suffix: step && step.pump === "flow" ? " bar" : " mL/s"
                                 valueColor: Theme.textSecondaryColor
@@ -1436,7 +1435,7 @@ Page {
                     TextField {
                         Layout.fillWidth: true
                         Layout.preferredHeight: Theme.scaled(40)
-                        text: step ? (step.popup || "") : ""
+                        text: { var v = stepVersion; return step ? (step.popup || "") : "" }
                         font: Theme.bodyFont
                         color: Theme.textColor
                         placeholderText: qsTr("e.g., Swirl now, $weight")
@@ -1666,6 +1665,11 @@ Page {
         // Insert after selected frame, or at end
         var insertIndex = selectedStepIndex >= 0 ? selectedStepIndex + 1 : profile.steps.length
         profile.steps.splice(insertIndex, 0, newStep)
+
+        // Force step editor bindings to re-evaluate BEFORE changing selection
+        // This ensures the new step's data is properly bound
+        stepVersion++
+
         selectedStepIndex = insertIndex
         // Force graph update by reassigning frames array
         profileGraph.frames = []
@@ -1682,6 +1686,10 @@ Page {
         copy.name = original.name + " (copy)"
 
         profile.steps.splice(index + 1, 0, copy)
+
+        // Force step editor bindings to re-evaluate BEFORE changing selection
+        stepVersion++
+
         selectedStepIndex = index + 1
         // Force graph update by reassigning frames array
         profileGraph.frames = []
