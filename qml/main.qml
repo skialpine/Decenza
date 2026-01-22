@@ -1833,7 +1833,12 @@ ApplicationWindow {
         sequence: "P"
         onActivated: {
             console.log("[Keyboard] Going to sleep via 'P' key")
+            // Put scale to LCD-off mode (keep connected for wake)
+            if (ScaleDevice && ScaleDevice.connected) {
+                ScaleDevice.disableLcd()
+            }
             DE1Device.goToSleep()
+            goToScreensaver()
         }
     }
 
