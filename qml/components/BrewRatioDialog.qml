@@ -6,10 +6,33 @@ import DecenzaDE1
 Dialog {
     id: root
     parent: Overlay.overlay
-    anchors.centerIn: parent
     width: Theme.scaled(400)
     modal: true
     padding: 0
+
+    // Center horizontally, but allow vertical shift for keyboard
+    x: parent ? (parent.width - width) / 2 : 0
+    y: parent ? Math.max(20, (parent.height - height) / 2 - keyboardOffset) : 0
+
+    // Keyboard offset - shift dialog up when keyboard is visible
+    property real keyboardOffset: 0
+
+    Connections {
+        target: Qt.inputMethod
+        function onVisibleChanged() {
+            if (Qt.inputMethod.visible && grindInput.activeFocus) {
+                // Shift dialog up to keep grind input visible
+                // Move to top 30% of screen
+                root.keyboardOffset = root.parent ? root.parent.height * 0.25 : 0
+            } else {
+                root.keyboardOffset = 0
+            }
+        }
+    }
+
+    Behavior on y {
+        NumberAnimation { duration: 200; easing.type: Easing.OutQuad }
+    }
 
     // Dose value (editable, default 18g)
     property double doseValue: 18.0
