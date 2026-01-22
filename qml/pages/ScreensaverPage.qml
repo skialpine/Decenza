@@ -249,7 +249,7 @@ Page {
         active: Settings.hasQuick3D && isPipesMode
         visible: isPipesMode
         z: 0
-        source: "qrc:/qml/components/PipesScreensaver.qml"
+        source: "qrc:/qt/qml/DecenzaDE1/qml/components/PipesScreensaver.qml"
         onLoaded: item.running = Qt.binding(function() { return isPipesMode && screensaverPage.visible })
     }
 
@@ -278,7 +278,7 @@ Page {
         active: Settings.hasQuick3D && isShotMapMode
         visible: isShotMapMode
         z: 0
-        source: "qrc:/qml/components/ShotMapScreensaver.qml"
+        source: "qrc:/qt/qml/DecenzaDE1/qml/components/ShotMapScreensaver.qml"
         onLoaded: item.running = Qt.binding(function() { return isShotMapMode && screensaverPage.visible })
     }
 

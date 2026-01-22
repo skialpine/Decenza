@@ -451,7 +451,7 @@ KeyboardAwareContainer {
                             id: mapLoader
                             anchors.fill: parent
                             active: mapTestPopup.visible && Settings.hasQuick3D
-                            source: "qrc:/qml/components/ShotMapScreensaver.qml"
+                            source: "qrc:/qt/qml/DecenzaDE1/qml/components/ShotMapScreensaver.qml"
                             onLoaded: {
                                 item.testMode = true
                                 item.testLatitude = Qt.binding(function() { return MainController.shotReporter ? MainController.shotReporter.latitude : 0 })
