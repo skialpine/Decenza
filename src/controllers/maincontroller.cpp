@@ -735,6 +735,9 @@ void MainController::loadProfile(const QString& profileName) {
         m_settings->setSelectedFavoriteProfile(favoriteIndex);
     }
 
+    // Clear brew-by-ratio when loading a new profile (old dose/ratio not applicable)
+    m_brewByRatioActive = false;
+
     if (m_machineState) {
         m_machineState->setTargetWeight(m_currentProfile.targetWeight());
         m_machineState->setTargetVolume(m_currentProfile.targetVolume());
@@ -2117,7 +2120,8 @@ void MainController::restoreCurrentProfile() {
 void MainController::onEspressoCycleStarted() {
     qDebug() << "[REFACTOR] ========== MainController::onEspressoCycleStarted() ==========";
     qDebug() << "[REFACTOR] Profile:" << m_currentProfile.title()
-             << "targetWeight:" << m_currentProfile.targetWeight();
+             << "targetWeight:" << targetWeight()
+             << "(brewByRatio:" << m_brewByRatioActive << ")";
     qDebug() << "[REFACTOR] m_timingController:" << (m_timingController ? "valid" : "NULL");
     qDebug() << "[REFACTOR] m_shotDataModel:" << (m_shotDataModel ? "valid" : "NULL");
 
@@ -2137,7 +2141,8 @@ void MainController::onEspressoCycleStarted() {
     // Start timing controller and tare via it
     if (m_timingController) {
         qDebug() << "[REFACTOR] Setting up timing controller...";
-        m_timingController->setTargetWeight(m_currentProfile.targetWeight());
+        // Use targetWeight() getter which respects brew-by-ratio override
+        m_timingController->setTargetWeight(targetWeight());
         m_timingController->setCurrentProfile(&m_currentProfile);
         m_timingController->startShot();
         m_timingController->tare();
