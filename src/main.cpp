@@ -273,7 +273,8 @@ int main(int argc, char *argv[])
         flowScaleFallbackTimer.stop();
 
         // Save scale address for future direct wake connections
-        settings.setScaleAddress(device.address().toString());
+        // Use getDeviceIdentifier to handle iOS (uses UUID) vs other platforms (uses MAC address)
+        settings.setScaleAddress(getDeviceIdentifier(device));
         settings.setScaleType(type);
         settings.setScaleName(device.name());
 

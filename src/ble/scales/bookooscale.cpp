@@ -55,9 +55,11 @@ void BookooScale::connectToDevice(const QBluetoothDeviceInfo& device) {
     m_serviceFound = false;
     m_characteristicsReady = false;
 
-    BOOKOO_LOG(QString("Connecting to %1 (%2)")
-               .arg(device.name())
-               .arg(device.address().toString()));
+    // Log device identifier (UUID on iOS, address on other platforms)
+    QString deviceId = device.address().isNull()
+        ? device.deviceUuid().toString()
+        : device.address().toString();
+    BOOKOO_LOG(QString("Connecting to %1 (%2)").arg(device.name(), deviceId));
 
     m_transport->connectToDevice(device);
 }

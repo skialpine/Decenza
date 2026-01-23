@@ -1,9 +1,18 @@
 #include "qtscalebletransport.h"
 #include <QDebug>
 
+// Helper macro for consistent logging
+#define QT_TRANSPORT_LOG(msg) log(msg)
+
 QtScaleBleTransport::QtScaleBleTransport(QObject* parent)
     : ScaleBleTransport(parent)
 {
+}
+
+void QtScaleBleTransport::log(const QString& message) {
+    QString msg = QString("[BLE QtTransport] ") + message;
+    qDebug().noquote() << msg;
+    emit logMessage(msg);
 }
 
 QtScaleBleTransport::~QtScaleBleTransport() {
@@ -12,20 +21,34 @@ QtScaleBleTransport::~QtScaleBleTransport() {
 
 void QtScaleBleTransport::connectToDevice(const QString& address, const QString& name) {
     // Create device info from address - works on Android/desktop, not on iOS
+    QT_TRANSPORT_LOG(QString("connectToDevice by address: %1 (%2)").arg(name, address));
     QBluetoothDeviceInfo deviceInfo(QBluetoothAddress(address), name, 0);
     connectToDevice(deviceInfo);
 }
 
 void QtScaleBleTransport::connectToDevice(const QBluetoothDeviceInfo& device) {
     if (m_controller) {
+        QT_TRANSPORT_LOG("Cleaning up previous controller");
         disconnectFromDevice();
     }
 
     m_deviceAddress = device.address().toString();
     m_deviceName = device.name();
 
+    // Log device identifier (UUID on iOS, address on other platforms)
+    QString deviceId = device.address().isNull()
+        ? device.deviceUuid().toString()
+        : device.address().toString();
+    QT_TRANSPORT_LOG(QString("Connecting to %1 (%2)").arg(m_deviceName, deviceId));
+
     // Use the full device info - this is required for iOS where address is not available
     m_controller = QLowEnergyController::createCentral(device, this);
+
+    if (!m_controller) {
+        QT_TRANSPORT_LOG("ERROR: Failed to create BLE controller!");
+        emit error("Failed to create BLE controller");
+        return;
+    }
 
     connect(m_controller, &QLowEnergyController::connected,
             this, &QtScaleBleTransport::onControllerConnected);
@@ -38,6 +61,7 @@ void QtScaleBleTransport::connectToDevice(const QBluetoothDeviceInfo& device) {
     connect(m_controller, &QLowEnergyController::discoveryFinished,
             this, &QtScaleBleTransport::onServiceDiscoveryFinished);
 
+    QT_TRANSPORT_LOG("Calling connectToDevice on controller...");
     m_controller->connectToDevice();
 }
 
@@ -48,6 +72,7 @@ void QtScaleBleTransport::disconnectFromDevice() {
         service->deleteLater();
     }
     m_services.clear();
+    m_pendingNotificationCharacteristic = QBluetoothUuid();
 
     if (m_controller) {
         m_controller->disconnect();
@@ -64,27 +89,39 @@ void QtScaleBleTransport::disconnectFromDevice() {
 
 void QtScaleBleTransport::discoverServices() {
     if (m_controller && m_controller->state() == QLowEnergyController::ConnectedState) {
+        QT_TRANSPORT_LOG("Starting service discovery");
         m_controller->discoverServices();
+    } else {
+        QT_TRANSPORT_LOG("Cannot discover services - not connected");
     }
 }
 
 void QtScaleBleTransport::discoverCharacteristics(const QBluetoothUuid& serviceUuid) {
+    QT_TRANSPORT_LOG(QString("Discovering characteristics for service %1").arg(serviceUuid.toString()));
     QLowEnergyService* service = getOrCreateService(serviceUuid);
     if (service) {
+        QT_TRANSPORT_LOG(QString("Service object created, state: %1").arg(static_cast<int>(service->state())));
         service->discoverDetails();
+    } else {
+        QT_TRANSPORT_LOG("ERROR: Failed to create service object!");
+        emit error("Failed to create service object");
     }
 }
 
 void QtScaleBleTransport::enableNotifications(const QBluetoothUuid& serviceUuid,
                                               const QBluetoothUuid& characteristicUuid) {
+    QT_TRANSPORT_LOG(QString("Enabling notifications for %1").arg(characteristicUuid.toString()));
+
     QLowEnergyService* service = m_services.value(serviceUuid);
     if (!service) {
+        QT_TRANSPORT_LOG("ERROR: Service not found for enabling notifications");
         emit error("Service not found for enabling notifications");
         return;
     }
 
     QLowEnergyCharacteristic characteristic = service->characteristic(characteristicUuid);
     if (!characteristic.isValid()) {
+        QT_TRANSPORT_LOG("ERROR: Characteristic not found for enabling notifications");
         emit error("Characteristic not found for enabling notifications");
         return;
     }
@@ -93,8 +130,12 @@ void QtScaleBleTransport::enableNotifications(const QBluetoothUuid& serviceUuid,
         QBluetoothUuid::DescriptorType::ClientCharacteristicConfiguration);
 
     if (cccd.isValid()) {
+        QT_TRANSPORT_LOG("Writing CCCD to enable notifications");
+        // Track which characteristic we're enabling notifications for
+        m_pendingNotificationCharacteristic = characteristicUuid;
         service->writeDescriptor(cccd, QByteArray::fromHex("0100"));
     } else {
+        QT_TRANSPORT_LOG("ERROR: CCCD descriptor not found");
         emit error("CCCD descriptor not found");
     }
 }
@@ -145,25 +186,44 @@ bool QtScaleBleTransport::isConnected() const {
 }
 
 void QtScaleBleTransport::onControllerConnected() {
+    QT_TRANSPORT_LOG("Controller connected!");
     m_connected = true;
     emit connected();
 }
 
 void QtScaleBleTransport::onControllerDisconnected() {
+    QT_TRANSPORT_LOG("Controller disconnected");
     m_connected = false;
     emit disconnected();
 }
 
 void QtScaleBleTransport::onControllerError(QLowEnergyController::Error err) {
-    QString msg = QString("BLE Controller error: %1").arg(static_cast<int>(err));
+    QString errorName;
+    switch (err) {
+        case QLowEnergyController::NoError: errorName = "NoError"; break;
+        case QLowEnergyController::UnknownError: errorName = "UnknownError"; break;
+        case QLowEnergyController::UnknownRemoteDeviceError: errorName = "UnknownRemoteDeviceError"; break;
+        case QLowEnergyController::NetworkError: errorName = "NetworkError"; break;
+        case QLowEnergyController::InvalidBluetoothAdapterError: errorName = "InvalidBluetoothAdapterError"; break;
+        case QLowEnergyController::ConnectionError: errorName = "ConnectionError"; break;
+        case QLowEnergyController::AdvertisingError: errorName = "AdvertisingError"; break;
+        case QLowEnergyController::RemoteHostClosedError: errorName = "RemoteHostClosedError"; break;
+        case QLowEnergyController::AuthorizationError: errorName = "AuthorizationError"; break;
+        case QLowEnergyController::MissingPermissionsError: errorName = "MissingPermissionsError"; break;
+        default: errorName = QString::number(static_cast<int>(err)); break;
+    }
+    QString msg = QString("BLE Controller error: %1").arg(errorName);
+    QT_TRANSPORT_LOG(msg);
     emit error(msg);
 }
 
 void QtScaleBleTransport::onServiceDiscovered(const QBluetoothUuid& uuid) {
+    QT_TRANSPORT_LOG(QString("Service discovered: %1").arg(uuid.toString()));
     emit serviceDiscovered(uuid);
 }
 
 void QtScaleBleTransport::onServiceDiscoveryFinished() {
+    QT_TRANSPORT_LOG("Service discovery finished");
     emit servicesDiscoveryFinished();
 }
 
@@ -171,12 +231,25 @@ void QtScaleBleTransport::onServiceStateChanged(QLowEnergyService::ServiceState 
     QLowEnergyService* service = qobject_cast<QLowEnergyService*>(sender());
     if (!service) return;
 
+    QString stateName;
+    switch (state) {
+        case QLowEnergyService::InvalidService: stateName = "InvalidService"; break;
+        case QLowEnergyService::RemoteService: stateName = "RemoteService"; break;
+        case QLowEnergyService::RemoteServiceDiscovering: stateName = "RemoteServiceDiscovering"; break;
+        case QLowEnergyService::RemoteServiceDiscovered: stateName = "RemoteServiceDiscovered"; break;
+        default: stateName = QString::number(static_cast<int>(state)); break;
+    }
+    QT_TRANSPORT_LOG(QString("Service %1 state changed: %2")
+        .arg(service->serviceUuid().toString(), stateName));
+
     if (state == QLowEnergyService::RemoteServiceDiscovered) {
         QBluetoothUuid serviceUuid = service->serviceUuid();
 
         // Emit discovered characteristics
         const QList<QLowEnergyCharacteristic> chars = service->characteristics();
+        QT_TRANSPORT_LOG(QString("Found %1 characteristics").arg(chars.size()));
         for (const QLowEnergyCharacteristic& c : chars) {
+            QT_TRANSPORT_LOG(QString("  - Characteristic: %1").arg(c.uuid().toString()));
             emit characteristicDiscovered(serviceUuid, c.uuid(),
                                          static_cast<int>(c.properties()));
         }
@@ -199,11 +272,36 @@ void QtScaleBleTransport::onCharacteristicWritten(const QLowEnergyCharacteristic
     emit characteristicWritten(c.uuid());
 }
 
+void QtScaleBleTransport::onDescriptorWritten(const QLowEnergyDescriptor& d, const QByteArray& value) {
+    Q_UNUSED(value);
+    // Check if this is a CCCD descriptor (notification enable)
+    if (d.type() == QBluetoothUuid::DescriptorType::ClientCharacteristicConfiguration) {
+        if (!m_pendingNotificationCharacteristic.isNull()) {
+            QT_TRANSPORT_LOG(QString("Notifications enabled for %1").arg(m_pendingNotificationCharacteristic.toString()));
+            emit notificationsEnabled(m_pendingNotificationCharacteristic);
+            m_pendingNotificationCharacteristic = QBluetoothUuid();  // Clear
+        } else {
+            QT_TRANSPORT_LOG("Descriptor written but no pending characteristic tracked");
+        }
+    }
+}
+
 void QtScaleBleTransport::onServiceError(QLowEnergyService::ServiceError err) {
     // Log but don't fail - some scales (like Bookoo) reject CCCD writes
     // but still work via setCharacteristicNotification
-    qDebug() << "QtScaleBleTransport: Service error:" << err << "(may be expected)";
-    emit error(QString("Service error: %1 (may be expected)").arg(static_cast<int>(err)));
+    QString errorName;
+    switch (err) {
+        case QLowEnergyService::NoError: errorName = "NoError"; break;
+        case QLowEnergyService::OperationError: errorName = "OperationError"; break;
+        case QLowEnergyService::CharacteristicWriteError: errorName = "CharacteristicWriteError"; break;
+        case QLowEnergyService::DescriptorWriteError: errorName = "DescriptorWriteError"; break;
+        case QLowEnergyService::UnknownError: errorName = "UnknownError"; break;
+        case QLowEnergyService::CharacteristicReadError: errorName = "CharacteristicReadError"; break;
+        case QLowEnergyService::DescriptorReadError: errorName = "DescriptorReadError"; break;
+        default: errorName = QString::number(static_cast<int>(err)); break;
+    }
+    QT_TRANSPORT_LOG(QString("Service error: %1 (may be expected)").arg(errorName));
+    emit error(QString("Service error: %1 (may be expected)").arg(errorName));
 }
 
 QLowEnergyService* QtScaleBleTransport::getOrCreateService(const QBluetoothUuid& serviceUuid) {
@@ -233,6 +331,8 @@ void QtScaleBleTransport::connectServiceSignals(QLowEnergyService* service) {
             this, &QtScaleBleTransport::onCharacteristicRead);
     connect(service, &QLowEnergyService::characteristicWritten,
             this, &QtScaleBleTransport::onCharacteristicWritten);
+    connect(service, &QLowEnergyService::descriptorWritten,
+            this, &QtScaleBleTransport::onDescriptorWritten);
     connect(service, &QLowEnergyService::errorOccurred,
             this, &QtScaleBleTransport::onServiceError);
 }

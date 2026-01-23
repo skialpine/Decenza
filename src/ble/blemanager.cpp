@@ -15,6 +15,10 @@
 #include <QJniObject>
 #endif
 
+#ifdef Q_OS_IOS
+#include <UIKit/UIKit.h>
+#endif
+
 BLEManager::BLEManager(QObject* parent)
     : QObject(parent)
 {
@@ -365,11 +369,16 @@ void BLEManager::onScaleConnectedChanged() {
             emit scaleConnectionFailedChanged();
         }
         qDebug() << "BLEManager: Scale connected, stopping reconnect timer";
-    } else if (!m_savedScaleAddress.isEmpty()) {
-        // Scale disconnected and we have a saved scale - start periodic reconnect
-        if (!m_scaleReconnectTimer->isActive()) {
-            qDebug() << "BLEManager: Scale disconnected, starting periodic reconnect timer (5s interval)";
-            appendScaleLog("Scale disconnected, will attempt reconnect every 5 seconds");
+    } else {
+        // Scale disconnected - notify UI immediately
+        qDebug() << "BLEManager: Scale disconnected";
+        appendScaleLog("Scale disconnected");
+        emit scaleDisconnected();
+
+        // If we have a saved scale, start periodic reconnect in background
+        if (!m_savedScaleAddress.isEmpty() && !m_scaleReconnectTimer->isActive()) {
+            qDebug() << "BLEManager: Starting periodic reconnect timer (5s interval)";
+            appendScaleLog("Will attempt reconnect every 5 seconds");
             m_scaleReconnectTimer->start();
         }
     }
@@ -472,9 +481,30 @@ void BLEManager::tryDirectConnectToScale() {
     // de1app does both: ble connect + scanning, and calls ble_connect_to_scale again when
     // the device appears in scan results (bluetooth.tcl lines 2032 and 2252-2256)
 
+    QString deviceName = m_savedScaleName.isEmpty() ? m_savedScaleType : m_savedScaleName;
+
+#ifdef Q_OS_IOS
+    // On iOS, we have a UUID, not a MAC address
+    // Direct connect with just a UUID rarely works - we need to find the device via scanning
+    // Just start scanning and match by UUID when found
+    qDebug() << "BLEManager: Direct wake (iOS) - scanning for" << deviceName << "UUID:" << m_savedScaleAddress;
+    appendScaleLog(QString("Direct wake (iOS): scanning for %1").arg(deviceName));
+
+    m_directConnectInProgress = true;
+    m_directConnectAddress = m_savedScaleAddress;  // UUID on iOS
+
+    // Start timeout timer
+    m_scaleConnectionTimer->start();
+
+    // On iOS, we skip the direct connect attempt and rely on scanning
+    m_scanningForScales = true;
+    if (!m_scanning) {
+        startScan();
+    }
+#else
+    // On Android/desktop, we have a MAC address - try direct connect
     QString upperAddress = m_savedScaleAddress.toUpper();
     QBluetoothAddress address(upperAddress);
-    QString deviceName = m_savedScaleName.isEmpty() ? m_savedScaleType : m_savedScaleName;
     QBluetoothDeviceInfo deviceInfo(address, deviceName, QBluetoothDeviceInfo::LowEnergyCoreConfiguration);
 
     qDebug() << "BLEManager: Direct wake - connecting to" << deviceName << "at" << upperAddress;
@@ -497,6 +527,7 @@ void BLEManager::tryDirectConnectToScale() {
     if (!m_scanning) {
         startScan();
     }
+#endif
 }
 
 void BLEManager::openLocationSettings()
@@ -626,6 +657,57 @@ void BLEManager::shareScaleLog() {
     context.callMethod<void>("startActivity", "(Landroid/content/Intent;)V", chooser.object());
 
     emit scaleLogMessage("Opening share dialog...");
+
+#elif defined(Q_OS_IOS)
+    // iOS: Use UIActivityViewController for sharing
+    NSString* filePath = m_scaleLogFilePath.toNSString();
+    NSURL* fileURL = [NSURL fileURLWithPath:filePath];
+
+    if (![[NSFileManager defaultManager] fileExistsAtPath:filePath]) {
+        qWarning() << "Log file does not exist:" << m_scaleLogFilePath;
+        emit scaleLogMessage("Error: Log file not found");
+        return;
+    }
+
+    // Create activity view controller with the file URL
+    NSArray* activityItems = @[fileURL];
+    UIActivityViewController* activityVC = [[UIActivityViewController alloc]
+        initWithActivityItems:activityItems
+        applicationActivities:nil];
+
+    // Get the root view controller to present from
+    UIWindow* keyWindow = nil;
+    for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
+        if ([scene isKindOfClass:[UIWindowScene class]]) {
+            UIWindowScene* windowScene = (UIWindowScene*)scene;
+            for (UIWindow* window in windowScene.windows) {
+                if (window.isKeyWindow) {
+                    keyWindow = window;
+                    break;
+                }
+            }
+        }
+        if (keyWindow) break;
+    }
+
+    UIViewController* rootVC = keyWindow.rootViewController;
+    if (rootVC) {
+        // For iPad, we need to set the popover presentation
+        if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+            activityVC.popoverPresentationController.sourceView = rootVC.view;
+            activityVC.popoverPresentationController.sourceRect = CGRectMake(
+                rootVC.view.bounds.size.width / 2,
+                rootVC.view.bounds.size.height / 2,
+                0, 0);
+        }
+
+        [rootVC presentViewController:activityVC animated:YES completion:nil];
+        emit scaleLogMessage("Opening share dialog...");
+    } else {
+        qWarning() << "Could not find root view controller for sharing";
+        emit scaleLogMessage("Error: Could not open share dialog");
+    }
+
 #else
     // Desktop: just show the file path
     emit scaleLogMessage("Log saved to: " + m_scaleLogFilePath);

@@ -44,14 +44,17 @@ private slots:
     void onCharacteristicChanged(const QLowEnergyCharacteristic& c, const QByteArray& value);
     void onCharacteristicRead(const QLowEnergyCharacteristic& c, const QByteArray& value);
     void onCharacteristicWritten(const QLowEnergyCharacteristic& c);
+    void onDescriptorWritten(const QLowEnergyDescriptor& d, const QByteArray& value);
     void onServiceError(QLowEnergyService::ServiceError err);
 
 private:
+    void log(const QString& message);
     QLowEnergyService* getOrCreateService(const QBluetoothUuid& serviceUuid);
     void connectServiceSignals(QLowEnergyService* service);
 
     QLowEnergyController* m_controller = nullptr;
     QMap<QBluetoothUuid, QLowEnergyService*> m_services;
+    QBluetoothUuid m_pendingNotificationCharacteristic;  // Track last characteristic we're enabling notifications for
     QString m_deviceAddress;
     QString m_deviceName;
     bool m_connected = false;
