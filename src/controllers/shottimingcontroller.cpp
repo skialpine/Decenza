@@ -134,29 +134,33 @@ void ShotTimingController::onShotSample(const ShotSample& sample, double pressur
         qDebug() << "[REFACTOR] FIRST BLE SAMPLE - base time =" << m_bleTimeBase;
     }
 
-    // Calculate relative time from DE1's BLE timer (single source of truth)
-    double time = sample.timer - m_bleTimeBase;
-    m_currentTime = time;
-
-    // Track frame number change
+    // Track frame number change and detect extraction start
     if (frameNumber != m_currentFrameNumber) {
-        qDebug() << "[REFACTOR] FRAME CHANGE:" << m_currentFrameNumber << "->" << frameNumber
-                 << "at time" << time << "s";
         if (m_currentProfile && frameNumber >= 0 && frameNumber < m_currentProfile->steps().size()) {
             const auto& frame = m_currentProfile->steps()[frameNumber];
-            qDebug() << "[REFACTOR] New frame:" << frame.name
+            qDebug() << "[REFACTOR] FRAME CHANGE:" << m_currentFrameNumber << "->" << frameNumber
+                     << "frame name:" << frame.name
                      << "exitWeight:" << frame.exitWeight
                      << "pressure:" << frame.pressure
                      << "flow:" << frame.flow;
+        } else {
+            qDebug() << "[REFACTOR] FRAME CHANGE:" << m_currentFrameNumber << "->" << frameNumber;
         }
         m_currentFrameNumber = frameNumber;
 
-        // Extraction starts when frame 0 is reached (preheating shows higher frame numbers)
+        // Extraction starts when frame 0 is reached (preheating shows higher frame numbers like 2-3)
+        // Reset timer base so shot timer starts from 0 at extraction, not at preheating
         if (frameNumber == 0 && !m_extractionStarted) {
             m_extractionStarted = true;
-            qDebug() << "[REFACTOR] EXTRACTION STARTED - frame 0 reached, weight tracking enabled";
+            m_bleTimeBase = sample.timer;  // Reset timer to 0 at extraction start
+            qDebug() << "[REFACTOR] EXTRACTION STARTED - frame 0 reached, timer reset to 0, weight tracking enabled";
         }
     }
+
+    // Calculate relative time from DE1's BLE timer (single source of truth)
+    // This is done after frame 0 detection so timer shows 0 at extraction start
+    double time = sample.timer - m_bleTimeBase;
+    m_currentTime = time;
 
     // Sync display timer base to match BLE time
     m_displayTimeBase = QDateTime::currentMSecsSinceEpoch() - static_cast<qint64>(time * 1000);

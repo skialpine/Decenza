@@ -269,6 +269,12 @@ void MachineState::updatePhase() {
 
                 m_tareCompleted = false;
 
+                // Start scale timer (Felicita, etc.) when flow starts
+                if (m_scale) {
+                    m_scale->startTimer();
+                    qDebug() << "=== SCALE TIMER: Started (flow began) ===";
+                }
+
                 // Auto-tare for Hot Water (espresso tares at cycle start via MainController)
                 if (m_phase == Phase::HotWater) {
                     QTimer::singleShot(100, this, [this]() {
@@ -295,6 +301,19 @@ void MachineState::updatePhase() {
             // Don't stop timer during espresso Ending phase - let it run until cycle ends
             if (!isInEspresso) {
                 stopShotTimer();
+                // Stop scale timer when flow ends
+                if (m_scale) {
+                    m_scale->stopTimer();
+                    qDebug() << "=== SCALE TIMER: Stopped (flow ended) ===";
+                }
+            }
+        }
+
+        // Stop scale timer when exiting espresso cycle (e.g., Ending -> Idle)
+        if (wasInEspresso && !isInEspresso) {
+            if (m_scale) {
+                m_scale->stopTimer();
+                qDebug() << "=== SCALE TIMER: Stopped (espresso cycle ended) ===";
             }
         }
 
@@ -336,6 +355,10 @@ void MachineState::updatePhase() {
     if (!isFlowing() && m_shotTimer->isActive()) {
         qDebug() << "=== TIMER STOP: isFlowing() became false (substate change) ===";
         stopShotTimer();
+        if (m_scale) {
+            m_scale->stopTimer();
+            qDebug() << "=== SCALE TIMER: Stopped (substate change) ===";
+        }
     }
 }
 
