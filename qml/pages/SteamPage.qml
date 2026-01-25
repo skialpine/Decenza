@@ -17,6 +17,7 @@ Page {
         Settings.steamTimeout = getCurrentPitcherDuration()
         Settings.steamFlow = getCurrentPitcherFlow()
         // Start heating steam heater (ignores keepSteamHeaterOn - user wants to steam)
+        // startSteamHeating clears steamDisabled flag automatically
         MainController.startSteamHeating()
     }
     StackView.onActivated: root.currentPageTitle = pageTitle
@@ -30,6 +31,14 @@ Page {
     readonly property real currentSteamTemp: DE1Device.steamTemperature
     readonly property real targetSteamTemp: Settings.steamTemperature
     readonly property bool isHeatingUp: !isSteaming && currentSteamTemp < (targetSteamTemp - 5)  // 5°C tolerance
+
+    // Check if DE1 is in Steam state but still heating (FinalHeating/Heating substate)
+    // DE1::State::Steam = 5
+    readonly property bool isSteamHeating: DE1Device.state === 5 && !isSteaming
+
+    // Check if DE1 is in Puffing state (waiting for user to press STOP or auto-flush)
+    // DE1::SubState::Puffing = 20
+    readonly property bool isPuffing: DE1Device.state === 5 && DE1Device.subState === 20
 
     // Debug logging for steam phase issues
     Connections {
@@ -63,7 +72,7 @@ Page {
             // Turn off steam heater after steaming if keepSteamHeaterOn is false
             if (wasSteaming && !Settings.keepSteamHeaterOn) {
                 console.log("SteamPage: Turning off steam heater (keepSteamHeaterOn=false)")
-                MainController.turnOffSteamHeater()
+                MainController.sendSteamTemperature(0)  // This sets steamDisabled=true
             }
             wasSteaming = false
         }
@@ -110,9 +119,10 @@ Page {
         spacing: Theme.scaled(15)
 
         // === STEAMING VIEW ===
-        // Stay visible during soft-stop (waiting for purge)
+        // Also shown during steam heating (DE1 in Steam state but FinalHeating substate)
+        // Stay visible during soft-stop (waiting for purge) and Puffing (auto-flush countdown)
         ColumnLayout {
-            visible: isSteaming || steamSoftStopped
+            visible: isSteaming || steamSoftStopped || isSteamHeating || isPuffing
             Layout.fillWidth: true
             Layout.fillHeight: true
             spacing: Theme.scaled(20)
@@ -166,9 +176,10 @@ Page {
                     anchors.horizontalCenter: parent.horizontalCenter
                     spacing: Theme.spacingMedium
 
-                    // Decrease time button
+                    // Decrease time button (hidden during heating and puffing)
                     Rectangle {
                         id: decreaseTimeBtn
+                        visible: !isSteamHeating && !isPuffing
                         anchors.verticalCenter: parent.verticalCenter
                         width: Theme.scaled(48)
                         height: width
@@ -197,14 +208,24 @@ Page {
 
                     Text {
                         id: steamProgressText
-                        text: MachineState.shotTime.toFixed(1) + "s / " + Settings.steamTimeout + "s"
+                        // Show temperature during heating, countdown during puffing, time during steaming
+                        text: {
+                            if (isSteamHeating) {
+                                return Math.round(currentSteamTemp) + "°C / " + Math.round(targetSteamTemp) + "°C"
+                            } else if (isPuffing && root.steamAutoFlushCountdown > 0) {
+                                return root.steamAutoFlushCountdown.toFixed(1) + "s / " + Settings.steamAutoFlushSeconds + "s"
+                            } else {
+                                return MachineState.shotTime.toFixed(1) + "s / " + Settings.steamTimeout + "s"
+                            }
+                        }
                         color: Theme.textColor
                         font: Theme.timerFont
                     }
 
-                    // Increase time button
+                    // Increase time button (hidden during heating and puffing)
                     Rectangle {
                         id: increaseTimeBtn
+                        visible: !isSteamHeating && !isPuffing
                         anchors.verticalCenter: parent.verticalCenter
                         width: Theme.scaled(48)
                         height: width
@@ -241,10 +262,20 @@ Page {
                     color: Theme.surfaceColor
 
                     Rectangle {
-                        width: parent.width * Math.min(1, MachineState.shotTime / Settings.steamTimeout)
+                        // Show temperature progress during heating, countdown during puffing, time during steaming
+                        width: {
+                            if (isSteamHeating) {
+                                return parent.width * Math.min(1, currentSteamTemp / targetSteamTemp)
+                            } else if (isPuffing && Settings.steamAutoFlushSeconds > 0) {
+                                // Countdown: progress goes from full to empty
+                                return parent.width * Math.min(1, root.steamAutoFlushCountdown / Settings.steamAutoFlushSeconds)
+                            } else {
+                                return parent.width * Math.min(1, MachineState.shotTime / Settings.steamTimeout)
+                            }
+                        }
                         height: parent.height
                         radius: Theme.scaled(4)
-                        color: Theme.primaryColor
+                        color: isSteamHeating ? Theme.warningColor : (isPuffing ? Theme.secondaryColor : Theme.primaryColor)
                     }
                 }
             }
@@ -349,9 +380,9 @@ Page {
         }
 
         // === SETTINGS VIEW ===
-        // Hide during soft-stop (waiting for purge)
+        // Hide during soft-stop (waiting for purge), steam heating, and puffing
         ColumnLayout {
-            visible: !isSteaming && !steamSoftStopped
+            visible: !isSteaming && !steamSoftStopped && !isSteamHeating && !isPuffing
             Layout.fillWidth: true
             Layout.fillHeight: true
             spacing: Theme.scaled(12)
@@ -746,14 +777,14 @@ Page {
     // Hidden translation helper for "No pitcher"
     Tr { id: noPitcherText; key: "steam.label.noPitcher"; fallback: "No pitcher"; visible: false }
 
-    // Bottom bar (hide during soft-stop waiting for purge)
+    // Bottom bar (hide during soft-stop waiting for purge, steam heating, and puffing)
     BottomBar {
-        visible: !isSteaming && !steamSoftStopped
+        visible: !isSteaming && !steamSoftStopped && !isSteamHeating && !isPuffing
         title: getCurrentPitcherName() || noPitcherText.text
         onBackClicked: {
             // Turn off heater if keepSteamHeaterOn is false, otherwise keep it warm
             if (!Settings.keepSteamHeaterOn) {
-                MainController.turnOffSteamHeater()
+                MainController.sendSteamTemperature(0)  // This sets steamDisabled=true
             } else {
                 MainController.applySteamSettings()
             }

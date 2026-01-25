@@ -565,12 +565,10 @@ Page {
                                     anchors.fill: parent
                                     onClicked: {
                                         if (Settings.steamDisabled) {
-                                            // Enable: restore saved temperature and clear disabled flag
-                                            Settings.steamDisabled = false
+                                            // Enable: restore saved temperature (sendSteamTemperature clears flag)
                                             MainController.sendSteamTemperature(Settings.steamTemperature)
                                         } else {
-                                            // Disable: set flag and send 0 temp (but keep saved temp in settings)
-                                            Settings.steamDisabled = true
+                                            // Disable: send 0 temp (sendSteamTemperature sets flag)
                                             MainController.sendSteamTemperature(0)
                                         }
                                     }

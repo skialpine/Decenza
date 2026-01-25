@@ -250,6 +250,7 @@ private:
     QString userProfilesPath() const;
     QString downloadedProfilesPath() const;
     void applyAllSettings();
+    double getGroupTemperature() const;
 
     Settings* m_settings = nullptr;
     DE1Device* m_device = nullptr;

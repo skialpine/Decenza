@@ -46,7 +46,8 @@ void ShotTimingController::setMachineState(MachineState* machineState)
 
 void ShotTimingController::setTargetWeight(double weight)
 {
-    qDebug() << "[REFACTOR] ShotTimingController::setTargetWeight(" << weight << ")";
+    qDebug() << "[REFACTOR] ShotTimingController::setTargetWeight(" << weight << "g)"
+             << "- this will be used for stop-at-weight during espresso";
     m_targetWeight = weight;
 }
 
@@ -297,31 +298,39 @@ void ShotTimingController::checkStopAtWeight()
         target = m_targetWeight;  // Espresso target
     }
 
-    if (target <= 0) return;
+    if (target <= 0) {
+        static int noTargetCount = 0;
+        if (++noTargetCount % 50 == 1) {
+            qDebug() << "[REFACTOR] STOP-AT-WEIGHT: target is 0! m_targetWeight=" << m_targetWeight
+                     << "state=" << static_cast<int>(state);
+        }
+        return;
+    }
 
-    // Account for flow rate and lag
-    double flowRate = m_flowRate;
-    // Cap flow rate to reasonable range
-    double maxFlowRate = (state == DE1::State::HotWater) ? 20.0 : 10.0;
-    if (flowRate > maxFlowRate) flowRate = maxFlowRate;
-    if (flowRate < 0) flowRate = 0;
+    double stopThreshold;
+    if (state == DE1::State::HotWater) {
+        // Hot water: use fixed 5g offset (predictable, avoids scale-dependent issues)
+        stopThreshold = target - 5.0;
+    } else {
+        // Espresso: use flow-rate-based lag compensation (more precise)
+        double flowRate = m_flowRate;
+        if (flowRate > 10.0) flowRate = 10.0;  // Cap at reasonable max
+        if (flowRate < 0) flowRate = 0;
+        double lagSeconds = 1.5;
+        double lagCompensation = flowRate * lagSeconds;
+        stopThreshold = target - lagCompensation;
+    }
 
-    // Lag compensation: time from stop command to actual flow stop
-    // Includes: BLE transmission, valve response, residual pressure, drip
-    // Empirically measured: espresso ~1.5s, hot water ~1.2s (faster valve, less pressure)
-    double lagSeconds = (state == DE1::State::HotWater) ? 1.2 : 1.5;
-    double lagCompensation = flowRate * lagSeconds;
-
-    if (m_weight >= (target - lagCompensation)) {
+    if (m_weight >= stopThreshold) {
         m_stopAtWeightTriggered = true;
         qDebug() << "[REFACTOR] STOP-AT-WEIGHT TRIGGERED: weight =" << m_weight
-                 << "target =" << target << "lagComp =" << lagCompensation;
+                 << "target =" << target << "threshold =" << stopThreshold;
         emit stopAtWeightReached();
     } else {
         static int progressCount = 0;
         if (++progressCount % 100 == 1) {
             qDebug() << "[REFACTOR] STOP-AT-WEIGHT: progress" << m_weight << "/" << target
-                     << "(lagComp:" << lagCompensation << ")";
+                     << "(threshold:" << stopThreshold << ")";
         }
     }
 }

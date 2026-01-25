@@ -102,6 +102,7 @@ private slots:
     void onDE1SubStateChanged();
     void onScaleWeightChanged(double weight);
     void updateShotTimer();
+    void onTimingControllerTareComplete();
 
 private:
     void updatePhase();

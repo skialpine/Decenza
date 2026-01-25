@@ -180,6 +180,40 @@ ApplicationWindow {
         }
     }
 
+    // Detect when DE1 enters Steam state (even during heating/FinalHeating substate)
+    // This clears steamDisabled BEFORE applySteamSettings runs, so GHC-initiated
+    // steaming works correctly even if keepSteamHeaterOn is false
+    Connections {
+        target: DE1Device
+        function onStateChanged() {
+            // DE1::State::Steam = 5
+            if (DE1Device.state === 5) {
+                console.log("DE1 entered Steam state - starting heater, navigating to SteamPage")
+                MainController.startSteamHeating()  // This clears steamDisabled flag
+                // Navigate to SteamPage immediately so user sees heating progress
+                var currentPage = pageStack.currentItem ? pageStack.currentItem.objectName : ""
+                if (currentPage !== "steamPage" && !pageStack.busy) {
+                    pageStack.replace(steamPage)
+                }
+            }
+        }
+        function onSubStateChanged() {
+            // DE1::SubState::Puffing = 20
+            // When entering Puffing, start the auto-flush countdown if enabled
+            if (DE1Device.state === 5 && DE1Device.subState === 20) {
+                console.log("DE1 entered Puffing substate")
+                if (Settings.steamAutoFlushSeconds > 0) {
+                    console.log("Starting auto-flush countdown:", Settings.steamAutoFlushSeconds, "seconds")
+                    root.steamAutoFlushCountdown = Settings.steamAutoFlushSeconds
+                    steamAutoFlushTimer.restart()
+                }
+            }
+        }
+    }
+
+    // Auto-flush countdown value (for display on SteamPage)
+    property real steamAutoFlushCountdown: 0
+
     // Handle settings changes
     Connections {
         target: Settings
@@ -248,16 +282,26 @@ ApplicationWindow {
     // Track if we were just steaming (for auto-flush timer)
     property bool wasSteaming: false
 
-    // Auto-flush steam wand timer - triggers Idle request after steaming ends
+    // Auto-flush steam wand timer - counts down smoothly during Puffing state
     Timer {
         id: steamAutoFlushTimer
-        interval: Settings.steamAutoFlushSeconds * 1000
+        interval: 100  // 100ms for smooth countdown
         running: false
-        repeat: false
+        repeat: true
         onTriggered: {
-            console.log("Steam auto-flush timer triggered, requesting Idle state")
-            if (DE1Device && DE1Device.connected) {
-                DE1Device.requestState(0)  // 0 = Idle
+            root.steamAutoFlushCountdown -= 0.1
+            if (root.steamAutoFlushCountdown <= 0) {
+                root.steamAutoFlushCountdown = 0
+                steamAutoFlushTimer.stop()
+                console.log("Steam auto-flush countdown complete, requesting Idle state")
+                // Turn off steam heater if keepSteamHeaterOn is false
+                if (!Settings.keepSteamHeaterOn) {
+                    console.log("Auto-flush complete, turning off steam heater (keepSteamHeaterOn=false)")
+                    MainController.sendSteamTemperature(0)  // This sets steamDisabled=true
+                }
+                if (DE1Device && DE1Device.connected) {
+                    DE1Device.requestIdle()  // Triggers steam purge
+                }
             }
         }
     }
@@ -1505,7 +1549,7 @@ ApplicationWindow {
             // Apply settings when entering operations (to handle GHC-initiated starts)
             if (phase === MachineStateType.Phase.Steaming && wasIdle) {
                 // Start steam heating when entering steam (from GHC button)
-                // Uses startSteamHeating() to force heater on regardless of keepSteamHeaterOn
+                // startSteamHeating clears steamDisabled flag and forces heater on regardless of keepSteamHeaterOn
                 MainController.startSteamHeating()
                 console.log("Started steam heating on phase change to Steaming")
                 // Stop any pending auto-flush timer when starting new steam
@@ -1524,13 +1568,11 @@ ApplicationWindow {
                 // Turn off steam heater if keepSteamHeaterOn is false
                 if (!Settings.keepSteamHeaterOn) {
                     console.log("Steaming ended, turning off steam heater (keepSteamHeaterOn=false)")
-                    MainController.turnOffSteamHeater()
+                    MainController.sendSteamTemperature(0)  // This sets steamDisabled=true
                 }
-                // Start auto-flush timer if enabled
-                if (Settings.steamAutoFlushSeconds > 0) {
-                    console.log("Steaming ended, starting auto-flush timer for", Settings.steamAutoFlushSeconds, "seconds")
-                    steamAutoFlushTimer.restart()
-                }
+                // Stop and reset auto-flush timer (steaming fully ended)
+                steamAutoFlushTimer.stop()
+                root.steamAutoFlushCountdown = 0
             }
 
             // Update previous phase tracking
@@ -1585,8 +1627,9 @@ ApplicationWindow {
                     MainController.applyHotWaterSettings()
                     MainController.applyFlushSettings()
                     console.log("Pre-loaded steam/hot water/flush settings for Ready state")
-                } else if (Settings.keepSteamHeaterOn && !Settings.steamDisabled) {
-                    // Keep steam heater on when idle if setting is enabled
+                } else {
+                    // Apply steam settings in Idle state too
+                    // applySteamSettings() sends 0°C if keepSteamHeaterOn is false
                     MainController.applySteamSettings()
                 }
             }

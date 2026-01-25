@@ -107,8 +107,9 @@ void MachineState::setTimingController(ShotTimingController* controller) {
         // Forward timing controller signals
         connect(m_timingController, &ShotTimingController::shotTimeChanged,
                 this, &MachineState::shotTimeChanged);
+        // Handle tare complete - need to update m_tareCompleted flag AND emit signal
         connect(m_timingController, &ShotTimingController::tareCompleteChanged,
-                this, &MachineState::tareCompleted);
+                this, &MachineState::onTimingControllerTareComplete);
         qDebug() << "[REFACTOR] Connected timing controller signals";
     }
 }
@@ -421,6 +422,19 @@ void MachineState::onScaleWeightChanged(double weight) {
 }
 
 void MachineState::checkStopAtWeight(double weight) {
+    DE1::State state = m_device ? m_device->state() : DE1::State::Sleep;
+
+    // Debug logging for hot water
+    if (state == DE1::State::HotWater) {
+        static int hwLogCount = 0;
+        if (++hwLogCount % 20 == 1) {
+            qDebug() << "[HOTWATER] checkStopAtWeight: weight=" << weight
+                     << "stopTriggered=" << m_stopAtWeightTriggered
+                     << "tareCompleted=" << m_tareCompleted
+                     << "waterVolume=" << (m_settings ? m_settings->waterVolume() : -1);
+        }
+    }
+
     if (m_stopAtWeightTriggered) return;
     if (!m_tareCompleted) {
         static int logCount = 0;
@@ -433,7 +447,6 @@ void MachineState::checkStopAtWeight(double weight) {
 
     // Determine target based on current state
     double target = 0;
-    DE1::State state = m_device ? m_device->state() : DE1::State::Sleep;
 
     if (state == DE1::State::HotWater && m_settings) {
         target = m_settings->waterVolume();  // ml ≈ g for water
@@ -441,20 +454,28 @@ void MachineState::checkStopAtWeight(double weight) {
         target = m_targetWeight;  // Espresso target
     }
 
-    if (target <= 0) return;
+    if (target <= 0) {
+        if (state == DE1::State::HotWater) {
+            qWarning() << "[HOTWATER] target is 0! waterVolume=" << (m_settings ? m_settings->waterVolume() : -1);
+        }
+        return;
+    }
 
-    // Account for flow rate and lag (simple implementation)
-    double flowRate = m_scale ? m_scale->flowRate() : 0;
-    // Cap flow rate to reasonable range (max ~10 g/s for espresso, higher for water)
-    double maxFlowRate = (state == DE1::State::HotWater) ? 20.0 : 10.0;
-    if (flowRate > maxFlowRate) flowRate = maxFlowRate;
-    if (flowRate < 0) flowRate = 0;
+    double stopThreshold;
+    if (state == DE1::State::HotWater) {
+        // Hot water: use fixed 5g offset (predictable, avoids scale-dependent issues)
+        stopThreshold = target - 5.0;
+    } else {
+        // Espresso: use flow-rate-based lag compensation (more precise)
+        double flowRate = m_scale ? m_scale->flowRate() : 0;
+        if (flowRate > 10.0) flowRate = 10.0;  // Cap at reasonable max
+        if (flowRate < 0) flowRate = 0;
+        double lagSeconds = 0.5;
+        double lagCompensation = flowRate * lagSeconds;
+        stopThreshold = target - lagCompensation;
+    }
 
-    // Hot water has higher flow rate, needs more lag compensation
-    double lagSeconds = (state == DE1::State::HotWater) ? 0.9 : 0.5;
-    double lagCompensation = flowRate * lagSeconds;
-
-    if (weight >= (target - lagCompensation)) {
+    if (weight >= stopThreshold) {
         m_stopAtWeightTriggered = true;
         qDebug() << "[SCALE] STOP TRIGGERED: weight=" << weight << "target=" << target;
         emit targetWeightReached();
@@ -625,4 +646,11 @@ void MachineState::tareScale() {
     } else {
         qDebug() << "[REFACTOR] No scale connected for legacy tare";
     }
+}
+
+void MachineState::onTimingControllerTareComplete() {
+    qDebug() << "[REFACTOR] MachineState::onTimingControllerTareComplete() - setting m_tareCompleted=true";
+    m_tareCompleted = true;
+    m_waitingForTare = false;
+    emit tareCompleted();
 }

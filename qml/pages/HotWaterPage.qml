@@ -13,6 +13,9 @@ Page {
         // Sync Settings.waterVolume with selected preset
         Settings.waterVolume = getCurrentVesselVolume()
         MainController.applyHotWaterSettings()
+        // Tare immediately so display shows 0g instead of current scale weight
+        // (scale will tare again when hot water flow actually starts)
+        MachineState.tareScale()
     }
     StackView.onActivated: root.currentPageTitle = pageTitleText.text
 
