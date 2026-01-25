@@ -387,11 +387,30 @@ void AcaiaScale::decodeWeight(const QByteArray& data, int payloadOffset) {
     setWeight(weight);
 }
 
-void AcaiaScale::tare() {
-    ACAIA_LOG("Sending tare");
-
+void AcaiaScale::sendTareCommand() {
     // Tare message: type 0x04 with zeros
     QByteArray payload(17, 0);
     QByteArray packet = encodePacket(0x04, payload);
     sendCommand(packet);
+}
+
+void AcaiaScale::tare() {
+    // Acaia Lunar scales are notoriously unreliable with single tare commands.
+    // The Decent app sends 3-4 tares at shot start. We do the same here.
+    ACAIA_LOG("Sending multiple tares (Acaia workaround)");
+
+    // Send first tare immediately
+    sendTareCommand();
+
+    // Send 2 more tares with 100ms delays
+    QTimer::singleShot(100, this, [this]() {
+        if (m_transport && m_characteristicsReady) {
+            sendTareCommand();
+        }
+    });
+    QTimer::singleShot(200, this, [this]() {
+        if (m_transport && m_characteristicsReady) {
+            sendTareCommand();
+        }
+    });
 }

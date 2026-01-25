@@ -376,6 +376,13 @@ void MqttClient::onInternalMessageReceived(const QString& topic, const QString& 
 
     if (topic.endsWith("/command")) {
         handleCommand(payload.trimmed().toLower());
+    } else if (topic.endsWith("/profile/set")) {
+        // Profile selection - payload is the profile name (filename without .json)
+        QString profileName = payload.trimmed();
+        if (!profileName.isEmpty()) {
+            qDebug() << "MqttClient: Profile selection requested:" << profileName;
+            emit profileSelectRequested(profileName);
+        }
     }
 }
 
@@ -383,19 +390,29 @@ void MqttClient::setupSubscriptions()
 {
     if (!m_client || !isConnected() || !m_settings) return;
 
-    QString commandTopic = topicPath("command");
-    QByteArray topicBytes = commandTopic.toUtf8();
-
     MQTTAsync_responseOptions opts = MQTTAsync_responseOptions_initializer;
     opts.onSuccess = onSubscribeSuccess;
     opts.onFailure = onSubscribeFailure;
     opts.context = this;
 
-    int rc = MQTTAsync_subscribe(m_client, topicBytes.constData(), 1, &opts);
+    // Subscribe to command topic
+    QString commandTopic = topicPath("command");
+    QByteArray commandBytes = commandTopic.toUtf8();
+    int rc = MQTTAsync_subscribe(m_client, commandBytes.constData(), 1, &opts);
     if (rc != MQTTASYNC_SUCCESS) {
         qWarning() << "MqttClient: Failed to subscribe to" << commandTopic << "- error" << rc;
     } else {
         qDebug() << "MqttClient: Subscribing to" << commandTopic;
+    }
+
+    // Subscribe to profile/set topic for profile selection
+    QString profileTopic = topicPath("profile/set");
+    QByteArray profileBytes = profileTopic.toUtf8();
+    rc = MQTTAsync_subscribe(m_client, profileBytes.constData(), 1, &opts);
+    if (rc != MQTTASYNC_SUCCESS) {
+        qWarning() << "MqttClient: Failed to subscribe to" << profileTopic << "- error" << rc;
+    } else {
+        qDebug() << "MqttClient: Subscribing to" << profileTopic;
     }
 }
 
@@ -415,6 +432,21 @@ void MqttClient::handleCommand(const QString& command)
         emit commandReceived("sleep");
     } else {
         qWarning() << "MqttClient: Unknown command:" << command;
+    }
+}
+
+void MqttClient::setCurrentProfile(const QString& profile)
+{
+    if (m_currentProfile != profile) {
+        m_currentProfile = profile;
+        emit currentProfileChanged();
+
+        // Publish profile change
+        if (isConnected() && profile != m_lastPublishedProfile) {
+            publish(topicPath("profile"), profile, true);
+            m_lastPublishedProfile = profile;
+            qDebug() << "MqttClient: Published profile change:" << profile;
+        }
     }
 }
 
@@ -522,6 +554,12 @@ void MqttClient::publishState()
     if (phase != m_lastPublishedPhase) {
         publish(topicPath("phase"), phase, true);
         m_lastPublishedPhase = phase;
+    }
+
+    // Publish profile if changed
+    if (!m_currentProfile.isEmpty() && m_currentProfile != m_lastPublishedProfile) {
+        publish(topicPath("profile"), m_currentProfile, true);
+        m_lastPublishedProfile = m_currentProfile;
     }
 
     publish(topicPath("substate"), substate, true);
@@ -683,6 +721,20 @@ void MqttClient::publishHomeAssistantDiscovery()
         config["availability_topic"] = baseTopic + "/availability";
         config["device"] = device;
         publishDiscoveryConfig("sensor", "shot_time", config);
+    }
+
+    // Profile sensor (text sensor for current profile name)
+    // To set profile from HA, publish to decenza/profile/set with profile name
+    {
+        QJsonObject config;
+        config["name"] = "DE1 Profile";
+        config["state_topic"] = baseTopic + "/profile";
+        config["command_topic"] = baseTopic + "/profile/set";
+        config["icon"] = "mdi:coffee";
+        config["unique_id"] = QString("de1_%1_profile").arg(m_clientId);
+        config["availability_topic"] = baseTopic + "/availability";
+        config["device"] = device;
+        publishDiscoveryConfig("text", "profile", config);
     }
 
     // Power switch (wake/sleep)

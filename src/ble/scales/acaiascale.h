@@ -41,6 +41,7 @@ private:
     void decodeWeight(const QByteArray& payload, int payloadOffset);
     QByteArray encodePacket(uint8_t msgType, const QByteArray& payload);
     void sendCommand(const QByteArray& command);
+    void sendTareCommand();  // Internal: sends a single tare command
     void startInitSequence();
     void stopAllTimers();
 

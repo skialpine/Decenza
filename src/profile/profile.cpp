@@ -348,10 +348,20 @@ Profile Profile::loadFromFile(const QString& filePath) {
 bool Profile::saveToFile(const QString& filePath) const {
     QFile file(filePath);
     if (!file.open(QIODevice::WriteOnly)) {
+        qWarning() << "Profile::saveToFile: Failed to open file for writing:" << filePath
+                   << "- Error:" << file.errorString();
         return false;
     }
 
-    file.write(toJson().toJson(QJsonDocument::Indented));
+    QByteArray data = toJson().toJson(QJsonDocument::Indented);
+    qint64 bytesWritten = file.write(data);
+    if (bytesWritten != data.size()) {
+        qWarning() << "Profile::saveToFile: Failed to write all data to:" << filePath
+                   << "- Expected:" << data.size() << "bytes, wrote:" << bytesWritten
+                   << "- Error:" << file.errorString();
+        return false;
+    }
+
     return true;
 }
 

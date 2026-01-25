@@ -25,6 +25,12 @@ AIManager::AIManager(Settings* settings, QObject* parent)
     // Create conversation handler for multi-turn interactions
     m_conversation = new AIConversation(this, this);
 
+    // Load any saved conversation from previous session
+    if (m_conversation->hasSavedConversation()) {
+        m_conversation->loadFromStorage();
+        qDebug() << "AIManager: Loaded saved conversation with" << m_conversation->messageCount() << "messages";
+    }
+
     // Connect to settings changes
     connect(m_settings, &Settings::valueChanged, this, &AIManager::onSettingsChanged);
 }

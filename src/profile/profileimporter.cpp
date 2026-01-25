@@ -373,7 +373,9 @@ QString ProfileImporter::downloadedProfilesPath() const
     // Ensure directory exists
     QDir dir(path);
     if (!dir.exists()) {
-        dir.mkpath(".");
+        if (!dir.mkpath(".")) {
+            qWarning() << "ProfileImporter: Failed to create directory:" << path;
+        }
     }
 
     return path;
@@ -550,13 +552,29 @@ int ProfileImporter::saveProfile(const Profile& profile, const QString& filename
 void ProfileImporter::saveOverwrite()
 {
     if (!m_pendingProfile.isValid()) {
+        qWarning() << "ProfileImporter::saveOverwrite: Pending profile is not valid";
         m_importing = false;
         emit isImportingChanged();
         return;
     }
 
     QString filename = generateFilename(m_pendingProfile.title());
-    QString fullPath = downloadedProfilesPath() + "/" + filename + ".json";
+    QString destDir = downloadedProfilesPath();
+    QString fullPath = destDir + "/" + filename + ".json";
+
+    // Verify directory exists
+    QDir dir(destDir);
+    if (!dir.exists()) {
+        qWarning() << "ProfileImporter::saveOverwrite: Directory does not exist:" << destDir;
+        emit importFailed("Failed to overwrite: destination folder does not exist");
+        m_pendingProfile = Profile();
+        m_pendingSourcePath.clear();
+        m_importing = false;
+        emit isImportingChanged();
+        return;
+    }
+
+    qDebug() << "ProfileImporter::saveOverwrite: Saving to" << fullPath;
 
     if (m_pendingProfile.saveToFile(fullPath)) {
         setStatus("Overwritten: " + m_pendingProfile.title());
@@ -565,7 +583,8 @@ void ProfileImporter::saveOverwrite()
             m_controller->refreshProfiles();
         }
     } else {
-        emit importFailed("Failed to overwrite: " + m_pendingProfile.title());
+        qWarning() << "ProfileImporter::saveOverwrite: saveToFile() failed for" << fullPath;
+        emit importFailed("Failed to overwrite: " + m_pendingProfile.title() + " (check app permissions)");
     }
 
     m_pendingProfile = Profile();

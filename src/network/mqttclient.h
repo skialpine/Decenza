@@ -18,6 +18,7 @@ class MqttClient : public QObject {
     Q_PROPERTY(bool connected READ isConnected NOTIFY connectedChanged)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(int reconnectAttempts READ reconnectAttempts NOTIFY reconnectAttemptsChanged)
+    Q_PROPERTY(QString currentProfile READ currentProfile WRITE setCurrentProfile NOTIFY currentProfileChanged)
 
 public:
     explicit MqttClient(DE1Device* device, MachineState* machineState,
@@ -27,6 +28,8 @@ public:
     bool isConnected() const;
     QString status() const { return m_status; }
     int reconnectAttempts() const { return m_reconnectAttempts; }
+    QString currentProfile() const { return m_currentProfile; }
+    void setCurrentProfile(const QString& profile);
 
     Q_INVOKABLE void connectToBroker();
     Q_INVOKABLE void disconnectFromBroker();
@@ -37,6 +40,8 @@ signals:
     void statusChanged();
     void reconnectAttemptsChanged();
     void commandReceived(const QString& command);
+    void profileSelectRequested(const QString& profileName);
+    void currentProfileChanged();
 
     // Internal signals for thread-safe callback handling
     void internalConnected();
@@ -102,6 +107,8 @@ private:
     bool m_discoveryPublished = false;
     QString m_lastPublishedState;
     QString m_lastPublishedPhase;
+    QString m_lastPublishedProfile;
+    QString m_currentProfile;
     QString m_clientId;
 
     mutable QMutex m_mutex;

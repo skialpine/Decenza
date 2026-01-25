@@ -174,6 +174,19 @@ MainController::MainController(Settings* settings, DE1Device* device,
         }
     });
 
+    // Handle profile selection via MQTT
+    connect(m_mqttClient, &MqttClient::profileSelectRequested, this, [this](const QString& profileName) {
+        qDebug() << "MainController: MQTT profile selection requested:" << profileName;
+        loadProfile(profileName);
+    });
+
+    // Update MQTT with current profile when it changes
+    connect(this, &MainController::currentProfileChanged, this, [this]() {
+        if (m_mqttClient) {
+            m_mqttClient->setCurrentProfile(m_currentProfile.title());
+        }
+    });
+
     // Auto-connect MQTT if enabled
     if (m_settings && m_settings->mqttEnabled() && !m_settings->mqttBrokerHost().isEmpty()) {
         // Delay connection to allow BLE to initialize
