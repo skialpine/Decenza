@@ -1166,7 +1166,9 @@ void DE1Device::setShotSettings(double steamTemp, int steamDuration,
     data[1] = BinaryCodec::encodeU8P0(steamTemp);
     data[2] = BinaryCodec::encodeU8P0(steamDuration);
     data[3] = BinaryCodec::encodeU8P0(hotWaterTemp);
-    data[4] = BinaryCodec::encodeU8P0(hotWaterVolume);
+    // Send 0 to disable machine's volume-based auto-stop - app controls stop via scale
+    data[4] = BinaryCodec::encodeU8P0(0);
+    Q_UNUSED(hotWaterVolume);  // Target is used by app's scale-based stop, not sent to machine
     data[5] = BinaryCodec::encodeU8P0(60);  // TargetHotWaterLength
     data[6] = BinaryCodec::encodeU8P0(36);  // TargetEspressoVol
 

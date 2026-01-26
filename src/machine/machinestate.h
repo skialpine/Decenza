@@ -108,7 +108,7 @@ private:
     void updatePhase();
     void startShotTimer();
     void stopShotTimer();
-    void checkStopAtWeight(double weight);
+    void checkStopAtWeightHotWater(double weight);
     void checkStopAtVolume();
     void checkStopAtTime();
 

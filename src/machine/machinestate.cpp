@@ -404,89 +404,48 @@ void MachineState::onScaleWeightChanged(double weight) {
     m_lastIdleWeight = 0.0;
 
     DE1::State state = m_device->state();
-    // For espresso: only check weight when stopAtType is Weight (Volume checked in onFlowSample)
-    // For hot water: always check weight (no volume option)
+    // Hot water: MachineState handles stop-at-weight (ShotTimingController not active)
+    // Espresso: ShotTimingController handles stop-at-weight (with proper 1.5s lag compensation)
     if (state == DE1::State::HotWater) {
-        checkStopAtWeight(weight);
-    } else if (state == DE1::State::Espresso && m_stopAtType == StopAtType::Weight) {
-        checkStopAtWeight(weight);
-    } else {
-        // Debug: log why stop-at-weight wasn't checked
-        static int skipCount = 0;
-        if (++skipCount % 100 == 1) {
-            qDebug() << "[SCALE] CHECK SKIPPED: state=" << static_cast<int>(state)
-                     << "stopAtType=" << static_cast<int>(m_stopAtType)
-                     << "weight=" << weight;
-        }
+        checkStopAtWeightHotWater(weight);
     }
 }
 
-void MachineState::checkStopAtWeight(double weight) {
-    DE1::State state = m_device ? m_device->state() : DE1::State::Sleep;
-
-    // Debug logging for hot water
-    if (state == DE1::State::HotWater) {
-        static int hwLogCount = 0;
-        if (++hwLogCount % 20 == 1) {
-            qDebug() << "[HOTWATER] checkStopAtWeight: weight=" << weight
-                     << "stopTriggered=" << m_stopAtWeightTriggered
-                     << "tareCompleted=" << m_tareCompleted
-                     << "waterVolume=" << (m_settings ? m_settings->waterVolume() : -1);
-        }
+void MachineState::checkStopAtWeightHotWater(double weight) {
+    static int hwLogCount = 0;
+    if (++hwLogCount % 20 == 1) {
+        qDebug() << "[HOTWATER] checkStopAtWeightHotWater: weight=" << weight
+                 << "stopTriggered=" << m_stopAtWeightTriggered
+                 << "tareCompleted=" << m_tareCompleted
+                 << "waterVolume=" << (m_settings ? m_settings->waterVolume() : -1);
     }
 
     if (m_stopAtWeightTriggered) return;
     if (!m_tareCompleted) {
         static int logCount = 0;
         if (++logCount % 50 == 1) {
-            qWarning() << "[SCALE] SKIPPED: tare not done, weight=" << weight
+            qWarning() << "[HOTWATER] SKIPPED: tare not done, weight=" << weight
                        << "waitingForTare=" << m_waitingForTare;
         }
         return;
     }
 
-    // Determine target based on current state
-    double target = 0;
-
-    if (state == DE1::State::HotWater && m_settings) {
-        target = m_settings->waterVolume();  // ml ≈ g for water
-    } else {
-        target = m_targetWeight;  // Espresso target
-    }
-
+    double target = m_settings ? m_settings->waterVolume() : 0;  // ml ≈ g for water
     if (target <= 0) {
-        if (state == DE1::State::HotWater) {
-            qWarning() << "[HOTWATER] target is 0! waterVolume=" << (m_settings ? m_settings->waterVolume() : -1);
-        }
+        qWarning() << "[HOTWATER] target is 0! waterVolume=" << (m_settings ? m_settings->waterVolume() : -1);
         return;
     }
 
-    double stopThreshold;
-    if (state == DE1::State::HotWater) {
-        // Hot water: use fixed 5g offset (predictable, avoids scale-dependent issues)
-        stopThreshold = target - 5.0;
-    } else {
-        // Espresso: use flow-rate-based lag compensation (more precise)
-        double flowRate = m_scale ? m_scale->flowRate() : 0;
-        if (flowRate > 10.0) flowRate = 10.0;  // Cap at reasonable max
-        if (flowRate < 0) flowRate = 0;
-        double lagSeconds = 0.5;
-        double lagCompensation = flowRate * lagSeconds;
-        stopThreshold = target - lagCompensation;
-    }
+    // Hot water: use fixed 5g offset (predictable, avoids scale-dependent issues)
+    double stopThreshold = target - 5.0;
 
     if (weight >= stopThreshold) {
         m_stopAtWeightTriggered = true;
-        qDebug() << "[SCALE] STOP TRIGGERED: weight=" << weight << "target=" << target;
+        qDebug() << "[HOTWATER] STOP TRIGGERED: weight=" << weight << "target=" << target;
         emit targetWeightReached();
 
         if (m_device) {
             m_device->stopOperation();
-        }
-    } else {
-        static int progressCount = 0;
-        if (++progressCount % 100 == 1) {
-            qDebug() << "[SCALE] PROGRESS: weight=" << weight << "/" << target;
         }
     }
 }
