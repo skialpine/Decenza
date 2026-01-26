@@ -713,19 +713,33 @@ void MainController::loadProfile(const QString& profileName) {
     QString path;
     bool found = false;
 
+    // Resolve profile name: could be title or filename (MQTT publishes titles)
+    QString resolvedName = profileName;
+
+    // First, check if it's a title (most common case from MQTT)
+    for (auto it = m_profileTitles.begin(); it != m_profileTitles.end(); ++it) {
+        if (it.value() == profileName) {
+            resolvedName = it.key();  // Found filename for this title
+            qDebug() << "MainController::loadProfile: Resolved title" << profileName << "to filename" << resolvedName;
+            break;
+        }
+    }
+
+    // If not found as title, assume it's already a filename (fallback)
+
     // 1. Check ProfileStorage first (SAF folder on Android)
     if (m_profileStorage && m_profileStorage->isConfigured()) {
-        QString jsonContent = m_profileStorage->readProfile(profileName);
+        QString jsonContent = m_profileStorage->readProfile(resolvedName);
         if (!jsonContent.isEmpty()) {
             m_currentProfile = Profile::loadFromJsonString(jsonContent);
             found = true;
-            qDebug() << "Loaded profile from ProfileStorage:" << profileName;
+            qDebug() << "Loaded profile from ProfileStorage:" << resolvedName;
         }
     }
 
     // 2. Check user profiles (local fallback)
     if (!found) {
-        path = userProfilesPath() + "/" + profileName + ".json";
+        path = userProfilesPath() + "/" + resolvedName + ".json";
         if (QFile::exists(path)) {
             m_currentProfile = Profile::loadFromFile(path);
             found = true;
@@ -734,7 +748,7 @@ void MainController::loadProfile(const QString& profileName) {
 
     // 3. Check downloaded profiles (local fallback)
     if (!found) {
-        path = downloadedProfilesPath() + "/" + profileName + ".json";
+        path = downloadedProfilesPath() + "/" + resolvedName + ".json";
         if (QFile::exists(path)) {
             m_currentProfile = Profile::loadFromFile(path);
             found = true;
@@ -743,7 +757,7 @@ void MainController::loadProfile(const QString& profileName) {
 
     // 4. Check built-in profiles
     if (!found) {
-        path = ":/profiles/" + profileName + ".json";
+        path = ":/profiles/" + resolvedName + ".json";
         if (QFile::exists(path)) {
             m_currentProfile = Profile::loadFromFile(path);
             found = true;
@@ -752,20 +766,21 @@ void MainController::loadProfile(const QString& profileName) {
 
     // 5. Fall back to default
     if (!found) {
+        qWarning() << "MainController::loadProfile: Profile not found:" << profileName << "(resolved:" << resolvedName << ")";
         loadDefaultProfile();
     }
 
     // Track the base profile name (filename without extension)
-    m_baseProfileName = profileName;
+    m_baseProfileName = resolvedName;
     bool wasModified = m_profileModified;
     m_profileModified = false;
 
     if (m_settings) {
-        m_settings->setCurrentProfile(profileName);
+        m_settings->setCurrentProfile(resolvedName);
         // Sync selectedFavoriteProfile with the loaded profile
         // This ensures the UI shows the correct pill as selected, or -1 if not a favorite
-        int favoriteIndex = m_settings->findFavoriteIndexByFilename(profileName);
-        qDebug() << "loadProfile: profileName=" << profileName << "favoriteIndex=" << favoriteIndex;
+        int favoriteIndex = m_settings->findFavoriteIndexByFilename(resolvedName);
+        qDebug() << "loadProfile: resolvedName=" << resolvedName << "favoriteIndex=" << favoriteIndex;
         m_settings->setSelectedFavoriteProfile(favoriteIndex);
     }
 
