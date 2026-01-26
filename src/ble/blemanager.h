@@ -136,8 +136,4 @@ private:
     QStringList m_scaleLogMessages;
     QString m_scaleLogFilePath;
     void writeScaleLogToFile();
-
-    // Bluetooth stuck detection
-    int m_consecutiveBleFailures = 0;
-    static constexpr int STUCK_THRESHOLD = 5;
 };

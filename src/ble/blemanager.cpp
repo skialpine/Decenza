@@ -368,7 +368,6 @@ void BLEManager::onScaleConnectedChanged() {
             m_scaleConnectionFailed = false;
             emit scaleConnectionFailedChanged();
         }
-        m_consecutiveBleFailures = 0;  // Reset stuck counter on successful connection
         qDebug() << "BLEManager: Scale connected, stopping reconnect timer";
     } else {
         // Scale disconnected - notify UI immediately
@@ -391,18 +390,12 @@ void BLEManager::onScaleConnectionTimeout() {
     m_directConnectAddress.clear();
 
     if (!m_scaleDevice || !m_scaleDevice->isConnected()) {
-        qWarning() << "Scale connection timeout - scale not responding";
+        qDebug() << "Scale connection timeout - scale not responding (this is normal if scale is off)";
         m_scaleConnectionFailed = true;
         emit scaleConnectionFailedChanged();
-
-        // Track consecutive failures to detect stuck Bluetooth
-        m_consecutiveBleFailures++;
-        qDebug() << "BLEManager: Consecutive BLE failures:" << m_consecutiveBleFailures;
-        if (m_consecutiveBleFailures >= STUCK_THRESHOLD) {
-            qWarning() << "BLEManager: Bluetooth appears stuck after" << m_consecutiveBleFailures << "failures";
-            emit bluetoothStuck();
-            m_consecutiveBleFailures = 0;  // Reset to allow future detection
-        }
+        // Note: We don't track this as a "BLE failure" because scales being off/unavailable
+        // is normal. The "Bluetooth stuck" detection should only apply to actual BLE stack issues,
+        // not to expected situations like a scale being powered off.
     }
 }
 
