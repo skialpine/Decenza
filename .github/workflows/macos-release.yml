@@ -58,6 +58,17 @@ jobs:
           cd build/macos
           cmake --build . --config Release --parallel
 
+      - name: Bundle Qt frameworks
+        run: |
+          APP_PATH="build/macos/Release/Decenza_DE1.app"
+          echo "Running macdeployqt on: $APP_PATH"
+
+          # macdeployqt bundles Qt frameworks and fixes library paths
+          $QT_ROOT_DIR/bin/macdeployqt "$APP_PATH" -qmldir=qml -verbose=2
+
+          echo "Bundled frameworks:"
+          ls -la "$APP_PATH/Contents/Frameworks/" | head -20
+
       - name: Create DMG
         run: |
           VERSION=${{ steps.version.outputs.version }}
