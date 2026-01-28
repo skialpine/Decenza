@@ -50,6 +50,7 @@ jobs:
           cd build/macos
           $QT_ROOT_DIR/bin/qt-cmake ../.. -G Xcode \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+            -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
       - name: Build Release
