@@ -8,8 +8,19 @@ Item {
     required property var items
 
     // Items that size to their content instead of using fixed button width
+    // Action buttons (espresso, steam, etc.) use fixed buttonWidth; readouts auto-size
     function isAutoSized(type) {
-        return type === "spacer" || type === "shotPlan"
+        switch (type) {
+            case "spacer":
+            case "shotPlan":
+            case "temperature":
+            case "waterLevel":
+            case "connectionStatus":
+            case "scaleWeight":
+                return true
+            default:
+                return false
+        }
     }
 
     // Calculate button sizing (auto-sized items don't count)

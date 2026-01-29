@@ -167,9 +167,9 @@ Rectangle {
                         // Remove button (only visible when selected)
                         Text {
                             visible: itemChip.isSelected
-                            text: "\u2715"
-                            color: "white"
-                            font.pixelSize: Theme.scaled(14)
+                            text: "\u00D7"
+                            color: Theme.errorColor
+                            font.pixelSize: Theme.scaled(20)
                             font.bold: true
                             MouseArea {
                                 anchors.fill: parent

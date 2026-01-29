@@ -205,8 +205,8 @@ Page {
         spacing: Theme.scaled(20)
 
         // Status readouts (temp, water level, connection)
-        LayoutBarZone {
-            Layout.alignment: Qt.AlignHCenter
+        LayoutCenterZone {
+            Layout.fillWidth: true
             Layout.topMargin: idlePage.centerStatusYOffset
             zoneName: "centerStatus"
             items: idlePage.centerStatusItems

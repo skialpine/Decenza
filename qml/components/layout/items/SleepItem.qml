@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Window
 import DecenzaDE1
 import "../.."
 
@@ -20,16 +21,10 @@ Item {
         root.goToScreensaver()
     }
 
-    // Try to find the root page's goToScreensaver function
     function goToScreensaver() {
-        // Walk up to find root with goToScreensaver
-        var p = root.parent
-        while (p) {
-            if (typeof p.goToScreensaver === "function") {
-                p.goToScreensaver()
-                return
-            }
-            p = p.parent
+        var win = Window.window
+        if (win && typeof win.goToScreensaver === "function") {
+            win.goToScreensaver()
         }
     }
 
