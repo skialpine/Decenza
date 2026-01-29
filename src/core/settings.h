@@ -159,6 +159,9 @@ class Settings : public QObject {
     // SAW (Stop-at-Weight) learning
     Q_PROPERTY(double sawLearnedLag READ sawLearnedLag NOTIFY sawLearnedLagChanged)
 
+    // Layout configuration (dynamic IdlePage layout)
+    Q_PROPERTY(QString layoutConfiguration READ layoutConfiguration WRITE setLayoutConfiguration NOTIFY layoutConfigurationChanged)
+
     // MQTT settings (Home Automation)
     Q_PROPERTY(bool mqttEnabled READ mqttEnabled WRITE setMqttEnabled NOTIFY mqttEnabledChanged)
     Q_PROPERTY(QString mqttBrokerHost READ mqttBrokerHost WRITE setMqttBrokerHost NOTIFY mqttBrokerHostChanged)
@@ -535,6 +538,17 @@ public:
     void addSawLearningPoint(double drip, double flowRate, const QString& scaleType);
     Q_INVOKABLE void resetSawLearning();
 
+    // Layout configuration (dynamic IdlePage layout)
+    QString layoutConfiguration() const;
+    void setLayoutConfiguration(const QString& json);
+    Q_INVOKABLE QVariantList getZoneItems(const QString& zoneName) const;
+    Q_INVOKABLE void moveItem(const QString& itemId, const QString& fromZone, const QString& toZone, int toIndex);
+    Q_INVOKABLE void addItem(const QString& type, const QString& zone, int index = -1);
+    Q_INVOKABLE void removeItem(const QString& itemId, const QString& zone);
+    Q_INVOKABLE void reorderItem(const QString& zoneName, int fromIndex, int toIndex);
+    Q_INVOKABLE void resetLayoutToDefault();
+    Q_INVOKABLE bool hasItemType(const QString& type) const;
+
     // Generic settings access (for extensibility)
     Q_INVOKABLE QVariant value(const QString& key, const QVariant& defaultValue = QVariant()) const;
     Q_INVOKABLE void setValue(const QString& key, const QVariant& value);
@@ -634,11 +648,18 @@ signals:
     void mqttHomeAssistantDiscoveryChanged();
     void mqttClientIdChanged();
     void sawLearnedLagChanged();
+    void layoutConfigurationChanged();
     void valueChanged(const QString& key);
 
 private:
     // Helper method to get bean presets as QJsonArray for internal manipulation
     QJsonArray getBeanPresetsArray() const;
+
+    // Layout configuration helpers
+    QString defaultLayoutJson() const;
+    QJsonObject getLayoutObject() const;
+    void saveLayoutObject(const QJsonObject& layout);
+    QString generateItemId(const QString& type) const;
 
     QSettings m_settings;
     bool m_steamDisabled = false;  // Session-only, not persisted (for descaling)

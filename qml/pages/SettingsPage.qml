@@ -52,7 +52,7 @@ Page {
         onCurrentIndexChanged: {
             if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
                 // Build tab names based on which tabs are visible
-                var tabNames = ["Bluetooth", "Preferences", "Options", "Screensaver", "Visualizer", "AI", "Accessibility", "Themes", "Language", "History", "Data", "MQTT"]
+                var tabNames = ["Bluetooth", "Preferences", "Options", "Screensaver", "Visualizer", "AI", "Accessibility", "Themes", "Layout", "Language", "History", "Data", "MQTT"]
                 if (MainController.updateChecker.canCheckForUpdates) tabNames.push("Update")
                 tabNames.push("About")
                 if (Settings.isDebugBuild) tabNames.push("Debug")
@@ -112,6 +112,12 @@ Page {
             id: themesTabButton
             text: TranslationManager.translate("settings.tab.themes", "Themes")
             tabLabel: TranslationManager.translate("settings.tab.themes", "Themes")
+        }
+
+        StyledTabButton {
+            id: layoutTabButton
+            text: TranslationManager.translate("settings.tab.layout", "Layout")
+            tabLabel: TranslationManager.translate("settings.tab.layout", "Layout")
         }
 
         // Language tab with badge for untranslated strings
@@ -280,7 +286,15 @@ Page {
             }
         }
 
-        // Tab 8: Language - preloads async in background
+        // Tab 8: Layout - preloads async in background
+        Loader {
+            id: layoutLoader
+            active: true
+            asynchronous: true
+            source: "settings/SettingsLayoutTab.qml"
+        }
+
+        // Tab 9: Language - preloads async in background
         Loader {
             id: languageLoader
             active: true

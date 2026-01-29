@@ -3,19 +3,15 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import DecenzaDE1
 import "../components"
+import "../components/layout"
 
 Page {
     id: idlePage
     objectName: "idlePage"
     background: Rectangle { color: Theme.backgroundColor }
 
-    Component.onCompleted: {
-        root.currentPageTitle = "Idle"
-        espressoButton.forceActiveFocus()
-    }
     StackView.onActivated: {
         root.currentPageTitle = "Idle"
-        espressoButton.forceActiveFocus()
     }
 
     // Secret developer mode: hold top-right corner for 5 seconds to simulate a completed shot
@@ -31,11 +27,8 @@ Page {
             interval: 5000
             onTriggered: {
                 console.log("DEV: Simulating completed shot")
-                // Generate fake shot data
                 MainController.generateFakeShotData()
-                // Navigate: push EspressoPage, then BeanInfoPage on top
                 pageStack.push(Qt.resolvedUrl("EspressoPage.qml"))
-                // Small delay to let espresso page load, then push metadata
                 fakeShowMetadataTimer.start()
             }
         }
@@ -44,7 +37,6 @@ Page {
             id: fakeShowMetadataTimer
             interval: 300
             onTriggered: {
-                // DEV: Show post-shot review with most recent shot (if any)
                 var shotId = MainController.lastSavedShotId
                 console.log("DEV: Opening PostShotReviewPage with shotId:", shotId)
                 pageStack.push(Qt.resolvedUrl("PostShotReviewPage.qml"), { editShotId: shotId })
@@ -59,7 +51,45 @@ Page {
         }
     }
 
-    // Track which function's presets are showing
+    // ============================================================
+    // Layout configuration
+    // ============================================================
+
+    // Parse layout and extract zone items
+    property var layoutConfig: {
+        var raw = Settings.layoutConfiguration
+        console.log("[IdlePage] layoutConfiguration raw length:", raw ? raw.length : "null/undefined")
+        console.log("[IdlePage] layoutConfiguration:", raw ? raw.substring(0, 200) : "EMPTY")
+        try {
+            var parsed = JSON.parse(raw)
+            console.log("[IdlePage] parsed OK, zones:", parsed.zones ? Object.keys(parsed.zones) : "NO ZONES")
+            return parsed
+        } catch(e) {
+            console.log("[IdlePage] JSON.parse FAILED:", e)
+            return { zones: {} }
+        }
+    }
+
+    property var topLeftItems: layoutConfig.zones ? (layoutConfig.zones.topLeft || []) : []
+    property var topRightItems: layoutConfig.zones ? (layoutConfig.zones.topRight || []) : []
+    property var centerStatusItems: layoutConfig.zones ? (layoutConfig.zones.centerStatus || []) : []
+    property var centerTopItems: layoutConfig.zones ? (layoutConfig.zones.centerTop || []) : []
+    property var centerMiddleItems: layoutConfig.zones ? (layoutConfig.zones.centerMiddle || []) : []
+    property var bottomLeftItems: layoutConfig.zones ? (layoutConfig.zones.bottomLeft || []) : []
+    property var bottomRightItems: layoutConfig.zones ? (layoutConfig.zones.bottomRight || []) : []
+
+    Component.onCompleted: {
+        root.currentPageTitle = "Idle"
+        console.log("[IdlePage] topLeftItems:", JSON.stringify(topLeftItems), "count:", topLeftItems.length)
+        console.log("[IdlePage] topRightItems:", JSON.stringify(topRightItems), "count:", topRightItems.length)
+        console.log("[IdlePage] centerStatusItems:", JSON.stringify(centerStatusItems), "count:", centerStatusItems.length)
+        console.log("[IdlePage] centerTopItems:", JSON.stringify(centerTopItems), "count:", centerTopItems.length)
+        console.log("[IdlePage] centerMiddleItems:", JSON.stringify(centerMiddleItems), "count:", centerMiddleItems.length)
+        console.log("[IdlePage] bottomLeftItems:", JSON.stringify(bottomLeftItems), "count:", bottomLeftItems.length)
+        console.log("[IdlePage] bottomRightItems:", JSON.stringify(bottomRightItems), "count:", bottomRightItems.length)
+    }
+
+    // Track which function's presets are showing (used by center-zone action items)
     property string activePresetFunction: ""  // "", "steam", "espresso", "hotwater", "flush", "beans"
 
     // Announce presets when they appear (accessibility)
@@ -128,7 +158,38 @@ Page {
         id: idleBrewDialog
     }
 
-    // Main content area - centered, offset down to account for top status section
+    // ============================================================
+    // Top info section (from layout topLeft/topRight zones)
+    // ============================================================
+    ColumnLayout {
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.margins: Theme.standardMargin
+        anchors.topMargin: Theme.pageTopMargin
+        spacing: Theme.scaled(20)
+
+        RowLayout {
+            Layout.alignment: Qt.AlignHCenter
+            spacing: Theme.scaled(50)
+
+            LayoutBarZone {
+                zoneName: "topLeft"
+                items: idlePage.topLeftItems
+            }
+
+            Item { Layout.fillWidth: true }
+
+            LayoutBarZone {
+                zoneName: "topRight"
+                items: idlePage.topRightItems
+            }
+        }
+    }
+
+    // ============================================================
+    // Center content (from layout centerTop/centerMiddle zones)
+    // ============================================================
     ColumnLayout {
         anchors.left: parent.left
         anchors.right: parent.right
@@ -138,176 +199,23 @@ Page {
         anchors.rightMargin: Theme.standardMargin
         spacing: Theme.scaled(20)
 
-        // Card containing main action buttons
-        Rectangle {
-            id: mainButtonsCard
-            Layout.fillWidth: true
-            Layout.preferredHeight: buttonHeight + Theme.scaled(20)
-            color: "transparent"
-
-            // Calculate button size to fit available width
-            readonly property int buttonCount: 4 + (beanInfoButton.visible ? 1 : 0) + (historyButton.visible ? 1 : 0) + (autoFavoritesButton.visible ? 1 : 0)  // 4 main + shotInfo + history + autoFavorites
-            readonly property real availableWidth: width - Theme.scaled(20) - (buttonCount - 1) * Theme.scaled(10)
-            readonly property real buttonWidth: Math.min(Theme.scaled(150), availableWidth / buttonCount)
-            // Fixed height to ensure content always fits
-            readonly property real buttonHeight: Theme.scaled(120)
-
-            RowLayout {
-                id: mainButtonsRow
-                anchors.centerIn: parent
-                spacing: Theme.scaled(10)
-
-                ActionButton {
-                    id: espressoButton
-                    implicitWidth: mainButtonsCard.buttonWidth
-                    implicitHeight: mainButtonsCard.buttonHeight
-                    translationKey: "idle.button.espresso"
-                    translationFallback: "Espresso"
-                    iconSource: "qrc:/icons/espresso.svg"
-                    enabled: DE1Device.guiEnabled
-                    // Gold highlight when a non-favorite profile is loaded (selectedFavoriteProfile === -1)
-                    backgroundColor: Settings.selectedFavoriteProfile === -1 ? Theme.highlightColor : Theme.primaryColor
-                    onClicked: {
-                        activePresetFunction = (activePresetFunction === "espresso") ? "" : "espresso"
-                    }
-                    onPressAndHold: root.goToProfileSelector()
-                    onDoubleClicked: root.goToProfileSelector()
-
-                    KeyNavigation.right: steamButton
-                    KeyNavigation.down: sleepButton
-
-                    Accessible.description: TranslationManager.translate("idle.accessible.espresso.description", "Start espresso. Double-tap to select profile. Long-press for settings.")
-                }
-
-                ActionButton {
-                    id: steamButton
-                    implicitWidth: mainButtonsCard.buttonWidth
-                    implicitHeight: mainButtonsCard.buttonHeight
-                    translationKey: "idle.button.steam"
-                    translationFallback: "Steam"
-                    iconSource: "qrc:/icons/steam.svg"
-                    enabled: DE1Device.guiEnabled
-                    onClicked: {
-                        activePresetFunction = (activePresetFunction === "steam") ? "" : "steam"
-                    }
-                    onPressAndHold: root.goToSteam()
-                    onDoubleClicked: root.goToSteam()
-
-                    KeyNavigation.left: espressoButton
-                    KeyNavigation.right: hotWaterButton
-                    KeyNavigation.down: activePresetFunction === "steam" ? steamPresetRow : sleepButton
-
-                    Accessible.description: TranslationManager.translate("idle.accessible.steam.description", "Start steaming milk. Long-press to configure.")
-                }
-
-                ActionButton {
-                    id: hotWaterButton
-                    implicitWidth: mainButtonsCard.buttonWidth
-                    implicitHeight: mainButtonsCard.buttonHeight
-                    translationKey: "idle.button.hotwater"
-                    translationFallback: "Hot Water"
-                    iconSource: "qrc:/icons/water.svg"
-                    enabled: DE1Device.guiEnabled
-                    onClicked: {
-                        activePresetFunction = (activePresetFunction === "hotwater") ? "" : "hotwater"
-                    }
-                    onPressAndHold: root.goToHotWater()
-                    onDoubleClicked: root.goToHotWater()
-
-                    KeyNavigation.left: steamButton
-                    KeyNavigation.right: flushButton
-                    KeyNavigation.down: activePresetFunction === "hotwater" ? hotWaterPresetRow : settingsButton
-
-                    Accessible.description: TranslationManager.translate("idle.accessible.hotwater.description", "Dispense hot water. Long-press to configure.")
-                }
-
-                ActionButton {
-                    id: flushButton
-                    implicitWidth: mainButtonsCard.buttonWidth
-                    implicitHeight: mainButtonsCard.buttonHeight
-                    translationKey: "idle.button.flush"
-                    translationFallback: "Flush"
-                    iconSource: "qrc:/icons/flush.svg"
-                    enabled: DE1Device.guiEnabled
-                    onClicked: {
-                        activePresetFunction = (activePresetFunction === "flush") ? "" : "flush"
-                    }
-                    onPressAndHold: root.goToFlush()
-                    onDoubleClicked: root.goToFlush()
-
-                    KeyNavigation.left: hotWaterButton
-                    KeyNavigation.right: beanInfoButton.visible ? beanInfoButton : (historyButton.visible ? historyButton : null)
-                    KeyNavigation.down: activePresetFunction === "flush" ? flushPresetRow : settingsButton
-
-                    Accessible.description: TranslationManager.translate("idle.accessible.flush.description", "Flush the group head. Long-press to configure.")
-                }
-
-                ActionButton {
-                    id: beanInfoButton
-                    implicitWidth: mainButtonsCard.buttonWidth
-                    implicitHeight: mainButtonsCard.buttonHeight
-                    translationKey: "idle.button.beaninfo"
-                    translationFallback: "Beans"
-                    iconSource: "qrc:/icons/edit.svg"
-                    iconSize: Theme.scaled(43)
-                    // Gold highlight when using a guest bean (not saved as preset)
-                    backgroundColor: Settings.selectedBeanPreset === -1 ? Theme.highlightColor : Theme.primaryColor
-                    visible: Settings.visualizerExtendedMetadata
-                    enabled: DE1Device.guiEnabled
-                    onClicked: {
-                        activePresetFunction = (activePresetFunction === "beans") ? "" : "beans"
-                    }
-                    onPressAndHold: pageStack.push(Qt.resolvedUrl("BeanInfoPage.qml"))
-                    onDoubleClicked: pageStack.push(Qt.resolvedUrl("BeanInfoPage.qml"))
-
-                    KeyNavigation.left: flushButton
-                    KeyNavigation.right: historyButton.visible ? historyButton : null
-                    KeyNavigation.down: activePresetFunction === "beans" ? beanPresetLoader.item : settingsButton
-
-                    Accessible.description: TranslationManager.translate("idle.accessible.beaninfo.description", "Set up bean and grinder info for your shots. Long-press for settings.")
-                }
-
-                ActionButton {
-                    id: historyButton
-                    visible: Settings.showHistoryButton
-                    implicitWidth: mainButtonsCard.buttonWidth
-                    implicitHeight: mainButtonsCard.buttonHeight
-                    translationKey: "idle.button.history"
-                    translationFallback: "History"
-                    iconSource: "qrc:/icons/espresso.svg"
-                    iconSize: Theme.scaled(43)
-                    backgroundColor: Theme.primaryColor
-                    onClicked: pageStack.push(Qt.resolvedUrl("ShotHistoryPage.qml"))
-
-                    KeyNavigation.left: beanInfoButton.visible ? beanInfoButton : flushButton
-                    KeyNavigation.right: autoFavoritesButton.visible ? autoFavoritesButton : null
-                    KeyNavigation.down: settingsButton
-
-                    Accessible.description: TranslationManager.translate("idle.accessible.history.description", "View and compare past shots")
-                }
-
-                ActionButton {
-                    id: autoFavoritesButton
-                    visible: Settings.autoFavoritesEnabled
-                    implicitWidth: mainButtonsCard.buttonWidth
-                    implicitHeight: mainButtonsCard.buttonHeight
-                    translationKey: "idle.button.autofavorites"
-                    translationFallback: "Favorites"
-                    iconSource: "qrc:/icons/star.svg"
-                    iconSize: Theme.scaled(43)
-                    backgroundColor: Theme.primaryColor
-                    onClicked: pageStack.push(Qt.resolvedUrl("AutoFavoritesPage.qml"))
-
-                    KeyNavigation.left: historyButton.visible ? historyButton :
-                                        (beanInfoButton.visible ? beanInfoButton : flushButton)
-                    KeyNavigation.down: settingsButton
-
-                    Accessible.description: TranslationManager.translate("idle.accessible.autofavorites.description", "Open auto-favorites list of recent bean and profile combinations")
-                }
-            }
+        // Status readouts (temp, water level, connection)
+        LayoutBarZone {
+            Layout.alignment: Qt.AlignHCenter
+            zoneName: "centerStatus"
+            items: idlePage.centerStatusItems
+            visible: idlePage.centerStatusItems.length > 0
         }
 
-        // Single container for all preset rows - ensures consistent Y position
+        // Main action buttons from centerTop zone
+        LayoutCenterZone {
+            id: centerTopZone
+            Layout.fillWidth: true
+            zoneName: "centerTop"
+            items: idlePage.centerTopItems
+        }
+
+        // Inline preset rows (for center-zone action buttons)
         Item {
             Layout.alignment: Qt.AlignHCenter
             Layout.preferredHeight: activePresetFunction !== "" ? activePresetRow.implicitHeight : 0
@@ -317,7 +225,6 @@ Page {
             Layout.rightMargin: Theme.standardMargin
             clip: true
 
-            // Get the currently active preset loader
             property var activePresetRow: {
                 switch (activePresetFunction) {
                     case "steam": return steamPresetLoader
@@ -325,7 +232,7 @@ Page {
                     case "hotwater": return hotWaterPresetLoader
                     case "flush": return flushPresetLoader
                     case "beans": return beanPresetLoader
-                    default: return steamPresetLoader  // fallback
+                    default: return steamPresetLoader
                 }
             }
 
@@ -333,7 +240,6 @@ Page {
                 NumberAnimation { duration: 200; easing.type: Easing.OutQuad }
             }
 
-            // All preset rows stacked in same position - use Loaders for lazy creation
             Loader {
                 id: steamPresetLoader
                 width: parent.width
@@ -341,13 +247,9 @@ Page {
                 active: activePresetFunction === "steam"
                 visible: active
                 sourceComponent: PresetPillRow {
-                    id: steamPresetRow
                     maxWidth: steamPresetLoader.width
                     presets: Settings.steamPitcherPresets
                     selectedIndex: Settings.selectedSteamPitcher
-
-                    KeyNavigation.up: steamButton
-                    KeyNavigation.down: sleepButton
 
                     onPresetSelected: function(index) {
                         var wasAlreadySelected = (index === Settings.selectedSteamPitcher)
@@ -372,7 +274,6 @@ Page {
                 }
             }
 
-            // Espresso presets - column containing favorites + optional non-favorite pill
             Loader {
                 id: espressoColumnLoader
                 width: parent.width
@@ -380,25 +281,16 @@ Page {
                 active: activePresetFunction === "espresso"
                 visible: active
                 sourceComponent: Column {
-                    id: espressoColumn
                     width: parent ? parent.width : 0
                     spacing: Theme.scaled(8)
 
                     PresetPillRow {
-                        id: espressoPresetRow
                         anchors.horizontalCenter: parent.horizontalCenter
                         maxWidth: espressoColumnLoader.width
 
                         presets: Settings.favoriteProfiles
                         selectedIndex: Settings.selectedFavoriteProfile
                         supportLongPress: true
-
-                        KeyNavigation.up: espressoButton
-                        KeyNavigation.down: sleepButton
-
-                        // Note: Profile is already loaded by MainController on startup.
-                        // Don't re-load here as it would override the correct profile with
-                        // whatever is at selectedFavoriteProfile index (bug fix).
 
                         onPresetSelected: function(index) {
                             var wasAlreadySelected = (index === Settings.selectedFavoriteProfile)
@@ -437,14 +329,13 @@ Page {
                         }
                     }
 
-                    // Green pill showing non-favorite profile name (when loaded from history)
+                    // Green pill showing non-favorite profile name
                     Row {
                         anchors.horizontalCenter: parent.horizontalCenter
                         visible: Settings.selectedFavoriteProfile === -1
                         spacing: Theme.scaled(8)
 
                         Rectangle {
-                            id: nonFavoriteProfilePill
                             width: nonFavoriteProfileText.implicitWidth + Theme.scaled(40)
                             height: Theme.scaled(50)
                             radius: Theme.scaled(10)
@@ -472,7 +363,6 @@ Page {
                             }
                         }
 
-                        // Info button for non-favorite profile
                         ProfileInfoButton {
                             anchors.verticalCenter: parent.verticalCenter
                             profileFilename: Settings.currentProfile
@@ -496,13 +386,9 @@ Page {
                 active: activePresetFunction === "hotwater"
                 visible: active
                 sourceComponent: PresetPillRow {
-                    id: hotWaterPresetRow
                     maxWidth: hotWaterPresetLoader.width
                     presets: Settings.waterVesselPresets
                     selectedIndex: Settings.selectedWaterVessel
-
-                    KeyNavigation.up: hotWaterButton
-                    KeyNavigation.down: settingsButton
 
                     onPresetSelected: function(index) {
                         var wasAlreadySelected = (index === Settings.selectedWaterVessel)
@@ -533,13 +419,9 @@ Page {
                 active: activePresetFunction === "flush"
                 visible: active
                 sourceComponent: PresetPillRow {
-                    id: flushPresetRow
                     maxWidth: flushPresetLoader.width
                     presets: Settings.flushPresets
                     selectedIndex: Settings.selectedFlushPreset
-
-                    KeyNavigation.up: flushButton
-                    KeyNavigation.down: settingsButton
 
                     onPresetSelected: function(index) {
                         var wasAlreadySelected = (index === Settings.selectedFlushPreset)
@@ -571,13 +453,9 @@ Page {
                 active: activePresetFunction === "beans"
                 visible: active
                 sourceComponent: PresetPillRow {
-                    id: beanPresetRow
                     maxWidth: beanPresetLoader.width
                     presets: Settings.beanPresets
                     selectedIndex: Settings.selectedBeanPreset
-
-                    KeyNavigation.up: beanInfoButton
-                    KeyNavigation.down: settingsButton
 
                     onPresetSelected: function(index) {
                         console.log("[IdlePage] Bean pill selected, index:", index)
@@ -588,176 +466,18 @@ Page {
             }
         }
 
-        // Next shot plan info line (clickable to open brew dialog)
-        ShotPlanText {
-            id: shotPlanText
+        // Center middle zone (shot plan, etc.)
+        LayoutCenterZone {
+            Layout.fillWidth: true
             Layout.alignment: Qt.AlignHCenter
-            Layout.maximumWidth: parent.width - 2 * Theme.standardMargin
-            visible: text !== "" && Settings.showShotPlan && !Settings.showShotPlanOnAllScreens
-            onClicked: idleBrewDialog.open()
+            zoneName: "centerMiddle"
+            items: idlePage.centerMiddleItems
         }
     }
 
-    // Top info section
-    ColumnLayout {
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.margins: Theme.standardMargin
-        anchors.topMargin: Theme.pageTopMargin  // Leave room for status bar
-        spacing: Theme.scaled(20)
-
-        // Status section
-        RowLayout {
-            Layout.alignment: Qt.AlignHCenter
-            spacing: Theme.scaled(50)
-
-            // Temperature (tap to announce)
-            Item {
-                id: temperatureStatus
-                Layout.alignment: Qt.AlignTop
-                implicitWidth: temperatureColumn.width
-                implicitHeight: temperatureColumn.height
-
-                // Effective target temperature (override or profile)
-                readonly property double effectiveTargetTemp: Settings.hasTemperatureOverride
-                    ? Settings.temperatureOverride
-                    : MainController.profileTargetTemperature
-
-                ColumnLayout {
-                    id: temperatureColumn
-                    spacing: Theme.spacingSmall
-                    // Temperature display: current / target (target smaller, colored blue when override)
-                    Row {
-                        Layout.alignment: Qt.AlignHCenter
-                        spacing: Theme.scaled(4)
-                        Text {
-                            text: DE1Device.temperature.toFixed(1) + "°C"
-                            color: Theme.temperatureColor
-                            font: Theme.valueFont
-                        }
-                        Text {
-                            anchors.baseline: parent.children[0].baseline
-                            text: "/ " + temperatureStatus.effectiveTargetTemp.toFixed(1) + "°C"
-                            color: Settings.hasTemperatureOverride ? Theme.primaryColor : Theme.textSecondaryColor
-                            font.family: Theme.valueFont.family
-                            font.pixelSize: Theme.valueFont.pixelSize / 2
-                        }
-                    }
-                    // Label with override indicator
-                    Row {
-                        Layout.alignment: Qt.AlignHCenter
-                        spacing: Theme.scaled(4)
-                        Tr {
-                            key: "idle.label.grouptemp"
-                            fallback: "Group Temp"
-                            color: Theme.textSecondaryColor
-                            font: Theme.labelFont
-                        }
-                        Text {
-                            visible: Settings.hasTemperatureOverride
-                            text: "(override)"
-                            color: Theme.primaryColor
-                            font: Theme.labelFont
-                        }
-                    }
-                }
-
-                // Tap to announce for accessibility
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: {
-                        if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
-                            var announcement = "Group temperature: " + DE1Device.temperature.toFixed(1) + " degrees, target: " + temperatureStatus.effectiveTargetTemp.toFixed(0) + " degrees"
-                            if (Settings.hasTemperatureOverride) {
-                                announcement += " (override active)"
-                            }
-                            AccessibilityManager.announceLabel(announcement)
-                        }
-                    }
-                }
-            }
-
-            // Water level (tap to announce)
-            Item {
-                id: waterLevelStatus
-                Layout.alignment: Qt.AlignTop
-                implicitWidth: waterLevelColumn.width
-                implicitHeight: waterLevelColumn.height
-
-                property bool showMl: Settings.waterLevelDisplayUnit === "ml"
-
-                ColumnLayout {
-                    id: waterLevelColumn
-                    spacing: Theme.spacingSmall
-                    Text {
-                        Layout.alignment: Qt.AlignHCenter
-                        text: waterLevelStatus.showMl
-                            ? DE1Device.waterLevelMl + " ml"
-                            : DE1Device.waterLevel.toFixed(0) + "%"
-                        color: DE1Device.waterLevel > 20 ? Theme.primaryColor : Theme.warningColor
-                        font: Theme.valueFont
-                    }
-                    Tr {
-                        Layout.alignment: Qt.AlignHCenter
-                        key: "idle.label.waterlevel"
-                        fallback: "Water Level"
-                        color: Theme.textSecondaryColor
-                        font: Theme.labelFont
-                    }
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: {
-                        if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
-                            var warning = DE1Device.waterLevel <= 20 ? ". Warning: water level is low" : ""
-                            if (waterLevelStatus.showMl) {
-                                AccessibilityManager.announceLabel("Water level: " + DE1Device.waterLevelMl + " milliliters" + warning)
-                            } else {
-                                AccessibilityManager.announceLabel("Water level: " + DE1Device.waterLevel.toFixed(0) + " percent" + warning)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Connection status (tap to announce)
-            Item {
-                id: connectionStatus
-                Layout.alignment: Qt.AlignTop
-                implicitWidth: connectionIndicator.implicitWidth
-                implicitHeight: connectionIndicator.implicitHeight
-
-                ConnectionIndicator {
-                    id: connectionIndicator
-                    machineConnected: DE1Device.connected
-                    scaleConnected: ScaleDevice && ScaleDevice.connected
-                    isFlowScale: ScaleDevice && ScaleDevice.name === "Flow Scale"
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: {
-                        if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
-                            var status = DE1Device.connected ? "Machine connected" : "Machine disconnected"
-                            if (ScaleDevice && ScaleDevice.connected) {
-                                if (ScaleDevice.name === "Flow Scale") {
-                                    status += ". Using simulated scale from flow sensor"
-                                } else {
-                                    status += ". Scale connected: " + ScaleDevice.name
-                                }
-                            } else {
-                                status += ". No scale connected"
-                            }
-                            AccessibilityManager.announceLabel(status)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Bottom bar with Sleep and Settings
+    // ============================================================
+    // Bottom bar (from layout bottomLeft/bottomRight zones)
+    // ============================================================
     Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
@@ -771,147 +491,18 @@ Page {
             anchors.rightMargin: Theme.spacingMedium
             spacing: Theme.spacingMedium
 
-            // Sleep button - fills bar height
-            Item {
-                id: sleepButton
+            LayoutBarZone {
+                zoneName: "bottomLeft"
+                items: idlePage.bottomLeftItems
                 Layout.fillHeight: true
-                Layout.preferredWidth: sleepButtonBg.implicitWidth
-                Layout.topMargin: Theme.spacingSmall
-                Layout.bottomMargin: Theme.spacingSmall
-                activeFocusOnTab: true
-
-                property bool enabled: DE1Device.guiEnabled
-
-                // Accessibility: Let AccessibleTapHandler handle screen reader interaction
-                // to avoid duplicate focus elements (icon + label announced separately)
-                Accessible.ignored: true
-
-                KeyNavigation.up: espressoButton
-                KeyNavigation.right: settingsButton
-
-                function doSleep() {
-                    console.log("[IdlePage] doSleep called, enabled:", enabled)
-                    if (!enabled) return
-                    // Put scale to LCD-off mode (keep connected for wake)
-                    if (ScaleDevice && ScaleDevice.connected) {
-                        ScaleDevice.disableLcd()  // LCD off only, stay connected
-                        // Do NOT disconnect - scale stays connected for wake
-                    }
-                    DE1Device.goToSleep()
-                    console.log("[IdlePage] Calling goToScreensaver")
-                    root.goToScreensaver()
-                }
-
-                Keys.onReturnPressed: doSleep()
-                Keys.onEnterPressed: doSleep()
-                Keys.onSpacePressed: doSleep()
-
-                Rectangle {
-                    id: sleepButtonBg
-                    anchors.fill: parent
-                    implicitWidth: Theme.scaled(140)
-                    color: sleepTapHandler.isPressed ? Qt.darker("#555555", 1.2) : "#555555"
-                    radius: Theme.cardRadius
-                    opacity: sleepButton.enabled ? 1.0 : 0.5
-
-                    // Focus indicator
-                    Rectangle {
-                        anchors.fill: parent
-                        anchors.margins: -Theme.focusMargin
-                        visible: sleepButton.activeFocus
-                        color: "transparent"
-                        border.width: Theme.focusBorderWidth
-                        border.color: Theme.focusColor
-                        radius: parent.radius + Theme.focusMargin
-                    }
-                }
-
-                RowLayout {
-                    anchors.centerIn: parent
-                    spacing: Theme.spacingSmall
-                    Image {
-                        source: "qrc:/icons/sleep.svg"
-                        sourceSize.width: Theme.scaled(28)
-                        sourceSize.height: Theme.scaled(28)
-                        Layout.alignment: Qt.AlignVCenter
-                        // Decorative - accessibility handled by AccessibleTapHandler
-                        Accessible.ignored: true
-                    }
-                    Tr {
-                        key: "idle.button.sleep"
-                        fallback: "Sleep"
-                        font: Theme.bodyFont
-                        color: "white"
-                        verticalAlignment: Text.AlignVCenter
-                        // Decorative - accessibility handled by AccessibleTapHandler
-                        Accessible.ignored: true
-                    }
-                }
-
-                // Using TapHandler for better touch responsiveness
-                AccessibleTapHandler {
-                    id: sleepTapHandler
-                    anchors.fill: parent
-                    enabled: sleepButton.enabled
-                    supportLongPress: true
-                    longPressInterval: 1000
-                    accessibleName: TranslationManager.translate("idle.accessible.sleep", "Sleep") + ". " + TranslationManager.translate("idle.accessible.sleep.description", "Put the machine to sleep")
-                    accessibleItem: sleepButton
-                    onAccessibleClicked: {
-                        console.log("[IdlePage] Sleep button tapped")
-                        sleepButton.doSleep()
-                    }
-                    onAccessibleLongPressed: Qt.quit()
-                }
             }
 
             Item { Layout.fillWidth: true }
 
-            // Settings button - square, fills bar height
-            Item {
-                id: settingsButton
-                Layout.preferredWidth: Theme.bottomBarHeight
-                Layout.preferredHeight: Theme.bottomBarHeight
-                activeFocusOnTab: true
-
-                // Accessibility: Let AccessibleTapHandler handle screen reader interaction
-                // to avoid duplicate focus elements
-                Accessible.ignored: true
-
-                KeyNavigation.up: flushButton
-                KeyNavigation.left: sleepButton
-
-                Keys.onReturnPressed: root.goToSettings()
-                Keys.onEnterPressed: root.goToSettings()
-                Keys.onSpacePressed: root.goToSettings()
-
-                Image {
-                    anchors.centerIn: parent
-                    source: "qrc:/icons/settings.svg"
-                    sourceSize.width: Theme.scaled(32)
-                    sourceSize.height: Theme.scaled(32)
-                    // Decorative - accessibility handled by AccessibleTapHandler
-                    Accessible.ignored: true
-                }
-
-                // Focus indicator
-                Rectangle {
-                    anchors.fill: parent
-                    anchors.margins: -Theme.focusMargin
-                    visible: settingsButton.activeFocus
-                    color: "transparent"
-                    border.width: Theme.focusBorderWidth
-                    border.color: Theme.focusColor
-                    radius: Theme.scaled(4)
-                }
-
-                // Using TapHandler for better touch responsiveness
-                AccessibleTapHandler {
-                    anchors.fill: parent
-                    accessibleName: "Settings. Open application settings"
-                    accessibleItem: settingsButton
-                    onAccessibleClicked: root.goToSettings()
-                }
+            LayoutBarZone {
+                zoneName: "bottomRight"
+                items: idlePage.bottomRightItems
+                Layout.fillHeight: true
             }
         }
     }
@@ -920,6 +511,4 @@ Page {
     ProfilePreviewPopup {
         id: profilePreviewPopup
     }
-
-
 }

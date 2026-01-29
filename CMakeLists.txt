@@ -385,6 +385,8 @@ set(QML_FILES
     qml/pages/settings/SettingsUpdateTab.qml
     qml/pages/settings/SettingsAboutTab.qml
     qml/pages/settings/SettingsDebugTab.qml
+    qml/pages/settings/SettingsLayoutTab.qml
+    qml/pages/settings/LayoutEditorZone.qml
     qml/pages/settings/AddLanguagePage.qml
     qml/pages/settings/StringBrowserPage.qml
     qml/components/ActionButton.qml
@@ -430,6 +432,23 @@ set(QML_FILES
     qml/components/SwipeableArea.qml
     qml/components/CrashReportDialog.qml
     qml/components/BluetoothStuckDialog.qml
+    qml/components/layout/LayoutItemDelegate.qml
+    qml/components/layout/LayoutBarZone.qml
+    qml/components/layout/LayoutCenterZone.qml
+    qml/components/layout/items/EspressoItem.qml
+    qml/components/layout/items/SteamItem.qml
+    qml/components/layout/items/HotWaterItem.qml
+    qml/components/layout/items/FlushItem.qml
+    qml/components/layout/items/BeansItem.qml
+    qml/components/layout/items/HistoryItem.qml
+    qml/components/layout/items/AutoFavoritesItem.qml
+    qml/components/layout/items/SleepItem.qml
+    qml/components/layout/items/SettingsItem.qml
+    qml/components/layout/items/TemperatureItem.qml
+    qml/components/layout/items/WaterLevelItem.qml
+    qml/components/layout/items/ConnectionStatusItem.qml
+    qml/components/layout/items/ScaleWeightItem.qml
+    qml/components/layout/items/ShotPlanItem.qml
 )
 
 # Simulator QML - Windows Debug or macOS

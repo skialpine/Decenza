@@ -2406,6 +2406,220 @@ void Settings::resetSawLearning() {
     emit sawLearnedLagChanged();
 }
 
+// ============================================================
+// Layout configuration (dynamic IdlePage layout)
+// ============================================================
+
+QString Settings::defaultLayoutJson() const {
+    QJsonObject layout;
+    layout["version"] = 1;
+
+    QJsonObject zones;
+
+    zones["topLeft"] = QJsonArray();
+    zones["topRight"] = QJsonArray();
+    zones["centerStatus"] = QJsonArray({
+        QJsonObject({{"type", "temperature"}, {"id", "temp1"}}),
+        QJsonObject({{"type", "waterLevel"}, {"id", "water1"}}),
+        QJsonObject({{"type", "connectionStatus"}, {"id", "conn1"}}),
+    });
+    zones["centerTop"] = QJsonArray({
+        QJsonObject({{"type", "espresso"}, {"id", "espresso1"}}),
+        QJsonObject({{"type", "steam"}, {"id", "steam1"}}),
+        QJsonObject({{"type", "hotwater"}, {"id", "hotwater1"}}),
+        QJsonObject({{"type", "flush"}, {"id", "flush1"}}),
+    });
+    zones["centerMiddle"] = QJsonArray({
+        QJsonObject({{"type", "shotPlan"}, {"id", "plan1"}}),
+    });
+    zones["bottomLeft"] = QJsonArray({
+        QJsonObject({{"type", "sleep"}, {"id", "sleep1"}}),
+    });
+    zones["bottomRight"] = QJsonArray({
+        QJsonObject({{"type", "settings"}, {"id", "settings1"}}),
+    });
+
+    layout["zones"] = zones;
+    return QString::fromUtf8(QJsonDocument(layout).toJson(QJsonDocument::Compact));
+}
+
+QJsonObject Settings::getLayoutObject() const {
+    QString stored = m_settings.value("layout/configuration").toString();
+    if (stored.isEmpty()) {
+        return QJsonDocument::fromJson(defaultLayoutJson().toUtf8()).object();
+    }
+    QJsonDocument doc = QJsonDocument::fromJson(stored.toUtf8());
+    if (doc.isNull() || !doc.isObject()) {
+        return QJsonDocument::fromJson(defaultLayoutJson().toUtf8()).object();
+    }
+    return doc.object();
+}
+
+void Settings::saveLayoutObject(const QJsonObject& layout) {
+    m_settings.setValue("layout/configuration",
+                        QString::fromUtf8(QJsonDocument(layout).toJson(QJsonDocument::Compact)));
+    emit layoutConfigurationChanged();
+}
+
+QString Settings::generateItemId(const QString& type) const {
+    QJsonObject layout = getLayoutObject();
+    QJsonObject zones = layout["zones"].toObject();
+
+    // Find highest existing number for this type across all zones
+    int maxNum = 0;
+    for (const QString& zoneName : zones.keys()) {
+        QJsonArray items = zones[zoneName].toArray();
+        for (const QJsonValue& val : items) {
+            QJsonObject item = val.toObject();
+            if (item["type"].toString() == type) {
+                QString id = item["id"].toString();
+                // Extract trailing number from id
+                int i = id.length() - 1;
+                while (i >= 0 && id[i].isDigit()) --i;
+                int num = id.mid(i + 1).toInt();
+                if (num > maxNum) maxNum = num;
+            }
+        }
+    }
+    // Use type as base, append next number
+    // Map type to short prefix for readable IDs
+    return type + QString::number(maxNum + 1);
+}
+
+QString Settings::layoutConfiguration() const {
+    QString stored = m_settings.value("layout/configuration").toString();
+    if (stored.isEmpty()) {
+        return defaultLayoutJson();
+    }
+    return stored;
+}
+
+void Settings::setLayoutConfiguration(const QString& json) {
+    m_settings.setValue("layout/configuration", json);
+    emit layoutConfigurationChanged();
+}
+
+QVariantList Settings::getZoneItems(const QString& zoneName) const {
+    QJsonObject layout = getLayoutObject();
+    QJsonObject zones = layout["zones"].toObject();
+    QJsonArray items = zones[zoneName].toArray();
+
+    QVariantList result;
+    for (const QJsonValue& val : items) {
+        result.append(val.toObject().toVariantMap());
+    }
+    return result;
+}
+
+void Settings::moveItem(const QString& itemId, const QString& fromZone, const QString& toZone, int toIndex) {
+    QJsonObject layout = getLayoutObject();
+    QJsonObject zones = layout["zones"].toObject();
+
+    // Find and remove from source zone
+    QJsonArray fromItems = zones[fromZone].toArray();
+    QJsonObject movedItem;
+    bool found = false;
+    for (int i = 0; i < fromItems.size(); ++i) {
+        if (fromItems[i].toObject()["id"].toString() == itemId) {
+            movedItem = fromItems[i].toObject();
+            fromItems.removeAt(i);
+            found = true;
+            break;
+        }
+    }
+    if (!found) return;
+
+    zones[fromZone] = fromItems;
+
+    // Insert into target zone
+    QJsonArray toItems = zones[toZone].toArray();
+    if (toIndex < 0 || toIndex >= toItems.size()) {
+        toItems.append(movedItem);
+    } else {
+        toItems.insert(toIndex, movedItem);
+    }
+    zones[toZone] = toItems;
+
+    layout["zones"] = zones;
+    saveLayoutObject(layout);
+}
+
+void Settings::addItem(const QString& type, const QString& zone, int index) {
+    QJsonObject layout = getLayoutObject();
+    QJsonObject zones = layout["zones"].toObject();
+
+    QString id = generateItemId(type);
+    QJsonObject newItem;
+    newItem["type"] = type;
+    newItem["id"] = id;
+
+    QJsonArray items = zones[zone].toArray();
+    if (index < 0 || index >= items.size()) {
+        items.append(newItem);
+    } else {
+        items.insert(index, newItem);
+    }
+    zones[zone] = items;
+
+    layout["zones"] = zones;
+    saveLayoutObject(layout);
+}
+
+void Settings::removeItem(const QString& itemId, const QString& zone) {
+    QJsonObject layout = getLayoutObject();
+    QJsonObject zones = layout["zones"].toObject();
+
+    QJsonArray items = zones[zone].toArray();
+    for (int i = 0; i < items.size(); ++i) {
+        if (items[i].toObject()["id"].toString() == itemId) {
+            items.removeAt(i);
+            break;
+        }
+    }
+    zones[zone] = items;
+
+    layout["zones"] = zones;
+    saveLayoutObject(layout);
+}
+
+void Settings::reorderItem(const QString& zoneName, int fromIndex, int toIndex) {
+    QJsonObject layout = getLayoutObject();
+    QJsonObject zones = layout["zones"].toObject();
+
+    QJsonArray items = zones[zoneName].toArray();
+    if (fromIndex < 0 || fromIndex >= items.size() || toIndex < 0 || toIndex >= items.size() || fromIndex == toIndex) {
+        return;
+    }
+
+    QJsonValue item = items[fromIndex];
+    items.removeAt(fromIndex);
+    items.insert(toIndex, item);
+    zones[zoneName] = items;
+
+    layout["zones"] = zones;
+    saveLayoutObject(layout);
+}
+
+void Settings::resetLayoutToDefault() {
+    m_settings.remove("layout/configuration");
+    emit layoutConfigurationChanged();
+}
+
+bool Settings::hasItemType(const QString& type) const {
+    QJsonObject layout = getLayoutObject();
+    QJsonObject zones = layout["zones"].toObject();
+
+    for (const QString& zoneName : zones.keys()) {
+        QJsonArray items = zones[zoneName].toArray();
+        for (const QJsonValue& val : items) {
+            if (val.toObject()["type"].toString() == type) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 // Generic settings access
 QVariant Settings::value(const QString& key, const QVariant& defaultValue) const {
     return m_settings.value(key, defaultValue);
