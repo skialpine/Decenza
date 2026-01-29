@@ -1639,6 +1639,16 @@ ApplicationWindow {
             } else if (phase === MachineStateType.Phase.Cleaning) {
                 // For now, cleaning uses the built-in machine routine
                 // Could navigate to a cleaning page in the future
+            } else if (phase === MachineStateType.Phase.Sleep) {
+                // Machine was put to sleep (e.g. via GHC stop button hold) - show screensaver
+                // Like de1app: navigates to saver page and disables scale LCD on sleep state
+                if (!screensaverActive) {
+                    console.log("Machine entered Sleep - showing screensaver")
+                    if (ScaleDevice && ScaleDevice.connected) {
+                        ScaleDevice.disableLcd()
+                    }
+                    goToScreensaver()
+                }
             } else if (phase === MachineStateType.Phase.Idle || phase === MachineStateType.Phase.Ready) {
                 // DE1 went to idle - if we're on an operation page, show completion
                 // Note: Don't check pageStack.busy here - completion must always be handled
