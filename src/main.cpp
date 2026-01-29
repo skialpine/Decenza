@@ -618,6 +618,24 @@ int main(int argc, char *argv[])
         }
     });
 
+    // Turn off scale LCD when DE1 sleeps, wake when DE1 wakes (like de1app's decentscale_off plugin)
+    // Uses disableLcd() instead of sleep() to keep BLE connected - no reconnection needed on wake
+    QObject::connect(&machineState, &MachineState::phaseChanged,
+                     [&physicalScale, &machineState]() {
+        auto phase = machineState.phase();
+        if (phase == MachineState::Phase::Sleep) {
+            if (physicalScale && physicalScale->isConnected()) {
+                qDebug() << "DE1 going to sleep - disabling scale LCD";
+                physicalScale->disableLcd();
+            }
+        } else if (phase == MachineState::Phase::Idle) {
+            if (physicalScale && physicalScale->isConnected()) {
+                qDebug() << "DE1 woke up - waking scale LCD";
+                physicalScale->wake();
+            }
+        }
+    });
+
     // Cleanup on exit
     QObject::connect(&app, &QCoreApplication::aboutToQuit, [&accessibilityManager, &batteryManager, &de1Device, &physicalScale]() {
         qDebug() << "Application exiting - shutting down devices";

@@ -121,8 +121,12 @@ void EurekaPrecisaScale::onCharacteristicsDiscoveryFinished(const QBluetoothUuid
 void EurekaPrecisaScale::onCharacteristicChanged(const QBluetoothUuid& characteristicUuid,
                                                   const QByteArray& value) {
     if (characteristicUuid == Scale::Generic::STATUS) {
-        // Eureka Precisa format: AA 09 41 timer_running timer sign weight(2 bytes)
-        // Header check: h1=0xAA (170), h2=0x09, h3=0x41 (65)
+        // Eureka Precisa format (from de1app binary scan "cucucu cu su cu su"):
+        //   Bytes 0-2: header (0xAA, 0x09, 0x41)
+        //   Byte 3: timer_running
+        //   Bytes 4-5: timer (16-bit little-endian)
+        //   Byte 6: sign (1 = negative)
+        //   Bytes 7-8: weight (16-bit little-endian, tenths of gram)
         if (value.size() >= 9) {
             const uint8_t* d = reinterpret_cast<const uint8_t*>(value.constData());
 
@@ -131,12 +135,12 @@ void EurekaPrecisaScale::onCharacteristicChanged(const QBluetoothUuid& character
                 return;
             }
 
-            // Weight is in bytes 6-7 as unsigned short (tenths of gram)
-            uint16_t weightRaw = (d[6] << 8) | d[7];
+            // Weight is in bytes 7-8 as little-endian unsigned short (tenths of gram)
+            uint16_t weightRaw = d[7] | (d[8] << 8);
             double weight = weightRaw / 10.0;
 
-            // Sign is in byte 5 (1 = negative)
-            if (d[5] == 1) {
+            // Sign is in byte 6 (1 = negative)
+            if (d[6] == 1) {
                 weight = -weight;
             }
 

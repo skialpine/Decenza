@@ -263,10 +263,11 @@ void MachineState::updatePhase() {
 
                 m_tareCompleted = false;
 
-                // Start scale timer (Felicita, etc.) when flow starts
+                // Reset and start scale timer when flow starts (like de1app)
                 if (m_scale) {
+                    m_scale->resetTimer();
                     m_scale->startTimer();
-                    qDebug() << "=== SCALE TIMER: Started (flow began) ===";
+                    qDebug() << "=== SCALE TIMER: Reset + Started (flow began) ===";
                 }
 
                 // Auto-tare for Hot Water (espresso tares at cycle start via MainController)
@@ -281,10 +282,11 @@ void MachineState::updatePhase() {
                 bool startingExtraction = (oldPhase == Phase::EspressoPreheating);
 
                 if (startingExtraction) {
-                    // Extraction starting - start scale timer (Felicita, etc.)
+                    // Extraction starting - reset and start scale timer (like de1app)
                     if (m_scale) {
+                        m_scale->resetTimer();
                         m_scale->startTimer();
-                        qDebug() << "=== SCALE TIMER: Started (espresso extraction began) ===";
+                        qDebug() << "=== SCALE TIMER: Reset + Started (espresso extraction began) ===";
                     }
                 }
 
