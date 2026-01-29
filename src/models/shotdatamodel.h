@@ -48,6 +48,9 @@ public:
     const QVector<QPointF>& pressureData() const { return m_pressurePoints; }
     const QVector<QPointF>& flowData() const { return m_flowPoints; }
     const QVector<QPointF>& temperatureData() const { return m_temperaturePoints; }
+    const QVector<QPointF>& temperatureMixData() const { return m_temperatureMixPoints; }
+    const QVector<QPointF>& resistanceData() const { return m_resistancePoints; }
+    const QVector<QPointF>& waterDispensedData() const { return m_waterDispensedPoints; }
     QVector<QPointF> pressureGoalData() const;  // Combines all segments
     QVector<QPointF> flowGoalData() const;      // Combines all segments
     const QVector<QPointF>& temperatureGoalData() const { return m_temperatureGoalPoints; }
@@ -60,6 +63,7 @@ public slots:
 
     // Fast data ingestion - no chart updates, just vector append
     void addSample(double time, double pressure, double flow, double temperature,
+                   double mixTemp,
                    double pressureGoal, double flowGoal, double temperatureGoal,
                    int frameNumber = -1, bool isFlowMode = false);
     void addWeightSample(double time, double weight, double flowRate);
@@ -85,6 +89,9 @@ private:
     QVector<QPointF> m_pressurePoints;
     QVector<QPointF> m_flowPoints;
     QVector<QPointF> m_temperaturePoints;
+    QVector<QPointF> m_temperatureMixPoints;
+    QVector<QPointF> m_resistancePoints;
+    QVector<QPointF> m_waterDispensedPoints;
     QVector<QVector<QPointF>> m_pressureGoalSegments;  // Separate segments for clean breaks
     QVector<QVector<QPointF>> m_flowGoalSegments;      // Separate segments for clean breaks
     QVector<QPointF> m_temperatureGoalPoints;

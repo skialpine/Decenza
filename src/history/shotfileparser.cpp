@@ -46,6 +46,11 @@ ShotFileParser::ParseResult ShotFileParser::parse(const QByteArray& fileContents
     QVector<double> flowGoal = parseTclList(extractValue(content, "espresso_flow_goal"));
     QVector<double> tempGoal = parseTclList(extractValue(content, "espresso_temperature_goal"));
 
+    // Additional data (de1app records these)
+    QVector<double> tempMix = parseTclList(extractValue(content, "espresso_temperature_mix"));
+    QVector<double> resistance = parseTclList(extractValue(content, "espresso_resistance"));
+    QVector<double> waterDispensed = parseTclList(extractValue(content, "espresso_water_dispensed"));
+
     // Convert to point vectors
     result.record.pressure = toPointVector(elapsed, pressure);
     result.record.flow = toPointVector(elapsed, flow);
@@ -54,6 +59,12 @@ ShotFileParser::ParseResult ShotFileParser::parse(const QByteArray& fileContents
     result.record.pressureGoal = toPointVector(elapsed, pressureGoal);
     result.record.flowGoal = toPointVector(elapsed, flowGoal);
     result.record.temperatureGoal = toPointVector(elapsed, tempGoal);
+    if (!tempMix.isEmpty())
+        result.record.temperatureMix = toPointVector(elapsed, tempMix);
+    if (!resistance.isEmpty())
+        result.record.resistance = toPointVector(elapsed, resistance);
+    if (!waterDispensed.isEmpty())
+        result.record.waterDispensed = toPointVector(elapsed, waterDispensed);
 
     // Duration from last elapsed time
     result.record.summary.duration = elapsed.isEmpty() ? 0 : elapsed.last();

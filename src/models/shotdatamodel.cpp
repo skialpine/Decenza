@@ -8,6 +8,9 @@ ShotDataModel::ShotDataModel(QObject* parent)
     m_pressurePoints.reserve(INITIAL_CAPACITY);
     m_flowPoints.reserve(INITIAL_CAPACITY);
     m_temperaturePoints.reserve(INITIAL_CAPACITY);
+    m_temperatureMixPoints.reserve(INITIAL_CAPACITY);
+    m_resistancePoints.reserve(INITIAL_CAPACITY);
+    m_waterDispensedPoints.reserve(INITIAL_CAPACITY);
     m_temperatureGoalPoints.reserve(INITIAL_CAPACITY);
     m_weightPoints.reserve(INITIAL_CAPACITY);
     m_cumulativeWeightPoints.reserve(INITIAL_CAPACITY);
@@ -109,6 +112,9 @@ void ShotDataModel::clear() {
     m_pressurePoints.clear();
     m_flowPoints.clear();
     m_temperaturePoints.clear();
+    m_temperatureMixPoints.clear();
+    m_resistancePoints.clear();
+    m_waterDispensedPoints.clear();
     m_temperatureGoalPoints.clear();
     m_weightPoints.clear();
     m_cumulativeWeightPoints.clear();
@@ -176,6 +182,7 @@ void ShotDataModel::clearWeightData() {
 }
 
 void ShotDataModel::addSample(double time, double pressure, double flow, double temperature,
+                              double mixTemp,
                               double pressureGoal, double flowGoal, double temperatureGoal,
                               int frameNumber, bool isFlowMode) {
     Q_UNUSED(frameNumber);
@@ -184,6 +191,26 @@ void ShotDataModel::addSample(double time, double pressure, double flow, double 
     m_pressurePoints.append(QPointF(time, pressure));
     m_flowPoints.append(QPointF(time, flow));
     m_temperaturePoints.append(QPointF(time, temperature));
+    m_temperatureMixPoints.append(QPointF(time, mixTemp));
+
+    // Resistance: pressure / flow² (de1app formula for laminar flow)
+    double resistance = 0.0;
+    if (flow > 0.0) {
+        resistance = pressure / (flow * flow);
+    }
+    m_resistancePoints.append(QPointF(time, resistance));
+
+    // Water dispensed: cumulative flow integration (flow is ml/s)
+    double waterDispensed = 0.0;
+    if (!m_waterDispensedPoints.isEmpty()) {
+        double lastWater = m_waterDispensedPoints.last().y();
+        double lastTime = m_waterDispensedPoints.last().x();
+        double dt = time - lastTime;
+        if (dt > 0) {
+            waterDispensed = lastWater + flow * dt;
+        }
+    }
+    m_waterDispensedPoints.append(QPointF(time, waterDispensed));
 
     // Start new segments when pump mode changes (creates visual gap in goal curves)
     if (m_hasPumpModeData && isFlowMode != m_lastPumpModeIsFlow) {

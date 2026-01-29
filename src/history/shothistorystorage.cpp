@@ -268,6 +268,10 @@ QByteArray ShotHistoryStorage::compressSampleData(ShotDataModel* shotData)
     root["flowGoal"] = pointsToJsonObject(shotData->flowGoalData());
     root["temperatureGoal"] = pointsToJsonObject(shotData->temperatureGoalData());
 
+    root["temperatureMix"] = pointsToJsonObject(shotData->temperatureMixData());
+    root["resistance"] = pointsToJsonObject(shotData->resistanceData());
+    root["waterDispensed"] = pointsToJsonObject(shotData->waterDispensedData());
+
     // Weight data - store cumulative weight for history
     root["weight"] = pointsToJsonObject(shotData->cumulativeWeightData());
     // Also store flow rate from scale for future graph display
@@ -306,6 +310,12 @@ void ShotHistoryStorage::decompressSampleData(const QByteArray& blob, ShotRecord
     record->pressureGoal = arrayToPoints(root["pressureGoal"].toObject());
     record->flowGoal = arrayToPoints(root["flowGoal"].toObject());
     record->temperatureGoal = arrayToPoints(root["temperatureGoal"].toObject());
+    if (root.contains("temperatureMix"))
+        record->temperatureMix = arrayToPoints(root["temperatureMix"].toObject());
+    if (root.contains("resistance"))
+        record->resistance = arrayToPoints(root["resistance"].toObject());
+    if (root.contains("waterDispensed"))
+        record->waterDispensed = arrayToPoints(root["waterDispensed"].toObject());
     record->weight = arrayToPoints(root["weight"].toObject());
 }
 
@@ -716,6 +726,9 @@ QVariantMap ShotHistoryStorage::getShot(qint64 shotId)
     result["pressure"] = pointsToVariant(record.pressure);
     result["flow"] = pointsToVariant(record.flow);
     result["temperature"] = pointsToVariant(record.temperature);
+    result["temperatureMix"] = pointsToVariant(record.temperatureMix);
+    result["resistance"] = pointsToVariant(record.resistance);
+    result["waterDispensed"] = pointsToVariant(record.waterDispensed);
     result["pressureGoal"] = pointsToVariant(record.pressureGoal);
     result["flowGoal"] = pointsToVariant(record.flowGoal);
     result["temperatureGoal"] = pointsToVariant(record.temperatureGoal);
@@ -1606,6 +1619,9 @@ qint64 ShotHistoryStorage::importShotRecord(const ShotRecord& record, bool overw
     root["pressure"] = pointsToJsonObject(record.pressure);
     root["flow"] = pointsToJsonObject(record.flow);
     root["temperature"] = pointsToJsonObject(record.temperature);
+    root["temperatureMix"] = pointsToJsonObject(record.temperatureMix);
+    root["resistance"] = pointsToJsonObject(record.resistance);
+    root["waterDispensed"] = pointsToJsonObject(record.waterDispensed);
     root["pressureGoal"] = pointsToJsonObject(record.pressureGoal);
     root["flowGoal"] = pointsToJsonObject(record.flowGoal);
     root["temperatureGoal"] = pointsToJsonObject(record.temperatureGoal);

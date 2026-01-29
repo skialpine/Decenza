@@ -57,6 +57,9 @@ struct ShotRecord {
     QVector<QPointF> pressureGoal;
     QVector<QPointF> flowGoal;
     QVector<QPointF> temperatureGoal;
+    QVector<QPointF> temperatureMix;
+    QVector<QPointF> resistance;
+    QVector<QPointF> waterDispensed;
     QVector<QPointF> weight;
 
     // Phase markers

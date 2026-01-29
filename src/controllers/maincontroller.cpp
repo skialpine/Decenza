@@ -2505,9 +2505,9 @@ void MainController::generateFakeShotData() {
             weight = 36.0 + progress * 4.0;  // 36-40g
         }
 
-        // addSample(time, pressure, flow, temperature, pressureGoal, flowGoal, temperatureGoal, frameNumber, isFlowMode)
+        // addSample(time, pressure, flow, temperature, mixTemp, pressureGoal, flowGoal, temperatureGoal, frameNumber, isFlowMode)
         // Simulation uses pressure mode (isFlowMode = false)
-        m_shotDataModel->addSample(t, pressure, flow, temperature, pressureGoal, flowGoal, 92.0, frameNumber, false);
+        m_shotDataModel->addSample(t, pressure, flow, temperature, temperature, pressureGoal, flowGoal, 92.0, frameNumber, false);
         // addWeightSample(time, weight, flowRate)
         m_shotDataModel->addWeightSample(t, weight, flow);
     }
@@ -2557,8 +2557,7 @@ void MainController::onShotSampleReceived(const ShotSample& sample) {
     m_lastSampleTime = sample.timer;
 
     // Record shot data only during active espresso phases OR during settling (for drip visualization)
-    bool isEspressoPhase = (phase == MachineState::Phase::EspressoPreheating ||
-                           phase == MachineState::Phase::Preinfusion ||
+    bool isEspressoPhase = (phase == MachineState::Phase::Preinfusion ||
                            phase == MachineState::Phase::Pouring);
     bool isSettling = m_timingController && m_timingController->isSawSettling();
 
@@ -2641,6 +2640,7 @@ void MainController::onShotSampleReceived(const ShotSample& sample) {
     // Add sample data to graph
     m_shotDataModel->addSample(time, sample.groupPressure,
                                sample.groupFlow, sample.headTemp,
+                               sample.mixTemp,
                                pressureGoal, flowGoal, sample.setTempGoal,
                                sample.frameNumber, isFlowMode);
 }

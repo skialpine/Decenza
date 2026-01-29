@@ -582,6 +582,11 @@ QByteArray VisualizerUploader::buildShotJson(ShotDataModel* shotData,
     temperature["basket"] = basketValues;
     // Interpolate goal data to match elapsed timestamps
     temperature["goal"] = interpolateGoalData(temperatureGoalData, pressureData);
+    // Mix temperature (water input temperature)
+    const auto& temperatureMixData = shotData->temperatureMixData();
+    if (!temperatureMixData.isEmpty()) {
+        temperature["mix"] = interpolateGoalData(temperatureMixData, pressureData);
+    }
     root["temperature"] = temperature;
 
     // Totals object
@@ -590,7 +595,20 @@ QByteArray VisualizerUploader::buildShotJson(ShotDataModel* shotData,
         // Interpolate cumulative weight to match elapsed timestamps
         totals["weight"] = interpolateGoalData(cumulativeWeightData, pressureData);
     }
+    // Water dispensed (cumulative flow volume in ml)
+    const auto& waterDispensedData = shotData->waterDispensedData();
+    if (!waterDispensedData.isEmpty()) {
+        totals["water_dispensed"] = interpolateGoalData(waterDispensedData, pressureData);
+    }
     root["totals"] = totals;
+
+    // Resistance object (pressure / flow²)
+    const auto& resistanceData = shotData->resistanceData();
+    if (!resistanceData.isEmpty()) {
+        QJsonObject resistance;
+        resistance["resistance"] = interpolateGoalData(resistanceData, pressureData);
+        root["resistance"] = resistance;
+    }
 
     // Meta object (de1app format)
     QJsonObject meta;
