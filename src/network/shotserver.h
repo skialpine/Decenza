@@ -25,6 +25,7 @@ struct PendingRequest {
     QString tempFilePath;           // Path to temp file
     QElapsedTimer lastActivity;     // For timeout tracking
     bool isMediaUpload = false;     // Flag for media upload requests
+    bool isBackupRestore = false;   // Flag for backup restore uploads
 };
 
 class ShotServer : public QObject {
@@ -105,6 +106,11 @@ private:
     void handleBackupProfileFile(QTcpSocket* socket, const QString& category, const QString& filename);
     void handleBackupMediaList(QTcpSocket* socket);
     void handleBackupMediaFile(QTcpSocket* socket, const QString& filename);
+
+    // Full backup download/restore
+    void handleBackupFull(QTcpSocket* socket);
+    QString generateRestorePage() const;
+    void handleBackupRestore(QTcpSocket* socket, const QString& tempFilePath, const QString& headers);
 
     // Settings web UI
     QString generateSettingsPage() const;

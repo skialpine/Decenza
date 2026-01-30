@@ -29,6 +29,8 @@ inline QString generateMenuHtml(bool includeUploadApk = false)
     html += R"HTML(
                         <a href="/database.db" class="menu-item">&#128190; Download Database</a>
                         <a href="/upload/media" class="menu-item">&#127912; Upload Screensaver Media</a>
+                        <a href="/api/backup/full" class="menu-item">&#128230; Download Backup</a>
+                        <a href="/restore" class="menu-item">&#128229; Restore Backup</a>
                     </div>
                 </div>)HTML";
 
