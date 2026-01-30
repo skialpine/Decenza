@@ -594,7 +594,15 @@ int main(int argc, char *argv[])
 
             // IMPORTANT: Ensure charger is ON when app goes to background
             // This prevents tablet from dying if user doesn't return to the app
+#ifdef Q_OS_IOS
+            // On iOS, skip queued BLE writes during suspension - CoreBluetooth invalidates
+            // its internal handles during app suspension, causing SIGSEGV when the queued
+            // write executes 50ms later. The DE1's 10-minute auto-charger timeout provides
+            // safety (it automatically re-enables the charger if no command is received).
+            qDebug() << "BatteryManager: Skipping ensureChargerOn on iOS (CoreBluetooth suspension)";
+#else
             batteryManager.ensureChargerOn();
+#endif
         }
         else if (state == Qt::ApplicationActive && wasSuspended) {
             // App resumed from suspended state - wake scale

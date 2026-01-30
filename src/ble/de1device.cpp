@@ -105,16 +105,19 @@ DE1Device::DE1Device(QObject* parent)
             m_connecting = true;
             emit connectingChanged();
             m_controller = QLowEnergyController::createCentral(m_pendingDevice, this);
+            // Use Qt::QueuedConnection for all BLE signals - fixes iOS CoreBluetooth threading
+            // issues where callbacks arrive on CoreBluetooth thread and cause re-entrancy/crash
+            auto qc = Qt::QueuedConnection;
             connect(m_controller, &QLowEnergyController::connected,
-                    this, &DE1Device::onControllerConnected);
+                    this, &DE1Device::onControllerConnected, qc);
             connect(m_controller, &QLowEnergyController::disconnected,
-                    this, &DE1Device::onControllerDisconnected);
+                    this, &DE1Device::onControllerDisconnected, qc);
             connect(m_controller, &QLowEnergyController::errorOccurred,
-                    this, &DE1Device::onControllerError);
+                    this, &DE1Device::onControllerError, qc);
             connect(m_controller, &QLowEnergyController::serviceDiscovered,
-                    this, &DE1Device::onServiceDiscovered);
+                    this, &DE1Device::onServiceDiscovered, qc);
             connect(m_controller, &QLowEnergyController::discoveryFinished,
-                    this, &DE1Device::onServiceDiscoveryFinished);
+                    this, &DE1Device::onServiceDiscoveryFinished, qc);
             m_controller->connectToDevice();
         }
     });
@@ -240,16 +243,19 @@ void DE1Device::connectToDevice(const QBluetoothDeviceInfo& device) {
 
     m_controller = QLowEnergyController::createCentral(device, this);
 
+    // Use Qt::QueuedConnection for all BLE signals - fixes iOS CoreBluetooth threading
+    // issues where callbacks arrive on CoreBluetooth thread and cause re-entrancy/crash
+    auto qc = Qt::QueuedConnection;
     connect(m_controller, &QLowEnergyController::connected,
-            this, &DE1Device::onControllerConnected);
+            this, &DE1Device::onControllerConnected, qc);
     connect(m_controller, &QLowEnergyController::disconnected,
-            this, &DE1Device::onControllerDisconnected);
+            this, &DE1Device::onControllerDisconnected, qc);
     connect(m_controller, &QLowEnergyController::errorOccurred,
-            this, &DE1Device::onControllerError);
+            this, &DE1Device::onControllerError, qc);
     connect(m_controller, &QLowEnergyController::serviceDiscovered,
-            this, &DE1Device::onServiceDiscovered);
+            this, &DE1Device::onServiceDiscovered, qc);
     connect(m_controller, &QLowEnergyController::discoveryFinished,
-            this, &DE1Device::onServiceDiscoveryFinished);
+            this, &DE1Device::onServiceDiscoveryFinished, qc);
 
     m_controller->connectToDevice();
 }
@@ -348,14 +354,17 @@ void DE1Device::onServiceDiscovered(const QBluetoothUuid& uuid) {
     if (uuid == DE1::SERVICE_UUID) {
         m_service = m_controller->createServiceObject(uuid, this);
         if (m_service) {
+            // Use Qt::QueuedConnection for all service signals - fixes iOS CoreBluetooth
+            // threading issues where callbacks arrive on CoreBluetooth thread
+            auto qc = Qt::QueuedConnection;
             connect(m_service, &QLowEnergyService::stateChanged,
-                    this, &DE1Device::onServiceStateChanged);
+                    this, &DE1Device::onServiceStateChanged, qc);
             connect(m_service, &QLowEnergyService::characteristicChanged,
-                    this, &DE1Device::onCharacteristicChanged);
+                    this, &DE1Device::onCharacteristicChanged, qc);
             connect(m_service, &QLowEnergyService::characteristicRead,
-                    this, &DE1Device::onCharacteristicChanged);  // Use same handler for reads
+                    this, &DE1Device::onCharacteristicChanged, qc);  // Use same handler for reads
             connect(m_service, &QLowEnergyService::characteristicWritten,
-                    this, &DE1Device::onCharacteristicWritten);
+                    this, &DE1Device::onCharacteristicWritten, qc);
             connect(m_service, &QLowEnergyService::errorOccurred,
                     this, [this](QLowEnergyService::ServiceError error) {
                 // Log but don't fail on descriptor errors - common on Windows
@@ -389,7 +398,7 @@ void DE1Device::onServiceDiscovered(const QBluetoothUuid& uuid) {
                         emit errorOccurred(QString("Service error: %1").arg(error));
                     }
                 }
-            });
+            }, qc);
             m_service->discoverDetails();
         } else {
             qWarning() << "DE1Device: Failed to create service object";
