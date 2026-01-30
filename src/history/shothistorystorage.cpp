@@ -240,6 +240,16 @@ bool ShotHistoryStorage::runMigrations()
         currentVersion = 3;
     }
 
+    // Migration 4: Add transition_reason to shot_phases
+    if (currentVersion < 4) {
+        qDebug() << "ShotHistoryStorage: Running migration to version 4 (transition_reason)";
+        if (!query.exec("ALTER TABLE shot_phases ADD COLUMN transition_reason TEXT DEFAULT ''")) {
+            qWarning() << "ShotHistoryStorage: Failed to add transition_reason column:" << query.lastError().text();
+        }
+        query.exec("UPDATE schema_version SET version = 4");
+        currentVersion = 4;
+    }
+
     m_schemaVersion = currentVersion;
     return true;
 }
@@ -436,14 +446,15 @@ qint64 ShotHistoryStorage::saveShot(ShotDataModel* shotData,
     for (const QVariant& markerVar : markers) {
         QVariantMap marker = markerVar.toMap();
         query.prepare(R"(
-            INSERT INTO shot_phases (shot_id, time_offset, label, frame_number, is_flow_mode)
-            VALUES (:shot_id, :time, :label, :frame, :flow_mode)
+            INSERT INTO shot_phases (shot_id, time_offset, label, frame_number, is_flow_mode, transition_reason)
+            VALUES (:shot_id, :time, :label, :frame, :flow_mode, :reason)
         )");
         query.bindValue(":shot_id", shotId);
         query.bindValue(":time", marker["time"].toDouble());
         query.bindValue(":label", marker["label"].toString());
         query.bindValue(":frame", marker["frameNumber"].toInt());
         query.bindValue(":flow_mode", marker["isFlowMode"].toBool() ? 1 : 0);
+        query.bindValue(":reason", marker["transitionReason"].toString());
         query.exec();  // Non-critical if markers fail
     }
 
@@ -742,6 +753,7 @@ QVariantMap ShotHistoryStorage::getShot(qint64 shotId)
         p["label"] = phase.label;
         p["frameNumber"] = phase.frameNumber;
         p["isFlowMode"] = phase.isFlowMode;
+        p["transitionReason"] = phase.transitionReason;
         phases.append(p);
     }
     result["phases"] = phases;
@@ -820,7 +832,7 @@ ShotRecord ShotHistoryStorage::getShotRecord(qint64 shotId)
     }
 
     // Load phase markers
-    query.prepare("SELECT time_offset, label, frame_number, is_flow_mode FROM shot_phases WHERE shot_id = ? ORDER BY time_offset");
+    query.prepare("SELECT time_offset, label, frame_number, is_flow_mode, transition_reason FROM shot_phases WHERE shot_id = ? ORDER BY time_offset");
     query.bindValue(0, shotId);
     if (query.exec()) {
         while (query.next()) {
@@ -829,6 +841,7 @@ ShotRecord ShotHistoryStorage::getShotRecord(qint64 shotId)
             marker.label = query.value(1).toString();
             marker.frameNumber = query.value(2).toInt();
             marker.isFlowMode = query.value(3).toInt() != 0;
+            marker.transitionReason = query.value(4).toString();
             record.phases.append(marker);
         }
     }
@@ -1480,21 +1493,29 @@ bool ShotHistoryStorage::importDatabase(const QString& filePath, bool merge)
             insertSample.exec();
         }
 
-        // Import phases for this shot
+        // Import phases for this shot (try with transition_reason, fall back for older DBs)
         QSqlQuery srcPhases(srcDb);
-        srcPhases.prepare("SELECT time_offset, label, frame_number, is_flow_mode FROM shot_phases WHERE shot_id = ?");
+        srcPhases.prepare("SELECT time_offset, label, frame_number, is_flow_mode, transition_reason FROM shot_phases WHERE shot_id = ?");
         srcPhases.addBindValue(oldId);
-        if (srcPhases.exec()) {
-            while (srcPhases.next()) {
-                QSqlQuery insertPhase(m_db);
-                insertPhase.prepare("INSERT INTO shot_phases (shot_id, time_offset, label, frame_number, is_flow_mode) VALUES (?, ?, ?, ?, ?)");
-                insertPhase.addBindValue(newId);
-                insertPhase.addBindValue(srcPhases.value(0));
-                insertPhase.addBindValue(srcPhases.value(1));
-                insertPhase.addBindValue(srcPhases.value(2));
-                insertPhase.addBindValue(srcPhases.value(3));
-                insertPhase.exec();
-            }
+        bool hasReason = srcPhases.exec();
+        if (!hasReason) {
+            srcPhases.prepare("SELECT time_offset, label, frame_number, is_flow_mode FROM shot_phases WHERE shot_id = ?");
+            srcPhases.addBindValue(oldId);
+            hasReason = false;
+            srcPhases.exec();
+        } else {
+            hasReason = true;
+        }
+        while (srcPhases.next()) {
+            QSqlQuery insertPhase(m_db);
+            insertPhase.prepare("INSERT INTO shot_phases (shot_id, time_offset, label, frame_number, is_flow_mode, transition_reason) VALUES (?, ?, ?, ?, ?, ?)");
+            insertPhase.addBindValue(newId);
+            insertPhase.addBindValue(srcPhases.value(0));
+            insertPhase.addBindValue(srcPhases.value(1));
+            insertPhase.addBindValue(srcPhases.value(2));
+            insertPhase.addBindValue(srcPhases.value(3));
+            insertPhase.addBindValue(hasReason ? srcPhases.value(4).toString() : QString());
+            insertPhase.exec();
         }
 
         imported++;
@@ -1645,14 +1666,15 @@ qint64 ShotHistoryStorage::importShotRecord(const ShotRecord& record, bool overw
     // Insert phase markers
     for (const auto& marker : record.phases) {
         query.prepare(R"(
-            INSERT INTO shot_phases (shot_id, time_offset, label, frame_number, is_flow_mode)
-            VALUES (:shot_id, :time, :label, :frame, :flow_mode)
+            INSERT INTO shot_phases (shot_id, time_offset, label, frame_number, is_flow_mode, transition_reason)
+            VALUES (:shot_id, :time, :label, :frame, :flow_mode, :reason)
         )");
         query.bindValue(":shot_id", shotId);
         query.bindValue(":time", marker.time);
         query.bindValue(":label", marker.label);
         query.bindValue(":frame", marker.frameNumber);
         query.bindValue(":flow_mode", marker.isFlowMode ? 1 : 0);
+        query.bindValue(":reason", marker.transitionReason);
         query.exec();  // Non-critical if markers fail
     }
 

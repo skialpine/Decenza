@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QTimer>
 #include <QDateTime>
+#include <QSet>
 #include "../profile/profile.h"
 
 class DE1Device;
@@ -58,6 +59,9 @@ public:
     // Shot lifecycle
     void startShot();   // Called when espresso cycle starts
     void endShot();     // Called when shot ends
+
+    // Transition reason tracking
+    bool wasWeightExit(int frameNumber) const { return m_weightExitFrames.contains(frameNumber); }
 
     // Data ingestion (called by MainController)
     void onShotSample(const ShotSample& sample, double pressureGoal, double flowGoal,
@@ -116,6 +120,7 @@ private:
     double m_targetWeight = 0;
     bool m_stopAtWeightTriggered = false;
     int m_frameWeightSkipSent = -1;  // Frame for which we've sent weight-based skip
+    QSet<int> m_weightExitFrames;    // Frames that exited due to weight (for transition reason tracking)
     int m_currentFrameNumber = -1;   // Current frame number from shot samples
     bool m_extractionStarted = false; // True after frame 0 seen (preheating complete)
 

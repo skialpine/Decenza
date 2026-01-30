@@ -110,6 +110,7 @@ private:
         struct PhaseMarker {
             double time = 0;
             QString label;
+            QString transitionReason;
         };
         QList<PhaseMarker> phases;
     };

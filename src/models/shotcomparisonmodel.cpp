@@ -172,6 +172,7 @@ void ShotComparisonModel::loadDisplayWindow()
             ComparisonShot::PhaseMarker marker;
             marker.time = phase.time;
             marker.label = phase.label;
+            marker.transitionReason = phase.transitionReason;
             shot.phases.append(marker);
         }
 
@@ -262,6 +263,7 @@ QVariantList ShotComparisonModel::getPhaseMarkers(int index) const
         QVariantMap p;
         p["time"] = phase.time;
         p["label"] = phase.label;
+        p["transitionReason"] = phase.transitionReason;
         result.append(p);
     }
     return result;

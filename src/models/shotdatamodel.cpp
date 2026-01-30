@@ -337,7 +337,7 @@ void ShotDataModel::markStopAt(double time) {
     emit weightAtStopChanged();
 }
 
-void ShotDataModel::addPhaseMarker(double time, const QString& label, int frameNumber, bool isFlowMode) {
+void ShotDataModel::addPhaseMarker(double time, const QString& label, int frameNumber, bool isFlowMode, const QString& transitionReason) {
     m_pendingMarkers.append({time, label});
 
     PhaseMarker marker;
@@ -345,6 +345,7 @@ void ShotDataModel::addPhaseMarker(double time, const QString& label, int frameN
     marker.label = label;
     marker.frameNumber = frameNumber;
     marker.isFlowMode = isFlowMode;
+    marker.transitionReason = transitionReason;
     m_phaseMarkers.append(marker);
 
     m_dirty = true;
@@ -431,6 +432,7 @@ QVariantList ShotDataModel::phaseMarkersVariant() const {
         map["label"] = marker.label;
         map["frameNumber"] = marker.frameNumber;
         map["isFlowMode"] = marker.isFlowMode;
+        map["transitionReason"] = marker.transitionReason;
         result.append(map);
     }
     return result;

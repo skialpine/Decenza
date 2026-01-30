@@ -75,6 +75,7 @@ void ShotTimingController::startShot()
     m_flowRate = 0;
     m_stopAtWeightTriggered = false;
     m_frameWeightSkipSent = -1;
+    m_weightExitFrames.clear();
     m_currentFrameNumber = -1;
     m_extractionStarted = false;
 
@@ -345,6 +346,7 @@ void ShotTimingController::checkPerFrameWeight(int frameNumber)
         qDebug() << "FRAME-WEIGHT EXIT: weight" << m_weight << ">=" << frame.exitWeight
                  << "on frame" << frameNumber << "(" << frame.name << ")";
         m_frameWeightSkipSent = frameNumber;
+        m_weightExitFrames.insert(frameNumber);
         emit perFrameWeightReached(frameNumber);
     }
 }

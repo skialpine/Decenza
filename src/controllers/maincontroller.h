@@ -276,6 +276,9 @@ private:
     bool m_extractionStarted = false;
     int m_lastFrameNumber = -1;
     int m_frameWeightSkipSent = -1;  // Frame number for which we've sent a weight-based skip command
+    double m_frameStartTime = 0;     // Shot-relative time when current frame started
+    double m_lastPressure = 0;       // Last sample pressure (for transition reason inference)
+    double m_lastFlow = 0;           // Last sample flow (for transition reason inference)
     bool m_tareDone = false;  // Track if we've tared for this shot
 
     QString m_baseProfileName;

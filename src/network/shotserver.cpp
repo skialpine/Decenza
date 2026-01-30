@@ -1776,6 +1776,22 @@ QString ShotServer::generateShotDetailPage(qint64 shotId) const
     QString pressureGoalData = goalPointsToJson(shot["pressureGoal"].toList());
     QString flowGoalData = goalPointsToJson(shot["flowGoal"].toList());
 
+    // Convert phase markers to JSON for Chart.js
+    auto phasesToJson = [](const QVariantList& phases) -> QString {
+        QStringList items;
+        for (const QVariant& p : phases) {
+            QVariantMap phase = p.toMap();
+            QString label = phase["label"].toString();
+            if (label == "Start") continue;  // Skip start marker
+            items << QString("{time:%1,label:\"%2\",reason:\"%3\"}")
+                .arg(phase["time"].toDouble(), 0, 'f', 2)
+                .arg(label.replace(QStringLiteral("\""), QStringLiteral("\\\"")))
+                .arg(phase["transitionReason"].toString());
+        }
+        return "[" + items.join(",") + "]";
+    };
+    QString phaseData = phasesToJson(shot["phases"].toList());
+
     return QString(R"HTML(
 <!DOCTYPE html>
 <html lang="en">
@@ -2152,6 +2168,55 @@ QString ShotServer::generateShotDetailPage(qint64 shotId) const
         const tempData = %18;
         const pressureGoalData = %19;
         const flowGoalData = %20;
+        const phaseData = %22;
+
+        // Chart.js plugin: draw vertical phase marker lines and labels
+        const phaseMarkerPlugin = {
+            id: 'phaseMarkers',
+            afterDraw: function(chart) {
+                if (!phaseData || phaseData.length === 0) return;
+                const ctx = chart.ctx;
+                const xScale = chart.scales.x;
+                const yScale = chart.scales.y;
+                const top = yScale.top;
+                const bottom = yScale.bottom;
+
+                ctx.save();
+                for (var i = 0; i < phaseData.length; i++) {
+                    var marker = phaseData[i];
+                    var x = xScale.getPixelForValue(marker.time);
+                    if (x < xScale.left || x > xScale.right) continue;
+
+                    // Draw vertical dotted line
+                    ctx.beginPath();
+                    ctx.setLineDash([3, 3]);
+                    ctx.strokeStyle = marker.label === 'End' ? '#FF6B6B' : 'rgba(255,255,255,0.4)';
+                    ctx.lineWidth = 1;
+                    ctx.moveTo(x, top);
+                    ctx.lineTo(x, bottom);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Draw label
+                    var suffix = '';
+                    if (marker.reason === 'weight') suffix = ' [W]';
+                    else if (marker.reason === 'pressure') suffix = ' [P]';
+                    else if (marker.reason === 'flow') suffix = ' [F]';
+                    else if (marker.reason === 'time') suffix = ' [T]';
+                    var text = marker.label + suffix;
+
+                    ctx.save();
+                    ctx.translate(x + 4, top + 10);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.font = (marker.label === 'End' ? 'bold ' : '') + '11px sans-serif';
+                    ctx.fillStyle = marker.label === 'End' ? '#FF6B6B' : 'rgba(255,255,255,0.8)';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(text, 0, 0);
+                    ctx.restore();
+                }
+                ctx.restore();
+            }
+        };
 
         // Track mouse position for tooltip
         var mouseX = 0, mouseY = 0;
@@ -2226,6 +2291,7 @@ QString ShotServer::generateShotDetailPage(qint64 shotId) const
         const ctx = document.getElementById('shotChart').getContext('2d');
         const chart = new Chart(ctx, {
             type: 'line',
+            plugins: [phaseMarkerPlugin],
             data: {
                 datasets: [
                     {
@@ -2418,7 +2484,8 @@ QString ShotServer::generateShotDetailPage(qint64 shotId) const
     .arg(tempData)
     .arg(pressureGoalData)
     .arg(flowGoalData)
-    .arg(shot["debugLog"].toString().isEmpty() ? "No debug log available" : shot["debugLog"].toString().toHtmlEscaped());
+    .arg(shot["debugLog"].toString().isEmpty() ? "No debug log available" : shot["debugLog"].toString().toHtmlEscaped())
+    .arg(phaseData);
 }
 
 QString ShotServer::generateComparisonPage(const QList<qint64>& shotIds) const

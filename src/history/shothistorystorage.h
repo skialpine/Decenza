@@ -32,6 +32,7 @@ struct HistoryPhaseMarker {
     QString label;
     int frameNumber = 0;
     bool isFlowMode = false;
+    QString transitionReason;  // "weight", "pressure", "flow", "time", or "" (unknown/old data)
 };
 
 // Full shot record for detail view / comparison

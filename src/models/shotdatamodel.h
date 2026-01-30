@@ -13,6 +13,7 @@ struct PhaseMarker {
     QString label;
     int frameNumber;
     bool isFlowMode = false;  // true = flow control, false = pressure control
+    QString transitionReason;  // "weight", "pressure", "flow", "time", or "" (unknown/old data)
 };
 
 class ShotDataModel : public QObject {
@@ -70,7 +71,7 @@ public slots:
     void addWeightSample(double time, double weight);  // Overload without flowRate (from ShotTimingController)
     void markExtractionStart(double time);
     void markStopAt(double time);  // Mark when SAW or user stopped the shot
-    void addPhaseMarker(double time, const QString& label, int frameNumber = -1, bool isFlowMode = false);
+    void addPhaseMarker(double time, const QString& label, int frameNumber = -1, bool isFlowMode = false, const QString& transitionReason = QString());
 
 signals:
     void cleared();

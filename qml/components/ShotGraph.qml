@@ -201,6 +201,7 @@ ChartView {
             required property var modelData
             property double markerTime: modelData.time
             property string markerLabel: modelData.label
+            property string transitionReason: modelData.transitionReason || ""
             property bool isStart: modelData.label === "Start"
             property bool isEnd: modelData.label === "End"
 
@@ -212,7 +213,17 @@ ChartView {
 
             Text {
                 id: markerText
-                text: markerLabel
+                text: {
+                    if (transitionReason === "" || isStart || isEnd) return markerLabel
+                    var suffix = ""
+                    switch (transitionReason) {
+                        case "weight": suffix = " [W]"; break
+                        case "pressure": suffix = " [P]"; break
+                        case "flow": suffix = " [F]"; break
+                        case "time": suffix = " [T]"; break
+                    }
+                    return markerLabel + suffix
+                }
                 font.pixelSize: Theme.scaled(18)
                 font.bold: isStart || isEnd
                 color: isStart ? Theme.accentColor : (isEnd ? "#FF6B6B" : Qt.rgba(255, 255, 255, 0.8))

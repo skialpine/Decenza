@@ -2220,6 +2220,9 @@ void MainController::onEspressoCycleStarted() {
     m_extractionStarted = false;
     m_lastFrameNumber = -1;
     m_frameWeightSkipSent = -1;
+    m_frameStartTime = 0;
+    m_lastPressure = 0;
+    m_lastFlow = 0;
     m_tareDone = true;
     if (m_shotDataModel) {
         m_shotDataModel->clear();
@@ -2598,8 +2601,13 @@ void MainController::onShotSampleReceived(const ShotSample& sample) {
 
     if (isExtracting && !m_extractionStarted) {
         m_extractionStarted = true;
+        m_frameStartTime = time;
         m_shotDataModel->markExtractionStart(time);
     }
+
+    // Track latest sensor values for transition reason inference
+    m_lastPressure = sample.groupPressure;
+    m_lastFlow = sample.groupFlow;
 
     // Determine active pump mode for current frame (to show only active goal curve)
     double pressureGoal = sample.setPressureGoal;
@@ -2636,7 +2644,44 @@ void MainController::onShotSampleReceived(const ShotSample& sample) {
             frameName = QString("F%1").arg(frameIndex);
         }
 
-        m_shotDataModel->addPhaseMarker(time, frameName, frameIndex, isFlowMode);
+        // Determine transition reason for the PREVIOUS frame that just exited
+        QString transitionReason;
+        int prevFrameIndex = m_lastFrameNumber;
+        if (prevFrameIndex >= 0 && prevFrameIndex < steps.size()) {
+            const ProfileFrame& prevFrame = steps[prevFrameIndex];
+
+            if (m_timingController && m_timingController->wasWeightExit(prevFrameIndex)) {
+                // App sent skipToNextFrame() due to weight - 100% certain
+                transitionReason = QStringLiteral("weight");
+            } else if (prevFrame.exitIf) {
+                // Machine-side exit condition was configured - infer from sensor values
+                double frameElapsed = time - m_frameStartTime;
+                bool timeExpired = frameElapsed >= prevFrame.seconds * 0.9;
+
+                if (prevFrame.exitType == QStringLiteral("pressure_over") && m_lastPressure >= prevFrame.exitPressureOver) {
+                    transitionReason = QStringLiteral("pressure");
+                } else if (prevFrame.exitType == QStringLiteral("pressure_under") && m_lastPressure > 0 && m_lastPressure <= prevFrame.exitPressureUnder) {
+                    transitionReason = QStringLiteral("pressure");
+                } else if (prevFrame.exitType == QStringLiteral("flow_over") && m_lastFlow >= prevFrame.exitFlowOver) {
+                    transitionReason = QStringLiteral("flow");
+                } else if (prevFrame.exitType == QStringLiteral("flow_under") && m_lastFlow > 0 && m_lastFlow <= prevFrame.exitFlowUnder) {
+                    transitionReason = QStringLiteral("flow");
+                } else if (timeExpired) {
+                    // Exit condition configured but time ran out first
+                    transitionReason = QStringLiteral("time");
+                } else {
+                    // Condition was configured, values near threshold - machine likely triggered it
+                    transitionReason = prevFrame.exitType.contains(QStringLiteral("pressure"))
+                        ? QStringLiteral("pressure") : QStringLiteral("flow");
+                }
+            } else {
+                // No exit condition configured - frame ended by time
+                transitionReason = QStringLiteral("time");
+            }
+        }
+
+        m_shotDataModel->addPhaseMarker(time, frameName, frameIndex, isFlowMode, transitionReason);
+        m_frameStartTime = time;  // Record start time of new frame
         m_lastFrameNumber = sample.frameNumber;
         m_currentFrameName = frameName;  // Store for accessibility QML binding
 
