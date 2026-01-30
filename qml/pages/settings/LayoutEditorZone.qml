@@ -23,6 +23,7 @@ Rectangle {
     signal addItemRequested(string type)
     signal moveUp()
     signal moveDown()
+    signal editTextRequested(string itemId, string zoneName)
 
     Layout.fillWidth: true
     implicitHeight: zoneContent.implicitHeight + Theme.scaled(20)
@@ -147,7 +148,7 @@ Rectangle {
                             text: getItemDisplayName(modelData.type)
                             color: modelData.id === root.selectedItemId
                                 ? "white"
-                                : (modelData.type === "spacer" ? "orange" : Theme.textColor)
+                                : ((modelData.type === "spacer" || modelData.type === "text") ? "orange" : Theme.textColor)
                             font: Theme.bodyFont
                         }
 
@@ -183,6 +184,10 @@ Rectangle {
                         anchors.fill: parent
                         z: -1
                         onClicked: root.itemTapped(modelData.id)
+                        onPressAndHold: {
+                            if (modelData.type === "text")
+                                root.editTextRequested(modelData.id, root.zoneName)
+                        }
                     }
                 }
             }
@@ -279,7 +284,8 @@ Rectangle {
                             { type: "connectionStatus", label: "Connection" },
                             { type: "scaleWeight", label: "Scale Weight" },
                             { type: "shotPlan", label: "Shot Plan" },
-                            { type: "spacer", label: "Spacer" }
+                            { type: "spacer", label: "Spacer" },
+                            { type: "text", label: "Text" }
                         ]
 
                         delegate: Rectangle {
@@ -293,7 +299,7 @@ Rectangle {
                                 anchors.leftMargin: Theme.scaled(12)
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: modelData.label
-                                color: modelData.type === "spacer" ? "orange" : Theme.textColor
+                                color: (modelData.type === "spacer" || modelData.type === "text") ? "orange" : Theme.textColor
                                 font: Theme.bodyFont
                             }
 
@@ -327,7 +333,7 @@ Rectangle {
             "autofavorites": "Favorites", "sleep": "Sleep", "settings": "Settings",
             "temperature": "Temp", "waterLevel": "Water",
             "connectionStatus": "Connection", "scaleWeight": "Scale",
-            "shotPlan": "Shot Plan", "spacer": "Spacer"
+            "shotPlan": "Shot Plan", "spacer": "Spacer", "text": "Text"
         }
         return names[type] || type
     }

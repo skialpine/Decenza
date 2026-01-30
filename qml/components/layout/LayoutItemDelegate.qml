@@ -30,6 +30,7 @@ Loader {
             case "scaleWeight":      src = "items/ScaleWeightItem.qml"; break
             case "shotPlan":         src = "items/ShotPlanItem.qml"; break
             case "spacer":           src = "items/SpacerItem.qml"; break
+            case "text":             src = "items/TextItem.qml"; break
             default:                 src = ""; break
         }
         console.log("[IdlePage] type:", itemType, "zone:", zoneName, "compact:", isCompact, "source:", src)
@@ -40,6 +41,9 @@ Loader {
         console.log("[IdlePage] LOADED type:", itemType, "id:", itemId, "item:", item, "implicitSize:", item.implicitWidth, "x", item.implicitHeight)
         item.isCompact = Qt.binding(function() { return root.isCompact })
         item.itemId = root.itemId
+        if (typeof item.modelData !== "undefined") {
+            item.modelData = Qt.binding(function() { return root.modelData })
+        }
         // Bind loaded item to fill the Loader so it gets the correct size
         // from the parent Layout (implicit size flows up, actual size flows down)
         item.anchors.fill = root

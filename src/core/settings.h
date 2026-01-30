@@ -550,6 +550,8 @@ public:
     Q_INVOKABLE bool hasItemType(const QString& type) const;
     Q_INVOKABLE int getZoneYOffset(const QString& zoneName) const;
     Q_INVOKABLE void setZoneYOffset(const QString& zoneName, int offset);
+    Q_INVOKABLE void setItemProperty(const QString& itemId, const QString& key, const QVariant& value);
+    Q_INVOKABLE QVariantMap getItemProperties(const QString& itemId) const;
 
     // Generic settings access (for extensibility)
     Q_INVOKABLE QVariant value(const QString& key, const QVariant& defaultValue = QVariant()) const;

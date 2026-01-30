@@ -450,6 +450,8 @@ set(QML_FILES
     qml/components/layout/items/ScaleWeightItem.qml
     qml/components/layout/items/ShotPlanItem.qml
     qml/components/layout/items/SpacerItem.qml
+    qml/components/layout/items/TextItem.qml
+    qml/components/layout/TextEditorPopup.qml
 )
 
 # Simulator QML - Windows Debug or macOS

@@ -50,7 +50,11 @@ Item {
         selectedColorName = colorName
         selectedColorValue = getColorValue(colorName)
         colorEditor.setColor(selectedColorValue)
+        hexField.text = selectedColorValue.toString().substring(0, 7)
     }
+
+    // Guard to prevent hex ↔ colorEditor feedback loop
+    property bool _updatingFromHex: false
 
     function applyColorChange(newColor) {
         Settings.setThemeColor(selectedColorName, newColor.toString())
@@ -162,6 +166,40 @@ Item {
                     font: Theme.subtitleFont
                 }
 
+                // Hex color input row
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingSmall
+
+                    Rectangle {
+                        width: Theme.scaled(32)
+                        height: Theme.scaled(32)
+                        radius: Theme.scaled(6)
+                        color: themesTab.selectedColorValue
+                        border.color: Theme.borderColor
+                        border.width: 1
+                    }
+
+                    StyledTextField {
+                        id: hexField
+                        Layout.preferredWidth: Theme.scaled(120)
+                        text: themesTab.selectedColorValue.toString().substring(0, 7)
+                        font.family: "monospace"
+                        font.pixelSize: Theme.bodyFont.pixelSize
+                        inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText
+
+                        onTextEdited: {
+                            var hex = text.trim()
+                            if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+                                themesTab._updatingFromHex = true
+                                colorEditor.setColor(hex)
+                                themesTab.applyColorChange(colorEditor.color)
+                                themesTab._updatingFromHex = false
+                            }
+                        }
+                    }
+                }
+
                 ColorEditor {
                     id: colorEditor
                     Layout.fillWidth: true
@@ -180,6 +218,10 @@ Item {
                         // Only save when user actually changes the color, not during init
                         if (initialized) {
                             themesTab.applyColorChange(colorEditor.color)
+                        }
+                        // Sync hex field (skip if the change came from hex input)
+                        if (!themesTab._updatingFromHex) {
+                            hexField.text = colorEditor.color.toString().substring(0, 7)
                         }
                     }
                 }

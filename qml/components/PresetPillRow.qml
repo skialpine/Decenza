@@ -79,7 +79,14 @@ FocusScope {
     onEffectiveMaxWidthChanged: rowsModel = calculateRows()
 
     // Recalculate after layout is complete to ensure correct width
-    Component.onCompleted: Qt.callLater(function() { rowsModel = calculateRows() })
+    // Use Timer instead of Qt.callLater to avoid "invalid context" errors
+    // when the component is destroyed before the deferred call fires
+    Timer {
+        id: recalcTimer
+        interval: 0
+        onTriggered: rowsModel = calculateRows()
+    }
+    Component.onCompleted: recalcTimer.start()
 
     // Group presets into rows, distributing evenly BY WIDTH for balanced aesthetics
     function calculateRows() {

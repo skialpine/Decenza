@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import DecenzaDE1
 import "../../components"
+import "../../components/layout"
 
 Item {
     id: layoutTab
@@ -77,6 +78,40 @@ Item {
         }
     }
 
+    function openTextEditor(itemId, zoneName) {
+        var props = Settings.getItemProperties(itemId)
+        textEditorPopup.openForItem(itemId, zoneName, props)
+    }
+
+    // Ensure there's always a way to reach Settings from the home screen
+    function ensureSettingsAccessible() {
+        var zones = ["topLeft", "topRight", "centerStatus", "centerTop",
+                     "centerMiddle", "bottomLeft", "bottomRight"]
+        for (var z = 0; z < zones.length; z++) {
+            var items = Settings.getZoneItems(zones[z])
+            for (var i = 0; i < items.length; i++) {
+                if (items[i].type === "settings") return
+                if (items[i].type === "text") {
+                    var props = Settings.getItemProperties(items[i].id)
+                    if (props.action === "navigate:settings") return
+                }
+            }
+        }
+        // No settings access found — add a settings widget to bottom right
+        Settings.addItem("settings", "bottomRight")
+        console.log("SettingsLayoutTab: Added settings widget to bottomRight (no settings access found)")
+    }
+
+    onVisibleChanged: {
+        if (!visible)
+            ensureSettingsAccessible()
+    }
+
+    TextEditorPopup {
+        id: textEditorPopup
+        pageContext: "idle"
+    }
+
     ScrollView {
         anchors.fill: parent
         contentWidth: availableWidth
@@ -112,7 +147,7 @@ Item {
             // Instructions
             Tr {
                 key: "settings.layout.instructions"
-                fallback: "Tap + to add widgets. Tap a widget to select it for moving or reordering."
+                fallback: "Tap + to add widgets. Tap a widget to select it for moving or reordering. Long-press Text items to edit."
                 color: Theme.textSecondaryColor
                 font: Theme.captionFont
                 Layout.fillWidth: true
@@ -137,6 +172,7 @@ Item {
                     onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "topLeft") }
                     onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "topLeft") }
                     onAddItemRequested: function(type) { Settings.addItem(type, "topLeft") }
+                    onEditTextRequested: function(itemId, zoneName) { layoutTab.openTextEditor(itemId, zoneName) }
                 }
 
                 LayoutEditorZone {
@@ -152,6 +188,7 @@ Item {
                     onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "topRight") }
                     onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "topRight") }
                     onAddItemRequested: function(type) { Settings.addItem(type, "topRight") }
+                    onEditTextRequested: function(itemId, zoneName) { layoutTab.openTextEditor(itemId, zoneName) }
                 }
             }
 
@@ -171,6 +208,7 @@ Item {
                 onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "centerStatus") }
                 onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "centerStatus") }
                 onAddItemRequested: function(type) { Settings.addItem(type, "centerStatus") }
+                onEditTextRequested: function(itemId, zoneName) { layoutTab.openTextEditor(itemId, zoneName) }
                 onMoveUp: Settings.setZoneYOffset("centerStatus", yOffset - 5)
                 onMoveDown: Settings.setZoneYOffset("centerStatus", yOffset + 5)
             }
@@ -191,6 +229,7 @@ Item {
                 onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "centerTop") }
                 onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "centerTop") }
                 onAddItemRequested: function(type) { Settings.addItem(type, "centerTop") }
+                onEditTextRequested: function(itemId, zoneName) { layoutTab.openTextEditor(itemId, zoneName) }
                 onMoveUp: Settings.setZoneYOffset("centerTop", yOffset - 5)
                 onMoveDown: Settings.setZoneYOffset("centerTop", yOffset + 5)
             }
@@ -211,6 +250,7 @@ Item {
                 onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "centerMiddle") }
                 onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "centerMiddle") }
                 onAddItemRequested: function(type) { Settings.addItem(type, "centerMiddle") }
+                onEditTextRequested: function(itemId, zoneName) { layoutTab.openTextEditor(itemId, zoneName) }
                 onMoveUp: Settings.setZoneYOffset("centerMiddle", yOffset - 5)
                 onMoveDown: Settings.setZoneYOffset("centerMiddle", yOffset + 5)
             }
@@ -233,6 +273,7 @@ Item {
                     onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "bottomLeft") }
                     onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "bottomLeft") }
                     onAddItemRequested: function(type) { Settings.addItem(type, "bottomLeft") }
+                    onEditTextRequested: function(itemId, zoneName) { layoutTab.openTextEditor(itemId, zoneName) }
                 }
 
                 LayoutEditorZone {
@@ -248,6 +289,7 @@ Item {
                     onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "bottomRight") }
                     onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "bottomRight") }
                     onAddItemRequested: function(type) { Settings.addItem(type, "bottomRight") }
+                    onEditTextRequested: function(itemId, zoneName) { layoutTab.openTextEditor(itemId, zoneName) }
                 }
             }
         }

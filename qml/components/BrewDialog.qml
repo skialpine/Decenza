@@ -7,7 +7,8 @@ Dialog {
     id: root
     parent: Overlay.overlay
     anchors.centerIn: parent
-    width: Theme.scaled(420)
+    property real dialogScale: 0.75
+    width: Theme.scaled(420) * dialogScale
     modal: true
     padding: 0
 
@@ -95,8 +96,17 @@ Dialog {
         border.color: "white"
     }
 
-    contentItem: ColumnLayout {
-        spacing: 0
+    contentItem: Item {
+        implicitHeight: mainColumn.implicitHeight * root.dialogScale
+        implicitWidth: Theme.scaled(420) * root.dialogScale
+        clip: true
+
+        ColumnLayout {
+            id: mainColumn
+            width: Theme.scaled(420)
+            scale: root.dialogScale
+            transformOrigin: Item.TopLeft
+            spacing: 0
 
         // Header
         Item {
@@ -379,7 +389,7 @@ Dialog {
                     Layout.fillWidth: true
                     value: root.ratio
                     from: 0.5
-                    to: 4.0
+                    to: 20.0
                     stepSize: 0.1
                     decimals: 1
                     valueColor: Theme.primaryColor
@@ -415,7 +425,7 @@ Dialog {
                         Layout.fillWidth: true
                         value: root.targetValue
                         from: 1
-                        to: 200
+                        to: 400
                         stepSize: 1
                         decimals: 0
                         suffix: "g"
@@ -601,5 +611,6 @@ Dialog {
                 }
             }
         }
-    }
+        } // ColumnLayout (mainColumn)
+    } // Item (contentItem)
 }

@@ -2638,6 +2638,42 @@ void Settings::setZoneYOffset(const QString& zoneName, int offset) {
     saveLayoutObject(layout);
 }
 
+void Settings::setItemProperty(const QString& itemId, const QString& key, const QVariant& value) {
+    QJsonObject layout = getLayoutObject();
+    QJsonObject zones = layout["zones"].toObject();
+
+    for (const QString& zoneName : zones.keys()) {
+        QJsonArray items = zones[zoneName].toArray();
+        for (int i = 0; i < items.size(); ++i) {
+            QJsonObject item = items[i].toObject();
+            if (item["id"].toString() == itemId) {
+                item[key] = QJsonValue::fromVariant(value);
+                items[i] = item;
+                zones[zoneName] = items;
+                layout["zones"] = zones;
+                saveLayoutObject(layout);
+                return;
+            }
+        }
+    }
+}
+
+QVariantMap Settings::getItemProperties(const QString& itemId) const {
+    QJsonObject layout = getLayoutObject();
+    QJsonObject zones = layout["zones"].toObject();
+
+    for (const QString& zoneName : zones.keys()) {
+        QJsonArray items = zones[zoneName].toArray();
+        for (const QJsonValue& val : items) {
+            QJsonObject item = val.toObject();
+            if (item["id"].toString() == itemId) {
+                return item.toVariantMap();
+            }
+        }
+    }
+    return QVariantMap();
+}
+
 // Generic settings access
 QVariant Settings::value(const QString& key, const QVariant& defaultValue) const {
     return m_settings.value(key, defaultValue);
