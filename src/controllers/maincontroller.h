@@ -253,6 +253,7 @@ private:
     QString userProfilesPath() const;
     QString downloadedProfilesPath() const;
     void applyAllSettings();
+    void applyWaterRefillLevel();
     double getGroupTemperature() const;
 
     Settings* m_settings = nullptr;

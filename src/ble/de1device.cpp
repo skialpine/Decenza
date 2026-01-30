@@ -643,15 +643,15 @@ void DE1Device::parseWaterLevel(const QByteArray& data) {
     constexpr double SENSOR_OFFSET = 5.0;
     m_waterLevelMm = rawMm + SENSOR_OFFSET;
 
-    // Use fixed thresholds matching de1app:
-    // - water_level_full_point = 40 (tank full)
-    // - water_refill_point = 5 (empty/refill threshold, same as sensor offset)
+    // Use fixed full point matching de1app (water_level_full_point = 40)
+    // Refill point comes from user setting (default 5mm, range 3-70)
     constexpr double FULL_POINT = 40.0;
-    constexpr double REFILL_POINT = 5.0;  // After offset, so raw = 0
+    double refillPoint = m_settings ? static_cast<double>(m_settings->waterRefillPoint()) : 5.0;
 
     // Calculate percentage: 0% at refill point, 100% at full point
-    double range = FULL_POINT - REFILL_POINT;
-    m_waterLevel = qBound(0.0, ((m_waterLevelMm - REFILL_POINT) / range) * 100.0, 100.0);
+    double range = FULL_POINT - refillPoint;
+    if (range <= 0) range = 1.0;  // Safety: avoid division by zero
+    m_waterLevel = qBound(0.0, ((m_waterLevelMm - refillPoint) / range) * 100.0, 100.0);
 
     // Lookup table from de1app CAD data (vars.tcl water_tank_level_to_milliliters)
     // Maps mm (0-65) to ml volume, accounting for non-linear tank geometry
@@ -1069,6 +1069,21 @@ void DE1Device::setUsbChargerOn(bool on, bool force) {
     if (stateChanged) {
         emit usbChargerOnChanged();
     }
+}
+
+void DE1Device::setWaterRefillLevel(int refillPointMm) {
+    // Write to WaterLevels characteristic (A011)
+    // Format: Level (U16P8, 2 bytes) + StartFillLevel (U16P8, 2 bytes)
+    // Level is set to 0 (read-only field, machine ignores it)
+    // StartFillLevel is the refill threshold in mm
+    QByteArray data;
+    data.append(BinaryCodec::encodeShortBE(BinaryCodec::encodeU16P8(0)));
+    data.append(BinaryCodec::encodeShortBE(BinaryCodec::encodeU16P8(static_cast<double>(refillPointMm))));
+
+    qDebug() << "DE1Device: Setting water refill level to" << refillPointMm << "mm";
+    queueCommand([this, data]() {
+        writeCharacteristic(DE1::Characteristic::WATER_LEVELS, data);
+    });
 }
 
 void DE1Device::sendInitialSettings() {

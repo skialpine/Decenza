@@ -1960,6 +1960,17 @@ void Settings::setWaterLevelDisplayUnit(const QString& unit) {
     }
 }
 
+int Settings::waterRefillPoint() const {
+    return m_settings.value("water/refillPoint", 5).toInt();
+}
+
+void Settings::setWaterRefillPoint(int mm) {
+    if (waterRefillPoint() != mm) {
+        m_settings.setValue("water/refillPoint", mm);
+        emit waterRefillPointChanged();
+    }
+}
+
 bool Settings::developerTranslationUpload() const {
     // Runtime-only flag - not persisted, resets to false on app restart
     return m_developerTranslationUpload;
@@ -2057,29 +2068,6 @@ void Settings::clearAllBrewOverrides() {
 
     if (changed) {
         emit brewOverridesChanged();
-    }
-}
-
-// Shot plan display settings
-bool Settings::showShotPlan() const {
-    return m_settings.value("brew/showShotPlan", true).toBool();
-}
-
-void Settings::setShowShotPlan(bool show) {
-    if (showShotPlan() != show) {
-        m_settings.setValue("brew/showShotPlan", show);
-        emit showShotPlanChanged();
-    }
-}
-
-bool Settings::showShotPlanOnAllScreens() const {
-    return m_settings.value("brew/showShotPlanOnAllScreens", false).toBool();
-}
-
-void Settings::setShowShotPlanOnAllScreens(bool show) {
-    if (showShotPlanOnAllScreens() != show) {
-        m_settings.setValue("brew/showShotPlanOnAllScreens", show);
-        emit showShotPlanOnAllScreensChanged();
     }
 }
 

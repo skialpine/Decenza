@@ -88,6 +88,12 @@ MainController::MainController(Settings* settings, DE1Device* device,
         });
     }
 
+    // Send water refill level to machine when setting changes
+    if (m_settings && m_device) {
+        connect(m_settings, &Settings::waterRefillPointChanged,
+                this, &MainController::applyWaterRefillLevel);
+    }
+
     // Connect to machine state events
     if (m_machineState) {
         connect(m_machineState, &MachineState::espressoCycleStarted,
@@ -1906,6 +1912,15 @@ void MainController::applyAllSettings() {
 
     // 4. Apply flush settings
     applyFlushSettings();
+
+    // 5. Apply water refill level
+    applyWaterRefillLevel();
+}
+
+void MainController::applyWaterRefillLevel() {
+    if (!m_device || !m_device->isConnected() || !m_settings) return;
+
+    m_device->setWaterRefillLevel(m_settings->waterRefillPoint());
 }
 
 double MainController::getGroupTemperature() const {

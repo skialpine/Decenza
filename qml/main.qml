@@ -253,6 +253,9 @@ ApplicationWindow {
     // Flag to prevent premature UI display
     property bool appInitialized: false
 
+    // Suppress screensaver on startup — machine may already be in Sleep when we connect
+    property bool startupGracePeriod: true
+
 
     // Suppress scale dialogs briefly after waking from sleep
     property bool justWokeFromSleep: false
@@ -424,6 +427,16 @@ ApplicationWindow {
 
         // Mark app as initialized
         root.appInitialized = true
+
+        // Clear startup grace period after 20s — until then, ignore Sleep phase
+        // to avoid briefly flashing the screensaver when connecting to an already-sleeping machine
+        startupGraceTimer.start()
+    }
+
+    Timer {
+        id: startupGraceTimer
+        interval: 5000
+        onTriggered: root.startupGracePeriod = false
     }
 
     function updateScale() {
@@ -1642,7 +1655,9 @@ ApplicationWindow {
             } else if (phase === MachineStateType.Phase.Sleep) {
                 // Machine was put to sleep (e.g. via GHC stop button hold) - show screensaver
                 // Like de1app: navigates to saver page and disables scale LCD on sleep state
-                if (!screensaverActive) {
+                // Skip during startup grace period to avoid flashing screensaver when
+                // connecting to a machine that's already asleep
+                if (!screensaverActive && !root.startupGracePeriod) {
                     console.log("Machine entered Sleep - showing screensaver")
                     if (ScaleDevice && ScaleDevice.connected) {
                         ScaleDevice.disableLcd()

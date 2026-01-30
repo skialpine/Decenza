@@ -136,6 +136,9 @@ class Settings : public QObject {
     // Water level display setting
     Q_PROPERTY(QString waterLevelDisplayUnit READ waterLevelDisplayUnit WRITE setWaterLevelDisplayUnit NOTIFY waterLevelDisplayUnitChanged)
 
+    // Water refill level (mm threshold for refill warning, sent to machine)
+    Q_PROPERTY(int waterRefillPoint READ waterRefillPoint WRITE setWaterRefillPoint NOTIFY waterRefillPointChanged)
+
     // Developer settings
     Q_PROPERTY(bool developerTranslationUpload READ developerTranslationUpload WRITE setDeveloperTranslationUpload NOTIFY developerTranslationUploadChanged)
 
@@ -146,10 +149,6 @@ class Settings : public QObject {
     // Brew parameter overrides (session-only, for next shot)
     Q_PROPERTY(double brewYieldOverride READ brewYieldOverride WRITE setBrewYieldOverride NOTIFY brewOverridesChanged)
     Q_PROPERTY(bool hasBrewYieldOverride READ hasBrewYieldOverride NOTIFY brewOverridesChanged)
-
-    // Shot plan display settings
-    Q_PROPERTY(bool showShotPlan READ showShotPlan WRITE setShowShotPlan NOTIFY showShotPlanChanged)
-    Q_PROPERTY(bool showShotPlanOnAllScreens READ showShotPlanOnAllScreens WRITE setShowShotPlanOnAllScreens NOTIFY showShotPlanOnAllScreensChanged)
 
     // Auto-wake schedule
     Q_PROPERTY(bool autoWakeEnabled READ autoWakeEnabled WRITE setAutoWakeEnabled NOTIFY autoWakeEnabledChanged)
@@ -479,6 +478,10 @@ public:
     QString waterLevelDisplayUnit() const;
     void setWaterLevelDisplayUnit(const QString& unit);
 
+    // Water refill level
+    int waterRefillPoint() const;
+    void setWaterRefillPoint(int mm);
+
     // Developer settings
     bool developerTranslationUpload() const;
     void setDeveloperTranslationUpload(bool enabled);
@@ -494,12 +497,6 @@ public:
     void setBrewYieldOverride(double yield);
     bool hasBrewYieldOverride() const;
     Q_INVOKABLE void clearAllBrewOverrides();
-
-    // Shot plan display
-    bool showShotPlan() const;
-    void setShowShotPlan(bool show);
-    bool showShotPlanOnAllScreens() const;
-    void setShowShotPlanOnAllScreens(bool show);
 
     // Auto-wake schedule
     bool autoWakeEnabled() const;
@@ -634,11 +631,10 @@ signals:
     void autoCheckUpdatesChanged();
     void betaUpdatesEnabledChanged();
     void waterLevelDisplayUnitChanged();
+    void waterRefillPointChanged();
     void developerTranslationUploadChanged();
     void temperatureOverrideChanged();
     void brewOverridesChanged();
-    void showShotPlanChanged();
-    void showShotPlanOnAllScreensChanged();
     void autoWakeEnabledChanged();
     void autoWakeScheduleChanged();
     void autoWakeStayAwakeEnabledChanged();

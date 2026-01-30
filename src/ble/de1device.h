@@ -134,6 +134,9 @@ public slots:
     // USB charger control (force=true to resend even if state unchanged, needed for DE1's 10-min timeout)
     void setUsbChargerOn(bool on, bool force = false);
 
+    // Water refill level (write StartFillLevel to machine via WaterLevels characteristic)
+    void setWaterRefillLevel(int refillPointMm);
+
 signals:
     void connectedChanged();
     void connectingChanged();

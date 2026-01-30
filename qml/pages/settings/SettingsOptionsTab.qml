@@ -13,7 +13,7 @@ KeyboardAwareContainer {
         height: parent.height
         spacing: Theme.scaled(15)
 
-        // Left column: Offline Mode, Water Level Display, Steam Heater
+        // Left column: Offline Mode, Shot Map
         ColumnLayout {
             Layout.preferredWidth: Theme.scaled(350)
             Layout.fillHeight: true
@@ -71,187 +71,6 @@ KeyboardAwareContainer {
                                 if (ScaleDevice) {
                                     ScaleDevice.simulationMode = checked
                                 }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Shot Plan Display
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: shotPlanContent.implicitHeight + Theme.scaled(30)
-                color: Theme.surfaceColor
-                radius: Theme.cardRadius
-
-                ColumnLayout {
-                    id: shotPlanContent
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.margins: Theme.scaled(15)
-                    spacing: Theme.scaled(8)
-
-                    Text {
-                        text: qsTr("Shot Plan")
-                        color: Theme.textColor
-                        font.pixelSize: Theme.scaled(16)
-                        font.bold: true
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: qsTr("Show brew parameters before the shot")
-                        color: Theme.textSecondaryColor
-                        font.pixelSize: Theme.scaled(12)
-                        wrapMode: Text.WordWrap
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-
-                        Text {
-                            text: qsTr("Show shot plan")
-                            color: Theme.textColor
-                            font.pixelSize: Theme.scaled(14)
-                        }
-
-                        Item { Layout.fillWidth: true }
-
-                        StyledSwitch {
-                            checked: Settings.showShotPlan
-                            accessibleName: qsTr("Show shot plan")
-                            onToggled: Settings.showShotPlan = checked
-                        }
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        visible: Settings.showShotPlan
-
-                        Text {
-                            text: qsTr("Show on all screens")
-                            color: Theme.textColor
-                            font.pixelSize: Theme.scaled(14)
-                        }
-
-                        Item { Layout.fillWidth: true }
-
-                        StyledSwitch {
-                            checked: Settings.showShotPlanOnAllScreens
-                            accessibleName: qsTr("Show shot plan on all screens")
-                            onToggled: Settings.showShotPlanOnAllScreens = checked
-                        }
-                    }
-                }
-            }
-
-            Item { Layout.fillHeight: true }
-        }
-
-        // Middle column: Water Level, Headless Machine (conditional) + placeholder
-        ColumnLayout {
-            Layout.preferredWidth: Theme.scaled(350)
-            Layout.fillHeight: true
-            spacing: Theme.scaled(15)
-
-            // Water Level Display
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: waterLevelContent.implicitHeight + Theme.scaled(30)
-                color: Theme.surfaceColor
-                radius: Theme.cardRadius
-
-                ColumnLayout {
-                    id: waterLevelContent
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.margins: Theme.scaled(15)
-                    spacing: Theme.scaled(8)
-
-                    Tr {
-                        key: "settings.options.waterLevelDisplay"
-                        fallback: "Water Level Display"
-                        color: Theme.textColor
-                        font.pixelSize: Theme.scaled(16)
-                        font.bold: true
-                    }
-
-                    Tr {
-                        Layout.fillWidth: true
-                        key: "settings.options.waterLevelDisplayDesc"
-                        fallback: "Choose how to display the water tank level"
-                        color: Theme.textSecondaryColor
-                        font.pixelSize: Theme.scaled(12)
-                        wrapMode: Text.WordWrap
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-
-                        Tr {
-                            key: "settings.options.showInMl"
-                            fallback: "Show in milliliters (ml)"
-                            color: Theme.textColor
-                            font.pixelSize: Theme.scaled(14)
-                        }
-
-                        Item { Layout.fillWidth: true }
-
-                        StyledSwitch {
-                            checked: Settings.waterLevelDisplayUnit === "ml"
-                            accessibleName: TranslationManager.translate("settings.options.showInMl", "Show in milliliters")
-                            onToggled: {
-                                Settings.waterLevelDisplayUnit = checked ? "ml" : "percent"
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Headless Machine Settings (only visible on headless machines)
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: headlessContent.implicitHeight + Theme.scaled(30)
-                color: Theme.surfaceColor
-                radius: Theme.cardRadius
-                visible: DE1Device.isHeadless
-
-                ColumnLayout {
-                    id: headlessContent
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.margins: Theme.scaled(15)
-                    spacing: Theme.scaled(10)
-
-                    Tr {
-                        key: "settings.options.headlessMachine"
-                        fallback: "Headless Machine"
-                        color: Theme.textColor
-                        font.pixelSize: Theme.scaled(16)
-                        font.bold: true
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-
-                        Tr {
-                            key: "settings.options.singlePressStopPurge"
-                            fallback: "Single press to stop & purge"
-                            color: Theme.textColor
-                            font.pixelSize: Theme.scaled(14)
-                        }
-
-                        Item { Layout.fillWidth: true }
-
-                        StyledSwitch {
-                            id: headlessStopSwitch
-                            checked: Settings.headlessSkipPurgeConfirm
-                            accessibleName: TranslationManager.translate("settings.options.singlePressStopPurge", "Single press to stop and purge")
-                            onClicked: {
-                                Settings.headlessSkipPurgeConfirm = checked
                             }
                         }
                     }
@@ -455,6 +274,170 @@ KeyboardAwareContainer {
                         color: Theme.textSecondaryColor
                         font.pixelSize: Theme.scaled(12)
                         horizontalAlignment: Text.AlignHCenter
+                    }
+                }
+            }
+
+            Item { Layout.fillHeight: true }
+        }
+
+        // Middle column: Water Level, Water Refill, Headless Machine (conditional)
+        ColumnLayout {
+            Layout.preferredWidth: Theme.scaled(350)
+            Layout.fillHeight: true
+            spacing: Theme.scaled(15)
+
+            // Water Level Display
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: waterLevelContent.implicitHeight + Theme.scaled(30)
+                color: Theme.surfaceColor
+                radius: Theme.cardRadius
+
+                ColumnLayout {
+                    id: waterLevelContent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: Theme.scaled(15)
+                    spacing: Theme.scaled(8)
+
+                    Tr {
+                        key: "settings.options.waterLevelDisplay"
+                        fallback: "Water Level Display"
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(16)
+                        font.bold: true
+                    }
+
+                    Tr {
+                        Layout.fillWidth: true
+                        key: "settings.options.waterLevelDisplayDesc"
+                        fallback: "Choose how to display the water tank level"
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: Theme.scaled(12)
+                        wrapMode: Text.WordWrap
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        Tr {
+                            key: "settings.options.showInMl"
+                            fallback: "Show in milliliters (ml)"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(14)
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        StyledSwitch {
+                            checked: Settings.waterLevelDisplayUnit === "ml"
+                            accessibleName: TranslationManager.translate("settings.options.showInMl", "Show in milliliters")
+                            onToggled: {
+                                Settings.waterLevelDisplayUnit = checked ? "ml" : "percent"
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Water Refill Level
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: refillContent.implicitHeight + Theme.scaled(30)
+                color: Theme.surfaceColor
+                radius: Theme.cardRadius
+
+                ColumnLayout {
+                    id: refillContent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: Theme.scaled(15)
+                    spacing: Theme.scaled(8)
+
+                    Text {
+                        text: qsTr("Water Refill Level")
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(16)
+                        font.bold: true
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: qsTr("Water level at which the machine warns you to refill")
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: Theme.scaled(12)
+                        wrapMode: Text.WordWrap
+                    }
+
+                    ValueInput {
+                        Layout.fillWidth: true
+                        from: 3
+                        to: 70
+                        stepSize: 1
+                        decimals: 0
+                        value: Settings.waterRefillPoint
+                        suffix: " mm"
+                        accessibleName: qsTr("Water refill level")
+                        onValueModified: function(newValue) {
+                            Settings.waterRefillPoint = newValue
+                        }
+                    }
+
+                    Text {
+                        text: qsTr("Current level: %1 mm").arg(DE1Device.waterLevelMm.toFixed(1))
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: Theme.scaled(11)
+                    }
+                }
+            }
+
+            // Headless Machine Settings (only visible on headless machines)
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: headlessContent.implicitHeight + Theme.scaled(30)
+                color: Theme.surfaceColor
+                radius: Theme.cardRadius
+                visible: DE1Device.isHeadless
+
+                ColumnLayout {
+                    id: headlessContent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: Theme.scaled(15)
+                    spacing: Theme.scaled(10)
+
+                    Tr {
+                        key: "settings.options.headlessMachine"
+                        fallback: "Headless Machine"
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(16)
+                        font.bold: true
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        Tr {
+                            key: "settings.options.singlePressStopPurge"
+                            fallback: "Single press to stop & purge"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(14)
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        StyledSwitch {
+                            id: headlessStopSwitch
+                            checked: Settings.headlessSkipPurgeConfirm
+                            accessibleName: TranslationManager.translate("settings.options.singlePressStopPurge", "Single press to stop and purge")
+                            onClicked: {
+                                Settings.headlessSkipPurgeConfirm = checked
+                            }
+                        }
                     }
                 }
             }

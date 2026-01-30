@@ -493,7 +493,7 @@ Page {
                                 Layout.fillWidth: true
                                 height: Theme.scaled(40)
                                 from: 0
-                                to: 30
+                                to: 40
                                 stepSize: 0.1
                                 decimals: 1
                                 suffix: "g"

@@ -30,18 +30,9 @@ Rectangle {
             visible: MachineState.isFlowing
         }
 
-        // Shot plan summary (fills remaining space, clickable to open BrewDialog)
-        ShotPlanText {
-            id: statusBarShotPlan
-            Layout.fillWidth: true
-            visible: Settings.showShotPlan && Settings.showShotPlanOnAllScreens && text !== ""
-            onClicked: brewRatioDialog.open()
-        }
-
-        // Spacer (when shot plan is not shown in status bar)
+        // Spacer
         Item {
             Layout.fillWidth: true
-            visible: !statusBarShotPlan.visible
         }
 
         // Temperature (tap to tare scale)

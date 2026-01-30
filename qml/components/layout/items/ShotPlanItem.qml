@@ -22,7 +22,7 @@ Item {
         ShotPlanText {
             id: compactShotPlan
             anchors.centerIn: parent
-            visible: text !== "" && Settings.showShotPlan
+            visible: text !== ""
             onClicked: brewDialog.open()
         }
     }
@@ -38,7 +38,7 @@ Item {
         ShotPlanText {
             id: fullShotPlan
             anchors.centerIn: parent
-            visible: text !== "" && Settings.showShotPlan
+            visible: text !== ""
             onClicked: brewDialog.open()
         }
     }

@@ -482,7 +482,7 @@ Page {
                                 ValueInput {
                                     Layout.fillWidth: true
                                     value: recipe.dose || 18
-                                    from: 10; to: 30; stepSize: 0.5
+                                    from: 3; to: 40; stepSize: 0.5
                                     suffix: "g"
                                     valueColor: Theme.weightColor
                                     accentColor: Theme.weightColor
