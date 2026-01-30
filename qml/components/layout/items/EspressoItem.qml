@@ -116,6 +116,7 @@ Item {
         }
 
         y: {
+            var _v = visible // Force re-evaluation when popup opens (mapToItem is not reactive)
             var win = root.Window.window
             if (win) {
                 var globalY = root.mapToItem(null, 0, 0).y
@@ -128,6 +129,7 @@ Item {
         }
 
         x: {
+            var _v = visible // Force re-evaluation when popup opens (mapToItem is not reactive)
             var win = root.Window.window
             if (win) {
                 var globalX = root.mapToItem(null, 0, 0).x

@@ -298,10 +298,23 @@ Page {
                         font.pixelSize: Theme.scaled(24)
                     }
 
-                    // Bean preset pills with drag-and-drop
+                    // Bean preset pills with drag-and-drop (scrollable)
+                    Flickable {
+                        id: pillsFlickable
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        contentWidth: beanPresetsRow.width
+                        contentHeight: height
+                        clip: true
+                        flickableDirection: Flickable.HorizontalFlick
+                        boundsBehavior: Flickable.StopAtBounds
+                        pressDelay: 150
+                        interactive: beanPresetsRow.draggedIndex < 0
+
                     Row {
                         id: beanPresetsRow
                         spacing: Theme.scaled(8)
+                        y: Math.round((pillsFlickable.height - height) / 2)
 
                         property int draggedIndex: -1
                         // Store reference to Settings for use in deeply nested delegates
@@ -465,8 +478,7 @@ Page {
                             }
                         }
                     }
-
-                    Item { Layout.fillWidth: true }
+                    }
 
                     Tr {
                         key: "beaninfo.hint.reorder"
