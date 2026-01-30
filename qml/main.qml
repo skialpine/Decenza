@@ -435,7 +435,7 @@ ApplicationWindow {
 
     Timer {
         id: startupGraceTimer
-        interval: 5000
+        interval: 10000
         onTriggered: root.startupGracePeriod = false
     }
 

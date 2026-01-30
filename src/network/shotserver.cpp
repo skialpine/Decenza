@@ -837,7 +837,11 @@ void ShotServer::sendJson(QTcpSocket* socket, const QByteArray& json)
 
 void ShotServer::sendHtml(QTcpSocket* socket, const QString& html)
 {
-    sendResponse(socket, 200, "text/html; charset=utf-8", html.toUtf8());
+    // Inject vital stats (temperature, water level, connection) into the header of every page
+    QString finalHtml = html;
+    static const QString vitalScript = generateVitalStatsScript();
+    finalHtml.replace(QLatin1String("</body>"), vitalScript + QStringLiteral("</body>"));
+    sendResponse(socket, 200, "text/html; charset=utf-8", finalHtml.toUtf8());
 }
 
 void ShotServer::sendFile(QTcpSocket* socket, const QString& path, const QString& contentType)

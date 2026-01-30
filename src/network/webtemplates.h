@@ -8,3 +8,4 @@
 #include "webtemplates/menu_html.h"
 #include "webtemplates/menu_js.h"
 #include "webtemplates/remote_page.h"
+#include "webtemplates/vital_stats.h"
