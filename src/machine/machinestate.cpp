@@ -407,6 +407,9 @@ void MachineState::checkStopAtWeightHotWater(double weight) {
     if (m_stopAtWeightTriggered) return;
     if (!m_tareCompleted) return;
 
+    // Volume mode: machine handles auto-stop via flowmeter, don't interfere
+    if (m_settings && m_settings->waterVolumeMode() == "volume") return;
+
     double target = m_settings ? m_settings->waterVolume() : 0;  // ml ≈ g for water
     if (target <= 0) return;
 

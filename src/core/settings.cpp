@@ -641,6 +641,17 @@ void Settings::setWaterVolume(int volume) {
     }
 }
 
+QString Settings::waterVolumeMode() const {
+    return m_settings.value("water/volumeMode", "weight").toString();
+}
+
+void Settings::setWaterVolumeMode(const QString& mode) {
+    if (waterVolumeMode() != mode) {
+        m_settings.setValue("water/volumeMode", mode);
+        emit waterVolumeModeChanged();
+    }
+}
+
 // Hot water vessel presets
 QVariantList Settings::waterVesselPresets() const {
     QByteArray data = m_settings.value("water/vesselPresets").toByteArray();
@@ -665,7 +676,7 @@ void Settings::setSelectedWaterCup(int index) {
     }
 }
 
-void Settings::addWaterVesselPreset(const QString& name, int volume) {
+void Settings::addWaterVesselPreset(const QString& name, int volume, const QString& mode) {
     QByteArray data = m_settings.value("water/vesselPresets").toByteArray();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     QJsonArray arr = doc.array();
@@ -673,13 +684,14 @@ void Settings::addWaterVesselPreset(const QString& name, int volume) {
     QJsonObject preset;
     preset["name"] = name;
     preset["volume"] = volume;
+    preset["mode"] = mode;
     arr.append(preset);
 
     m_settings.setValue("water/vesselPresets", QJsonDocument(arr).toJson());
     emit waterVesselPresetsChanged();
 }
 
-void Settings::updateWaterVesselPreset(int index, const QString& name, int volume) {
+void Settings::updateWaterVesselPreset(int index, const QString& name, int volume, const QString& mode) {
     QByteArray data = m_settings.value("water/vesselPresets").toByteArray();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     QJsonArray arr = doc.array();
@@ -688,6 +700,7 @@ void Settings::updateWaterVesselPreset(int index, const QString& name, int volum
         QJsonObject preset;
         preset["name"] = name;
         preset["volume"] = volume;
+        preset["mode"] = mode;
         arr[index] = preset;
 
         m_settings.setValue("water/vesselPresets", QJsonDocument(arr).toJson());

@@ -10,12 +10,15 @@ Page {
 
     Component.onCompleted: {
         root.currentPageTitle = pageTitleText.text
-        // Sync Settings.waterVolume with selected preset
+        // Sync Settings with selected preset
         Settings.waterVolume = getCurrentVesselVolume()
+        Settings.waterVolumeMode = getCurrentVesselMode()
         MainController.applyHotWaterSettings()
         // Tare immediately so display shows 0g instead of current scale weight
         // (scale will tare again when hot water flow actually starts)
-        MachineState.tareScale()
+        if (!isVolumeMode) {
+            MachineState.tareScale()
+        }
     }
     StackView.onActivated: root.currentPageTitle = pageTitleText.text
 
@@ -24,6 +27,8 @@ Page {
 
     property bool isDispensing: MachineState.phase === MachineStateType.Phase.HotWater || root.debugLiveView
     property int editingVesselIndex: -1
+
+    property bool isVolumeMode: Settings.waterVolumeMode === "volume"
 
     // Get current vessel's volume
     function getCurrentVesselVolume() {
@@ -36,11 +41,16 @@ Page {
         return preset ? preset.name : ""
     }
 
+    function getCurrentVesselMode() {
+        var preset = Settings.getWaterVesselPreset(Settings.selectedWaterVessel)
+        return (preset && preset.mode) ? preset.mode : "weight"
+    }
+
     // Save current vessel with new volume
     function saveCurrentVessel(volume) {
         var name = getCurrentVesselName()
         if (name) {
-            Settings.updateWaterVesselPreset(Settings.selectedWaterVessel, name, volume)
+            Settings.updateWaterVesselPreset(Settings.selectedWaterVessel, name, volume, Settings.waterVolumeMode)
         }
     }
 
@@ -87,6 +97,7 @@ Page {
                             onClicked: {
                                 Settings.selectedWaterVessel = index
                                 Settings.waterVolume = modelData.volume
+                                Settings.waterVolumeMode = (modelData.mode || "weight")
                                 MainController.applyHotWaterSettings()
                             }
                         }
@@ -96,7 +107,7 @@ Page {
 
             Item { Layout.fillHeight: true }
 
-            // Weight progress with progress bar
+            // Progress display — adapts to weight vs volume mode
             Item {
                 Layout.fillWidth: true
                 Layout.preferredHeight: childrenRect.height
@@ -105,16 +116,38 @@ Page {
                     anchors.horizontalCenter: parent.horizontalCenter
                     spacing: Theme.scaled(8)
 
+                    // Weight mode: show live weight progress
                     Text {
                         id: hotWaterProgressText
+                        visible: !isVolumeMode
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: Math.max(0, ScaleDevice ? ScaleDevice.weight : 0).toFixed(0) + "g / " + Settings.waterVolume + "g"
                         color: Theme.textColor
                         font: Theme.timerFont
                     }
 
-                    // Progress bar
+                    // Volume mode: show target
+                    Text {
+                        id: hotWaterVolumeText
+                        visible: isVolumeMode
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: Settings.waterVolume + " ml"
+                        color: Theme.textColor
+                        font: Theme.timerFont
+                    }
+
+                    Tr {
+                        visible: isVolumeMode
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        key: "hotwater.dispensing.flowmeter"
+                        fallback: "Dispensing (flowmeter)"
+                        color: Theme.textSecondaryColor
+                        font: Theme.labelFont
+                    }
+
+                    // Progress bar (weight mode only — scale provides live data)
                     Rectangle {
+                        visible: !isVolumeMode
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: hotWaterProgressText.width
                         height: Theme.scaled(8)
@@ -270,6 +303,7 @@ Page {
                                                 Settings.selectedWaterVessel = vesselDelegate.vesselIndex
                                                 volumeInput.value = modelData.volume
                                                 Settings.waterVolume = modelData.volume
+                                                Settings.waterVolumeMode = (modelData.mode || "weight")
                                                 MainController.applyHotWaterSettings()
                                             }
                                             vesselPill.Drag.drop()
@@ -369,16 +403,73 @@ Page {
                     anchors.margins: Theme.scaled(16)
                     spacing: Theme.scaled(8)
 
-                    // Weight (per-vessel, auto-saves)
+                    // Mode toggle + target value (per-vessel, auto-saves)
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: Theme.scaled(16)
 
-                        Tr {
-                            key: "hotwater.label.weight"
-                            fallback: "Weight"
-                            color: Theme.textColor
-                            font.pixelSize: Theme.scaled(24)
+                        // Weight / Volume mode toggle pills
+                        Row {
+                            spacing: Theme.scaled(4)
+
+                            Rectangle {
+                                width: weightModeText.implicitWidth + Theme.scaled(20)
+                                height: Theme.scaled(36)
+                                radius: Theme.scaled(18)
+                                color: !isVolumeMode ? Theme.primaryColor : Theme.backgroundColor
+                                border.color: !isVolumeMode ? Theme.primaryColor : Theme.textSecondaryColor
+                                border.width: 1
+
+                                Text {
+                                    id: weightModeText
+                                    anchors.centerIn: parent
+                                    text: TranslationManager.translate("hotwater.mode.weight", "Weight (g)")
+                                    color: !isVolumeMode ? "white" : Theme.textColor
+                                    font: Theme.bodyFont
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: {
+                                        Settings.waterVolumeMode = "weight"
+                                        saveCurrentVessel(volumeInput.value)
+                                        MainController.applyHotWaterSettings()
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                width: volumeModeText.implicitWidth + Theme.scaled(20)
+                                height: Theme.scaled(36)
+                                radius: Theme.scaled(18)
+                                color: isVolumeMode ? Theme.primaryColor : Theme.backgroundColor
+                                border.color: isVolumeMode ? Theme.primaryColor : Theme.textSecondaryColor
+                                border.width: 1
+
+                                Text {
+                                    id: volumeModeText
+                                    anchors.centerIn: parent
+                                    text: TranslationManager.translate("hotwater.mode.volume", "Volume (ml)")
+                                    color: isVolumeMode ? "white" : Theme.textColor
+                                    font: Theme.bodyFont
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: {
+                                        Settings.waterVolumeMode = "volume"
+                                        // Clamp value to 255ml max for volume mode
+                                        if (volumeInput.value > 255) {
+                                            volumeInput.value = 255
+                                            Settings.waterVolume = 255
+                                            saveCurrentVessel(255)
+                                        } else {
+                                            saveCurrentVessel(volumeInput.value)
+                                        }
+                                        MainController.applyHotWaterSettings()
+                                    }
+                                }
+                            }
                         }
 
                         Item { Layout.fillWidth: true }
@@ -388,11 +479,13 @@ Page {
                             Layout.preferredWidth: Theme.scaled(180)
                             value: getCurrentVesselVolume()
                             from: 50
-                            to: 500
+                            to: isVolumeMode ? 255 : 500
                             stepSize: 10
-                            suffix: " g"
+                            suffix: isVolumeMode ? " ml" : " g"
                             valueColor: Theme.primaryColor
-                            accessibleName: TranslationManager.translate("hotwater.label.weight", "Weight")
+                            accessibleName: isVolumeMode
+                                ? TranslationManager.translate("hotwater.label.volume", "Volume")
+                                : TranslationManager.translate("hotwater.label.weight", "Weight")
 
                             onValueModified: function(newValue) {
                                 volumeInput.value = newValue
@@ -457,7 +550,7 @@ Page {
         }
 
         Text {
-            text: volumeInput.value.toFixed(0) + " g"
+            text: volumeInput.value.toFixed(0) + (isVolumeMode ? " ml" : " g")
             color: "white"
             font: Theme.bodyFont
         }
@@ -568,7 +661,7 @@ Page {
                     accessibleName: qsTr("Save changes to water vessel preset")
                     onClicked: {
                         var preset = Settings.getWaterVesselPreset(editingVesselIndex)
-                        Settings.updateWaterVesselPreset(editingVesselIndex, editVesselNameInput.text, preset.volume)
+                        Settings.updateWaterVesselPreset(editingVesselIndex, editVesselNameInput.text, preset.volume, preset.mode || "weight")
                         editVesselPopup.close()
                     }
                 }

@@ -1890,7 +1890,16 @@ void MainController::applyHotWaterSettings() {
         steamTemp = m_settings->steamTemperature();
     }
 
-    qDebug() << "applyHotWaterSettings: steam temp=" << steamTemp << "°C";
+    // Volume mode: send actual volume to machine so it auto-stops via flowmeter
+    // Weight mode: send 0, app controls stop via scale
+    int hotWaterVolume = 0;
+    if (m_settings->waterVolumeMode() == "volume") {
+        hotWaterVolume = qMin(m_settings->waterVolume(), 255);  // BLE uint8 max
+    }
+
+    qDebug() << "applyHotWaterSettings: steam temp=" << steamTemp << "°C"
+             << "mode=" << m_settings->waterVolumeMode()
+             << "volume=" << hotWaterVolume;
 
     double groupTemp = getGroupTemperature();
 
@@ -1899,7 +1908,7 @@ void MainController::applyHotWaterSettings() {
         steamTemp,
         m_settings->steamTimeout(),
         m_settings->waterTemperature(),
-        m_settings->waterVolume(),
+        hotWaterVolume,
         groupTemp
     );
 

@@ -52,6 +52,7 @@ class Settings : public QObject {
     // Hot water settings
     Q_PROPERTY(double waterTemperature READ waterTemperature WRITE setWaterTemperature NOTIFY waterTemperatureChanged)
     Q_PROPERTY(int waterVolume READ waterVolume WRITE setWaterVolume NOTIFY waterVolumeChanged)
+    Q_PROPERTY(QString waterVolumeMode READ waterVolumeMode WRITE setWaterVolumeMode NOTIFY waterVolumeModeChanged)
 
     // Hot water vessel presets
     Q_PROPERTY(QVariantList waterVesselPresets READ waterVesselPresets NOTIFY waterVesselPresetsChanged)
@@ -272,13 +273,16 @@ public:
     int waterVolume() const;
     void setWaterVolume(int volume);
 
+    QString waterVolumeMode() const;  // "weight" or "volume"
+    void setWaterVolumeMode(const QString& mode);
+
     // Hot water vessel presets
     QVariantList waterVesselPresets() const;
     int selectedWaterVessel() const;
     void setSelectedWaterCup(int index);
 
-    Q_INVOKABLE void addWaterVesselPreset(const QString& name, int volume);
-    Q_INVOKABLE void updateWaterVesselPreset(int index, const QString& name, int volume);
+    Q_INVOKABLE void addWaterVesselPreset(const QString& name, int volume, const QString& mode = "weight");
+    Q_INVOKABLE void updateWaterVesselPreset(int index, const QString& name, int volume, const QString& mode = "weight");
     Q_INVOKABLE void removeWaterVesselPreset(int index);
     Q_INVOKABLE void moveWaterVesselPreset(int from, int to);
     Q_INVOKABLE QVariantMap getWaterVesselPreset(int index) const;
@@ -580,6 +584,7 @@ signals:
     void selectedBuiltInProfilesChanged();
     void waterTemperatureChanged();
     void waterVolumeChanged();
+    void waterVolumeModeChanged();
     void waterVesselPresetsChanged();
     void selectedWaterVesselChanged();
     void flushPresetsChanged();
