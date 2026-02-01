@@ -30,6 +30,36 @@ Page {
         }
     }
 
+    // Build accessible text based on current groupBy setting
+    function buildGroupByText(beanBrand, beanType, profileName, grinderModel, grinderSetting, doseWeight, finalWeight, shotCount, avgEnjoyment) {
+        var groupBy = Settings.autoFavoritesGroupBy
+        var parts = []
+
+        // Add fields based on groupBy
+        var includeBean = (groupBy === "bean" || groupBy === "bean_profile" || groupBy === "bean_profile_grinder")
+        var includeProfile = (groupBy === "profile" || groupBy === "bean_profile" || groupBy === "bean_profile_grinder")
+        var includeGrinder = (groupBy === "bean_profile_grinder")
+
+        if (includeBean) {
+            var bean = (beanBrand || "") + (beanType ? " - " + beanType : "")
+            if (bean) parts.push(bean)
+        }
+        if (includeProfile && profileName)
+            parts.push(profileName)
+        if (includeGrinder) {
+            var grinder = (grinderModel || "") + (grinderSetting ? " @ " + grinderSetting : "")
+            if (grinder) parts.push(grinder)
+        }
+
+        // Always include recipe summary
+        parts.push((doseWeight || 0).toFixed(1) + "g to " + (finalWeight || 0).toFixed(1) + "g")
+        parts.push(shotCount + " " + TranslationManager.translate("autofavorites.shots", "shots"))
+        if (avgEnjoyment > 0)
+            parts.push(avgEnjoyment + "% enjoyment")
+
+        return parts.join(". ")
+    }
+
     // Refresh when a new shot is saved
     Connections {
         target: MainController.shotHistory
@@ -68,21 +98,26 @@ Page {
 
             // Settings button (gear icon)
             Rectangle {
+                id: settingsButton
                 width: Theme.scaled(36)
                 height: Theme.scaled(36)
                 radius: Theme.scaled(18)
                 color: Theme.surfaceColor
+                Accessible.ignored: true
 
                 Image {
                     anchors.centerIn: parent
                     source: "qrc:/icons/settings.svg"
                     sourceSize.width: Theme.scaled(20)
                     sourceSize.height: Theme.scaled(20)
+                    Accessible.ignored: true
                 }
 
-                MouseArea {
+                AccessibleMouseArea {
                     anchors.fill: parent
-                    onClicked: settingsPopup.open()
+                    accessibleName: TranslationManager.translate("autofavorites.settings", "Auto-Favorites Settings")
+                    accessibleItem: settingsButton
+                    onAccessibleClicked: settingsPopup.open()
                 }
             }
         }
@@ -102,6 +137,22 @@ Page {
                 height: Theme.scaled(100)
                 radius: Theme.cardRadius
                 color: Theme.surfaceColor
+                Accessible.ignored: true
+
+                property string _beanText: (model.beanBrand || "") +
+                    (model.beanType ? " - " + model.beanType : "")
+                property string _groupByText: autoFavoritesPage.buildGroupByText(
+                    model.beanBrand, model.beanType, model.profileName,
+                    model.grinderModel, model.grinderSetting,
+                    model.doseWeight, model.finalWeight, model.shotCount, model.avgEnjoyment)
+
+                // Whole card announces full details based on groupBy setting
+                AccessibleMouseArea {
+                    anchors.fill: parent
+                    accessibleName: favoriteDelegate._groupByText
+                    accessibleItem: favoriteDelegate
+                    onAccessibleClicked: {} // Informational only
+                }
 
                 RowLayout {
                     anchors.fill: parent
@@ -115,14 +166,14 @@ Page {
 
                         // Bean info (primary line)
                         Text {
-                            text: (model.beanBrand || "") +
-                                  (model.beanType ? " - " + model.beanType : "")
+                            text: favoriteDelegate._beanText
                             font.family: Theme.subtitleFont.family
                             font.pixelSize: Theme.subtitleFont.pixelSize
                             color: Theme.textColor
                             Layout.fillWidth: true
                             elide: Text.ElideRight
                             visible: model.beanBrand || model.beanType
+                            Accessible.ignored: true
                         }
 
                         // Profile name with info button
@@ -137,6 +188,7 @@ Page {
                                 color: Theme.primaryColor
                                 Layout.fillWidth: true
                                 elide: Text.ElideRight
+                                Accessible.ignored: true
                             }
 
                             ProfileInfoButton {
@@ -165,6 +217,7 @@ Page {
                             elide: Text.ElideRight
                             visible: Settings.autoFavoritesGroupBy.indexOf("grinder") >= 0 &&
                                      (model.grinderModel || model.grinderSetting)
+                            Accessible.ignored: true
                         }
 
                         // Recipe summary
@@ -177,6 +230,7 @@ Page {
                                 font.family: Theme.captionFont.family
                                 font.pixelSize: Theme.captionFont.pixelSize
                                 color: Theme.textSecondaryColor
+                                Accessible.ignored: true
                             }
 
                             Text {
@@ -185,6 +239,7 @@ Page {
                                 font.family: Theme.captionFont.family
                                 font.pixelSize: Theme.captionFont.pixelSize
                                 color: Theme.textSecondaryColor
+                                Accessible.ignored: true
                             }
 
                             Text {
@@ -193,16 +248,19 @@ Page {
                                 font.pixelSize: Theme.captionFont.pixelSize
                                 color: Theme.warningColor
                                 visible: model.avgEnjoyment > 0
+                                Accessible.ignored: true
                             }
                         }
                     }
 
-                    // Load button
+                    // Load button - first tap announces, second tap loads
                     Rectangle {
+                        id: loadButton
                         width: Theme.scaled(70)
                         height: Theme.scaled(50)
                         radius: Theme.scaled(25)
                         color: Theme.primaryColor
+                        Accessible.ignored: true
 
                         Text {
                             anchors.centerIn: parent
@@ -210,14 +268,16 @@ Page {
                             font.pixelSize: Theme.scaled(14)
                             font.bold: true
                             color: "white"
+                            Accessible.ignored: true
                         }
 
-                        MouseArea {
+                        AccessibleMouseArea {
                             anchors.fill: parent
-                            onClicked: {
+                            accessibleName: TranslationManager.translate("autofavorites.load", "Load") +
+                                ". " + favoriteDelegate._groupByText
+                            accessibleItem: loadButton
+                            onAccessibleClicked: {
                                 MainController.loadShotWithMetadata(model.shotId)
-                                // Don't reset selectedFavoriteProfile - loadShotWithMetadata
-                                // will set it correctly if the profile is a favorite
                                 pageStack.pop()
                             }
                         }
@@ -250,6 +310,12 @@ Page {
         modal: true
         padding: Theme.scaled(20)
 
+        onOpened: {
+            if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
+                AccessibilityManager.announce(TranslationManager.translate("autofavorites.settings", "Auto-Favorites Settings"))
+            }
+        }
+
         background: Rectangle {
             color: Theme.surfaceColor
             radius: Theme.cardRadius
@@ -265,6 +331,7 @@ Page {
                 font.family: Theme.subtitleFont.family
                 font.pixelSize: Theme.subtitleFont.pixelSize
                 color: Theme.textColor
+                Accessible.ignored: true
             }
 
             // Group by setting
@@ -277,10 +344,14 @@ Page {
                     font.family: Theme.labelFont.family
                     font.pixelSize: Theme.labelFont.pixelSize
                     color: Theme.textSecondaryColor
+                    Accessible.ignored: true
                 }
 
                 StyledComboBox {
+                    id: groupByCombo
                     Layout.fillWidth: true
+                    Accessible.name: TranslationManager.translate("autofavorites.groupby", "Group by") +
+                        ": " + displayText
                     model: [
                         TranslationManager.translate("autofavorites.groupby.bean", "Bean only"),
                         TranslationManager.translate("autofavorites.groupby.profile", "Profile only"),
@@ -299,6 +370,11 @@ Page {
                         var values = ["bean", "profile", "bean_profile", "bean_profile_grinder"]
                         Settings.autoFavoritesGroupBy = values[currentIndex]
                         loadFavorites()
+                        if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
+                            AccessibilityManager.announce(
+                                TranslationManager.translate("autofavorites.groupby", "Group by") +
+                                " " + displayText)
+                        }
                     }
                 }
             }
@@ -313,7 +389,7 @@ Page {
                     font.family: Theme.labelFont.family
                     font.pixelSize: Theme.labelFont.pixelSize
                     color: Theme.textSecondaryColor
-                    Layout.fillWidth: true
+                    Accessible.ignored: true
                 }
 
                 ValueInput {
@@ -321,7 +397,8 @@ Page {
                     from: 5
                     to: 50
                     stepSize: 5
-                    accessibleName: "Maximum favorites to show"
+                    accessibleName: TranslationManager.translate("autofavorites.maxitems", "Max items") +
+                        ", " + value
                     onValueModified: function(newValue) {
                         Settings.autoFavoritesMaxItems = newValue
                         loadFavorites()
@@ -333,7 +410,8 @@ Page {
             AccessibleButton {
                 Layout.fillWidth: true
                 text: TranslationManager.translate("common.close", "Close")
-                accessibleName: "Close settings"
+                accessibleName: TranslationManager.translate("common.close", "Close") + " " +
+                    TranslationManager.translate("autofavorites.settings", "Auto-Favorites Settings")
                 onClicked: settingsPopup.close()
             }
         }

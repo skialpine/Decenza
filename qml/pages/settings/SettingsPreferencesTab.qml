@@ -76,15 +76,27 @@ Item {
                 }
             }
 
+            Item { Layout.fillHeight: true }
+        }
+
+        // Middle column: Per-Screen Scale + Battery / Charging
+        ColumnLayout {
+            Layout.preferredWidth: Theme.scaled(350)
+            Layout.fillHeight: true
+            spacing: Theme.scaled(15)
+
             // Per-Screen Scale Configuration
             Rectangle {
                 Layout.fillWidth: true
-                Layout.fillHeight: true
+                implicitHeight: scaleContent.implicitHeight + Theme.scaled(30)
                 color: Theme.surfaceColor
                 radius: Theme.cardRadius
 
                 ColumnLayout {
-                    anchors.fill: parent
+                    id: scaleContent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
                     anchors.margins: Theme.scaled(15)
                     spacing: Theme.scaled(10)
 
@@ -104,8 +116,6 @@ Item {
                         font.pixelSize: Theme.scaled(12)
                         wrapMode: Text.WordWrap
                     }
-
-                    Item { Layout.fillHeight: true }
 
                     RowLayout {
                         Layout.fillWidth: true
@@ -144,13 +154,6 @@ Item {
                     }
                 }
             }
-        }
-
-        // Middle column: Battery / Charging
-        ColumnLayout {
-            Layout.preferredWidth: Theme.scaled(350)
-            Layout.fillHeight: true
-            spacing: Theme.scaled(15)
 
             // Battery / Charging settings
             Rectangle {
@@ -333,6 +336,7 @@ Item {
                 }
             }
 
+            Item { Layout.fillHeight: true }
         }
 
         // Right column: Flow Sensor Calibration
