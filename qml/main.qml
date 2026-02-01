@@ -89,6 +89,9 @@ ApplicationWindow {
             Settings.setValue("mainWindow/y", root.y)
         }
 
+        // Mark as shutting down to suppress screensaver from DE1 sleep response
+        root.shuttingDown = true
+
         // Send scale sleep first (it's faster/simpler)
         if (ScaleDevice && ScaleDevice.connected) {
             console.log("Sending scale to sleep on app close")
@@ -255,6 +258,9 @@ ApplicationWindow {
 
     // Suppress screensaver on startup — machine may already be in Sleep when we connect
     property bool startupGracePeriod: true
+
+    // Suppress screensaver during shutdown — we send DE1 to sleep which triggers Sleep phase
+    property bool shuttingDown: false
 
 
     // Suppress scale dialogs briefly after waking from sleep
@@ -1657,7 +1663,7 @@ ApplicationWindow {
                 // Like de1app: navigates to saver page and disables scale LCD on sleep state
                 // Skip during startup grace period to avoid flashing screensaver when
                 // connecting to a machine that's already asleep
-                if (!screensaverActive && !root.startupGracePeriod) {
+                if (!screensaverActive && !root.startupGracePeriod && !root.shuttingDown) {
                     console.log("Machine entered Sleep - showing screensaver")
                     if (ScaleDevice && ScaleDevice.connected) {
                         ScaleDevice.disableLcd()

@@ -659,7 +659,7 @@ int main(int argc, char *argv[])
     });
 
     // Cleanup on exit
-    QObject::connect(&app, &QCoreApplication::aboutToQuit, [&accessibilityManager, &batteryManager, &de1Device, &physicalScale]() {
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, [&accessibilityManager, &batteryManager, &de1Device, &physicalScale, &engine]() {
         qDebug() << "Application exiting - shutting down devices";
 
         bool needBleWait = false;
@@ -690,6 +690,15 @@ int main(int argc, char *argv[])
         // IMPORTANT: Ensure charger is ON before exiting
         // This matches de1app's app_exit behavior - always leave charger ON for safety
         batteryManager.ensureChargerOn();
+
+        // Detach QML from C++ objects before destruction to prevent QML from
+        // reading properties (e.g. ScaleDevice.name) on already-destroyed objects
+        QQmlContext* ctx = engine.rootContext();
+        ctx->setContextProperty("ScaleDevice", nullptr);
+        ctx->setContextProperty("FlowScale", nullptr);
+        ctx->setContextProperty("DE1Device", nullptr);
+        ctx->setContextProperty("MachineState", nullptr);
+        ctx->setContextProperty("MainController", nullptr);
 
         // Disable Qt's accessibility bridge before window destruction
         // This prevents iOS crash (SIGBUS) where the accessibility system tries to

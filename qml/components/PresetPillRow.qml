@@ -59,8 +59,8 @@ FocusScope {
     readonly property real pillSpacing: Theme.scaled(12)
     readonly property real pillPadding: Theme.scaled(40)  // Horizontal padding inside pill
 
-    // Cached rows model to avoid binding loops
-    property var rowsModel: calculateRows()
+    // Cached rows model - populated by recalcTimer, not a binding
+    property var rowsModel: []
 
     // Hidden TextMetrics for measuring pill text widths
     TextMetrics {
@@ -74,16 +74,16 @@ FocusScope {
         return textMetrics.width
     }
 
-    // Recalculate when presets or width changes
-    onPresetsChanged: rowsModel = calculateRows()
-    onEffectiveMaxWidthChanged: rowsModel = calculateRows()
+    // Recalculate when presets or width changes (deferred via timer to avoid
+    // destroying Repeater delegates during signal handler chains)
+    onPresetsChanged: recalcTimer.restart()
+    onEffectiveMaxWidthChanged: recalcTimer.restart()
 
-    // Recalculate after layout is complete to ensure correct width
-    // Use Timer instead of Qt.callLater to avoid "invalid context" errors
-    // when the component is destroyed before the deferred call fires
+    // All model recalculations go through this timer to coalesce rapid changes
+    // and ensure delegates aren't destroyed while their signal handlers run
     Timer {
         id: recalcTimer
-        interval: 0
+        interval: 1
         onTriggered: rowsModel = calculateRows()
     }
     Component.onCompleted: recalcTimer.start()
