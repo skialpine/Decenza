@@ -14,6 +14,7 @@
 #include <QStandardPaths>
 #include <QFile>
 #include <QDir>
+#include <QBuffer>
 
 VisualizerUploader::VisualizerUploader(Settings* settings, QObject* parent)
     : QObject(parent)
@@ -407,6 +408,129 @@ void VisualizerUploader::uploadShotFromHistory(const QVariantMap& shotData)
     });
 
     qDebug() << "Visualizer: Uploading shot from history...";
+}
+
+void VisualizerUploader::updateShotOnVisualizer(const QString& visualizerId, const QVariantMap& shotData)
+{
+    if (visualizerId.isEmpty()) {
+        emit uploadFailed("No visualizer ID for update");
+        return;
+    }
+
+    // Check credentials
+    QString username = m_settings->value("visualizer/username", "").toString();
+    QString password = m_settings->value("visualizer/password", "").toString();
+
+    if (username.isEmpty() || password.isEmpty()) {
+        m_lastUploadStatus = "No credentials configured";
+        emit lastUploadStatusChanged();
+        emit uploadFailed("Visualizer credentials not configured");
+        return;
+    }
+
+    m_uploading = true;
+    emit uploadingChanged();
+    m_lastUploadStatus = "Updating...";
+    emit lastUploadStatusChanged();
+
+    // Build JSON body: {"shot": {"bean_brand": "...", ...}}
+    QJsonObject shotObj;
+    auto setField = [&](const QString& apiField, const QString& mapKey) {
+        if (!shotData.contains(mapKey)) return;
+        QVariant val = shotData[mapKey];
+        if (val.typeId() == QMetaType::Double) {
+            double d = val.toDouble();
+            if (d > 0) shotObj[apiField] = d;
+        } else if (val.typeId() == QMetaType::Int) {
+            int i = val.toInt();
+            if (i > 0) shotObj[apiField] = i;
+        } else {
+            QString s = val.toString();
+            if (!s.isEmpty()) shotObj[apiField] = s;
+        }
+    };
+
+    setField("bean_brand", "beanBrand");
+    setField("bean_type", "beanType");
+    setField("roast_level", "roastLevel");
+    setField("roast_date", "roastDate");
+    setField("bean_weight", "doseWeight");
+    setField("drink_weight", "finalWeight");
+    setField("grinder_model", "grinderModel");
+    setField("grinder_setting", "grinderSetting");
+    setField("drink_tds", "drinkTds");
+    setField("drink_ey", "drinkEy");
+    setField("espresso_enjoyment", "enjoyment");
+    setField("espresso_notes", "espressoNotes");
+    setField("barista", "barista");
+    setField("profile_title", "profileName");
+
+    QJsonObject root;
+    root["shot"] = shotObj;
+
+    QJsonDocument doc(root);
+    QByteArray jsonData = doc.toJson(QJsonDocument::Compact);
+
+    qDebug() << "Visualizer: Updating shot" << visualizerId << "with:" << jsonData;
+
+    // Build PATCH request
+    QUrl url(QString(VISUALIZER_SHOTS_API_URL) + visualizerId);
+    QNetworkRequest request(url);
+    request.setRawHeader("Authorization", authHeader().toUtf8());
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setRawHeader("Accept", "application/json");
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::NoLessSafeRedirectPolicy);
+
+    // Use QBuffer for sendCustomRequest to ensure Content-Type is preserved
+    QBuffer* buffer = new QBuffer();
+    buffer->setData(jsonData);
+    buffer->open(QIODevice::ReadOnly);
+
+    QNetworkReply* reply = m_networkManager->sendCustomRequest(request, "PATCH", buffer);
+    buffer->setParent(reply);  // Auto-delete buffer when reply is deleted
+    connect(reply, &QNetworkReply::finished, this, [this, reply, visualizerId]() {
+        onUpdateFinished(reply, visualizerId);
+    });
+}
+
+void VisualizerUploader::onUpdateFinished(QNetworkReply* reply, const QString& visualizerId)
+{
+    m_uploading = false;
+    emit uploadingChanged();
+
+    int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    QByteArray response = reply->readAll();
+
+    if (reply->error() == QNetworkReply::NoError) {
+        m_lastUploadStatus = "Update successful";
+        emit lastUploadStatusChanged();
+        emit updateSuccess(visualizerId);
+        qDebug() << "Visualizer: Update successful for shot" << visualizerId;
+    } else {
+        QString errorMsg;
+
+        if (statusCode == 401) {
+            errorMsg = "Invalid credentials";
+        } else if (statusCode == 404) {
+            errorMsg = "Shot not found on Visualizer";
+        } else if (statusCode == 422) {
+            QJsonDocument doc = QJsonDocument::fromJson(response);
+            errorMsg = doc.object()["error"].toString();
+            if (errorMsg.isEmpty()) {
+                errorMsg = "Invalid data (422)";
+            }
+        } else {
+            errorMsg = QString("HTTP %1: %2").arg(statusCode).arg(reply->errorString());
+        }
+
+        m_lastUploadStatus = "Failed: " + errorMsg;
+        emit lastUploadStatusChanged();
+        emit uploadFailed(errorMsg);
+        qDebug() << "Visualizer: Update failed -" << errorMsg << "Response:" << response;
+    }
+
+    reply->deleteLater();
 }
 
 void VisualizerUploader::testConnection()

@@ -188,7 +188,13 @@ Page {
             // Update the shot history with visualizer info
             if (editShotId > 0) {
                 MainController.shotHistory.updateVisualizerInfo(editShotId, shotId, url)
-                // Reload shot data to update the UI (hides upload button)
+                // Reload shot data to update the UI
+                loadShotForEditing()
+            }
+        }
+        function onUpdateSuccess(visualizerId) {
+            // Reload shot data to refresh the UI after metadata update
+            if (editShotId > 0) {
                 loadShotForEditing()
             }
         }
@@ -799,17 +805,19 @@ Page {
             }
         }
 
-        // Upload to Visualizer button - visible when shot not yet uploaded
+        // Upload / Re-Upload to Visualizer button
         Rectangle {
             id: uploadButton
-            visible: editShotData.id > 0 && !editShotData.visualizerId && !MainController.visualizer.uploading
+            visible: editShotData.id > 0 && !MainController.visualizer.uploading
             Layout.preferredWidth: uploadButtonContent.width + 32
             Layout.preferredHeight: Theme.scaled(44)
             radius: Theme.scaled(8)
             color: uploadArea.pressed ? Qt.darker(Theme.primaryColor, 1.2) : Theme.primaryColor
 
             Accessible.role: Accessible.Button
-            Accessible.name: TranslationManager.translate("postshotreview.button.upload", "Upload to Visualizer")
+            Accessible.name: editShotData.visualizerId
+                ? TranslationManager.translate("postshotreview.button.reupload", "Re-Upload to Visualizer")
+                : TranslationManager.translate("postshotreview.button.upload", "Upload to Visualizer")
             Accessible.onPressAction: uploadArea.clicked(null)
 
             Row {
@@ -825,8 +833,12 @@ Page {
                 }
 
                 Tr {
-                    key: "postshotreview.button.upload"
-                    fallback: "Upload to Visualizer"
+                    key: editShotData.visualizerId
+                         ? "postshotreview.button.reupload"
+                         : "postshotreview.button.upload"
+                    fallback: editShotData.visualizerId
+                              ? "Re-Upload to Visualizer"
+                              : "Upload to Visualizer"
                     color: "white"
                     font: Theme.bodyFont
                     anchors.verticalCenter: parent.verticalCenter
@@ -837,16 +849,47 @@ Page {
                 id: uploadArea
                 anchors.fill: parent
                 onClicked: {
-                    MainController.visualizer.uploadShotFromHistory(editShotData)
+                    // Auto-save any unsaved changes before uploading
+                    if (hasUnsavedChanges) {
+                        saveEditedShot()
+                    }
+
+                    if (editShotData.visualizerId) {
+                        // Re-upload: PATCH metadata from current edit fields
+                        var currentData = {
+                            "beanBrand": editBeanBrand,
+                            "beanType": editBeanType,
+                            "roastDate": editRoastDate,
+                            "roastLevel": editRoastLevel,
+                            "grinderModel": editGrinderModel,
+                            "grinderSetting": editGrinderSetting,
+                            "barista": editBarista,
+                            "doseWeight": editDoseWeight,
+                            "finalWeight": editDrinkWeight,
+                            "drinkTds": editDrinkTds,
+                            "drinkEy": editDrinkEy,
+                            "enjoyment": editEnjoyment,
+                            "espressoNotes": editNotes,
+                            "profileName": editShotData.profileName || ""
+                        }
+                        MainController.visualizer.updateShotOnVisualizer(
+                            editShotData.visualizerId, currentData)
+                    } else {
+                        // First upload: POST full shot data
+                        MainController.visualizer.uploadShotFromHistory(
+                            MainController.shotHistory.getShot(editShotId))
+                    }
                 }
             }
         }
 
-        // Uploading indicator
+        // Uploading/Updating indicator
         Tr {
             visible: MainController.visualizer.uploading
-            key: "postshotreview.status.uploading"
-            fallback: "Uploading..."
+            key: editShotData.visualizerId
+                 ? "postshotreview.status.updating"
+                 : "postshotreview.status.uploading"
+            fallback: editShotData.visualizerId ? "Updating..." : "Uploading..."
             color: Theme.textSecondaryColor
             font: Theme.labelFont
         }

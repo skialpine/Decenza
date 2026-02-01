@@ -52,6 +52,9 @@ public:
     // Upload a shot from history (takes QVariantMap from ShotHistoryStorage::getShot())
     Q_INVOKABLE void uploadShotFromHistory(const QVariantMap& shotData);
 
+    // Update metadata on an already-uploaded shot (PATCH to visualizer.coffee)
+    Q_INVOKABLE void updateShotOnVisualizer(const QString& visualizerId, const QVariantMap& shotData);
+
     // Test connection with current credentials
     Q_INVOKABLE void testConnection();
 
@@ -60,11 +63,13 @@ signals:
     void lastUploadStatusChanged();
     void lastShotUrlChanged();
     void uploadSuccess(const QString& shotId, const QString& url);
+    void updateSuccess(const QString& visualizerId);
     void uploadFailed(const QString& error);
     void connectionTestResult(bool success, const QString& message);
 
 private slots:
     void onUploadFinished(QNetworkReply* reply);
+    void onUpdateFinished(QNetworkReply* reply, const QString& visualizerId);
     void onTestFinished(QNetworkReply* reply);
 
 private:
@@ -85,5 +90,6 @@ private:
     QString m_lastShotUrl;
 
     static constexpr const char* VISUALIZER_API_URL = "https://visualizer.coffee/api/shots/upload";
+    static constexpr const char* VISUALIZER_SHOTS_API_URL = "https://visualizer.coffee/api/shots/";
     static constexpr const char* VISUALIZER_SHOT_URL = "https://visualizer.coffee/shots/";
 };

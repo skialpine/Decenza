@@ -57,6 +57,22 @@ Page {
     }
 
 
+    // Handle visualizer upload/update status changes
+    Connections {
+        target: MainController.visualizer
+        function onUploadSuccess(shotId, url) {
+            if (shotDetailPage.shotId > 0) {
+                MainController.shotHistory.updateVisualizerInfo(shotDetailPage.shotId, shotId, url)
+                loadShot()
+            }
+        }
+        function onUpdateSuccess(visualizerId) {
+            if (shotDetailPage.shotId > 0) {
+                loadShot()
+            }
+        }
+    }
+
     ScrollView {
         anchors.left: parent.left
         anchors.right: parent.right
@@ -803,6 +819,71 @@ Page {
         id: bottomBar
         title: TranslationManager.translate("shotdetail.title", "Shot Detail")
         onBackClicked: root.goBack()
+
+        // Upload / Re-Upload to Visualizer button
+        Rectangle {
+            id: uploadButton
+            visible: shotData.duration > 0 && !MainController.visualizer.uploading
+            Layout.preferredWidth: uploadButtonContent.width + 32
+            Layout.preferredHeight: Theme.scaled(44)
+            radius: Theme.scaled(8)
+            color: uploadButtonArea.pressed ? Qt.darker(Theme.primaryColor, 1.2) : Theme.primaryColor
+
+            Accessible.role: Accessible.Button
+            Accessible.name: shotData.visualizerId
+                ? TranslationManager.translate("shotdetail.button.reupload", "Re-Upload to Visualizer")
+                : TranslationManager.translate("shotdetail.button.upload", "Upload to Visualizer")
+            Accessible.onPressAction: uploadButtonArea.clicked(null)
+
+            Row {
+                id: uploadButtonContent
+                anchors.centerIn: parent
+                spacing: Theme.scaled(6)
+
+                Text {
+                    text: "\u2601"  // Cloud icon
+                    font.pixelSize: Theme.scaled(16)
+                    color: "white"
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Tr {
+                    key: shotData.visualizerId
+                         ? "shotdetail.button.reupload"
+                         : "shotdetail.button.upload"
+                    fallback: shotData.visualizerId
+                              ? "Re-Upload"
+                              : "Upload"
+                    color: "white"
+                    font: Theme.bodyFont
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+
+            MouseArea {
+                id: uploadButtonArea
+                anchors.fill: parent
+                onClicked: {
+                    if (shotData.visualizerId) {
+                        MainController.visualizer.updateShotOnVisualizer(
+                            shotData.visualizerId, shotData)
+                    } else {
+                        MainController.visualizer.uploadShotFromHistory(shotData)
+                    }
+                }
+            }
+        }
+
+        // Uploading/Updating indicator
+        Tr {
+            visible: MainController.visualizer.uploading
+            key: shotData.visualizerId
+                 ? "shotdetail.status.updating"
+                 : "shotdetail.status.uploading"
+            fallback: shotData.visualizerId ? "Updating..." : "Uploading..."
+            color: Theme.textSecondaryColor
+            font: Theme.labelFont
+        }
 
         // AI Advice button
         Rectangle {
