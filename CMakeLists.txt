@@ -180,6 +180,7 @@ set(SOURCES
     src/network/crashreporter.cpp
     src/core/settingsserializer.cpp
     src/core/datamigrationclient.cpp
+    src/weather/weathermanager.cpp
 )
 
 # Simulator files - Windows Debug or macOS
@@ -268,6 +269,7 @@ set(HEADERS
     src/network/crashreporter.h
     src/core/settingsserializer.h
     src/core/datamigrationclient.h
+    src/weather/weathermanager.h
 )
 
 # Simulator headers - Windows Debug or macOS
@@ -451,6 +453,7 @@ set(QML_FILES
     qml/components/layout/items/ShotPlanItem.qml
     qml/components/layout/items/SpacerItem.qml
     qml/components/layout/items/TextItem.qml
+    qml/components/layout/items/WeatherItem.qml
     qml/components/layout/TextEditorPopup.qml
 )
 

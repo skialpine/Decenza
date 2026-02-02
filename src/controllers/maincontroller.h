@@ -131,6 +131,7 @@ public:
     UpdateChecker* updateChecker() const { return m_updateChecker; }
     ShotReporter* shotReporter() const { return m_shotReporter; }
     DataMigrationClient* dataMigration() const { return m_dataMigration; }
+    LocationProvider* locationProvider() const { return m_locationProvider; }
     qint64 lastSavedShotId() const { return m_lastSavedShotId; }
     double profileTargetTemperature() const { return m_currentProfile.espressoTemperature(); }
     bool profileHasRecommendedDose() const { return m_currentProfile.hasRecommendedDose(); }

@@ -10,6 +10,7 @@
 #include <QAccessible>
 #include <QDebug>
 #include <memory>
+#include <QElapsedTimer>
 #include "version.h"
 
 #ifdef Q_OS_ANDROID
@@ -42,6 +43,7 @@
 #include "screensaver/pipegeometry.h"
 #include "screensaver/strangeattractorrenderer.h"
 #include "network/webdebuglogger.h"
+#include "weather/weathermanager.h"
 
 // GHC Simulator for Windows debug builds
 #if (defined(Q_OS_WIN) || defined(Q_OS_MACOS)) && defined(QT_DEBUG)
@@ -57,10 +59,8 @@ int main(int argc, char *argv[])
     // Install crash handler first - catches SIGSEGV, SIGABRT, etc.
     CrashHandler::install();
 
-    // Set simple message pattern for desktop (Android uses its own format)
-#ifndef Q_OS_ANDROID
-    qSetMessagePattern("%{message}");
-#endif
+    // Include wall clock in all log messages on all platforms
+    qSetMessagePattern("[%{time HH:mm:ss.zzz}] %{message}");
 
 #ifdef Q_OS_IOS
     // Use basic (single-threaded) render loop on iOS to avoid threading issues
@@ -84,6 +84,14 @@ int main(int argc, char *argv[])
 
     qDebug() << "App started - version" << VERSION_STRING;
 
+    // Startup timing - always on, lightweight. Helps diagnose ANRs on slow devices.
+    // Wall clock comes from WebDebugLogger's [LOG HH:mm:ss.zzz] prefix automatically.
+    QElapsedTimer startupTimer;
+    startupTimer.start();
+    auto checkpoint = [&startupTimer](const char* label) {
+        qDebug() << "[Startup]" << label << "-" << startupTimer.elapsed() << "ms";
+    };
+
     // Check for crash log from previous run (don't clear yet - QML will clear after user dismisses)
     QString previousCrashLog;
     QString previousDebugLogTail;
@@ -94,10 +102,13 @@ int main(int argc, char *argv[])
         qWarning().noquote() << previousCrashLog;
         qWarning() << "=== END CRASH REPORT ===";
     }
+    checkpoint("Crash check done");
 
     // Create core objects
     Settings settings;
+    checkpoint("Settings");
     TranslationManager translationManager(&settings);
+    checkpoint("TranslationManager");
     BLEManager bleManager;
 
     // Disable BLE early in simulator mode to prevent real device connections
@@ -115,7 +126,9 @@ int main(int argc, char *argv[])
     machineState.setScale(&flowScale);  // Start with FlowScale, switch to physical scale if found
     flowScale.setSettings(&settings);
     ProfileStorage profileStorage;
+    checkpoint("Core objects");
     MainController mainController(&settings, &de1Device, &machineState, &shotDataModel, &profileStorage);
+    checkpoint("MainController");
 
     // Create and wire ShotTimingController (centralized timing and weight handling)
     ShotTimingController timingController(&de1Device);
@@ -172,6 +185,8 @@ int main(int argc, char *argv[])
     QObject::connect(&timingController, &ShotTimingController::shotProcessingReady,
                      &mainController, &MainController::onShotEnded);
 
+    checkpoint("ShotTimingController wiring");
+
     // Create and wire AI Manager
     AIManager aiManager(&settings);
     mainController.setAiManager(&aiManager);
@@ -181,6 +196,7 @@ int main(int argc, char *argv[])
                      &mainController, &MainController::onScaleWeightChanged);
 
     ScreensaverVideoManager screensaverManager(&settings, &profileStorage);
+    checkpoint("ScreensaverVideoManager");
 
     // Connect screensaver manager to shot server for personal media upload
     mainController.shotServer()->setScreensaverVideoManager(&screensaverManager);
@@ -191,6 +207,10 @@ int main(int argc, char *argv[])
     BatteryManager batteryManager;
     batteryManager.setDE1Device(&de1Device);
     batteryManager.setSettings(&settings);
+
+    // Weather forecast manager (hourly updates, region-aware API selection)
+    WeatherManager weatherManager;
+    weatherManager.setLocationProvider(mainController.locationProvider());
 
     // Auto-wake manager for scheduled wake-ups
     AutoWakeManager autoWakeManager(&settings);
@@ -210,6 +230,8 @@ int main(int argc, char *argv[])
         }
     });
     autoWakeManager.start();
+
+    checkpoint("Managers wired");
 
     AccessibilityManager accessibilityManager;
     accessibilityManager.setTranslationManager(&translationManager);
@@ -235,8 +257,11 @@ int main(int argc, char *argv[])
         }
     });
 
+    checkpoint("Pre-QML setup done");
+
     // Set up QML engine
     QQmlApplicationEngine engine;
+    checkpoint("QML engine created");
 
     // Auto-connect when DE1 is discovered
     QObject::connect(&bleManager, &BLEManager::de1Discovered,
@@ -401,6 +426,7 @@ int main(int argc, char *argv[])
     context->setContextProperty("BatteryManager", &batteryManager);
     context->setContextProperty("AccessibilityManager", &accessibilityManager);
     context->setContextProperty("ProfileStorage", &profileStorage);
+    context->setContextProperty("WeatherManager", &weatherManager);
     context->setContextProperty("CrashReporter", &crashReporter);
     context->setContextProperty("PreviousCrashLog", previousCrashLog);
     context->setContextProperty("PreviousDebugLogTail", previousDebugLogTail);
@@ -434,16 +460,21 @@ int main(int argc, char *argv[])
     // Register strange attractor renderer for attractor screensaver
     qmlRegisterType<StrangeAttractorRenderer>("DecenzaDE1", 1, 0, "StrangeAttractorRenderer");
 
+    checkpoint("Context properties & type registration");
+
     // Load main QML file (QTP0001 NEW policy uses /qt/qml/ prefix)
     const QUrl url(u"qrc:/qt/qml/DecenzaDE1/qml/main.qml"_s);
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated,
-        &app, [url](QObject *obj, const QUrl &objUrl) {
+        &app, [url, &checkpoint](QObject *obj, const QUrl &objUrl) {
             if (!obj && url == objUrl)
                 QCoreApplication::exit(-1);
+            else if (obj)
+                checkpoint("QML objectCreated");
         }, Qt::QueuedConnection);
 
     engine.load(url);
+    checkpoint("engine.load(main.qml) returned");
 
     // GHC Simulator window for Windows debug builds
 #if (defined(Q_OS_WIN) || defined(Q_OS_MACOS)) && defined(QT_DEBUG)

@@ -1,7 +1,6 @@
 #include "webdebuglogger.h"
 
 #include <QDebug>
-#include <QTime>
 #include <QStandardPaths>
 #include <QDir>
 #include <QTextStream>
@@ -43,10 +42,9 @@ WebDebugLogger::WebDebugLogger(QObject* parent)
 
 void WebDebugLogger::messageHandler(QtMsgType type, const QMessageLogContext& context, const QString& msg)
 {
-    // Forward to previous handler (console output) with [LOG] prefix and timestamp for easy filtering
+    // Forward to previous handler (console output) - wall clock comes from qSetMessagePattern
     if (s_previousHandler) {
-        QString timestamp = QTime::currentTime().toString(QStringLiteral("HH:mm:ss.zzz"));
-        s_previousHandler(type, context, QStringLiteral("[LOG %1] ").arg(timestamp) + msg);
+        s_previousHandler(type, context, msg);
     }
 
     // Capture to our buffer (without prefix - internal use)

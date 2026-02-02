@@ -18,6 +18,7 @@ Item {
             case "waterLevel":
             case "connectionStatus":
             case "scaleWeight":
+            case "weather":
                 return true
             default:
                 return false

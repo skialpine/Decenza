@@ -6044,7 +6044,8 @@ QString ShotServer::generateLayoutPage() const
         {type:"settings",label:"Settings"},{type:"temperature",label:"Temperature"},
         {type:"waterLevel",label:"Water Level"},{type:"connectionStatus",label:"Connection"},
         {type:"scaleWeight",label:"Scale Weight"},{type:"shotPlan",label:"Shot Plan"},
-        {type:"spacer",label:"Spacer",special:true},{type:"text",label:"Text",special:true}
+        {type:"spacer",label:"Spacer",special:true},{type:"text",label:"Text",special:true},
+        {type:"weather",label:"Weather",special:true}
     ];
 
     var DISPLAY_NAMES = {
@@ -6052,7 +6053,7 @@ QString ShotServer::generateLayoutPage() const
         beans:"Beans",history:"History",autofavorites:"Favorites",sleep:"Sleep",
         settings:"Settings",temperature:"Temp",waterLevel:"Water",
         connectionStatus:"Connection",scaleWeight:"Scale",shotPlan:"Shot Plan",
-        spacer:"Spacer",text:"Text"
+        spacer:"Spacer",text:"Text",weather:"Weather"
     };
 
     var ACTIONS = [
@@ -6111,7 +6112,7 @@ QString ShotServer::generateLayoutPage() const
             html += '<div class="chips-area">';
             for (var i = 0; i < items.length; i++) {
                 var item = items[i];
-                var isSpecial = item.type === "spacer" || item.type === "text";
+                var isSpecial = item.type === "spacer" || item.type === "text" || item.type === "weather";
                 var isSel = selectedChip && selectedChip.id === item.id;
                 var cls = "chip" + (isSel ? " selected" : "") + (isSpecial ? " special" : "");
                 html += '<span class="' + cls + '" onclick="chipClick(\'' + item.id + '\',\'' + zone.key + '\',\'' + item.type + '\')">';

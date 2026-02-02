@@ -148,7 +148,7 @@ Rectangle {
                             text: getItemDisplayName(modelData.type)
                             color: modelData.id === root.selectedItemId
                                 ? "white"
-                                : ((modelData.type === "spacer" || modelData.type === "text") ? "orange" : Theme.textColor)
+                                : ((modelData.type === "spacer" || modelData.type === "text" || modelData.type === "weather") ? "orange" : Theme.textColor)
                             font: Theme.bodyFont
                         }
 
@@ -285,7 +285,8 @@ Rectangle {
                             { type: "scaleWeight", label: "Scale Weight" },
                             { type: "shotPlan", label: "Shot Plan" },
                             { type: "spacer", label: "Spacer" },
-                            { type: "text", label: "Text" }
+                            { type: "text", label: "Text" },
+                            { type: "weather", label: "Weather" }
                         ]
 
                         delegate: Rectangle {
@@ -299,7 +300,7 @@ Rectangle {
                                 anchors.leftMargin: Theme.scaled(12)
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: modelData.label
-                                color: (modelData.type === "spacer" || modelData.type === "text") ? "orange" : Theme.textColor
+                                color: (modelData.type === "spacer" || modelData.type === "text" || modelData.type === "weather") ? "orange" : Theme.textColor
                                 font: Theme.bodyFont
                             }
 
@@ -333,7 +334,8 @@ Rectangle {
             "autofavorites": "Favorites", "sleep": "Sleep", "settings": "Settings",
             "temperature": "Temp", "waterLevel": "Water",
             "connectionStatus": "Connection", "scaleWeight": "Scale",
-            "shotPlan": "Shot Plan", "spacer": "Spacer", "text": "Text"
+            "shotPlan": "Shot Plan", "spacer": "Spacer", "text": "Text",
+            "weather": "Weather"
         }
         return names[type] || type
     }

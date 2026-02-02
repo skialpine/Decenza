@@ -31,6 +31,7 @@ Loader {
             case "shotPlan":         src = "items/ShotPlanItem.qml"; break
             case "spacer":           src = "items/SpacerItem.qml"; break
             case "text":             src = "items/TextItem.qml"; break
+            case "weather":          src = "items/WeatherItem.qml"; break
             default:                 src = ""; break
         }
         console.log("[IdlePage] type:", itemType, "zone:", zoneName, "compact:", isCompact, "source:", src)
