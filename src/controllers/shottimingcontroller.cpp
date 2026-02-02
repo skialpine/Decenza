@@ -21,7 +21,7 @@ ShotTimingController::ShotTimingController(DE1Device* device, QObject* parent)
 
 double ShotTimingController::shotTime() const
 {
-    // Show 0 during preheating, start counting when extraction begins (frame 0)
+    // Show 0 during preheating, start counting when first extraction frame arrives
     if (!m_extractionStarted) {
         return 0.0;
     }
@@ -139,11 +139,12 @@ void ShotTimingController::onShotSample(const ShotSample& sample, double pressur
         }
         m_currentFrameNumber = frameNumber;
 
-        // Extraction starts when frame 0 is reached (preheating shows higher frame numbers like 2-3)
-        if (frameNumber == 0 && !m_extractionStarted) {
+        // Extraction starts on the first frame we see. The DE1 may skip preheating
+        // frames (0-1) if the group is already hot, jumping straight to frame 2+.
+        if (!m_extractionStarted) {
             m_extractionStarted = true;
             m_displayTimeBase = QDateTime::currentMSecsSinceEpoch();
-            qDebug() << "EXTRACTION STARTED at frame 0";
+            qDebug() << "EXTRACTION STARTED at frame" << frameNumber;
         }
     }
 
@@ -224,7 +225,7 @@ void ShotTimingController::tare()
     }
 
     // Fire-and-forget: assume tare worked, set weight to 0 immediately
-    // Weight samples are ignored until frame 0 starts anyway (4-5s preheating)
+    // Weight samples are ignored until extraction starts anyway (preheating phase)
     m_weight = 0;
     m_tareState = TareState::Complete;
     emit tareCompleteChanged();
@@ -234,7 +235,7 @@ void ShotTimingController::tare()
 void ShotTimingController::onTareTimeout()
 {
     // No longer used - tare is fire-and-forget now
-    // Weight samples are ignored until frame 0 starts (4-5s preheating)
+    // Weight samples are ignored until extraction starts (preheating phase)
 }
 
 void ShotTimingController::updateDisplayTimer()
