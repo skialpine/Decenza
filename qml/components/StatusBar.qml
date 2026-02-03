@@ -159,9 +159,6 @@ Rectangle {
             // Accessibility: Handle TalkBack double-tap directly (triggers tare)
             Accessible.onPressAction: {
                 console.log("StatusBar: Accessible.onPressAction triggered (TalkBack double-tap)")
-                if (MainController.brewByRatioActive) {
-                    MainController.clearBrewByRatio()
-                }
                 MachineState.tareScale()
             }
 
@@ -244,9 +241,6 @@ Rectangle {
                     // Don't allow ratio dialog during shot
                     if (MachineState.isFlowing) {
                         console.log("StatusBar: Tare during shot")
-                        if (MainController.brewByRatioActive) {
-                            MainController.clearBrewByRatio()
-                        }
                         MachineState.tareScale()
                         return
                     }
@@ -295,11 +289,6 @@ Rectangle {
                     console.log("StatusBar: Timer triggered, tapCount=" + scaleMouseArea.tapCount)
                     if (scaleMouseArea.tapCount === 1) {
                         console.log("StatusBar: Single tap confirmed, taring scale")
-                        // Cancel ratio mode if active
-                        if (MainController.brewByRatioActive) {
-                            console.log("StatusBar: Cancelling brew-by-ratio mode")
-                            MainController.clearBrewByRatio()
-                        }
                         MachineState.tareScale()
                     }
                     scaleMouseArea.tapCount = 0

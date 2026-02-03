@@ -992,6 +992,12 @@ void DE1Device::uploadProfile(const Profile& profile) {
         qDebug() << "  BLE Frame" << i << ": temp=" << profile.steps()[i].temperature;
     }
 
+#if (defined(Q_OS_WIN) || defined(Q_OS_MACOS)) && defined(QT_DEBUG)
+    if (m_simulationMode && m_simulator) {
+        m_simulator->setProfile(profile);
+    }
+#endif
+
     // Queue header write
     QByteArray header = profile.toHeaderBytes();
     queueCommand([this, header]() {
@@ -1014,6 +1020,12 @@ void DE1Device::uploadProfile(const Profile& profile) {
 
 void DE1Device::uploadProfileAndStartEspresso(const Profile& profile) {
     qDebug() << "uploadProfileAndStartEspresso: Uploading profile with" << profile.steps().size() << "frames, then starting espresso";
+
+#if (defined(Q_OS_WIN) || defined(Q_OS_MACOS)) && defined(QT_DEBUG)
+    if (m_simulationMode && m_simulator) {
+        m_simulator->setProfile(profile);
+    }
+#endif
 
     // Queue header write
     QByteArray header = profile.toHeaderBytes();

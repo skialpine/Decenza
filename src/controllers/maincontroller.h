@@ -52,9 +52,9 @@ class MainController : public QObject {
     Q_PROPERTY(QString baseProfileName READ baseProfileName NOTIFY currentProfileChanged)
     Q_PROPERTY(bool profileModified READ isProfileModified NOTIFY profileModifiedChanged)
     Q_PROPERTY(double targetWeight READ targetWeight WRITE setTargetWeight NOTIFY targetWeightChanged)
-    Q_PROPERTY(bool brewByRatioActive READ brewByRatioActive NOTIFY brewByRatioChanged)
-    Q_PROPERTY(double brewByRatioDose READ brewByRatioDose NOTIFY brewByRatioChanged)
-    Q_PROPERTY(double brewByRatio READ brewByRatio NOTIFY brewByRatioChanged)
+    Q_PROPERTY(bool brewByRatioActive READ brewByRatioActive NOTIFY targetWeightChanged)
+    Q_PROPERTY(double brewByRatioDose READ brewByRatioDose NOTIFY targetWeightChanged)
+    Q_PROPERTY(double brewByRatio READ brewByRatio NOTIFY targetWeightChanged)
     Q_PROPERTY(QVariantList availableProfiles READ availableProfiles NOTIFY profilesChanged)
     Q_PROPERTY(QVariantList selectedProfiles READ selectedProfiles NOTIFY profilesChanged)
     Q_PROPERTY(QVariantList allBuiltInProfiles READ allBuiltInProfiles NOTIFY profilesChanged)
@@ -82,6 +82,7 @@ class MainController : public QObject {
     Q_PROPERTY(bool isCurrentProfileRecipe READ isCurrentProfileRecipe NOTIFY currentProfileChanged)
     Q_PROPERTY(qint64 lastSavedShotId READ lastSavedShotId NOTIFY lastSavedShotIdChanged)
     Q_PROPERTY(double profileTargetTemperature READ profileTargetTemperature NOTIFY currentProfileChanged)
+    Q_PROPERTY(double profileTargetWeight READ profileTargetWeight NOTIFY currentProfileChanged)
     Q_PROPERTY(bool profileHasRecommendedDose READ profileHasRecommendedDose NOTIFY currentProfileChanged)
     Q_PROPERTY(double profileRecommendedDose READ profileRecommendedDose NOTIFY currentProfileChanged)
     Q_PROPERTY(bool sawSettling READ isSawSettling NOTIFY sawSettlingChanged)
@@ -97,11 +98,11 @@ public:
     bool isProfileModified() const { return m_profileModified; }
     double targetWeight() const;
     void setTargetWeight(double weight);
-    bool brewByRatioActive() const { return m_brewByRatioActive; }
-    double brewByRatioDose() const { return m_brewByRatioDose; }
-    double brewByRatio() const { return m_brewByRatio; }
+    bool brewByRatioActive() const;
+    double brewByRatioDose() const;
+    double brewByRatio() const;
     Q_INVOKABLE void activateBrewWithOverrides(double dose, double yield, double temperature, const QString& grind);
-    Q_INVOKABLE void clearBrewByRatio();
+    Q_INVOKABLE void clearBrewOverrides();
     QVariantList availableProfiles() const;
     QVariantList selectedProfiles() const;
     QVariantList allBuiltInProfiles() const;
@@ -134,6 +135,7 @@ public:
     LocationProvider* locationProvider() const { return m_locationProvider; }
     qint64 lastSavedShotId() const { return m_lastSavedShotId; }
     double profileTargetTemperature() const { return m_currentProfile.espressoTemperature(); }
+    double profileTargetWeight() const { return m_currentProfile.targetWeight(); }
     bool profileHasRecommendedDose() const { return m_currentProfile.hasRecommendedDose(); }
     double profileRecommendedDose() const { return m_currentProfile.recommendedDose(); }
 
@@ -230,7 +232,6 @@ signals:
     void currentProfileChanged();
     void profileModifiedChanged();
     void targetWeightChanged();
-    void brewByRatioChanged();
     void profilesChanged();
     void calibrationModeChanged();
     void sawSettlingChanged();
@@ -291,11 +292,6 @@ private:
     bool m_profileModified = false;
     bool m_calibrationMode = false;
     QString m_currentFrameName;  // For accessibility announcements
-
-    // Brew-by-ratio state
-    bool m_brewByRatioActive = false;
-    double m_brewByRatioDose = 0.0;
-    double m_brewByRatio = 2.0;
 
     QTimer m_settingsTimer;  // Delayed settings application after connection
 
