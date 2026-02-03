@@ -52,6 +52,7 @@ class DE1Device : public QObject {
     Q_PROPERTY(QString firmwareVersion READ firmwareVersion NOTIFY firmwareVersionChanged)
     Q_PROPERTY(bool usbChargerOn READ usbChargerOn NOTIFY usbChargerOnChanged)
     Q_PROPERTY(bool isHeadless READ isHeadless NOTIFY isHeadlessChanged)
+    Q_PROPERTY(int refillKitDetected READ refillKitDetected NOTIFY refillKitDetectedChanged)
 
 public:
     explicit DE1Device(QObject* parent = nullptr);
@@ -80,6 +81,7 @@ public:
     bool usbChargerOn() const { return m_usbChargerOn; }
     bool isHeadless() const { return m_isHeadless; }
     Q_INVOKABLE void setIsHeadless(bool headless);  // Debug toggle
+    int refillKitDetected() const { return m_refillKitDetected; }  // -1=unknown, 0=not detected, 1=detected
 
     // Simulation mode for GUI development without hardware
     bool simulationMode() const { return m_simulationMode; }
@@ -137,6 +139,10 @@ public slots:
     // Water refill level (write StartFillLevel to machine via WaterLevels characteristic)
     void setWaterRefillLevel(int refillPointMm);
 
+    // Refill kit control (MMR 0x80385C: 0=off, 1=on, 2=auto-detect)
+    void setRefillKitPresent(int value);
+    void requestRefillKitStatus();
+
 signals:
     void connectedChanged();
     void connectingChanged();
@@ -152,6 +158,7 @@ signals:
     void guiEnabledChanged();
     void usbChargerOnChanged();
     void isHeadlessChanged();
+    void refillKitDetectedChanged();
     void logMessage(const QString& message);
 
 private slots:
@@ -215,6 +222,7 @@ private:
     Settings* m_settings = nullptr;       // For water level calibration persistence
     bool m_usbChargerOn = true;  // Default on (safe default like de1app)
     bool m_isHeadless = false;   // True if app can start operations (GHC not installed or inactive)
+    int m_refillKitDetected = -1;  // -1=unknown, 0=not detected, 1=detected
 
     // Retry logic for service discovery failures
     QBluetoothDeviceInfo m_pendingDevice;

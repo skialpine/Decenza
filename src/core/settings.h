@@ -140,6 +140,9 @@ class Settings : public QObject {
     // Water refill level (mm threshold for refill warning, sent to machine)
     Q_PROPERTY(int waterRefillPoint READ waterRefillPoint WRITE setWaterRefillPoint NOTIFY waterRefillPointChanged)
 
+    // Refill kit override (0=force off, 1=force on, 2=auto-detect)
+    Q_PROPERTY(int refillKitOverride READ refillKitOverride WRITE setRefillKitOverride NOTIFY refillKitOverrideChanged)
+
     // Developer settings
     Q_PROPERTY(bool developerTranslationUpload READ developerTranslationUpload WRITE setDeveloperTranslationUpload NOTIFY developerTranslationUploadChanged)
 
@@ -486,6 +489,10 @@ public:
     int waterRefillPoint() const;
     void setWaterRefillPoint(int mm);
 
+    // Refill kit override
+    int refillKitOverride() const;
+    void setRefillKitOverride(int value);
+
     // Developer settings
     bool developerTranslationUpload() const;
     void setDeveloperTranslationUpload(bool enabled);
@@ -639,6 +646,7 @@ signals:
     void betaUpdatesEnabledChanged();
     void waterLevelDisplayUnitChanged();
     void waterRefillPointChanged();
+    void refillKitOverrideChanged();
     void developerTranslationUploadChanged();
     void temperatureOverrideChanged();
     void brewOverridesChanged();

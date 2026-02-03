@@ -1984,6 +1984,17 @@ void Settings::setWaterRefillPoint(int mm) {
     }
 }
 
+int Settings::refillKitOverride() const {
+    return m_settings.value("water/refillKitOverride", 2).toInt();  // Default: auto-detect
+}
+
+void Settings::setRefillKitOverride(int value) {
+    if (refillKitOverride() != value) {
+        m_settings.setValue("water/refillKitOverride", value);
+        emit refillKitOverrideChanged();
+    }
+}
+
 bool Settings::developerTranslationUpload() const {
     // Runtime-only flag - not persisted, resets to false on app restart
     return m_developerTranslationUpload;

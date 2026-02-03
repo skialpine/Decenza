@@ -777,6 +777,25 @@ void DE1Device::parseMMRResponse(const QByteArray& data) {
             emit isHeadlessChanged();
         }
     }
+    // Check if this is REFILL_KIT response (address 0x80385C)
+    else if (address == 0x80385C) {
+        uint8_t kitStatus = d[4];
+        qDebug() << "DE1Device: REFILL_KIT raw byte:" << kitStatus
+                 << QString("(0x%1)").arg(kitStatus, 2, 16, QChar('0'));
+
+        // 0 = not detected, 1 = detected
+        int detected = (kitStatus > 0) ? 1 : 0;
+        QString statusName = detected ? "detected" : "not detected";
+
+        QString logMsg = QString("Refill kit: %1").arg(statusName);
+        qDebug() << "DE1Device:" << logMsg;
+        emit logMessage(logMsg);
+
+        if (m_refillKitDetected != detected) {
+            m_refillKitDetected = detected;
+            emit refillKitDetectedChanged();
+        }
+    }
 }
 
 void DE1Device::writeCharacteristic(const QBluetoothUuid& uuid, const QByteArray& data) {
@@ -1095,6 +1114,27 @@ void DE1Device::setWaterRefillLevel(int refillPointMm) {
     });
 }
 
+void DE1Device::setRefillKitPresent(int value) {
+    // Write refill kit override to machine via MMR (0x80385C)
+    // 0 = force off (no refill kit), 1 = force on, 2 = auto-detect
+    qDebug() << "DE1Device: Setting refill kit present to" << value;
+    writeMMR(DE1::MMR::REFILL_KIT, static_cast<uint32_t>(value));
+}
+
+void DE1Device::requestRefillKitStatus() {
+    // Request refill kit status via MMR read (same pattern as requestGHCStatus)
+    QByteArray mmrRead(20, 0);
+    mmrRead[0] = 0x00;   // Len = 0 (read 4 bytes)
+    mmrRead[1] = 0x80;   // Address high byte
+    mmrRead[2] = 0x38;   // Address mid byte
+    mmrRead[3] = 0x5C;   // Address low byte (REFILL_KIT)
+
+    queueCommand([this, mmrRead]() {
+        qDebug() << "DE1Device: Requesting REFILL_KIT status...";
+        writeCharacteristic(DE1::Characteristic::READ_FROM_MMR, mmrRead);
+    });
+}
+
 void DE1Device::sendInitialSettings() {
     // This mimics de1app's later_new_de1_connection_setup
     // Send a basic profile and shot settings to trigger machine wake-up response
@@ -1165,6 +1205,9 @@ void DE1Device::sendInitialSettings() {
         qDebug() << "DE1Device: Requesting GHC_INFO from machine...";
         writeCharacteristic(DE1::Characteristic::READ_FROM_MMR, mmrRead);
     });
+
+    // Read refill kit status via MMR (like de1app's get_refill_kit_present)
+    requestRefillKitStatus();
 
     // Send shot settings
     // Default values similar to de1app defaults

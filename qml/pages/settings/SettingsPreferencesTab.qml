@@ -76,6 +76,111 @@ Item {
                 }
             }
 
+            // Refill Kit
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: refillKitContent.implicitHeight + Theme.scaled(30)
+                color: Theme.surfaceColor
+                radius: Theme.cardRadius
+
+                property bool kitAvailable: DE1Device.refillKitDetected > 0
+
+                ColumnLayout {
+                    id: refillKitContent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: Theme.scaled(15)
+                    spacing: Theme.scaled(8)
+                    opacity: parent.kitAvailable ? 1.0 : 0.5
+
+                    Tr {
+                        key: "settings.preferences.refillKit"
+                        fallback: "Refill Kit"
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(16)
+                        font.bold: true
+                    }
+
+                    Tr {
+                        Layout.fillWidth: true
+                        key: "settings.preferences.refillKitDesc"
+                        fallback: "Control whether the machine uses an automatic water refill kit"
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: Theme.scaled(12)
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Text {
+                        text: {
+                            var status = DE1Device.refillKitDetected
+                            if (status === 1) return TranslationManager.translate("settings.preferences.refillKitDetected", "Status: Detected")
+                            if (status === 0) return TranslationManager.translate("settings.preferences.refillKitNotDetected", "Status: Not detected")
+                            return TranslationManager.translate("settings.preferences.refillKitUnknown", "Status: Unknown")
+                        }
+                        color: DE1Device.refillKitDetected === 1 ? Theme.successColor : Theme.textSecondaryColor
+                        font.pixelSize: Theme.scaled(12)
+                    }
+
+                    Row {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Theme.scaled(42)
+                        spacing: Theme.scaled(8)
+
+                        Repeater {
+                            model: [
+                                { value: 2, label: TranslationManager.translate("settings.preferences.refillKitAuto", "Auto"), desc: TranslationManager.translate("settings.preferences.refillKitAutoDesc", "Auto-detect") },
+                                { value: 0, label: TranslationManager.translate("settings.preferences.refillKitOff", "Off"), desc: TranslationManager.translate("settings.preferences.refillKitOffDesc", "Force off") },
+                                { value: 1, label: TranslationManager.translate("settings.preferences.refillKitOn", "On"), desc: TranslationManager.translate("settings.preferences.refillKitOnDesc", "Force on") }
+                            ]
+
+                            delegate: Rectangle {
+                                id: refillKitButton
+                                width: (parent.width - 2 * parent.spacing) / 3
+                                height: parent.height
+                                radius: Theme.scaled(6)
+                                color: Settings.refillKitOverride === modelData.value ?
+                                       Theme.primaryColor : Theme.backgroundColor
+                                border.color: Settings.refillKitOverride === modelData.value ?
+                                              Theme.primaryColor : Theme.textSecondaryColor
+                                border.width: 1
+
+                                ColumnLayout {
+                                    anchors.centerIn: parent
+                                    spacing: Theme.scaled(2)
+
+                                    Text {
+                                        text: modelData.label
+                                        color: Settings.refillKitOverride === modelData.value ?
+                                               "white" : Theme.textColor
+                                        font.pixelSize: Theme.scaled(14)
+                                        font.bold: true
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+
+                                    Text {
+                                        text: modelData.desc
+                                        color: Settings.refillKitOverride === modelData.value ?
+                                               Qt.rgba(1, 1, 1, 0.7) : Theme.textSecondaryColor
+                                        font.pixelSize: Theme.scaled(10)
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                }
+
+                                AccessibleMouseArea {
+                                    anchors.fill: parent
+                                    enabled: refillKitContent.opacity > 0.9
+                                    accessibleName: modelData.label + " refill kit mode. " + modelData.desc +
+                                                   (Settings.refillKitOverride === modelData.value ? ", selected" : "")
+                                    accessibleItem: refillKitButton
+                                    onAccessibleClicked: Settings.refillKitOverride = modelData.value
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             Item { Layout.fillHeight: true }
         }
 
@@ -423,7 +528,7 @@ Item {
 
                         AccessibleButton {
                             Layout.preferredWidth: Theme.scaled(80)
-                            text: qsTr("Reset")
+                            text: TranslationManager.translate("settings.preferences.reset", "Reset")
                             accessibleName: "Reset flow calibration to 1.0"
                             enabled: Settings.flowCalibrationFactor !== 1.0
                             onClicked: Settings.flowCalibrationFactor = 1.0
@@ -529,7 +634,7 @@ Item {
                             value: Settings.steamAutoFlushSeconds
                             valueColor: value > 0 ? Theme.primaryColor : Theme.textSecondaryColor
                             displayText: value === 0 ? "Off" : value + "s"
-                            accessibleName: qsTr("Auto flush duration")
+                            accessibleName: TranslationManager.translate("settings.preferences.autoFlushDuration", "Auto flush duration")
                             onValueModified: function(newValue) {
                                 Settings.steamAutoFlushSeconds = newValue
                             }

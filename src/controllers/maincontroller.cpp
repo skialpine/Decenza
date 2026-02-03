@@ -94,6 +94,14 @@ MainController::MainController(Settings* settings, DE1Device* device,
                 this, &MainController::applyWaterRefillLevel);
     }
 
+    // Apply refill kit override when setting changes or when kit detection completes
+    if (m_settings && m_device) {
+        connect(m_settings, &Settings::refillKitOverrideChanged,
+                this, &MainController::applyRefillKitOverride);
+        connect(m_device, &DE1Device::refillKitDetectedChanged,
+                this, &MainController::applyRefillKitOverride);
+    }
+
     // Connect to machine state events
     if (m_machineState) {
         connect(m_machineState, &MachineState::espressoCycleStarted,
@@ -1946,12 +1954,23 @@ void MainController::applyAllSettings() {
 
     // 5. Apply water refill level
     applyWaterRefillLevel();
+
+    // 6. Apply refill kit override
+    applyRefillKitOverride();
 }
 
 void MainController::applyWaterRefillLevel() {
     if (!m_device || !m_device->isConnected() || !m_settings) return;
 
     m_device->setWaterRefillLevel(m_settings->waterRefillPoint());
+}
+
+void MainController::applyRefillKitOverride() {
+    if (!m_device || !m_device->isConnected() || !m_settings) return;
+
+    int override = m_settings->refillKitOverride();
+    // Values match de1app: 0=force off, 1=force on, 2=auto-detect
+    m_device->setRefillKitPresent(override);
 }
 
 double MainController::getGroupTemperature() const {
