@@ -69,6 +69,52 @@ jobs:
           echo "Bundled frameworks:"
           ls -la "$APP_PATH/Contents/Frameworks/" | head -20
 
+      - name: Import Code Signing Certificate
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          # Create temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate
+          echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
+          security import certificate.p12 -P "$MACOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+          # Allow codesign to access the keychain
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          rm certificate.p12
+
+      - name: Code Sign App
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          APP_PATH="build/macos/Release/Decenza_DE1.app"
+          IDENTITY="Developer ID Application: Michael Nesbitt ($APPLE_TEAM_ID)"
+
+          echo "Signing with identity: $IDENTITY"
+
+          # Sign all frameworks and dylibs first (deep signing)
+          find "$APP_PATH/Contents/Frameworks" -type f \( -name "*.dylib" -o -name "*.framework" \) -exec \
+            codesign --force --options runtime --timestamp --sign "$IDENTITY" {} \; 2>/dev/null || true
+
+          # Sign the main executable
+          codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP_PATH/Contents/MacOS/Decenza_DE1"
+
+          # Sign the entire app bundle
+          codesign --force --deep --options runtime --timestamp --sign "$IDENTITY" "$APP_PATH"
+
+          # Verify
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          echo "Code signing complete"
+
       - name: Create DMG
         run: |
           VERSION=${{ steps.version.outputs.version }}
@@ -99,6 +145,27 @@ jobs:
 
           echo "Created: $DMG_NAME"
           ls -la "$DMG_NAME"
+
+      - name: Notarize DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          DMG_NAME="Decenza_DE1_v${VERSION}_macos.dmg"
+
+          echo "Submitting for notarization..."
+          xcrun notarytool submit "$DMG_NAME" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+          echo "Stapling notarization ticket..."
+          xcrun stapler staple "$DMG_NAME"
+
+          echo "Notarization complete"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
