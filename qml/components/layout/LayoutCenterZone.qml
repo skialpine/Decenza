@@ -50,7 +50,6 @@ Item {
     implicitHeight: contentRow.implicitHeight
 
     Component.onCompleted: {
-        console.log("[IdlePage] LayoutCenterZone", zoneName, "items count:", items ? items.length : "null", "size:", width, "x", height, "buttonWidth:", buttonWidth, "buttonHeight:", buttonHeight)
     }
 
     RowLayout {
@@ -65,7 +64,6 @@ Item {
 
         Repeater {
             model: root.items
-            onCountChanged: console.log("[IdlePage] LayoutCenterZone", root.zoneName, "Repeater count:", count)
             delegate: LayoutItemDelegate {
                 zoneName: root.zoneName
                 Layout.preferredWidth: root.isAutoSized(modelData.type) ? -1 : root.buttonWidth

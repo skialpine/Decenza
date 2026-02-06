@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(Decenza_DE1 VERSION 1.3.8 LANGUAGES CXX)
+project(Decenza_DE1 VERSION 1.3.9 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -192,13 +192,6 @@ if((WIN32 OR APPLE) AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     )
 endif()
 
-# Android-specific native BLE transport
-if(ANDROID)
-    list(APPEND SOURCES
-        src/ble/transport/androidscalebletransport.cpp
-    )
-endif()
-
 # Native CoreBluetooth transport (iOS and macOS)
 if(APPLE)
     list(APPEND SOURCES
@@ -278,13 +271,6 @@ if((WIN32 OR APPLE) AND CMAKE_BUILD_TYPE STREQUAL "Debug")
         src/simulator/ghcsimulator.h
         src/simulator/de1simulator.h
         src/simulator/simulatedscale.h
-    )
-endif()
-
-# Android-specific native BLE transport header
-if(ANDROID)
-    list(APPEND HEADERS
-        src/ble/transport/androidscalebletransport.h
     )
 endif()
 

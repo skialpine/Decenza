@@ -11,7 +11,6 @@ Item {
     implicitWidth: itemsRow.implicitWidth
 
     Component.onCompleted: {
-        console.log("[IdlePage] LayoutBarZone", zoneName, "items count:", items ? items.length : "null", "size:", width, "x", height, "implicitSize:", implicitWidth, "x", implicitHeight)
     }
 
     RowLayout {
@@ -23,7 +22,6 @@ Item {
 
         Repeater {
             model: root.items
-            onCountChanged: console.log("[IdlePage] LayoutBarZone", root.zoneName, "Repeater count:", count)
             delegate: LayoutItemDelegate {
                 zoneName: root.zoneName
                 Layout.fillWidth: modelData.type === "spacer"
