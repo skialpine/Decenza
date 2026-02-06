@@ -2635,6 +2635,50 @@ void MainController::generateFakeShotData() {
     m_pendingShotDoseWeight = 18.0;
 
     qDebug() << "DEV: Generated" << numSamples << "fake samples";
+
+    // Save simulated shot to history (like a real shot)
+    if (m_shotHistory && m_shotHistory->isReady() && m_settings) {
+        ShotMetadata metadata;
+        metadata.beanBrand = m_settings->dyeBeanBrand();
+        metadata.beanType = m_settings->dyeBeanType();
+        metadata.roastDate = m_settings->dyeRoastDate();
+        metadata.roastLevel = m_settings->dyeRoastLevel();
+        metadata.grinderModel = m_settings->dyeGrinderModel();
+        metadata.grinderSetting = m_settings->dyeGrinderSetting();
+        metadata.beanWeight = m_pendingShotDoseWeight;
+        metadata.drinkWeight = m_settings->dyeDrinkWeight();
+        metadata.drinkTds = m_settings->dyeDrinkTds();
+        metadata.drinkEy = m_settings->dyeDrinkEy();
+        metadata.espressoEnjoyment = m_settings->dyeEspressoEnjoyment();
+        metadata.espressoNotes = m_settings->dyeShotNotes();
+        metadata.barista = m_settings->dyeBarista();
+
+        // Use current profile's temperature and target weight as overrides
+        double temperatureOverride = m_currentProfile.espressoTemperature();
+        double yieldOverride = m_currentProfile.targetWeight();
+
+        qint64 shotId = m_shotHistory->saveShot(
+            m_shotDataModel, &m_currentProfile,
+            totalDuration, m_pendingShotFinalWeight, m_pendingShotDoseWeight,
+            metadata, "[Simulated shot]",
+            temperatureOverride, yieldOverride);
+
+        if (shotId > 0) {
+            qDebug() << "DEV: Simulated shot saved to history with ID:" << shotId;
+            m_lastSavedShotId = shotId;
+            emit lastSavedShotIdChanged();
+
+            // Update drink weight
+            m_settings->setDyeDrinkWeight(m_pendingShotFinalWeight);
+
+            // Reset shot-specific metadata for next shot
+            m_settings->setDyeEspressoEnjoyment(0);
+            m_settings->setDyeShotNotes("");
+            m_settings->sync();
+        } else {
+            qDebug() << "DEV: WARNING: Failed to save simulated shot to history";
+        }
+    }
 }
 
 void MainController::clearCrashLog() {
