@@ -47,6 +47,7 @@ Button {
     contentItem: Column {
         spacing: Theme.scaled(10)
         anchors.centerIn: parent
+        anchors.verticalCenterOffset: Theme.scaled(4)
 
         Item {
             anchors.horizontalCenter: parent.horizontalCenter
