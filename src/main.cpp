@@ -723,14 +723,9 @@ int main(int argc, char *argv[])
         // This matches de1app's app_exit behavior - always leave charger ON for safety
         batteryManager.ensureChargerOn();
 
-        // Detach QML from C++ objects before destruction to prevent QML from
-        // reading properties (e.g. ScaleDevice.name) on already-destroyed objects
-        QQmlContext* ctx = engine.rootContext();
-        ctx->setContextProperty("ScaleDevice", nullptr);
-        ctx->setContextProperty("FlowScale", nullptr);
-        ctx->setContextProperty("DE1Device", nullptr);
-        ctx->setContextProperty("MachineState", nullptr);
-        ctx->setContextProperty("MainController", nullptr);
+        // Note: No need to null context properties here. All C++ objects are
+        // stack-allocated before the QML engine, so reverse destruction order
+        // guarantees the engine (and all QML items) is destroyed first.
 
         // Disable Qt's accessibility bridge before window destruction
         // This prevents iOS crash (SIGBUS) where the accessibility system tries to

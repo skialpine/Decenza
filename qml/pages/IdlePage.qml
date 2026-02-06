@@ -58,14 +58,9 @@ Page {
     // Parse layout and extract zone items
     property var layoutConfig: {
         var raw = Settings.layoutConfiguration
-        console.log("[IdlePage] layoutConfiguration raw length:", raw ? raw.length : "null/undefined")
-        console.log("[IdlePage] layoutConfiguration:", raw ? raw.substring(0, 200) : "EMPTY")
         try {
-            var parsed = JSON.parse(raw)
-            console.log("[IdlePage] parsed OK, zones:", parsed.zones ? Object.keys(parsed.zones) : "NO ZONES")
-            return parsed
+            return JSON.parse(raw)
         } catch(e) {
-            console.log("[IdlePage] JSON.parse FAILED:", e)
             return { zones: {} }
         }
     }
@@ -85,13 +80,6 @@ Page {
 
     Component.onCompleted: {
         root.currentPageTitle = "Idle"
-        console.log("[IdlePage] topLeftItems:", JSON.stringify(topLeftItems), "count:", topLeftItems.length)
-        console.log("[IdlePage] topRightItems:", JSON.stringify(topRightItems), "count:", topRightItems.length)
-        console.log("[IdlePage] centerStatusItems:", JSON.stringify(centerStatusItems), "count:", centerStatusItems.length)
-        console.log("[IdlePage] centerTopItems:", JSON.stringify(centerTopItems), "count:", centerTopItems.length)
-        console.log("[IdlePage] centerMiddleItems:", JSON.stringify(centerMiddleItems), "count:", centerMiddleItems.length)
-        console.log("[IdlePage] bottomLeftItems:", JSON.stringify(bottomLeftItems), "count:", bottomLeftItems.length)
-        console.log("[IdlePage] bottomRightItems:", JSON.stringify(bottomRightItems), "count:", bottomRightItems.length)
     }
 
     // Track which function's presets are showing (used by center-zone action items)
@@ -260,7 +248,6 @@ Page {
 
                     onPresetSelected: function(index) {
                         var wasAlreadySelected = (index === Settings.selectedSteamPitcher)
-                        console.log("[IdlePage] Steam pill selected, index:", index, "wasAlreadySelected:", wasAlreadySelected, "isReady:", MachineState.isReady)
                         Settings.selectedSteamPitcher = index
                         var preset = Settings.getSteamPitcherPreset(index)
                         if (preset) {
@@ -271,10 +258,8 @@ Page {
 
                         if (wasAlreadySelected) {
                             if (MachineState.isReady) {
-                                console.log("[IdlePage] Starting steam...")
                                 DE1Device.startSteam()
                             } else {
-                                console.log("[IdlePage] NOT starting steam - MachineState.isReady is false, phase:", MachineState.phase)
                             }
                         }
                     }
@@ -301,20 +286,16 @@ Page {
 
                         onPresetSelected: function(index) {
                             var wasAlreadySelected = (index === Settings.selectedFavoriteProfile)
-                            console.log("[IdlePage] Espresso pill selected, index:", index, "wasAlreadySelected:", wasAlreadySelected, "isReady:", MachineState.isReady)
                             Settings.selectedFavoriteProfile = index
                             var preset = Settings.getFavoriteProfile(index)
 
                             if (wasAlreadySelected) {
                                 if (MachineState.isReady) {
-                                    console.log("[IdlePage] Starting espresso...")
                                     DE1Device.startEspresso()
                                 } else {
-                                    console.log("[IdlePage] NOT starting espresso - MachineState.isReady is false, phase:", MachineState.phase)
                                 }
                             } else {
                                 if (preset && preset.filename) {
-                                    console.log("[IdlePage] Loading profile:", preset.filename)
                                     MainController.loadProfile(preset.filename)
                                 }
                             }
@@ -324,11 +305,9 @@ Page {
                             var preset = Settings.getFavoriteProfile(index)
                             if (preset && preset.filename) {
                                 if (index !== Settings.selectedFavoriteProfile) {
-                                    console.log("[IdlePage] Long-press selecting profile:", preset.filename)
                                     Settings.selectedFavoriteProfile = index
                                     MainController.loadProfile(preset.filename)
                                 }
-                                console.log("[IdlePage] Long-press showing preview for:", preset.filename)
                                 profilePreviewPopup.profileFilename = preset.filename
                                 profilePreviewPopup.profileName = preset.name || ""
                                 profilePreviewPopup.open()
@@ -361,10 +340,8 @@ Page {
                                 anchors.fill: parent
                                 onClicked: {
                                     if (MachineState.isReady) {
-                                        console.log("[IdlePage] Starting espresso with non-favorite profile...")
                                         DE1Device.startEspresso()
                                     } else {
-                                        console.log("[IdlePage] NOT starting espresso - MachineState.isReady is false, phase:", MachineState.phase)
                                     }
                                 }
                             }
@@ -399,7 +376,6 @@ Page {
 
                     onPresetSelected: function(index) {
                         var wasAlreadySelected = (index === Settings.selectedWaterVessel)
-                        console.log("[IdlePage] HotWater pill selected, index:", index, "wasAlreadySelected:", wasAlreadySelected, "isReady:", MachineState.isReady)
                         Settings.selectedWaterVessel = index
                         var preset = Settings.getWaterVesselPreset(index)
                         if (preset) {
@@ -409,10 +385,8 @@ Page {
 
                         if (wasAlreadySelected) {
                             if (MachineState.isReady) {
-                                console.log("[IdlePage] Starting hot water...")
                                 DE1Device.startHotWater()
                             } else {
-                                console.log("[IdlePage] NOT starting hot water - MachineState.isReady is false, phase:", MachineState.phase)
                             }
                         }
                     }
@@ -432,7 +406,6 @@ Page {
 
                     onPresetSelected: function(index) {
                         var wasAlreadySelected = (index === Settings.selectedFlushPreset)
-                        console.log("[IdlePage] Flush pill selected, index:", index, "wasAlreadySelected:", wasAlreadySelected, "isReady:", MachineState.isReady)
                         Settings.selectedFlushPreset = index
                         var preset = Settings.getFlushPreset(index)
                         if (preset) {
@@ -443,10 +416,8 @@ Page {
 
                         if (wasAlreadySelected) {
                             if (MachineState.isReady) {
-                                console.log("[IdlePage] Starting flush...")
                                 DE1Device.startFlush()
                             } else {
-                                console.log("[IdlePage] NOT starting flush - MachineState.isReady is false, phase:", MachineState.phase)
                             }
                         }
                     }
@@ -465,7 +436,6 @@ Page {
                     selectedIndex: Settings.selectedBeanPreset
 
                     onPresetSelected: function(index) {
-                        console.log("[IdlePage] Bean pill selected, index:", index)
                         Settings.selectedBeanPreset = index
                         Settings.applyBeanPreset(index)
                     }

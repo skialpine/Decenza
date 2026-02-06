@@ -37,12 +37,10 @@ Loader {
             case "separator":        src = "items/SeparatorItem.qml"; break
             default:                 src = ""; break
         }
-        console.log("[IdlePage] type:", itemType, "zone:", zoneName, "compact:", isCompact, "source:", src)
         return src ? Qt.resolvedUrl(src) : ""
     }
 
     onLoaded: {
-        console.log("[IdlePage] LOADED type:", itemType, "id:", itemId, "item:", item, "implicitSize:", item.implicitWidth, "x", item.implicitHeight)
         item.isCompact = Qt.binding(function() { return root.isCompact })
         item.itemId = root.itemId
         if (typeof item.modelData !== "undefined") {
@@ -51,16 +49,12 @@ Loader {
         // Bind loaded item to fill the Loader so it gets the correct size
         // from the parent Layout (implicit size flows up, actual size flows down)
         item.anchors.fill = root
-        console.log("[IdlePage] after setup - loader size:", root.width, "x", root.height, "item size:", item.width, "x", item.height)
     }
 
     onStatusChanged: {
         if (status === Loader.Error) {
-            console.log("[IdlePage] LOAD ERROR for type:", itemType, "source:", source)
         } else if (status === Loader.Null) {
-            console.log("[IdlePage] NULL status for type:", itemType)
         } else if (status === Loader.Loading) {
-            console.log("[IdlePage] Loading type:", itemType)
         }
     }
 }
