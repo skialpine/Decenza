@@ -708,12 +708,16 @@ void DataMigrationClient::startDiscovery()
     qint64 sent = m_discoverySocket->writeDatagram(discoveryMessage, QHostAddress::Broadcast, DISCOVERY_PORT);
     if (sent == -1) {
         qWarning() << "DataMigrationClient: Failed to send broadcast:" << m_discoverySocket->errorString();
+        qWarning() << "DataMigrationClient: This may be due to firewall, network configuration, or missing permissions";
     } else {
-        qDebug() << "DataMigrationClient: Sent discovery broadcast to port" << DISCOVERY_PORT;
+        qDebug() << "DataMigrationClient: Sent discovery broadcast to 255.255.255.255"
+                 << "port" << DISCOVERY_PORT << "(" << sent << "bytes)";
     }
 
     // Also try sending to common subnet broadcast addresses (255.255.255.255 may not work on all networks)
     // Get local addresses and compute their broadcast addresses
+    qDebug() << "DataMigrationClient: Scanning network interfaces for subnet broadcast addresses...";
+    int interfaceCount = 0;
     for (const QNetworkInterface& interface : QNetworkInterface::allInterfaces()) {
         if (!(interface.flags() & QNetworkInterface::IsUp) ||
             !(interface.flags() & QNetworkInterface::IsRunning) ||
@@ -721,15 +725,27 @@ void DataMigrationClient::startDiscovery()
             continue;
         }
 
+        interfaceCount++;
+        qDebug() << "DataMigrationClient: Interface" << interface.name() << "is up";
+
         for (const QNetworkAddressEntry& entry : interface.addressEntries()) {
             if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol) {
                 QHostAddress broadcast = entry.broadcast();
+                qDebug() << "DataMigrationClient:   Local IP:" << entry.ip().toString()
+                         << "Broadcast:" << (broadcast.isNull() ? "none" : broadcast.toString());
                 if (!broadcast.isNull() && broadcast != QHostAddress::Broadcast) {
-                    m_discoverySocket->writeDatagram(discoveryMessage, broadcast, DISCOVERY_PORT);
-                    qDebug() << "DataMigrationClient: Sent discovery to" << broadcast.toString();
+                    qint64 sent = m_discoverySocket->writeDatagram(discoveryMessage, broadcast, DISCOVERY_PORT);
+                    if (sent > 0) {
+                        qDebug() << "DataMigrationClient:   Sent discovery to" << broadcast.toString() << "(" << sent << "bytes)";
+                    } else {
+                        qWarning() << "DataMigrationClient:   Failed to send to" << broadcast.toString() << ":" << m_discoverySocket->errorString();
+                    }
                 }
             }
         }
+    }
+    if (interfaceCount == 0) {
+        qWarning() << "DataMigrationClient: No active network interfaces found!";
     }
 
     // Set up timeout timer
