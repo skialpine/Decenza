@@ -390,6 +390,51 @@ KeyboardAwareContainer {
                     }
                 }
 
+                // Default shot rating (only when extended metadata enabled)
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.scaled(15)
+                    visible: Settings.visualizerExtendedMetadata
+
+                    ColumnLayout {
+                        spacing: Theme.scaled(2)
+                        Layout.fillWidth: true
+
+                        Tr {
+                            key: "settings.visualizer.defaultRating"
+                            fallback: "Default Shot Rating"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(14)
+                        }
+
+                        Tr {
+                            Layout.fillWidth: true
+                            key: "settings.visualizer.defaultRatingDesc"
+                            fallback: "Starting rating for new shots (0 = unrated)"
+                            color: Theme.textSecondaryColor
+                            font.pixelSize: Theme.scaled(12)
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    ValueInput {
+                        id: defaultRatingInput
+                        value: Settings.defaultShotRating
+                        from: 0
+                        to: 100
+                        stepSize: 1
+                        suffix: " %"
+                        valueColor: Theme.primaryColor
+                        accessibleName: TranslationManager.translate("settings.visualizer.defaultRating", "Default Shot Rating")
+
+                        onValueModified: function(newValue) {
+                            Settings.defaultShotRating = newValue
+                        }
+                    }
+                }
+
                 Item { Layout.fillHeight: true }
             }
         }

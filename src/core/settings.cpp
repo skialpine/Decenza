@@ -1589,6 +1589,17 @@ void Settings::setVisualizerClearNotesOnStart(bool enabled) {
     }
 }
 
+int Settings::defaultShotRating() const {
+    return m_settings.value("shot/defaultRating", 75).toInt();
+}
+
+void Settings::setDefaultShotRating(int rating) {
+    if (defaultShotRating() != rating) {
+        m_settings.setValue("shot/defaultRating", rating);
+        emit defaultShotRatingChanged();
+    }
+}
+
 // AI Dialing Assistant settings
 QString Settings::aiProvider() const {
     return m_settings.value("ai/provider", "openai").toString();
@@ -1807,7 +1818,7 @@ void Settings::setDyeDrinkEy(double value) {
 }
 
 int Settings::dyeEspressoEnjoyment() const {
-    return m_settings.value("dye/espressoEnjoyment", 0).toInt();
+    return m_settings.value("dye/espressoEnjoyment", defaultShotRating()).toInt();
 }
 
 void Settings::setDyeEspressoEnjoyment(int value) {

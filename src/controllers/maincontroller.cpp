@@ -2466,6 +2466,12 @@ void MainController::onShotEnded() {
         m_settings->setDyeDrinkWeight(finalWeight);
         qDebug() << "[metadata] Set dyeDrinkWeight to:" << finalWeight;
 
+        // Reset shot-specific metadata (enjoyment and notes) for the next shot
+        // Bean/grinder info persists (sticky), but rating resets to default
+        m_settings->setDyeEspressoEnjoyment(m_settings->defaultShotRating());
+        m_settings->setDyeShotNotes("");
+        qDebug() << "[metadata] Reset enjoyment to" << m_settings->defaultShotRating() << "and notes for next shot";
+
         // Force QSettings to sync to disk immediately
         m_settings->sync();
     } else {
@@ -2696,7 +2702,7 @@ void MainController::generateFakeShotData() {
             m_settings->setDyeDrinkWeight(m_pendingShotFinalWeight);
 
             // Reset shot-specific metadata for next shot
-            m_settings->setDyeEspressoEnjoyment(0);
+            m_settings->setDyeEspressoEnjoyment(m_settings->defaultShotRating());
             m_settings->setDyeShotNotes("");
             m_settings->sync();
         } else {
