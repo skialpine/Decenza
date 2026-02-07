@@ -12,7 +12,7 @@ Item {
     function isAutoSized(type) {
         switch (type) {
             case "spacer":
-            case "text":
+            case "custom":
             case "shotPlan":
             case "temperature":
             case "waterLevel":

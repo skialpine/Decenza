@@ -438,13 +438,13 @@ set(QML_FILES
     qml/components/layout/items/ScaleWeightItem.qml
     qml/components/layout/items/ShotPlanItem.qml
     qml/components/layout/items/SpacerItem.qml
-    qml/components/layout/items/TextItem.qml
+    qml/components/layout/items/CustomItem.qml
     qml/components/layout/items/WeatherItem.qml
     qml/components/layout/items/PageTitleItem.qml
     qml/components/layout/items/SteamTemperatureItem.qml
     qml/components/layout/items/SeparatorItem.qml
     qml/components/layout/items/QuitItem.qml
-    qml/components/layout/TextEditorPopup.qml
+    qml/components/layout/CustomEditorPopup.qml
     qml/components/layout/EmojiPicker.qml
     qml/components/layout/EmojiData.js
 )

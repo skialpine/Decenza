@@ -6301,7 +6301,7 @@ QString ShotServer::generateLayoutPage() const
         {type:"scaleWeight",label:"Scale Weight"},{type:"shotPlan",label:"Shot Plan"},
         {type:"pageTitle",label:"Page Title",special:true},
         {type:"spacer",label:"Spacer",special:true},{type:"separator",label:"Separator",special:true},
-        {type:"text",label:"Text",special:true},
+        {type:"custom",label:"Custom",special:true},
         {type:"weather",label:"Weather",special:true}
     ];
 
@@ -6311,7 +6311,7 @@ QString ShotServer::generateLayoutPage() const
         settings:"Settings",temperature:"Temp",steamTemperature:"Steam",
         waterLevel:"Water",connectionStatus:"Connection",scaleWeight:"Scale",
         shotPlan:"Shot Plan",pageTitle:"Title",spacer:"Spacer",separator:"Sep",
-        text:"Text",weather:"Weather"
+        custom:"Custom",weather:"Weather"
     };
 
     var ACTIONS = [
@@ -6370,7 +6370,7 @@ QString ShotServer::generateLayoutPage() const
             html += '<div class="chips-area">';
             for (var i = 0; i < items.length; i++) {
                 var item = items[i];
-                var isSpecial = item.type === "spacer" || item.type === "text" || item.type === "weather" || item.type === "separator" || item.type === "pageTitle";
+                var isSpecial = item.type === "spacer" || item.type === "custom" || item.type === "weather" || item.type === "separator" || item.type === "pageTitle";
                 var isSel = selectedChip && selectedChip.id === item.id;
                 var cls = "chip" + (isSel ? " selected" : "") + (isSpecial ? " special" : "");
                 html += '<span class="' + cls + '" onclick="chipClick(\'' + item.id + '\',\'' + zone.key + '\',\'' + item.type + '\')">';
@@ -6423,7 +6423,7 @@ QString ShotServer::generateLayoutPage() const
             return;
         } else {
             selectedChip = {id: itemId, zone: zone};
-            if (type === "text") {
+            if (type === "custom") {
                 openEditor(itemId, zone);
             }
         }

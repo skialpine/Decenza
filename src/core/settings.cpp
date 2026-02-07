@@ -2502,6 +2502,27 @@ QJsonObject Settings::getLayoutObject() const {
         layout["zones"] = zones;
     }
 
+    // Migration: rename "text" type to "custom"
+    bool textMigrated = false;
+    for (const QString& zoneName : zones.keys()) {
+        QJsonArray items = zones[zoneName].toArray();
+        for (int i = 0; i < items.size(); ++i) {
+            QJsonObject item = items[i].toObject();
+            if (item["type"].toString() == "text") {
+                item["type"] = "custom";
+                items[i] = item;
+                textMigrated = true;
+            }
+        }
+        if (textMigrated)
+            zones[zoneName] = items;
+    }
+    if (textMigrated) {
+        layout["zones"] = zones;
+        // Persist the migration so it only runs once
+        const_cast<Settings*>(this)->saveLayoutObject(layout);
+    }
+
     return layout;
 }
 

@@ -40,9 +40,6 @@ Item {
 
     // Handle zone tap: move selected item to this zone
     function onZoneTapped(targetZone) {
-        if (selectedItemId !== "" && selectedFromZone !== targetZone) {
-            Settings.moveItem(selectedItemId, selectedFromZone, targetZone, -1)
-        }
         selectedItemId = ""
         selectedFromZone = ""
     }
@@ -78,13 +75,13 @@ Item {
         }
     }
 
-    function openTextEditor(itemId, zoneName) {
+    function openCustomEditor(itemId, zoneName) {
         var props = Settings.getItemProperties(itemId)
-        textEditorPopup.openForItem(itemId, zoneName, props)
+        customEditorPopup.openForItem(itemId, zoneName, props)
     }
 
     // Convert a widget to a Text widget with equivalent behavior
-    function convertItemToText(itemId, originalType) {
+    function convertItemToCustom(itemId, originalType) {
         var mappings = {
             "settings":         { emoji: "qrc:/icons/settings.svg",    content: "Settings",      action: "navigate:settings" },
             "history":          { emoji: "qrc:/icons/history.svg",     content: "History",       action: "navigate:history" },
@@ -99,7 +96,7 @@ Item {
         var mapping = mappings[originalType]
         if (!mapping) return
 
-        Settings.setItemProperty(itemId, "type", "text")
+        Settings.setItemProperty(itemId, "type", "custom")
         Settings.setItemProperty(itemId, "content", mapping.content)
         Settings.setItemProperty(itemId, "action", mapping.action)
         Settings.setItemProperty(itemId, "emoji", mapping.emoji)
@@ -115,7 +112,7 @@ Item {
             var items = Settings.getZoneItems(zones[z])
             for (var i = 0; i < items.length; i++) {
                 if (items[i].type === "settings") return
-                if (items[i].type === "text") {
+                if (items[i].type === "custom") {
                     var props = Settings.getItemProperties(items[i].id)
                     if (props.action === "navigate:settings") return
                 }
@@ -131,8 +128,8 @@ Item {
             ensureSettingsAccessible()
     }
 
-    TextEditorPopup {
-        id: textEditorPopup
+    CustomEditorPopup {
+        id: customEditorPopup
         pageContext: "idle"
     }
 
@@ -171,7 +168,7 @@ Item {
             // Instructions
             Tr {
                 key: "settings.layout.instructions"
-                fallback: "Tap + to add widgets. Tap a widget to select it for moving or reordering. Long-press Text items to edit."
+                fallback: "Tap + to add widgets. Tap a widget to select it for moving or reordering. Long-press Custom items to edit."
                 color: Theme.textSecondaryColor
                 font: Theme.captionFont
                 Layout.fillWidth: true
@@ -192,8 +189,8 @@ Item {
                 onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "statusBar") }
                 onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "statusBar") }
                 onAddItemRequested: function(type) { Settings.addItem(type, "statusBar") }
-                onEditTextRequested: function(itemId, zoneName) { layoutTab.openTextEditor(itemId, zoneName) }
-                onConvertToTextRequested: function(itemId, itemType) { layoutTab.convertItemToText(itemId, itemType) }
+                onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
+                onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
             }
 
             // Zone cards - paired top zones
@@ -214,8 +211,8 @@ Item {
                     onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "topLeft") }
                     onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "topLeft") }
                     onAddItemRequested: function(type) { Settings.addItem(type, "topLeft") }
-                    onEditTextRequested: function(itemId, zoneName) { layoutTab.openTextEditor(itemId, zoneName) }
-                onConvertToTextRequested: function(itemId, itemType) { layoutTab.convertItemToText(itemId, itemType) }
+                    onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
+                onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
                 }
 
                 LayoutEditorZone {
@@ -231,8 +228,8 @@ Item {
                     onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "topRight") }
                     onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "topRight") }
                     onAddItemRequested: function(type) { Settings.addItem(type, "topRight") }
-                    onEditTextRequested: function(itemId, zoneName) { layoutTab.openTextEditor(itemId, zoneName) }
-                onConvertToTextRequested: function(itemId, itemType) { layoutTab.convertItemToText(itemId, itemType) }
+                    onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
+                onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
                 }
             }
 
@@ -252,8 +249,8 @@ Item {
                 onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "centerStatus") }
                 onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "centerStatus") }
                 onAddItemRequested: function(type) { Settings.addItem(type, "centerStatus") }
-                onEditTextRequested: function(itemId, zoneName) { layoutTab.openTextEditor(itemId, zoneName) }
-                onConvertToTextRequested: function(itemId, itemType) { layoutTab.convertItemToText(itemId, itemType) }
+                onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
+                onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
                 onMoveUp: Settings.setZoneYOffset("centerStatus", yOffset - 5)
                 onMoveDown: Settings.setZoneYOffset("centerStatus", yOffset + 5)
             }
@@ -274,8 +271,8 @@ Item {
                 onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "centerTop") }
                 onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "centerTop") }
                 onAddItemRequested: function(type) { Settings.addItem(type, "centerTop") }
-                onEditTextRequested: function(itemId, zoneName) { layoutTab.openTextEditor(itemId, zoneName) }
-                onConvertToTextRequested: function(itemId, itemType) { layoutTab.convertItemToText(itemId, itemType) }
+                onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
+                onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
                 onMoveUp: Settings.setZoneYOffset("centerTop", yOffset - 5)
                 onMoveDown: Settings.setZoneYOffset("centerTop", yOffset + 5)
             }
@@ -296,8 +293,8 @@ Item {
                 onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "centerMiddle") }
                 onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "centerMiddle") }
                 onAddItemRequested: function(type) { Settings.addItem(type, "centerMiddle") }
-                onEditTextRequested: function(itemId, zoneName) { layoutTab.openTextEditor(itemId, zoneName) }
-                onConvertToTextRequested: function(itemId, itemType) { layoutTab.convertItemToText(itemId, itemType) }
+                onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
+                onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
                 onMoveUp: Settings.setZoneYOffset("centerMiddle", yOffset - 5)
                 onMoveDown: Settings.setZoneYOffset("centerMiddle", yOffset + 5)
             }
@@ -320,8 +317,8 @@ Item {
                     onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "bottomLeft") }
                     onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "bottomLeft") }
                     onAddItemRequested: function(type) { Settings.addItem(type, "bottomLeft") }
-                    onEditTextRequested: function(itemId, zoneName) { layoutTab.openTextEditor(itemId, zoneName) }
-                onConvertToTextRequested: function(itemId, itemType) { layoutTab.convertItemToText(itemId, itemType) }
+                    onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
+                onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
                 }
 
                 LayoutEditorZone {
@@ -337,8 +334,8 @@ Item {
                     onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "bottomRight") }
                     onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "bottomRight") }
                     onAddItemRequested: function(type) { Settings.addItem(type, "bottomRight") }
-                    onEditTextRequested: function(itemId, zoneName) { layoutTab.openTextEditor(itemId, zoneName) }
-                onConvertToTextRequested: function(itemId, itemType) { layoutTab.convertItemToText(itemId, itemType) }
+                    onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
+                onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
                 }
             }
         }

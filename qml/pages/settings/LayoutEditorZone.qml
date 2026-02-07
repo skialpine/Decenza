@@ -23,8 +23,8 @@ Rectangle {
     signal addItemRequested(string type)
     signal moveUp()
     signal moveDown()
-    signal editTextRequested(string itemId, string zoneName)
-    signal convertToTextRequested(string itemId, string itemType)
+    signal editCustomRequested(string itemId, string zoneName)
+    signal convertToCustomRequested(string itemId, string itemType)
 
     Layout.fillWidth: true
     implicitHeight: zoneContent.implicitHeight + Theme.scaled(20)
@@ -122,8 +122,8 @@ Rectangle {
                     height: Theme.scaled(36)
                     radius: Theme.scaled(8)
                     color: modelData.id === root.selectedItemId ? Theme.primaryColor : Theme.backgroundColor
-                    border.color: Theme.borderColor
-                    border.width: 1
+                    border.color: modelData.type === "custom" && modelData.id !== root.selectedItemId ? "orange" : Theme.borderColor
+                    border.width: modelData.type === "custom" && modelData.id !== root.selectedItemId ? 2 : 1
 
                     property bool isSelected: modelData.id === root.selectedItemId
 
@@ -145,12 +145,44 @@ Rectangle {
                             }
                         }
 
+                        // Standard label for non-text items
                         Text {
+                            visible: modelData.type !== "custom"
                             text: getItemDisplayName(modelData.type)
                             color: modelData.id === root.selectedItemId
                                 ? "white"
-                                : ((modelData.type === "spacer" || modelData.type === "separator" || modelData.type === "text" || modelData.type === "weather") ? "orange" : Theme.textColor)
+                                : ((modelData.type === "spacer" || modelData.type === "separator" || modelData.type === "weather") ? "orange" : Theme.textColor)
                             font: Theme.bodyFont
+                        }
+
+                        // Mini preview for text items
+                        Row {
+                            visible: modelData.type === "custom"
+                            spacing: Theme.scaled(3)
+                            Layout.alignment: Qt.AlignVCenter
+
+                            Image {
+                                visible: (modelData.emoji || "").indexOf("qrc:") === 0
+                                source: visible ? (modelData.emoji || "") : ""
+                                sourceSize.width: Theme.scaled(18)
+                                sourceSize.height: Theme.scaled(18)
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+
+                            Text {
+                                visible: (modelData.emoji || "") !== "" && (modelData.emoji || "").indexOf("qrc:") !== 0
+                                text: modelData.emoji || ""
+                                font.family: Theme.emojiFontFamily
+                                font.pixelSize: Theme.scaled(14)
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+
+                            Text {
+                                text: root.getTextChipLabel(modelData)
+                                color: modelData.id === root.selectedItemId ? "white" : "orange"
+                                font: Theme.captionFont
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
                         }
 
                         // Move right arrow (only visible when selected)
@@ -166,7 +198,7 @@ Rectangle {
                             }
                         }
 
-                        // Convert to Text button (only for convertible types when selected)
+                        // Convert to Custom button (only for convertible types when selected)
                         Text {
                             visible: itemChip.isSelected && root.isConvertibleType(modelData.type)
                             text: "\u21C4"
@@ -176,7 +208,7 @@ Rectangle {
                             MouseArea {
                                 anchors.fill: parent
                                 anchors.margins: -Theme.scaled(4)
-                                onClicked: root.convertToTextRequested(modelData.id, modelData.type)
+                                onClicked: root.convertToCustomRequested(modelData.id, modelData.type)
                             }
                         }
 
@@ -200,8 +232,8 @@ Rectangle {
                         z: -1
                         onClicked: root.itemTapped(modelData.id)
                         onPressAndHold: {
-                            if (modelData.type === "text")
-                                root.editTextRequested(modelData.id, root.zoneName)
+                            if (modelData.type === "custom")
+                                root.editCustomRequested(modelData.id, root.zoneName)
                         }
                     }
                 }
@@ -303,7 +335,7 @@ Rectangle {
                             { type: "pageTitle", label: "Page Title" },
                             { type: "spacer", label: "Spacer" },
                             { type: "separator", label: "Separator" },
-                            { type: "text", label: "Text" },
+                            { type: "custom", label: "Custom" },
                             { type: "weather", label: "Weather" },
                             { type: "quit", label: "Quit" }
                         ]
@@ -319,7 +351,7 @@ Rectangle {
                                 anchors.leftMargin: Theme.scaled(12)
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: modelData.label
-                                color: (modelData.type === "spacer" || modelData.type === "separator" || modelData.type === "text" || modelData.type === "weather") ? "orange" : Theme.textColor
+                                color: (modelData.type === "spacer" || modelData.type === "separator" || modelData.type === "custom" || modelData.type === "weather") ? "orange" : Theme.textColor
                                 font: Theme.bodyFont
                             }
 
@@ -346,6 +378,54 @@ Rectangle {
         onClicked: root.zoneTapped()
     }
 
+    // Build a short label for a text item chip from its content/action
+    function getTextChipLabel(item) {
+        var content = item.content || ""
+
+        // Strip HTML tags to get plain text
+        var plain = content.replace(/<[^>]*>/g, "").trim()
+
+        // Replace variables with short readable labels
+        var varLabels = {
+            "%TEMP%": "92\u00B0", "%STEAM_TEMP%": "155\u00B0",
+            "%PRESSURE%": "9bar", "%FLOW%": "2.1ml",
+            "%WATER%": "78%", "%WATER_ML%": "850ml",
+            "%WEIGHT%": "36g", "%SHOT_TIME%": "28s",
+            "%TARGET_WEIGHT%": "36g", "%VOLUME%": "42ml",
+            "%PROFILE%": "Profile", "%STATE%": "Idle",
+            "%TARGET_TEMP%": "93\u00B0", "%SCALE%": "Scale",
+            "%TIME%": "14:30", "%DATE%": "2025-01",
+            "%RATIO%": "2.0", "%DOSE%": "18g",
+            "%CONNECTED%": "Online", "%CONNECTED_COLOR%": "",
+            "%DEVICES%": "Devices"
+        }
+        for (var token in varLabels) {
+            if (plain.indexOf(token) >= 0)
+                plain = plain.replace(new RegExp(token.replace(/%/g, "\\%"), "g"), varLabels[token])
+        }
+
+        if (plain && plain !== "Text" && plain !== "Custom") {
+            return plain.length > 14 ? plain.substring(0, 12) + ".." : plain
+        }
+
+        // Fall back to action target if content is just "Text"
+        var action = item.action || ""
+        if (action) {
+            var actionLabels = {
+                "navigate:settings": "Settings", "navigate:history": "History",
+                "navigate:profiles": "Profiles", "navigate:autofavorites": "Favorites",
+                "navigate:visualizer": "Visualizer", "navigate:recipes": "Recipes",
+                "command:sleep": "Sleep", "command:quit": "Quit",
+                "command:startEspresso": "Espresso", "command:startSteam": "Steam",
+                "command:startHotWater": "Hot Water", "command:startFlush": "Flush",
+                "command:tare": "Tare", "command:idle": "Stop"
+            }
+            if (actionLabels[action]) return actionLabels[action]
+        }
+
+        return "Custom"
+    }
+
     function getItemDisplayName(type) {
         var names = {
             "espresso": "Espresso", "steam": "Steam", "hotwater": "Hot Water",
@@ -355,7 +435,7 @@ Rectangle {
             "waterLevel": "Water",
             "connectionStatus": "Connection", "scaleWeight": "Scale",
             "shotPlan": "Shot Plan", "pageTitle": "Page Title",
-            "spacer": "Spacer", "separator": "Sep", "text": "Text",
+            "spacer": "Spacer", "separator": "Sep", "custom": "Custom",
             "weather": "Weather",
             "quit": "Quit"
         }

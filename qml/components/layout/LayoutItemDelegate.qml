@@ -30,7 +30,7 @@ Loader {
             case "scaleWeight":      src = "items/ScaleWeightItem.qml"; break
             case "shotPlan":         src = "items/ShotPlanItem.qml"; break
             case "spacer":           src = "items/SpacerItem.qml"; break
-            case "text":             src = "items/TextItem.qml"; break
+            case "custom":           src = "items/CustomItem.qml"; break
             case "weather":          src = "items/WeatherItem.qml"; break
             case "pageTitle":        src = "items/PageTitleItem.qml"; break
             case "steamTemperature": src = "items/SteamTemperatureItem.qml"; break

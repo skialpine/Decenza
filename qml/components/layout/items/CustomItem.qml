@@ -80,7 +80,7 @@ Item {
                 if (ch === '"') inQuote = false
                 else if (ch === '<') {
                     // Tag inside a quoted attribute — HTML is broken, strip all tags
-                    console.warn("[TextItem] Malformed HTML detected, stripping tags:", html.substring(0, 80))
+                    console.warn("[CustomItem] Malformed HTML detected, stripping tags:", html.substring(0, 80))
                     return html.replace(/<[^>]*>/g, "")
                 }
             } else if (inTag) {

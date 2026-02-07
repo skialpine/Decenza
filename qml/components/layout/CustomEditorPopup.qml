@@ -58,7 +58,7 @@ Popup {
             if (inQuote) {
                 if (ch === '"') inQuote = false
                 else if (ch === '<') {
-                    console.warn("[TextEditorPopup] Malformed HTML detected, stripping tags")
+                    console.warn("[CustomEditorPopup] Malformed HTML detected, stripping tags")
                     return html.replace(/<[^>]*>/g, "")
                 }
             } else if (inTag) {
@@ -76,9 +76,9 @@ Popup {
         zoneName = zone
         var rawContent = props.content || "Text"
         textContent = sanitizeHtml(rawContent)
-        // Auto-fix malformed content in settings so TextItem stops crashing
+        // Auto-fix malformed content in settings so CustomItem stops crashing
         if (textContent !== rawContent) {
-            console.warn("[TextEditorPopup] Auto-saved sanitized content for item:", id)
+            console.warn("[CustomEditorPopup] Auto-saved sanitized content for item:", id)
             Settings.setItemProperty(id, "content", textContent)
         }
         textAlign = props.align || "center"
