@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import DecenzaDE1
 import "../../components"
 import "../../components/layout"
+import "../../components/library"
 
 Item {
     id: layoutTab
@@ -11,6 +12,9 @@ Item {
     // Currently selected item for move operations
     property string selectedItemId: ""
     property string selectedFromZone: ""
+
+    // Currently selected zone for library operations
+    property string selectedZoneName: ""
 
     // Helper to get zone items from settings
     // Reading layoutConfiguration establishes a QML binding dependency
@@ -36,12 +40,16 @@ Item {
             selectedItemId = itemId
             selectedFromZone = zoneName
         }
+        // Clear zone selection when an item is selected
+        selectedZoneName = ""
     }
 
-    // Handle zone tap: move selected item to this zone
+    // Handle zone tap: toggle zone selection or clear item selection
     function onZoneTapped(targetZone) {
         selectedItemId = ""
         selectedFromZone = ""
+        // Toggle zone selection
+        selectedZoneName = (selectedZoneName === targetZone) ? "" : targetZone
     }
 
     // Handle item removal
@@ -133,211 +141,239 @@ Item {
         pageContext: "idle"
     }
 
-    ScrollView {
+    // Two-column layout: zone editors on left, library panel on right
+    RowLayout {
         anchors.fill: parent
-        contentWidth: availableWidth
+        spacing: Theme.spacingMedium
 
-        ColumnLayout {
-            width: parent.width
-            spacing: Theme.spacingMedium
+        // Left column: zone editors
+        ScrollView {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            contentWidth: availableWidth
 
-            // Title + Reset button
-            RowLayout {
-                Layout.fillWidth: true
+            ColumnLayout {
+                width: parent.width
+                spacing: Theme.spacingMedium
 
-                Tr {
-                    key: "settings.layout.title"
-                    fallback: "Home Screen Layout"
-                    font: Theme.subtitleFont
-                    color: Theme.textColor
+                // Title + Reset button
+                RowLayout {
+                    Layout.fillWidth: true
+
+                    Tr {
+                        key: "settings.layout.title"
+                        fallback: "Home Screen Layout"
+                        font: Theme.subtitleFont
+                        color: Theme.textColor
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    AccessibleButton {
+                        text: TranslationManager.translate("settings.layout.reset", "Reset to Default")
+                        accessibleName: TranslationManager.translate("settings.layout.reset", "Reset to Default")
+                        onClicked: {
+                            Settings.resetLayoutToDefault()
+                            layoutTab.selectedItemId = ""
+                            layoutTab.selectedFromZone = ""
+                            layoutTab.selectedZoneName = ""
+                        }
+                    }
                 }
 
-                Item { Layout.fillWidth: true }
+                // Instructions
+                Tr {
+                    key: "settings.layout.instructions"
+                    fallback: "Tap + to add widgets. Tap a widget to select it for moving or reordering. Long-press Custom items to edit."
+                    color: Theme.textSecondaryColor
+                    font: Theme.captionFont
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                }
 
-                AccessibleButton {
-                    text: TranslationManager.translate("settings.layout.reset", "Reset to Default")
-                    accessibleName: TranslationManager.translate("settings.layout.reset", "Reset to Default")
-                    onClicked: {
-                        Settings.resetLayoutToDefault()
-                        layoutTab.selectedItemId = ""
-                        layoutTab.selectedFromZone = ""
+                // Status Bar zone (visible on all pages)
+                LayoutEditorZone {
+                    Layout.fillWidth: true
+                    zoneName: "statusBar"
+                    zoneLabel: TranslationManager.translate("settings.layout.zone.statusbar", "Status Bar (All Pages)")
+                    items: layoutTab.getZoneItems("statusBar")
+                    selectedItemId: layoutTab.selectedItemId
+                    zoneSelected: layoutTab.selectedZoneName === "statusBar"
+
+                    onItemTapped: function(itemId) { layoutTab.onItemTapped(itemId, "statusBar") }
+                    onZoneTapped: layoutTab.onZoneTapped("statusBar")
+                    onItemRemoved: function(itemId) { layoutTab.onItemRemoved(itemId, "statusBar") }
+                    onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "statusBar") }
+                    onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "statusBar") }
+                    onAddItemRequested: function(type) { Settings.addItem(type, "statusBar") }
+                    onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
+                    onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
+                }
+
+                // Zone cards - paired top zones
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingMedium
+
+                    LayoutEditorZone {
+                        Layout.fillWidth: true
+                        zoneName: "topLeft"
+                        zoneLabel: TranslationManager.translate("settings.layout.zone.topleft", "Top Bar (Left)")
+                        items: layoutTab.getZoneItems("topLeft")
+                        selectedItemId: layoutTab.selectedItemId
+                        zoneSelected: layoutTab.selectedZoneName === "topLeft"
+
+                        onItemTapped: function(itemId) { layoutTab.onItemTapped(itemId, "topLeft") }
+                        onZoneTapped: layoutTab.onZoneTapped("topLeft")
+                        onItemRemoved: function(itemId) { layoutTab.onItemRemoved(itemId, "topLeft") }
+                        onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "topLeft") }
+                        onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "topLeft") }
+                        onAddItemRequested: function(type) { Settings.addItem(type, "topLeft") }
+                        onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
+                        onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
+                    }
+
+                    LayoutEditorZone {
+                        Layout.fillWidth: true
+                        zoneName: "topRight"
+                        zoneLabel: TranslationManager.translate("settings.layout.zone.topright", "Top Bar (Right)")
+                        items: layoutTab.getZoneItems("topRight")
+                        selectedItemId: layoutTab.selectedItemId
+                        zoneSelected: layoutTab.selectedZoneName === "topRight"
+
+                        onItemTapped: function(itemId) { layoutTab.onItemTapped(itemId, "topRight") }
+                        onZoneTapped: layoutTab.onZoneTapped("topRight")
+                        onItemRemoved: function(itemId) { layoutTab.onItemRemoved(itemId, "topRight") }
+                        onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "topRight") }
+                        onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "topRight") }
+                        onAddItemRequested: function(type) { Settings.addItem(type, "topRight") }
+                        onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
+                        onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
+                    }
+                }
+
+                // Center Status zone (readouts)
+                LayoutEditorZone {
+                    Layout.fillWidth: true
+                    zoneName: "centerStatus"
+                    zoneLabel: TranslationManager.translate("settings.layout.zone.centerstatus", "Center - Top")
+                    items: layoutTab.getZoneItems("centerStatus")
+                    selectedItemId: layoutTab.selectedItemId
+                    zoneSelected: layoutTab.selectedZoneName === "centerStatus"
+                    showPositionControls: true
+                    yOffset: layoutTab.getZoneYOffset("centerStatus")
+
+                    onItemTapped: function(itemId) { layoutTab.onItemTapped(itemId, "centerStatus") }
+                    onZoneTapped: layoutTab.onZoneTapped("centerStatus")
+                    onItemRemoved: function(itemId) { layoutTab.onItemRemoved(itemId, "centerStatus") }
+                    onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "centerStatus") }
+                    onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "centerStatus") }
+                    onAddItemRequested: function(type) { Settings.addItem(type, "centerStatus") }
+                    onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
+                    onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
+                    onMoveUp: Settings.setZoneYOffset("centerStatus", yOffset - 5)
+                    onMoveDown: Settings.setZoneYOffset("centerStatus", yOffset + 5)
+                }
+
+                // Center Top zone
+                LayoutEditorZone {
+                    Layout.fillWidth: true
+                    zoneName: "centerTop"
+                    zoneLabel: TranslationManager.translate("settings.layout.zone.centertop", "Center - Action Buttons")
+                    items: layoutTab.getZoneItems("centerTop")
+                    selectedItemId: layoutTab.selectedItemId
+                    zoneSelected: layoutTab.selectedZoneName === "centerTop"
+                    showPositionControls: true
+                    yOffset: layoutTab.getZoneYOffset("centerTop")
+
+                    onItemTapped: function(itemId) { layoutTab.onItemTapped(itemId, "centerTop") }
+                    onZoneTapped: layoutTab.onZoneTapped("centerTop")
+                    onItemRemoved: function(itemId) { layoutTab.onItemRemoved(itemId, "centerTop") }
+                    onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "centerTop") }
+                    onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "centerTop") }
+                    onAddItemRequested: function(type) { Settings.addItem(type, "centerTop") }
+                    onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
+                    onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
+                    onMoveUp: Settings.setZoneYOffset("centerTop", yOffset - 5)
+                    onMoveDown: Settings.setZoneYOffset("centerTop", yOffset + 5)
+                }
+
+                // Center Middle zone
+                LayoutEditorZone {
+                    Layout.fillWidth: true
+                    zoneName: "centerMiddle"
+                    zoneLabel: TranslationManager.translate("settings.layout.zone.centermiddle", "Center - Info")
+                    items: layoutTab.getZoneItems("centerMiddle")
+                    selectedItemId: layoutTab.selectedItemId
+                    zoneSelected: layoutTab.selectedZoneName === "centerMiddle"
+                    showPositionControls: true
+                    yOffset: layoutTab.getZoneYOffset("centerMiddle")
+
+                    onItemTapped: function(itemId) { layoutTab.onItemTapped(itemId, "centerMiddle") }
+                    onZoneTapped: layoutTab.onZoneTapped("centerMiddle")
+                    onItemRemoved: function(itemId) { layoutTab.onItemRemoved(itemId, "centerMiddle") }
+                    onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "centerMiddle") }
+                    onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "centerMiddle") }
+                    onAddItemRequested: function(type) { Settings.addItem(type, "centerMiddle") }
+                    onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
+                    onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
+                    onMoveUp: Settings.setZoneYOffset("centerMiddle", yOffset - 5)
+                    onMoveDown: Settings.setZoneYOffset("centerMiddle", yOffset + 5)
+                }
+
+                // Bottom bar zones
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingMedium
+
+                    LayoutEditorZone {
+                        Layout.fillWidth: true
+                        zoneName: "bottomLeft"
+                        zoneLabel: TranslationManager.translate("settings.layout.zone.bottomleft", "Bottom Bar (Left)")
+                        items: layoutTab.getZoneItems("bottomLeft")
+                        selectedItemId: layoutTab.selectedItemId
+                        zoneSelected: layoutTab.selectedZoneName === "bottomLeft"
+
+                        onItemTapped: function(itemId) { layoutTab.onItemTapped(itemId, "bottomLeft") }
+                        onZoneTapped: layoutTab.onZoneTapped("bottomLeft")
+                        onItemRemoved: function(itemId) { layoutTab.onItemRemoved(itemId, "bottomLeft") }
+                        onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "bottomLeft") }
+                        onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "bottomLeft") }
+                        onAddItemRequested: function(type) { Settings.addItem(type, "bottomLeft") }
+                        onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
+                        onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
+                    }
+
+                    LayoutEditorZone {
+                        Layout.fillWidth: true
+                        zoneName: "bottomRight"
+                        zoneLabel: TranslationManager.translate("settings.layout.zone.bottomright", "Bottom Bar (Right)")
+                        items: layoutTab.getZoneItems("bottomRight")
+                        selectedItemId: layoutTab.selectedItemId
+                        zoneSelected: layoutTab.selectedZoneName === "bottomRight"
+
+                        onItemTapped: function(itemId) { layoutTab.onItemTapped(itemId, "bottomRight") }
+                        onZoneTapped: layoutTab.onZoneTapped("bottomRight")
+                        onItemRemoved: function(itemId) { layoutTab.onItemRemoved(itemId, "bottomRight") }
+                        onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "bottomRight") }
+                        onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "bottomRight") }
+                        onAddItemRequested: function(type) { Settings.addItem(type, "bottomRight") }
+                        onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
+                        onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
                     }
                 }
             }
+        }
 
-            // Instructions
-            Tr {
-                key: "settings.layout.instructions"
-                fallback: "Tap + to add widgets. Tap a widget to select it for moving or reordering. Long-press Custom items to edit."
-                color: Theme.textSecondaryColor
-                font: Theme.captionFont
-                Layout.fillWidth: true
-                wrapMode: Text.Wrap
-            }
+        // Right column: Library panel
+        LibraryPanel {
+            Layout.preferredWidth: Theme.scaled(260)
+            Layout.minimumWidth: Theme.scaled(200)
+            Layout.fillHeight: true
 
-            // Status Bar zone (visible on all pages)
-            LayoutEditorZone {
-                Layout.fillWidth: true
-                zoneName: "statusBar"
-                zoneLabel: TranslationManager.translate("settings.layout.zone.statusbar", "Status Bar (All Pages)")
-                items: layoutTab.getZoneItems("statusBar")
-                selectedItemId: layoutTab.selectedItemId
-
-                onItemTapped: function(itemId) { layoutTab.onItemTapped(itemId, "statusBar") }
-                onZoneTapped: layoutTab.onZoneTapped("statusBar")
-                onItemRemoved: function(itemId) { layoutTab.onItemRemoved(itemId, "statusBar") }
-                onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "statusBar") }
-                onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "statusBar") }
-                onAddItemRequested: function(type) { Settings.addItem(type, "statusBar") }
-                onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
-                onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
-            }
-
-            // Zone cards - paired top zones
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Theme.spacingMedium
-
-                LayoutEditorZone {
-                    Layout.fillWidth: true
-                    zoneName: "topLeft"
-                    zoneLabel: TranslationManager.translate("settings.layout.zone.topleft", "Top Bar (Left)")
-                    items: layoutTab.getZoneItems("topLeft")
-                    selectedItemId: layoutTab.selectedItemId
-
-                    onItemTapped: function(itemId) { layoutTab.onItemTapped(itemId, "topLeft") }
-                    onZoneTapped: layoutTab.onZoneTapped("topLeft")
-                    onItemRemoved: function(itemId) { layoutTab.onItemRemoved(itemId, "topLeft") }
-                    onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "topLeft") }
-                    onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "topLeft") }
-                    onAddItemRequested: function(type) { Settings.addItem(type, "topLeft") }
-                    onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
-                onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
-                }
-
-                LayoutEditorZone {
-                    Layout.fillWidth: true
-                    zoneName: "topRight"
-                    zoneLabel: TranslationManager.translate("settings.layout.zone.topright", "Top Bar (Right)")
-                    items: layoutTab.getZoneItems("topRight")
-                    selectedItemId: layoutTab.selectedItemId
-
-                    onItemTapped: function(itemId) { layoutTab.onItemTapped(itemId, "topRight") }
-                    onZoneTapped: layoutTab.onZoneTapped("topRight")
-                    onItemRemoved: function(itemId) { layoutTab.onItemRemoved(itemId, "topRight") }
-                    onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "topRight") }
-                    onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "topRight") }
-                    onAddItemRequested: function(type) { Settings.addItem(type, "topRight") }
-                    onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
-                onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
-                }
-            }
-
-            // Center Status zone (readouts)
-            LayoutEditorZone {
-                Layout.fillWidth: true
-                zoneName: "centerStatus"
-                zoneLabel: TranslationManager.translate("settings.layout.zone.centerstatus", "Center - Top")
-                items: layoutTab.getZoneItems("centerStatus")
-                selectedItemId: layoutTab.selectedItemId
-                showPositionControls: true
-                yOffset: layoutTab.getZoneYOffset("centerStatus")
-
-                onItemTapped: function(itemId) { layoutTab.onItemTapped(itemId, "centerStatus") }
-                onZoneTapped: layoutTab.onZoneTapped("centerStatus")
-                onItemRemoved: function(itemId) { layoutTab.onItemRemoved(itemId, "centerStatus") }
-                onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "centerStatus") }
-                onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "centerStatus") }
-                onAddItemRequested: function(type) { Settings.addItem(type, "centerStatus") }
-                onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
-                onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
-                onMoveUp: Settings.setZoneYOffset("centerStatus", yOffset - 5)
-                onMoveDown: Settings.setZoneYOffset("centerStatus", yOffset + 5)
-            }
-
-            // Center Top zone
-            LayoutEditorZone {
-                Layout.fillWidth: true
-                zoneName: "centerTop"
-                zoneLabel: TranslationManager.translate("settings.layout.zone.centertop", "Center - Action Buttons")
-                items: layoutTab.getZoneItems("centerTop")
-                selectedItemId: layoutTab.selectedItemId
-                showPositionControls: true
-                yOffset: layoutTab.getZoneYOffset("centerTop")
-
-                onItemTapped: function(itemId) { layoutTab.onItemTapped(itemId, "centerTop") }
-                onZoneTapped: layoutTab.onZoneTapped("centerTop")
-                onItemRemoved: function(itemId) { layoutTab.onItemRemoved(itemId, "centerTop") }
-                onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "centerTop") }
-                onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "centerTop") }
-                onAddItemRequested: function(type) { Settings.addItem(type, "centerTop") }
-                onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
-                onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
-                onMoveUp: Settings.setZoneYOffset("centerTop", yOffset - 5)
-                onMoveDown: Settings.setZoneYOffset("centerTop", yOffset + 5)
-            }
-
-            // Center Middle zone
-            LayoutEditorZone {
-                Layout.fillWidth: true
-                zoneName: "centerMiddle"
-                zoneLabel: TranslationManager.translate("settings.layout.zone.centermiddle", "Center - Info")
-                items: layoutTab.getZoneItems("centerMiddle")
-                selectedItemId: layoutTab.selectedItemId
-                showPositionControls: true
-                yOffset: layoutTab.getZoneYOffset("centerMiddle")
-
-                onItemTapped: function(itemId) { layoutTab.onItemTapped(itemId, "centerMiddle") }
-                onZoneTapped: layoutTab.onZoneTapped("centerMiddle")
-                onItemRemoved: function(itemId) { layoutTab.onItemRemoved(itemId, "centerMiddle") }
-                onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "centerMiddle") }
-                onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "centerMiddle") }
-                onAddItemRequested: function(type) { Settings.addItem(type, "centerMiddle") }
-                onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
-                onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
-                onMoveUp: Settings.setZoneYOffset("centerMiddle", yOffset - 5)
-                onMoveDown: Settings.setZoneYOffset("centerMiddle", yOffset + 5)
-            }
-
-            // Bottom bar zones
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Theme.spacingMedium
-
-                LayoutEditorZone {
-                    Layout.fillWidth: true
-                    zoneName: "bottomLeft"
-                    zoneLabel: TranslationManager.translate("settings.layout.zone.bottomleft", "Bottom Bar (Left)")
-                    items: layoutTab.getZoneItems("bottomLeft")
-                    selectedItemId: layoutTab.selectedItemId
-
-                    onItemTapped: function(itemId) { layoutTab.onItemTapped(itemId, "bottomLeft") }
-                    onZoneTapped: layoutTab.onZoneTapped("bottomLeft")
-                    onItemRemoved: function(itemId) { layoutTab.onItemRemoved(itemId, "bottomLeft") }
-                    onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "bottomLeft") }
-                    onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "bottomLeft") }
-                    onAddItemRequested: function(type) { Settings.addItem(type, "bottomLeft") }
-                    onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
-                onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
-                }
-
-                LayoutEditorZone {
-                    Layout.fillWidth: true
-                    zoneName: "bottomRight"
-                    zoneLabel: TranslationManager.translate("settings.layout.zone.bottomright", "Bottom Bar (Right)")
-                    items: layoutTab.getZoneItems("bottomRight")
-                    selectedItemId: layoutTab.selectedItemId
-
-                    onItemTapped: function(itemId) { layoutTab.onItemTapped(itemId, "bottomRight") }
-                    onZoneTapped: layoutTab.onZoneTapped("bottomRight")
-                    onItemRemoved: function(itemId) { layoutTab.onItemRemoved(itemId, "bottomRight") }
-                    onMoveLeft: function(itemId) { layoutTab.onMoveLeft(itemId, "bottomRight") }
-                    onMoveRight: function(itemId) { layoutTab.onMoveRight(itemId, "bottomRight") }
-                    onAddItemRequested: function(type) { Settings.addItem(type, "bottomRight") }
-                    onEditCustomRequested: function(itemId, zoneName) { layoutTab.openCustomEditor(itemId, zoneName) }
-                onConvertToCustomRequested: function(itemId, itemType) { layoutTab.convertItemToCustom(itemId, itemType) }
-                }
-            }
+            selectedItemId: layoutTab.selectedItemId
+            selectedFromZone: layoutTab.selectedFromZone
+            selectedZoneName: layoutTab.selectedZoneName
         }
     }
 }

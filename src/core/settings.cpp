@@ -7,6 +7,7 @@
 #include <QUrl>
 #include <QtMath>
 #include <QColor>
+#include <QUuid>
 
 #ifdef Q_OS_ANDROID
 #include <QJniObject>
@@ -2738,6 +2739,16 @@ QVariantMap Settings::getItemProperties(const QString& itemId) const {
         }
     }
     return QVariantMap();
+}
+
+// Device identity
+QString Settings::deviceId() const {
+    QString id = m_settings.value("device/uuid").toString();
+    if (id.isEmpty()) {
+        id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        const_cast<QSettings&>(m_settings).setValue("device/uuid", id);
+    }
+    return id;
 }
 
 // Generic settings access

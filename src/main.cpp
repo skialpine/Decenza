@@ -43,6 +43,8 @@
 #include "screensaver/pipegeometry.h"
 #include "screensaver/strangeattractorrenderer.h"
 #include "network/webdebuglogger.h"
+#include "core/widgetlibrary.h"
+#include "network/librarysharing.h"
 #include "weather/weathermanager.h"
 
 // GHC Simulator for Windows debug builds
@@ -208,6 +210,12 @@ int main(int argc, char *argv[])
     BatteryManager batteryManager;
     batteryManager.setDE1Device(&de1Device);
     batteryManager.setSettings(&settings);
+
+    // Widget library for saving/sharing layout items, zones, and layouts
+    WidgetLibrary widgetLibrary(&settings);
+
+    // Library sharing - upload/download widgets to/from decenza.coffee
+    LibrarySharing librarySharing(&settings, &widgetLibrary);
 
     // Weather forecast manager (hourly updates, region-aware API selection)
     WeatherManager weatherManager;
@@ -429,6 +437,8 @@ int main(int argc, char *argv[])
     context->setContextProperty("ProfileStorage", &profileStorage);
     context->setContextProperty("WeatherManager", &weatherManager);
     context->setContextProperty("CrashReporter", &crashReporter);
+    context->setContextProperty("WidgetLibrary", &widgetLibrary);
+    context->setContextProperty("LibrarySharing", &librarySharing);
     context->setContextProperty("PreviousCrashLog", previousCrashLog);
     context->setContextProperty("PreviousDebugLogTail", previousDebugLogTail);
     context->setContextProperty("AppVersion", VERSION_STRING);

@@ -12,6 +12,7 @@ Rectangle {
     property string zoneLabel: ""
     property var items: []
     property string selectedItemId: ""
+    property bool zoneSelected: false
     property bool showPositionControls: false
     property int yOffset: 0
 
@@ -30,8 +31,8 @@ Rectangle {
     implicitHeight: zoneContent.implicitHeight + Theme.scaled(20)
     color: Theme.surfaceColor
     radius: Theme.cardRadius
-    border.color: Theme.borderColor
-    border.width: 1
+    border.color: zoneSelected ? Theme.primaryColor : Theme.borderColor
+    border.width: zoneSelected ? 2 : 1
 
     ColumnLayout {
         id: zoneContent

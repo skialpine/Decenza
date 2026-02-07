@@ -564,6 +564,9 @@ public:
     Q_INVOKABLE void setItemProperty(const QString& itemId, const QString& key, const QVariant& value);
     Q_INVOKABLE QVariantMap getItemProperties(const QString& itemId) const;
 
+    // Device identity (stable UUID for server communication)
+    Q_INVOKABLE QString deviceId() const;
+
     // Generic settings access (for extensibility)
     Q_INVOKABLE QVariant value(const QString& key, const QVariant& defaultValue = QVariant()) const;
     Q_INVOKABLE void setValue(const QString& key, const QVariant& value);

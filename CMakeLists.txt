@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(Decenza_DE1 VERSION 1.3.9 LANGUAGES CXX)
+project(Decenza_DE1 VERSION 1.4.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -120,6 +120,7 @@ endif()
 set(SOURCES
     src/main.cpp
     src/core/settings.cpp
+    src/core/widgetlibrary.cpp
     src/core/batterymanager.cpp
     src/core/accessibilitymanager.cpp
     src/core/autowakemanager.cpp
@@ -178,6 +179,7 @@ set(SOURCES
     src/network/locationprovider.cpp
     src/network/shotreporter.cpp
     src/network/crashreporter.cpp
+    src/network/librarysharing.cpp
     src/core/settingsserializer.cpp
     src/core/datamigrationclient.cpp
     src/weather/weathermanager.cpp
@@ -201,6 +203,7 @@ endif()
 
 set(HEADERS
     src/core/settings.h
+    src/core/widgetlibrary.h
     src/core/batterymanager.h
     src/core/accessibilitymanager.h
     src/core/autowakemanager.h
@@ -260,6 +263,7 @@ set(HEADERS
     src/network/locationprovider.h
     src/network/shotreporter.h
     src/network/crashreporter.h
+    src/network/librarysharing.h
     src/core/settingsserializer.h
     src/core/datamigrationclient.h
     src/weather/weathermanager.h
@@ -447,6 +451,10 @@ set(QML_FILES
     qml/components/layout/CustomEditorPopup.qml
     qml/components/layout/EmojiPicker.qml
     qml/components/layout/EmojiData.js
+    qml/components/library/LibraryPanel.qml
+    qml/components/library/LibraryItemCard.qml
+    qml/components/library/SaveToLibraryDialog.qml
+    qml/pages/CommunityBrowserPage.qml
 )
 
 # Simulator QML - Windows Debug or macOS
