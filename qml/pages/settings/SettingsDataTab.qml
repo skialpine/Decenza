@@ -4,8 +4,9 @@ import QtQuick.Layouts
 import DecenzaDE1
 import "../../components"
 
-Item {
+KeyboardAwareContainer {
     id: dataTab
+    textFields: [manualIpField]
 
     RowLayout {
         anchors.fill: parent
@@ -271,11 +272,70 @@ Item {
                         visible: !MainController.dataMigration.isSearching &&
                                  MainController.dataMigration.discoveredDevices.length === 0 &&
                                  MainController.dataMigration.currentOperation === TranslationManager.translate("settings.data.nodevices", "No devices found")
-                        text: TranslationManager.translate("settings.data.nodeviceshint", "Make sure the other device has the web server enabled in Settings.")
+                        text: TranslationManager.translate("settings.data.nodeviceshint", "Make sure the other device has Remote Access enabled in Shot History settings.")
                         color: Theme.textSecondaryColor
                         font.pixelSize: Theme.scaled(11)
                         wrapMode: Text.WordWrap
                         Layout.fillWidth: true
+                    }
+
+                    // Manual IP entry (shown after search completes, whether devices found or not)
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.scaled(8)
+                        visible: !MainController.dataMigration.isSearching &&
+                                 MainController.dataMigration.currentOperation !== "" &&
+                                 MainController.dataMigration.currentOperation !== TranslationManager.translate("settings.data.searchdevices", "Search for Devices")
+
+                        Item { height: Theme.scaled(5) }
+
+                        Text {
+                            text: TranslationManager.translate("settings.data.manualconnect", "Manual Connection")
+                            color: Theme.textSecondaryColor
+                            font.pixelSize: Theme.scaled(11)
+                            font.bold: true
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: TranslationManager.translate("settings.data.manualconnecthint", "Enter the IP address and port of the device (example: 192.168.1.100:8888)")
+                            color: Theme.textSecondaryColor
+                            font.pixelSize: Theme.scaled(10)
+                            wrapMode: Text.WordWrap
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.scaled(8)
+
+                            StyledTextField {
+                                id: manualIpField
+                                Layout.fillWidth: true
+                                placeholderText: "192.168.1.100:8888"
+
+                                // Auto-focus when visible
+                                Component.onCompleted: {
+                                    if (visible) {
+                                        forceActiveFocus()
+                                    }
+                                }
+                            }
+
+                            AccessibleButton {
+                                text: TranslationManager.translate("settings.data.connect", "Connect")
+                                accessibleName: TranslationManager.translate("settings.data.connectmanual", "Connect to manually entered address")
+                                primary: true
+                                enabled: manualIpField.text.trim().length > 0
+                                onClicked: {
+                                    var address = manualIpField.text.trim()
+                                    // If user didn't include http://, add it
+                                    if (!address.startsWith("http://") && !address.startsWith("https://")) {
+                                        address = "http://" + address
+                                    }
+                                    MainController.dataMigration.connectToServer(address)
+                                }
+                            }
+                        }
                     }
                 }
 

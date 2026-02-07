@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.github.kulitorum.decenza_de1"
-    android:versionCode="2528"
+    android:versionCode="2534"
     android:versionName="1.4.0">
 
     <uses-permission android:name="android.permission.BLUETOOTH" />
@@ -11,6 +11,10 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Network discovery permissions for device-to-device data migration -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <!-- Storage permissions -->
     <!-- Android 9 (SDK 28): needs WRITE_EXTERNAL_STORAGE -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
