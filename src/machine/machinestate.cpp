@@ -374,7 +374,17 @@ void MachineState::onScaleWeightChanged(double weight) {
     }
 
     // Auto-tare when cup is removed (significant weight drop while idle)
+    // BUT: don't trigger during SAW settling (scale readings are unstable)
     if (m_phase == Phase::Ready || m_phase == Phase::Idle) {
+        // Skip auto-tare if SAW settling is in progress (prevents false triggers from scale glitches)
+        bool isSettling = m_timingController && m_timingController->isSawSettling();
+        if (isSettling) {
+            // Update tracking variables but don't auto-tare
+            m_lastIdleWeight = weight;
+            m_lastWeightTime = QDateTime::currentMSecsSinceEpoch();
+            return;
+        }
+
         qint64 now = QDateTime::currentMSecsSinceEpoch();
 
         // Detect cup removal: weight was >50g and dropped to <10g within 2 seconds

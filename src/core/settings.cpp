@@ -1597,6 +1597,10 @@ void Settings::setDefaultShotRating(int rating) {
     if (defaultShotRating() != rating) {
         m_settings.setValue("shot/defaultRating", rating);
         emit defaultShotRatingChanged();
+
+        // Also update the current shot's enjoyment rating so the new default
+        // applies immediately to the next shot (not the shot after that)
+        setDyeEspressoEnjoyment(rating);
     }
 }
 

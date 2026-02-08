@@ -11,6 +11,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QRegularExpression>
 #include <QDebug>
 #include <algorithm>
 
@@ -164,12 +165,14 @@ bool ShotHistoryStorage::createTables()
         return false;
     }
 
-    // Full-text search
+    // Full-text search (includes notes, beans, profile, and grinder)
     QString createFts = R"(
         CREATE VIRTUAL TABLE IF NOT EXISTS shots_fts USING fts5(
             espresso_notes,
             bean_brand,
             bean_type,
+            profile_name,
+            grinder_model,
             content='shots',
             content_rowid='id'
         )
@@ -183,24 +186,24 @@ bool ShotHistoryStorage::createTables()
     // Triggers for FTS sync
     query.exec(R"(
         CREATE TRIGGER IF NOT EXISTS shots_ai AFTER INSERT ON shots BEGIN
-            INSERT INTO shots_fts(rowid, espresso_notes, bean_brand, bean_type)
-            VALUES (new.id, new.espresso_notes, new.bean_brand, new.bean_type);
+            INSERT INTO shots_fts(rowid, espresso_notes, bean_brand, bean_type, profile_name, grinder_model)
+            VALUES (new.id, new.espresso_notes, new.bean_brand, new.bean_type, new.profile_name, new.grinder_model);
         END
     )");
 
     query.exec(R"(
         CREATE TRIGGER IF NOT EXISTS shots_ad AFTER DELETE ON shots BEGIN
-            INSERT INTO shots_fts(shots_fts, rowid, espresso_notes, bean_brand, bean_type)
-            VALUES ('delete', old.id, old.espresso_notes, old.bean_brand, old.bean_type);
+            INSERT INTO shots_fts(shots_fts, rowid, espresso_notes, bean_brand, bean_type, profile_name, grinder_model)
+            VALUES ('delete', old.id, old.espresso_notes, old.bean_brand, old.bean_type, old.profile_name, old.grinder_model);
         END
     )");
 
     query.exec(R"(
         CREATE TRIGGER IF NOT EXISTS shots_au AFTER UPDATE ON shots BEGIN
-            INSERT INTO shots_fts(shots_fts, rowid, espresso_notes, bean_brand, bean_type)
-            VALUES ('delete', old.id, old.espresso_notes, old.bean_brand, old.bean_type);
-            INSERT INTO shots_fts(rowid, espresso_notes, bean_brand, bean_type)
-            VALUES (new.id, new.espresso_notes, new.bean_brand, new.bean_type);
+            INSERT INTO shots_fts(shots_fts, rowid, espresso_notes, bean_brand, bean_type, profile_name, grinder_model)
+            VALUES ('delete', old.id, old.espresso_notes, old.bean_brand, old.bean_type, old.profile_name, old.grinder_model);
+            INSERT INTO shots_fts(rowid, espresso_notes, bean_brand, bean_type, profile_name, grinder_model)
+            VALUES (new.id, new.espresso_notes, new.bean_brand, new.bean_type, new.profile_name, new.grinder_model);
         END
     )");
 
@@ -258,6 +261,58 @@ bool ShotHistoryStorage::runMigrations()
 
         query.exec("UPDATE schema_version SET version = 4");
         currentVersion = 4;
+    }
+
+    // Migration 5: Add profile_name and grinder_model to FTS search
+    if (currentVersion < 5) {
+        qDebug() << "ShotHistoryStorage: Running migration to version 5 (FTS profile_name + grinder_model)";
+
+        // Drop old FTS table and triggers
+        query.exec("DROP TRIGGER IF EXISTS shots_ai");
+        query.exec("DROP TRIGGER IF EXISTS shots_ad");
+        query.exec("DROP TRIGGER IF EXISTS shots_au");
+        query.exec("DROP TABLE IF EXISTS shots_fts");
+
+        // Create the FTS table (must do it here, not rely on createTables())
+        if (!query.exec(R"(
+            CREATE VIRTUAL TABLE IF NOT EXISTS shots_fts USING fts5(
+                espresso_notes, bean_brand, bean_type, profile_name, grinder_model,
+                content='shots', content_rowid='id'
+            )
+        )")) {
+            qWarning() << "Migration 5: Failed to create FTS table:" << query.lastError().text();
+        }
+
+        // Create triggers
+        query.exec(R"(
+            CREATE TRIGGER IF NOT EXISTS shots_ai AFTER INSERT ON shots BEGIN
+                INSERT INTO shots_fts(rowid, espresso_notes, bean_brand, bean_type, profile_name, grinder_model)
+                VALUES (new.id, new.espresso_notes, new.bean_brand, new.bean_type, new.profile_name, new.grinder_model);
+            END
+        )");
+        query.exec(R"(
+            CREATE TRIGGER IF NOT EXISTS shots_ad AFTER DELETE ON shots BEGIN
+                INSERT INTO shots_fts(shots_fts, rowid, espresso_notes, bean_brand, bean_type, profile_name, grinder_model)
+                VALUES ('delete', old.id, old.espresso_notes, old.bean_brand, old.bean_type, old.profile_name, old.grinder_model);
+            END
+        )");
+        query.exec(R"(
+            CREATE TRIGGER IF NOT EXISTS shots_au AFTER UPDATE ON shots BEGIN
+                INSERT INTO shots_fts(shots_fts, rowid, espresso_notes, bean_brand, bean_type, profile_name, grinder_model)
+                VALUES ('delete', old.id, old.espresso_notes, old.bean_brand, old.bean_type, old.profile_name, old.grinder_model);
+                INSERT INTO shots_fts(rowid, espresso_notes, bean_brand, bean_type, profile_name, grinder_model)
+                VALUES (new.id, new.espresso_notes, new.bean_brand, new.bean_type, new.profile_name, new.grinder_model);
+            END
+        )");
+
+        // Rebuild FTS index from existing shots
+        query.exec(R"(
+            INSERT INTO shots_fts(rowid, espresso_notes, bean_brand, bean_type, profile_name, grinder_model)
+            SELECT id, espresso_notes, bean_brand, bean_type, profile_name, grinder_model FROM shots
+        )");
+
+        query.exec("UPDATE schema_version SET version = 5");
+        currentVersion = 5;
     }
 
     m_schemaVersion = currentVersion;
@@ -579,21 +634,29 @@ QString ShotHistoryStorage::buildFilterQuery(const ShotFilter& filter, QVariantL
 
 QString ShotHistoryStorage::formatFtsQuery(const QString& userInput)
 {
-    // FTS5 special characters that need quoting: " ( ) * : ^
-    // We'll wrap each word in quotes and add * for prefix matching
+    // FTS5 tokenizes on punctuation (hyphens, slashes, etc)
+    // So "D-Flow / Q" becomes tokens: "D", "Flow", "Q"
+    // We need to split user input the same way to match
 
     QString cleaned = userInput.simplified();
     if (cleaned.isEmpty()) {
         return QString();
     }
 
-    QStringList words = cleaned.split(' ', Qt::SkipEmptyParts);
+    // Replace common punctuation with spaces so "d-flo" becomes "d flo"
+    // This matches how FTS5 tokenizes the indexed data
+    QString normalized = cleaned;
+    normalized.replace(QRegularExpression("[\\-/\\.]"), " ");
+
+    QStringList words = normalized.split(' ', Qt::SkipEmptyParts);
     QStringList terms;
 
     for (const QString& word : words) {
         // Escape double quotes by doubling them
         QString escaped = word;
         escaped.replace('"', "\"\"");
+        // Escape single quotes (for SQL string literal embedding)
+        escaped.replace('\'', "''");
         // Use prefix matching with * for partial word matches
         // Wrap in quotes to handle special characters
         terms << QString("\"%1\"*").arg(escaped);
@@ -614,23 +677,41 @@ QVariantList ShotHistoryStorage::getShotsFiltered(const QVariantMap& filterMap, 
 
     // Handle FTS search separately
     QString sql;
+    QString ftsQuery;
+
     if (!filter.searchText.isEmpty()) {
         // Format search text for FTS5: escape special chars and add prefix wildcards
-        QString ftsQuery = formatFtsQuery(filter.searchText);
+        ftsQuery = formatFtsQuery(filter.searchText);
 
+        // If formatFtsQuery returns empty (invalid input), skip FTS search
+        if (ftsQuery.isEmpty()) {
+            qWarning() << "ShotHistoryStorage: Empty FTS query from input:" << filter.searchText;
+        }
+    }
+
+    if (!ftsQuery.isEmpty()) {
+        // FTS5 query - embed FTS query directly in SQL (Qt's SQLite driver
+        // doesn't support parameterized queries for FTS5 MATCH)
+        // ftsQuery is already sanitized by formatFtsQuery() (quoted + escaped)
+        // whereClause starts with " WHERE ..." but we already have a WHERE,
+        // so replace the leading WHERE with AND
+        QString extraConditions;
+        if (!whereClause.isEmpty()) {
+            extraConditions = whereClause;
+            extraConditions.replace(extraConditions.indexOf("WHERE"), 5, "AND");
+        }
         sql = QString(R"(
-            SELECT s.id, s.uuid, s.timestamp, s.profile_name, s.duration_seconds,
-                   s.final_weight, s.dose_weight, s.bean_brand, s.bean_type,
-                   s.enjoyment, s.visualizer_id, s.grinder_setting,
-                   s.temperature_override, s.yield_override
-            FROM shots s
-            JOIN shots_fts fts ON s.id = fts.rowid
-            WHERE shots_fts MATCH ?
-            %1
-            ORDER BY s.timestamp DESC
+            SELECT id, uuid, timestamp, profile_name, duration_seconds,
+                   final_weight, dose_weight, bean_brand, bean_type,
+                   enjoyment, visualizer_id, grinder_setting,
+                   temperature_override, yield_override
+            FROM shots
+            WHERE id IN (SELECT rowid FROM shots_fts WHERE shots_fts MATCH '%1')
+            %2
+            ORDER BY timestamp DESC
             LIMIT ? OFFSET ?
-        )").arg(whereClause.isEmpty() ? "" : " AND " + whereClause.mid(7));  // Remove " WHERE "
-        bindValues.prepend(ftsQuery);
+        )").arg(ftsQuery)
+           .arg(extraConditions);
     } else {
         sql = QString(R"(
             SELECT id, uuid, timestamp, profile_name, duration_seconds,
@@ -647,13 +728,17 @@ QVariantList ShotHistoryStorage::getShotsFiltered(const QVariantMap& filterMap, 
     bindValues << limit << offset;
 
     QSqlQuery query(m_db);
-    query.prepare(sql);
+    if (!query.prepare(sql)) {
+        qWarning() << "ShotHistoryStorage: Query prepare failed:" << query.lastError().text();
+        return results;
+    }
+
     for (int i = 0; i < bindValues.size(); ++i) {
         query.bindValue(i, bindValues[i]);
     }
 
     if (!query.exec()) {
-        qWarning() << "ShotHistoryStorage: Query failed:" << query.lastError().text();
+        qWarning() << "[ShotHistory] Query exec failed:" << query.lastError().text();
         return results;
     }
 
@@ -671,8 +756,8 @@ QVariantList ShotHistoryStorage::getShotsFiltered(const QVariantMap& filterMap, 
         shot["enjoyment"] = query.value(9).toInt();
         shot["hasVisualizerUpload"] = !query.value(10).isNull();
         shot["grinderSetting"] = query.value(11).toString();
-        shot["temperatureOverride"] = query.value(12).isNull() ? QVariant() : query.value(12).toDouble();
-        shot["yieldOverride"] = query.value(13).isNull() ? QVariant() : query.value(13).toDouble();
+        shot["temperatureOverride"] = query.value(12).toDouble();  // 0.0 for NULL
+        shot["yieldOverride"] = query.value(13).toDouble();  // 0.0 for NULL
 
         // Format date for display
         QDateTime dt = QDateTime::fromSecsSinceEpoch(query.value(2).toLongLong());

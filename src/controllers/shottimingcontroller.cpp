@@ -169,6 +169,17 @@ void ShotTimingController::onWeightSample(double weight, double flowRate)
 {
     // Keep updating weight while settling timer is running (for SAW learning)
     if (m_settlingTimer.isActive()) {
+        // Detect cup removal during settling: dramatic weight drop (>20g decrease)
+        // Freeze weight at last valid reading to preserve shot data
+        if (m_weight > 20.0 && weight < m_weight - 20.0) {
+            qWarning() << "[SAW] Cup removed during settling (weight dropped from"
+                       << m_weight << "to" << weight << ") - freezing weight at last valid reading";
+            // Stop settling immediately and use the frozen weight
+            m_settlingTimer.stop();
+            onSettlingComplete();
+            return;
+        }
+
         m_weight = weight;
         emit weightChanged();
 

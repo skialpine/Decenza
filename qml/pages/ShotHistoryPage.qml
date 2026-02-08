@@ -9,18 +9,6 @@ Page {
     objectName: "shotHistoryPage"
     background: Rectangle { color: Theme.backgroundColor }
 
-    // Keyboard handling for search field
-    property real keyboardOffset: 0
-
-    Connections {
-        target: Qt.inputMethod
-        function onVisibleChanged() {
-            if (!Qt.inputMethod.visible) {
-                shotHistoryPage.keyboardOffset = 0
-            }
-        }
-    }
-
     // Tap outside to dismiss keyboard
     MouseArea {
         anchors.fill: parent
@@ -40,12 +28,6 @@ Page {
     property bool isLoadingMore: false
     property int filteredTotalCount: 0
 
-    Component.onCompleted: {
-        root.currentPageTitle = TranslationManager.translate("shothistory.title", "Shot History")
-        refreshFilterOptions()
-        loadShots()
-    }
-
     StackView.onActivated: {
         root.currentPageTitle = TranslationManager.translate("shothistory.title", "Shot History")
         refreshFilterOptions()
@@ -53,17 +35,29 @@ Page {
     }
 
     function loadShots() {
+        loadMoreTimer.stop()
         currentOffset = 0
         hasMoreShots = true
         var filter = buildFilter()
         var shots = MainController.shotHistory.getShotsFiltered(filter, 0, pageSize)
-        shotListModel.clear()
-        for (var i = 0; i < shots.length; i++) {
-            shotListModel.append(shots[i])
+
+        shotListView.contentY = 0
+
+        // In-place model update to avoid flicker
+        var i
+        for (i = 0; i < shots.length; i++) {
+            if (i < shotListModel.count) {
+                shotListModel.set(i, shots[i])
+            } else {
+                shotListModel.append(shots[i])
+            }
         }
+        while (shotListModel.count > shots.length) {
+            shotListModel.remove(shotListModel.count - 1)
+        }
+
         currentOffset = shots.length
         hasMoreShots = shots.length >= pageSize
-        // Get total count matching current filter
         filteredTotalCount = MainController.shotHistory.getFilteredShotCount(filter)
     }
 
@@ -340,8 +334,19 @@ Page {
             StyledTextField {
                 id: searchField
                 Layout.fillWidth: true
-                placeholderText: TranslationManager.translate("shothistory.searchplaceholder", "Search notes...")
-                onTextChanged: searchTimer.restart()
+                placeholderText: TranslationManager.translate("shothistory.searchplaceholder", "Search shots...")
+                // Disable predictive text / autocorrect — forces IME to commit each
+                // character individually. Without this, the IME holds composing text
+                // and commits the entire word at once on space, which triggers a blank screen.
+                inputMethodHints: Qt.ImhNoPredictiveText
+                property string lastTriggeredText: ""
+                onTextChanged: {
+                    var trimmed = text.trim()
+                    if (trimmed !== lastTriggeredText) {
+                        lastTriggeredText = trimmed
+                        searchTimer.restart()
+                    }
+                }
             }
 
             Timer {
@@ -376,17 +381,32 @@ Page {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            spacing: Theme.spacingSmall
             model: shotListModel
+            spacing: Theme.spacingSmall
+            boundsBehavior: Flickable.StopAtBounds
+
+            // Dismiss keyboard when user starts scrolling
+            onMovementStarted: {
+                if (searchField.activeFocus) {
+                    searchField.focus = false
+                    Qt.inputMethod.hide()
+                }
+            }
 
             // Infinite scroll - load more when near bottom
             onContentYChanged: {
                 if (!isLoadingMore && hasMoreShots && contentHeight > 0) {
                     var threshold = contentHeight - height - Theme.scaled(200)
                     if (contentY > threshold) {
-                        loadMoreShots()
+                        loadMoreTimer.restart()
                     }
                 }
+            }
+
+            Timer {
+                id: loadMoreTimer
+                interval: 100
+                onTriggered: loadMoreShots()
             }
 
             delegate: Rectangle {
@@ -398,7 +418,6 @@ Page {
                 border.color: isSelected(model.id) ? Theme.primaryColor : "transparent"
                 border.width: isSelected(model.id) ? 2 : 0
 
-                // Store enjoyment for child components to access
                 property int shotEnjoyment: model.enjoyment || 0
 
                 RowLayout {
@@ -447,8 +466,8 @@ Page {
                             Text {
                                 text: {
                                     var name = model.profileName || ""
-                                    var tempOvr = model.temperatureOverride
-                                    if (tempOvr !== undefined && tempOvr !== null && tempOvr > 0) {
+                                    var tempOvr = model.temperatureOverride || 0
+                                    if (tempOvr > 0) {
                                         return name + " (" + Math.round(tempOvr) + "\u00B0C)"
                                     }
                                     return name
@@ -484,9 +503,8 @@ Page {
                                     var dose = (model.doseWeight || 0).toFixed(1)
                                     var actual = (model.finalWeight || 0).toFixed(1)
                                     var yieldText = actual + "g"
-                                    var yieldOvr = model.yieldOverride
-                                    if (yieldOvr !== undefined && yieldOvr !== null && yieldOvr > 0
-                                        && Math.abs(yieldOvr - model.finalWeight) > 0.5) {
+                                    var yieldOvr = model.yieldOverride || 0
+                                    if (yieldOvr > 0 && Math.abs(yieldOvr - model.finalWeight) > 0.5) {
                                         yieldText = actual + "g (" + Math.round(yieldOvr) + "g)"
                                     }
                                     return dose + "g \u2192 " + yieldText
@@ -540,8 +558,6 @@ Page {
                         MouseArea {
                             anchors.fill: parent
                             onClicked: {
-                                // Load profile + metadata from history shot
-                                // loadShotWithMetadata handles favorite index automatically
                                 MainController.loadShotWithMetadata(model.id)
                                 pageStack.pop()
                             }
@@ -553,7 +569,7 @@ Page {
                         width: Theme.scaled(40)
                         height: Theme.scaled(40)
                         radius: Theme.scaled(20)
-                        color: "#2E7D32"  // Dark green
+                        color: "#2E7D32"
 
                         Text {
                             anchors.centerIn: parent
@@ -601,7 +617,6 @@ Page {
                 }
             }
 
-            // Loading indicator footer
             footer: Item {
                 width: shotListView.width
                 height: isLoadingMore ? Theme.scaled(50) : 0
@@ -634,4 +649,5 @@ Page {
         rightText: MainController.shotHistory.totalShots + " " + TranslationManager.translate("shothistory.shots", "shots")
         onBackClicked: root.goBack()
     }
+
 }
