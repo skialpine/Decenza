@@ -7,6 +7,7 @@
 #include <QJsonArray>
 #include <QStandardPaths>
 #include <QDir>
+#include <QFileInfo>
 #include <QRegularExpression>
 #include <QDesktopServices>
 
@@ -350,7 +351,24 @@ void UpdateChecker::onDownloadFinished()
         return;
     }
 
-    qDebug() << "UpdateChecker: Download complete:" << filePath;
+    // Verify download is complete (not truncated by dropped connection)
+    qint64 expectedSize = m_currentReply->header(QNetworkRequest::ContentLengthHeader).toLongLong();
+    qint64 actualSize = QFileInfo(filePath).size();
+    if (expectedSize > 0 && actualSize < expectedSize) {
+        m_errorMessage = QString("Download incomplete: got %1 of %2 bytes")
+                             .arg(actualSize).arg(expectedSize);
+        qWarning() << "UpdateChecker:" << m_errorMessage;
+        emit errorMessageChanged();
+        QFile::remove(filePath);
+        delete m_downloadFile;
+        m_downloadFile = nullptr;
+        m_currentReply->deleteLater();
+        m_currentReply = nullptr;
+        return;
+    }
+
+    qDebug() << "UpdateChecker: Download complete:" << filePath
+             << "(" << actualSize << "bytes)";
 
     delete m_downloadFile;
     m_downloadFile = nullptr;
