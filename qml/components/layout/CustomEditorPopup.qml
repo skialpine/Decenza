@@ -418,18 +418,24 @@ Popup {
                     }
                 }
 
-                // Preview column: Full + Bar previews
+                // Preview column: Full + Bar previews (1:1 match with CustomItem rendering)
                 Column {
                     id: previewCol
                     spacing: Theme.scaled(4)
 
-                    readonly property string previewText: popup.substitutePreview(contentInput.getText(0, Math.min(contentInput.length, 30)) || "Text")
+                    // Compile editor content to HTML with preview variable substitution
+                    readonly property string previewHtml: {
+                        var _ = contentInput.text  // Trigger re-evaluation on content changes
+                        var segments = formatter.toSegments()
+                        var html = formatter.segmentsToHtml(segments)
+                        return popup.substitutePreview(html || "Text")
+                    }
                     readonly property bool hasAction: popup.textAction !== "" || popup.textLongPressAction !== "" || popup.textDoubleclickAction !== ""
                     readonly property bool hasEmoji: popup.textEmoji !== ""
-                    readonly property bool emojiIsSvg: hasEmoji && popup.textEmoji.indexOf("qrc:") === 0
-                    readonly property color previewBg: popup.textBackgroundColor || ((hasAction || hasEmoji) ? "#555555" : Theme.backgroundColor)
+                    readonly property color fullBg: popup.textBackgroundColor || (hasAction ? "#555555" : Theme.surfaceColor)
+                    readonly property color compactBg: popup.textBackgroundColor || "#555555"
 
-                    // --- Full mode preview (center zones) ---
+                    // --- Full mode preview (exact match with CustomItem full mode) ---
                     Text {
                         text: "Full"
                         color: Theme.textSecondaryColor
@@ -437,43 +443,62 @@ Popup {
                         font.pixelSize: Theme.scaled(9)
                     }
 
-                    Rectangle {
-                        width: Theme.scaled(112)
-                        height: Theme.scaled(70)
-                        radius: Theme.cardRadius
-                        color: previewCol.previewBg
-                        border.color: previewCol.hasAction ? Theme.primaryColor : Theme.borderColor
-                        border.width: previewCol.hasAction ? 2 : 1
-                        clip: true
+                    Item {
+                        width: previewCol.hasEmoji
+                            ? Math.max(Theme.scaled(150), fpEmojiText.implicitWidth + Theme.scaled(24))
+                            : (fpText.implicitWidth + Theme.scaled(16) + (previewCol.hasAction ? Theme.scaled(16) : 0))
+                        height: previewCol.hasEmoji
+                            ? Theme.scaled(120)
+                            : (fpText.implicitHeight + Theme.scaled(16) + (previewCol.hasAction ? Theme.scaled(8) : 0))
 
+                        Rectangle {
+                            visible: previewCol.hasAction || previewCol.hasEmoji
+                            anchors.fill: parent
+                            color: previewCol.fullBg
+                            radius: Theme.cardRadius
+                        }
+
+                        // With emoji: icon above text
                         Column {
+                            visible: previewCol.hasEmoji
                             anchors.centerIn: parent
-                            spacing: Theme.scaled(2)
+                            spacing: Theme.spacingSmall
 
                             Image {
-                                visible: previewCol.hasEmoji
-                                source: visible ? Theme.emojiToImage(popup.textEmoji) : ""
-                                sourceSize.width: Theme.scaled(28)
-                                sourceSize.height: Theme.scaled(28)
+                                source: previewCol.hasEmoji ? Theme.emojiToImage(popup.textEmoji) : ""
+                                sourceSize.width: Theme.scaled(48)
+                                sourceSize.height: Theme.scaled(48)
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
 
                             Text {
-                                width: Theme.scaled(100)
-                                text: previewCol.previewText
-                                textFormat: Text.PlainText
-                                color: (previewCol.hasAction || previewCol.hasEmoji || popup.textBackgroundColor !== "") ? "white" : Theme.textColor
-                                font: Theme.captionFont
+                                id: fpEmojiText
+                                text: previewCol.previewHtml
+                                textFormat: Text.RichText
+                                color: "white"
+                                font: Theme.bodyFont
                                 horizontalAlignment: Text.AlignHCenter
-                                wrapMode: Text.Wrap
-                                maximumLineCount: 2
-                                elide: Text.ElideRight
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
                         }
+
+                        // Without emoji: text only
+                        Text {
+                            id: fpText
+                            visible: !previewCol.hasEmoji
+                            anchors.centerIn: parent
+                            width: parent.width > 0 ? parent.width - (previewCol.hasAction ? Theme.scaled(24) : 0) : implicitWidth
+                            text: previewCol.previewHtml
+                            textFormat: Text.RichText
+                            color: Theme.textColor
+                            font: Theme.bodyFont
+                            horizontalAlignment: popup.textAlign === "left" ? Text.AlignLeft
+                                : popup.textAlign === "right" ? Text.AlignRight : Text.AlignHCenter
+                            wrapMode: Text.Wrap
+                        }
                     }
 
-                    // --- Bar mode preview (statusline / bar zones) ---
+                    // --- Bar mode preview (exact match with CustomItem compact mode) ---
                     Text {
                         text: "Bar"
                         color: Theme.textSecondaryColor
@@ -481,35 +506,39 @@ Popup {
                         font.pixelSize: Theme.scaled(9)
                     }
 
-                    Rectangle {
-                        width: Theme.scaled(112)
-                        height: Theme.scaled(28)
-                        radius: Theme.cardRadius
-                        color: previewCol.previewBg
-                        border.color: previewCol.hasAction ? Theme.primaryColor : Theme.borderColor
-                        border.width: previewCol.hasAction ? 2 : 1
-                        clip: true
+                    Item {
+                        width: bpRow.implicitWidth + (previewCol.hasAction || popup.textBackgroundColor !== "" ? Theme.scaled(16) : 0)
+                        height: Theme.bottomBarHeight
 
-                        Row {
+                        Rectangle {
+                            visible: previewCol.hasAction || popup.textBackgroundColor !== ""
+                            anchors.fill: parent
+                            anchors.topMargin: Theme.spacingSmall
+                            anchors.bottomMargin: Theme.spacingSmall
+                            color: previewCol.compactBg
+                            radius: Theme.cardRadius
+                        }
+
+                        RowLayout {
+                            id: bpRow
                             anchors.centerIn: parent
-                            spacing: Theme.scaled(4)
+                            spacing: Theme.spacingSmall
 
                             Image {
                                 visible: previewCol.hasEmoji
                                 source: visible ? Theme.emojiToImage(popup.textEmoji) : ""
-                                sourceSize.width: Theme.scaled(18)
-                                sourceSize.height: Theme.scaled(18)
-                                anchors.verticalCenter: parent.verticalCenter
+                                sourceSize.width: Theme.scaled(28)
+                                sourceSize.height: Theme.scaled(28)
+                                Layout.alignment: Qt.AlignVCenter
                             }
 
                             Text {
-                                text: previewCol.previewText
-                                textFormat: Text.PlainText
-                                color: (previewCol.hasAction || previewCol.hasEmoji || popup.textBackgroundColor !== "") ? "white" : Theme.textColor
-                                font: Theme.captionFont
+                                text: previewCol.previewHtml
+                                textFormat: Text.RichText
+                                color: (previewCol.hasAction || popup.textBackgroundColor !== "") ? "white" : Theme.textColor
+                                font: Theme.bodyFont
                                 elide: Text.ElideRight
                                 maximumLineCount: 1
-                                anchors.verticalCenter: parent.verticalCenter
                             }
                         }
                     }
