@@ -73,12 +73,13 @@ QTextCharFormat DocumentFormatter::charFormatAtCursor() const
     QTextDocument *doc = textDocument();
     if (!doc)
         return {};
+    const int maxPos = doc->characterCount() - 1;
     QTextCursor cursor(doc);
     if (m_selectionStart != m_selectionEnd) {
-        cursor.setPosition(m_selectionStart);
-        cursor.setPosition(m_selectionEnd, QTextCursor::KeepAnchor);
+        cursor.setPosition(qBound(0, m_selectionStart, maxPos));
+        cursor.setPosition(qBound(0, m_selectionEnd, maxPos), QTextCursor::KeepAnchor);
     } else {
-        cursor.setPosition(m_cursorPosition);
+        cursor.setPosition(qBound(0, m_cursorPosition, maxPos));
     }
     return cursor.charFormat();
 }
@@ -128,12 +129,13 @@ QTextCursor DocumentFormatter::textCursor() const
     QTextDocument *doc = textDocument();
     if (!doc)
         return QTextCursor();
+    const int maxPos = doc->characterCount() - 1;
     QTextCursor cursor(doc);
     if (m_selectionStart != m_selectionEnd) {
-        cursor.setPosition(m_selectionStart);
-        cursor.setPosition(m_selectionEnd, QTextCursor::KeepAnchor);
+        cursor.setPosition(qBound(0, m_selectionStart, maxPos));
+        cursor.setPosition(qBound(0, m_selectionEnd, maxPos), QTextCursor::KeepAnchor);
     } else {
-        cursor.setPosition(m_cursorPosition);
+        cursor.setPosition(qBound(0, m_cursorPosition, maxPos));
     }
     return cursor;
 }
