@@ -62,8 +62,29 @@ Page {
             }
         }
 
+        // Override Material contentItem to remove the accent-colored highlight indicator
+        contentItem: ListView {
+            model: tabBar.contentModel
+            currentIndex: tabBar.currentIndex
+            spacing: tabBar.spacing
+            orientation: ListView.Horizontal
+            boundsBehavior: Flickable.StopAtBounds
+            flickableDirection: Flickable.AutoFlickIfNeeded
+            snapMode: ListView.SnapToItem
+            highlightMoveDuration: 0
+            highlight: Item {}  // No Material indicator
+        }
+
         background: Rectangle {
             color: "transparent"
+            // Bottom border line (active tab extends below to cover its portion)
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 1
+                color: Theme.borderColor
+            }
         }
 
         StyledTabButton {

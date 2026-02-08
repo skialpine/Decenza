@@ -116,36 +116,69 @@ Rectangle {
         }
 
         // Tab row
-        RowLayout {
+        Item {
             Layout.fillWidth: true
-            spacing: Theme.scaled(2)
+            height: Theme.scaled(28)
 
-            Repeater {
-                model: [
-                    { key: "local", label: "My Library" },
-                    { key: "community", label: "Community" }
-                ]
+            // Bottom border line (active tab covers its portion)
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 1
+                color: Theme.borderColor
+            }
 
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: Theme.scaled(28)
-                    radius: Theme.scaled(4)
-                    color: activeTab === modelData.key
-                        ? Theme.primaryColor
-                        : "transparent"
+            RowLayout {
+                anchors.fill: parent
+                spacing: 0
 
-                    Text {
-                        anchors.centerIn: parent
-                        text: modelData.label
-                        color: activeTab === modelData.key ? "white" : Theme.textSecondaryColor
-                        font.family: Theme.captionFont.family
-                        font.pixelSize: Theme.scaled(10)
-                        font.bold: activeTab === modelData.key
-                    }
+                Repeater {
+                    model: [
+                        { key: "local", label: "My Library" },
+                        { key: "community", label: "Community" }
+                    ]
 
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: activeTab = modelData.key
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+
+                        // Active tab shape
+                        Rectangle {
+                            visible: activeTab === modelData.key
+                            anchors.fill: parent
+                            anchors.bottomMargin: -1
+                            color: Theme.backgroundColor
+                            border.color: Theme.borderColor
+                            border.width: 1
+                            radius: Theme.scaled(4)
+
+                            // Cover bottom rounded corners and bottom border
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.bottom: parent.bottom
+                                anchors.leftMargin: 1
+                                anchors.rightMargin: 1
+                                height: Theme.scaled(5)
+                                color: Theme.backgroundColor
+                            }
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: modelData.label
+                            color: activeTab === modelData.key ? Theme.textColor : Theme.textSecondaryColor
+                            font.family: Theme.captionFont.family
+                            font.pixelSize: Theme.scaled(11)
+                            font.bold: activeTab === modelData.key
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: activeTab = modelData.key
+                        }
                     }
                 }
             }

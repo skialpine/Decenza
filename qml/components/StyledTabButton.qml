@@ -2,8 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import DecenzaDE1
 
-// Styled tab button with consistent appearance
-// Uses built-in 'checked' property (set automatically by TabBar)
+// Classic tab button - active tab has top-rounded corners and merges with content
 TabButton {
     id: root
 
@@ -33,11 +32,28 @@ TabButton {
     }
 
     background: Rectangle {
-        color: root.checked ? Theme.surfaceColor : "transparent"
-        radius: Theme.scaled(6)
+        color: "transparent"
 
-        Behavior on color {
-            ColorAnimation { duration: 100 }
+        // Active tab shape
+        Rectangle {
+            visible: root.checked
+            anchors.fill: parent
+            anchors.bottomMargin: -1  // extend below to cover tab bar border
+            color: Theme.backgroundColor
+            border.color: Theme.borderColor
+            border.width: 1
+            radius: Theme.scaled(4)
+
+            // Cover bottom rounded corners and bottom border
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.leftMargin: 1
+                anchors.rightMargin: 1
+                height: Theme.scaled(5)
+                color: Theme.backgroundColor
+            }
         }
     }
 
@@ -45,9 +61,9 @@ TabButton {
     Accessible.name: root.accessibleName
     Accessible.focusable: true
 
-    // Focus indicator
+    // Focus indicator - only for keyboard navigation, not mouse clicks
     FocusIndicator {
         targetItem: root
-        visible: root.activeFocus
+        visible: root.visualFocus
     }
 }
