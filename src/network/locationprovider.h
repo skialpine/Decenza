@@ -38,10 +38,10 @@ public:
     double roundedLatitude() const;
     double roundedLongitude() const;
 
-    // Manual city fallback when GPS unavailable
+    // Manual city override (takes precedence over GPS when set)
     QString manualCity() const { return m_manualCity; }
     void setManualCity(const QString& city);
-    bool useManualCity() const { return !m_manualCity.isEmpty() && !m_currentLocation.valid; }
+    bool useManualCity() const { return !m_manualCity.isEmpty(); }
 
     // Geocode a city name to coordinates (for manual city)
     Q_INVOKABLE void geocodeManualCity();

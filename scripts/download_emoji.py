@@ -149,6 +149,14 @@ def get_weather_emojis() -> list[str]:
         "\u2744",      # ❄ snow/freezing-rain
         "\U0001F328",  # 🌨 snow-showers
         "\u26A1",      # ⚡ thunderstorm
+        "\U0001F311",  # 🌑 new moon
+        "\U0001F312",  # 🌒 waxing crescent
+        "\U0001F313",  # 🌓 first quarter
+        "\U0001F314",  # 🌔 waxing gibbous
+        "\U0001F315",  # 🌕 full moon
+        "\U0001F316",  # 🌖 waning gibbous
+        "\U0001F317",  # 🌗 last quarter
+        "\U0001F318",  # 🌘 waning crescent
     ]
 
 

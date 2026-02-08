@@ -22,6 +22,7 @@ struct HourlyForecast {
     int weatherCode = -1;                 // WMO standard code (0-99)
     double cloudCover = 0.0;              // %
     double uvIndex = 0.0;
+    bool isDaytime = true;                // true if sun is up
 
     QVariantMap toVariantMap() const;
 };
@@ -93,6 +94,11 @@ private:
     // Store parsed data and emit signals
     void storeForecasts(const QList<HourlyForecast>& forecasts, WeatherProvider provider);
 
+    // Fetch sunrise/sunset from Open-Meteo and apply to stored forecasts
+    void fetchSunTimes(double lat, double lon);
+    void applySunTimes();
+    bool isDaytimeAt(const QDateTime& time) const;
+
     // Fallback to Open-Meteo on primary provider failure
     void fallbackToOpenMeteo(double lat, double lon, const QString& reason);
 
@@ -120,6 +126,9 @@ private:
     bool m_valid = false;
     bool m_loading = false;
 
+    // Sunrise/sunset times per day (for isDaytime calculation)
+    QVector<QPair<QDateTime, QDateTime>> m_sunTimes;
+
     // Track last fetch coordinates to detect significant moves
     double m_lastFetchLat = 0.0;
     double m_lastFetchLon = 0.0;
@@ -129,7 +138,7 @@ private:
 
     static constexpr int REFRESH_INTERVAL_MS = 60 * 60 * 1000;  // 1 hour
     static constexpr double LOCATION_CHANGE_THRESHOLD = 0.1;     // ~11km
-    static constexpr int MAX_HOURLY_ENTRIES = 25;                 // 24h + current hour
+    static constexpr int MAX_HOURLY_ENTRIES = 73;                 // 3 days + current hour
 
     static const QString USER_AGENT;
 };

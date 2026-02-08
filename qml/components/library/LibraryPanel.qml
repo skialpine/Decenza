@@ -432,11 +432,13 @@ Rectangle {
     }
 
     // Off-screen thumbnail renderers for upload (full + compact)
+    // Uses layer.enabled to force FBO rendering (Android GPU skips off-screen items)
     Item {
         id: thumbContainer
         visible: false
         width: Theme.scaled(280)
         height: Math.max(thumbCardFull.height, thumbCardCompact.height)
+        layer.enabled: visible  // Force offscreen framebuffer rendering for grabToImage
 
         LibraryItemCard {
             id: thumbCardFull
@@ -455,6 +457,23 @@ Rectangle {
             entryData: ({})
             isSelected: false
             showBadge: false
+        }
+    }
+
+    // Timer to allow thumbnail components to fully render before capture
+    Timer {
+        id: captureTimer
+        interval: 200
+        repeat: false
+        property string captureEntryId: ""
+        onTriggered: {
+            thumbCardFull.grabToImage(function(fullResult) {
+                thumbCardCompact.grabToImage(function(compactResult) {
+                    thumbContainer.visible = false
+                    LibrarySharing.uploadEntryWithThumbnails(captureEntryId,
+                        fullResult.image, compactResult.image)
+                }, Qt.size(Theme.scaled(280), thumbCardCompact.height))
+            }, Qt.size(Theme.scaled(280), thumbCardFull.height))
         }
     }
 
@@ -522,19 +541,14 @@ Rectangle {
         thumbCardFull.entryData = fullEntry
         thumbCardCompact.entryData = fullEntry
 
-        Qt.callLater(function() {
-            thumbContainer.visible = true
-            thumbContainer.x = -9999
+        // Show container behind content (z: -1 keeps it invisible to user)
+        // Using layer.enabled forces FBO rendering so grabToImage works on Android
+        thumbContainer.z = -1
+        thumbContainer.visible = true
 
-            // Grab full preview first, then compact, then upload both
-            thumbCardFull.grabToImage(function(fullResult) {
-                thumbCardCompact.grabToImage(function(compactResult) {
-                    thumbContainer.visible = false
-                    LibrarySharing.uploadEntryWithThumbnails(entryId,
-                        fullResult.image, compactResult.image)
-                }, Qt.size(Theme.scaled(280), thumbCardCompact.height))
-            }, Qt.size(Theme.scaled(280), thumbCardFull.height))
-        })
+        // Wait for complex components (CustomItem, zones) to render before capture
+        captureTimer.captureEntryId = entryId
+        captureTimer.start()
     }
 
     // Upload/sharing feedback

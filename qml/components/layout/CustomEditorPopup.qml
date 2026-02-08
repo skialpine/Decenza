@@ -256,14 +256,37 @@ Popup {
         return actionId
     }
 
-    contentItem: ScrollView {
-        contentWidth: availableWidth
-        clip: true
+    contentItem: Item {
+        // Dismiss keyboard when tapping outside text input
+        MouseArea {
+            anchors.fill: parent
+            z: 100  // Above all content
+            propagateComposedEvents: true
+            onPressed: function(mouse) {
+                if (contentInput.activeFocus) {
+                    // Don't dismiss if tapping on the text input itself (avoids keyboard flicker)
+                    var mapped = mapToItem(inputFlickable, mouse.x, mouse.y)
+                    if (mapped.x >= 0 && mapped.y >= 0 &&
+                        mapped.x <= inputFlickable.width && mapped.y <= inputFlickable.height) {
+                        mouse.accepted = false
+                        return
+                    }
+                    contentInput.focus = false
+                    Qt.inputMethod.hide()
+                }
+                mouse.accepted = false  // Let event propagate to buttons/scrollview
+            }
+        }
 
-        ColumnLayout {
-            id: mainColumn
-            width: parent.width
-            spacing: Theme.scaled(4)
+        ScrollView {
+            anchors.fill: parent
+            contentWidth: availableWidth
+            clip: true
+
+            ColumnLayout {
+                id: mainColumn
+                width: parent.width
+                spacing: Theme.scaled(4)
 
             // === ROW 1: Icon/Emoji selector ===
             RowLayout {
@@ -1033,6 +1056,7 @@ Popup {
                     MouseArea { id: saveMa; anchors.fill: parent; onClicked: popup.doSave() }
                 }
             }
+        }
         }
     }
 

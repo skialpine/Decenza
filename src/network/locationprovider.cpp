@@ -68,18 +68,22 @@ LocationProvider::~LocationProvider()
 
 double LocationProvider::roundedLatitude() const
 {
-    // Use GPS if valid, otherwise use manual city coordinates
-    double lat = m_currentLocation.valid ? m_currentLocation.latitude : m_manualLat;
-    // Round to 1 decimal place (~11km precision)
-    return std::round(lat * 10.0) / 10.0;
+    // Manual city takes precedence over GPS
+    if (!m_manualCity.isEmpty() && m_manualGeocoded)
+        return std::round(m_manualLat * 10.0) / 10.0;
+    if (m_currentLocation.valid)
+        return std::round(m_currentLocation.latitude * 10.0) / 10.0;
+    return 0.0;
 }
 
 double LocationProvider::roundedLongitude() const
 {
-    // Use GPS if valid, otherwise use manual city coordinates
-    double lon = m_currentLocation.valid ? m_currentLocation.longitude : m_manualLon;
-    // Round to 1 decimal place (~11km precision)
-    return std::round(lon * 10.0) / 10.0;
+    // Manual city takes precedence over GPS
+    if (!m_manualCity.isEmpty() && m_manualGeocoded)
+        return std::round(m_manualLon * 10.0) / 10.0;
+    if (m_currentLocation.valid)
+        return std::round(m_currentLocation.longitude * 10.0) / 10.0;
+    return 0.0;
 }
 
 void LocationProvider::requestUpdate()
@@ -221,11 +225,12 @@ void LocationProvider::onReverseGeocodeFinished(QNetworkReply* reply)
 
 QString LocationProvider::city() const
 {
-    // If GPS location is valid, use it; otherwise fall back to manual city
-    if (m_currentLocation.valid) {
+    // Manual city takes precedence over GPS
+    if (!m_manualCity.isEmpty())
+        return m_manualCity;
+    if (m_currentLocation.valid)
         return m_currentLocation.city;
-    }
-    return m_manualCity;
+    return QString();
 }
 
 void LocationProvider::setManualCity(const QString& city)

@@ -11,11 +11,27 @@ Item {
     implicitWidth: isCompact ? compactContent.implicitWidth : fullContent.implicitWidth
     implicitHeight: isCompact ? compactContent.implicitHeight : fullContent.implicitHeight
 
+    // Moon phase emoji based on date (synodic month = 29.53059 days)
+    function moonEmoji(timeStr) {
+        // Reference new moon: Jan 6, 2000 18:14 UTC
+        var refNew = Date.UTC(2000, 0, 6, 18, 14, 0) / 86400000
+        var now = new Date(timeStr).getTime() / 86400000
+        var phase = ((now - refNew) / 29.53059) % 1
+        if (phase < 0) phase += 1
+        // 8 phases: 🌑🌒🌓🌔🌕🌖🌗🌘
+        var phases = [
+            "\uD83C\uDF11", "\uD83C\uDF12", "\uD83C\uDF13", "\uD83C\uDF14",
+            "\uD83C\uDF15", "\uD83C\uDF16", "\uD83C\uDF17", "\uD83C\uDF18"
+        ]
+        return phases[Math.floor(phase * 8) % 8]
+    }
+
     // Map WMO weather icon names to unicode symbols
-    function weatherEmoji(iconName) {
+    function weatherEmoji(iconName, isDaytime, timeStr) {
+        if (typeof isDaytime === "undefined") isDaytime = true
         switch (iconName) {
-            case "clear":         return "\u2600"   // ☀
-            case "partly-cloudy": return "\u26C5"   // ⛅
+            case "clear":         return isDaytime ? "\u2600" : moonEmoji(timeStr)     // ☀ / moon phase
+            case "partly-cloudy": return isDaytime ? "\u26C5" : moonEmoji(timeStr)     // ⛅ / moon phase
             case "overcast":      return "\u2601"   // ☁
             case "fog":           return "\uD83C\uDF2B"  // 🌫
             case "drizzle":       return "\uD83C\uDF26"  // 🌦
@@ -41,38 +57,59 @@ Item {
         return arrows[index]
     }
 
-    // --- COMPACT MODE (bar zone - next 4 hours) ---
+    // --- COMPACT MODE (bar zone - flickable hourly forecast) ---
     Item {
         id: compactContent
         visible: root.isCompact
         anchors.fill: parent
-        implicitWidth: compactRow.implicitWidth
+        implicitWidth: Theme.scaled(160)
         implicitHeight: Theme.bottomBarHeight
 
-        Row {
-            id: compactRow
-            anchors.centerIn: parent
+        ListView {
+            id: compactList
+            anchors.fill: parent
+            anchors.topMargin: Theme.scaled(2)
+            anchors.bottomMargin: Theme.scaled(2)
+            orientation: ListView.Horizontal
             spacing: Theme.scaled(8)
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            visible: WeatherManager.valid
 
-            Repeater {
-                model: {
-                    if (!WeatherManager.valid) return []
-                    var forecast = WeatherManager.hourlyForecast
-                    return forecast.slice(0, Math.min(4, forecast.length))
+            model: WeatherManager.hourlyForecast
+
+            delegate: Item {
+                width: Theme.scaled(32)
+                height: compactList.height
+
+                // Day-alternating background
+                Rectangle {
+                    anchors.fill: parent
+                    color: parseInt((modelData.time || "").substring(8, 10)) % 2 === 0
+                        ? Qt.rgba(1, 1, 1, 0.06) : "transparent"
+                    radius: Theme.scaled(3)
+                }
+                // Daytime yellow overlay
+                Rectangle {
+                    anchors.fill: parent
+                    color: Qt.rgba(1, 0.9, 0.3, 0.1)
+                    radius: Theme.scaled(3)
+                    visible: modelData.isDaytime || false
                 }
 
-                delegate: Column {
+                Column {
+                    anchors.centerIn: parent
                     spacing: Theme.scaled(1)
 
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: modelData.hour || ""
-                        color: Theme.textSecondaryColor
+                        color: index === 0 ? Theme.primaryColor : Theme.textSecondaryColor
                         font: Theme.captionFont
                     }
                     Image {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        source: Theme.emojiToImage(weatherEmoji(modelData.weatherIcon || ""))
+                        source: Theme.emojiToImage(weatherEmoji(modelData.weatherIcon || "", modelData.isDaytime, modelData.time || ""))
                         sourceSize.width: Theme.scaled(16)
                         sourceSize.height: Theme.scaled(16)
                     }
@@ -84,15 +121,15 @@ Item {
                     }
                 }
             }
+        }
 
-            // Loading / no data fallback
-            Text {
-                visible: !WeatherManager.valid
-                anchors.verticalCenter: parent.verticalCenter
-                text: WeatherManager.loading ? "..." : "--"
-                color: Theme.textSecondaryColor
-                font: Theme.bodyFont
-            }
+        // Loading / no data fallback
+        Text {
+            visible: !WeatherManager.valid
+            anchors.centerIn: parent
+            text: WeatherManager.loading ? "..." : "--"
+            color: Theme.textSecondaryColor
+            font: Theme.bodyFont
         }
     }
 
@@ -119,7 +156,7 @@ Item {
                     source: {
                         var forecast = WeatherManager.hourlyForecast
                         if (forecast.length > 0)
-                            return Theme.emojiToImage(weatherEmoji(forecast[0].weatherIcon || ""))
+                            return Theme.emojiToImage(weatherEmoji(forecast[0].weatherIcon || "", forecast[0].isDaytime, forecast[0].time || ""))
                         return ""
                     }
                     sourceSize.width: Theme.scaled(28)
@@ -185,46 +222,66 @@ Item {
 
                 model: WeatherManager.hourlyForecast
 
-                delegate: Column {
+                delegate: Item {
                     width: Theme.scaled(38)
-                    spacing: Theme.scaled(1)
+                    height: hourlyList.height
 
-                    // Hour
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: modelData.hour || ""
-                        color: index === 0 ? Theme.primaryColor : Theme.textSecondaryColor
-                        font: Theme.captionFont
+                    // Day-alternating background
+                    Rectangle {
+                        anchors.fill: parent
+                        color: parseInt((modelData.time || "").substring(8, 10)) % 2 === 0
+                            ? Qt.rgba(1, 1, 1, 0.06) : "transparent"
+                        radius: Theme.scaled(3)
+                    }
+                    // Daytime yellow overlay
+                    Rectangle {
+                        anchors.fill: parent
+                        color: Qt.rgba(1, 0.9, 0.3, 0.1)
+                        radius: Theme.scaled(3)
+                        visible: modelData.isDaytime || false
                     }
 
-                    // Weather icon
-                    Image {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        source: Theme.emojiToImage(weatherEmoji(modelData.weatherIcon || ""))
-                        sourceSize.width: Theme.scaled(16)
-                        sourceSize.height: Theme.scaled(16)
-                    }
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: Theme.scaled(1)
 
-                    // Temperature
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: formatTemp(modelData.temperature || 0)
-                        color: Theme.textColor
-                        font.family: Theme.captionFont.family
-                        font.pixelSize: Theme.captionFont.pixelSize
-                        font.bold: index === 0
-                    }
+                        // Hour
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: modelData.hour || ""
+                            color: index === 0 ? Theme.primaryColor : Theme.textSecondaryColor
+                            font: Theme.captionFont
+                        }
 
-                    // Precipitation probability (only if > 0)
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: (modelData.precipitationProbability || 0) > 0
-                              ? (modelData.precipitationProbability + "%")
-                              : ""
-                        color: Theme.primaryColor
-                        font.family: Theme.captionFont.family
-                        font.pixelSize: Theme.scaled(10)
-                        visible: (modelData.precipitationProbability || 0) > 0
+                        // Weather icon
+                        Image {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            source: Theme.emojiToImage(weatherEmoji(modelData.weatherIcon || "", modelData.isDaytime, modelData.time || ""))
+                            sourceSize.width: Theme.scaled(16)
+                            sourceSize.height: Theme.scaled(16)
+                        }
+
+                        // Temperature
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: formatTemp(modelData.temperature || 0)
+                            color: Theme.textColor
+                            font.family: Theme.captionFont.family
+                            font.pixelSize: Theme.captionFont.pixelSize
+                            font.bold: index === 0
+                        }
+
+                        // Precipitation probability (only if > 0)
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: (modelData.precipitationProbability || 0) > 0
+                                  ? (modelData.precipitationProbability + "%")
+                                  : ""
+                            color: Theme.primaryColor
+                            font.family: Theme.captionFont.family
+                            font.pixelSize: Theme.scaled(10)
+                            visible: (modelData.precipitationProbability || 0) > 0
+                        }
                     }
                 }
             }
@@ -244,29 +301,47 @@ Item {
                 font.pixelSize: Theme.scaled(10)
             }
 
-            // Loading state
-            Text {
+            // Loading / no-data state
+            RowLayout {
                 Layout.alignment: Qt.AlignHCenter
                 visible: !WeatherManager.valid
-                text: WeatherManager.loading ? "Loading weather..." : "No weather data"
-                color: Theme.textSecondaryColor
-                font: Theme.labelFont
+                spacing: Theme.scaled(4)
+
+                Image {
+                    visible: !WeatherManager.loading
+                    source: "qrc:/emoji/26c5.svg"
+                    sourceSize.width: Theme.scaled(18)
+                    sourceSize.height: Theme.scaled(18)
+                }
+
+                Text {
+                    text: WeatherManager.loading ? "Loading weather..." : "Set city in Settings \u2192 Options"
+                    color: Theme.textSecondaryColor
+                    font: Theme.labelFont
+                }
+
+                Image {
+                    visible: !WeatherManager.loading
+                    source: "qrc:/emoji/1f327.svg"
+                    sourceSize.width: Theme.scaled(18)
+                    sourceSize.height: Theme.scaled(18)
+                }
             }
         }
 
+        // Accessibility only - don't block flick gestures on the hourly list
         MouseArea {
             anchors.fill: parent
+            enabled: typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled
             onClicked: {
-                if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
-                    var forecast = WeatherManager.hourlyForecast
-                    if (forecast.length > 0) {
-                        var f = forecast[0]
-                        var msg = "Weather: " + (f.weatherDescription || "unknown")
-                            + ", " + Math.round(f.temperature) + " degrees"
-                            + ", humidity " + f.relativeHumidity + " percent"
-                            + ", wind " + Math.round(f.windSpeed) + " kilometers per hour"
-                        AccessibilityManager.announceLabel(msg)
-                    }
+                var forecast = WeatherManager.hourlyForecast
+                if (forecast.length > 0) {
+                    var f = forecast[0]
+                    var msg = "Weather: " + (f.weatherDescription || "unknown")
+                        + ", " + Math.round(f.temperature) + " degrees"
+                        + ", humidity " + f.relativeHumidity + " percent"
+                        + ", wind " + Math.round(f.windSpeed) + " kilometers per hour"
+                    AccessibilityManager.announceLabel(msg)
                 }
             }
         }

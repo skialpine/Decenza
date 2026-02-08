@@ -31,6 +31,7 @@ QVariantMap HourlyForecast::toVariantMap() const
         {"weatherCode",               weatherCode},
         {"cloudCover",                cloudCover},
         {"uvIndex",                   uvIndex},
+        {"isDaytime",                  isDaytime},
         {"weatherDescription",        WeatherManager::weatherDescription(weatherCode)},
         {"weatherIcon",               WeatherManager::weatherIconName(weatherCode)}
     };
@@ -221,7 +222,7 @@ void WeatherManager::fetchFromOpenMeteo(double lat, double lon)
     query.addQueryItem("hourly",
         "temperature_2m,relative_humidity_2m,apparent_temperature,"
         "precipitation_probability,precipitation,weather_code,"
-        "wind_speed_10m,wind_direction_10m,cloud_cover,uv_index");
+        "wind_speed_10m,wind_direction_10m,cloud_cover,uv_index,is_day");
     query.addQueryItem("timezone", "auto");
     query.addQueryItem("forecast_hours", QString::number(MAX_HOURLY_ENTRIES));
     url.setQuery(query);
@@ -271,6 +272,7 @@ QList<HourlyForecast> WeatherManager::parseOpenMeteoResponse(const QJsonDocument
     QJsonArray windDir = hourly["wind_direction_10m"].toArray();
     QJsonArray cloud = hourly["cloud_cover"].toArray();
     QJsonArray uv = hourly["uv_index"].toArray();
+    QJsonArray isDay = hourly["is_day"].toArray();
 
     int count = qMin(static_cast<int>(times.size()), MAX_HOURLY_ENTRIES);
     result.reserve(count);
@@ -288,6 +290,7 @@ QList<HourlyForecast> WeatherManager::parseOpenMeteoResponse(const QJsonDocument
         f.windDirection = windDir[i].toInt();
         f.cloudCover = cloud[i].toDouble();
         f.uvIndex = uv[i].toDouble();
+        f.isDaytime = isDay[i].toInt() == 1;
         result.append(f);
     }
 
@@ -419,6 +422,9 @@ QList<HourlyForecast> WeatherManager::parseNWSResponse(const QJsonDocument& doc)
         QString iconUrl = period["icon"].toString();
         f.weatherCode = nwsIconToWMO(iconUrl);
 
+        // Daytime flag
+        f.isDaytime = period["isDaytime"].toBool(true);
+
         // NWS doesn't provide these directly with the hourly endpoint
         f.apparentTemperature = f.temperature;  // Approximate
         f.precipitation = 0.0;
@@ -534,9 +540,79 @@ void WeatherManager::storeForecasts(const QList<HourlyForecast>& forecasts, Weat
     setLoading(false);
     emit weatherChanged();
 
+    // Fetch accurate sunrise/sunset times to fix isDaytime
+    fetchSunTimes(m_lastFetchLat, m_lastFetchLon);
+
     qDebug() << "WeatherManager: Stored" << forecasts.size() << "hourly forecasts from"
              << providerName() << "- current temp:"
              << (forecasts.isEmpty() ? 0.0 : forecasts.first().temperature) << "°C";
+}
+
+// ─── Sunrise/sunset from Open-Meteo ──────────────────────────────────────────
+
+void WeatherManager::fetchSunTimes(double lat, double lon)
+{
+    QUrl url(QStringLiteral("https://api.open-meteo.com/v1/forecast"));
+    QUrlQuery query;
+    query.addQueryItem("latitude", QString::number(lat, 'f', 2));
+    query.addQueryItem("longitude", QString::number(lon, 'f', 2));
+    query.addQueryItem("daily", "sunrise,sunset");
+    query.addQueryItem("timezone", "auto");
+    query.addQueryItem("forecast_days", "4");
+    url.setQuery(query);
+
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::UserAgentHeader, USER_AGENT);
+
+    QNetworkReply* reply = m_networkManager->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+
+        if (reply->error() != QNetworkReply::NoError) {
+            qWarning() << "WeatherManager: Sun times request failed:" << reply->errorString();
+            return;
+        }
+
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        QJsonObject daily = doc.object()["daily"].toObject();
+        QJsonArray sunrises = daily["sunrise"].toArray();
+        QJsonArray sunsets = daily["sunset"].toArray();
+
+        m_sunTimes.clear();
+        int count = qMin(sunrises.size(), sunsets.size());
+        for (int i = 0; i < count; ++i) {
+            QDateTime rise = QDateTime::fromString(sunrises[i].toString(), Qt::ISODate);
+            QDateTime set = QDateTime::fromString(sunsets[i].toString(), Qt::ISODate);
+            m_sunTimes.append({rise, set});
+        }
+
+        qDebug() << "WeatherManager: Got sun times for" << count << "days";
+
+        // Re-apply isDaytime to stored forecasts
+        applySunTimes();
+    });
+}
+
+void WeatherManager::applySunTimes()
+{
+    if (m_sunTimes.isEmpty() || m_forecasts.isEmpty())
+        return;
+
+    for (auto& f : m_forecasts)
+        f.isDaytime = isDaytimeAt(f.time);
+
+    emit weatherChanged();
+}
+
+bool WeatherManager::isDaytimeAt(const QDateTime& time) const
+{
+    for (const auto& pair : m_sunTimes) {
+        if (time.date() == pair.first.date())
+            return time >= pair.first && time < pair.second;
+    }
+    // No sun data for this day — fallback to hour
+    int hour = time.time().hour();
+    return hour >= 7 && hour < 19;
 }
 
 // ─── NWS icon URL → WMO weather code ────────────────────────────────────────
