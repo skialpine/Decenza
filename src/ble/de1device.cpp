@@ -628,14 +628,11 @@ void DE1Device::parseShotSample(const QByteArray& data) {
     // Log steam temp periodically for debugging
     static int steamLogCounter = 0;
     if (++steamLogCounter % 20 == 0) {  // Every ~4 seconds (samples come at ~5Hz)
-        QString logPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/steam_debug.log";
-        QFile file(logPath);
-        if (file.open(QIODevice::Append | QIODevice::Text)) {
-            QTextStream out(&file);
-            out << QDateTime::currentDateTime().toString("hh:mm:ss")
-                << " STEAM_TEMP=" << m_steamTemp << "\n";
-            file.close();
-        }
+        qDebug() << "[steam] BLE spec:" << (newSpec ? "new" : "old")
+                 << "size:" << data.size()
+                 << "raw_byte18:" << (data.size() > 18 ? d[18] : 0)
+                 << "sample.steamTemp:" << sample.steamTemp
+                 << "m_steamTemp:" << m_steamTemp;
     }
 
     emit shotSampleReceived(sample);

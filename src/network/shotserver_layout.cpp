@@ -9,6 +9,8 @@
 #include "../core/profilestorage.h"
 #include "../core/settingsserializer.h"
 #include "../ai/aimanager.h"
+#include "../core/widgetlibrary.h"
+#include "librarysharing.h"
 #include "version.h"
 
 #include <QNetworkInterface>
@@ -68,7 +70,113 @@ void ShotServer::handleLayoutApi(QTcpSocket* socket, const QString& method, cons
         return;
     }
 
-    // All remaining endpoints are POST
+    // GET /api/library/entries — list all local library entries
+    if (method == "GET" && path == "/api/library/entries") {
+        if (!m_widgetLibrary) {
+            sendJson(socket, R"({"error":"Library not available"})");
+            return;
+        }
+        QVariantList entries = m_widgetLibrary->entries();
+        QJsonArray arr;
+        for (const QVariant& v : entries)
+            arr.append(QJsonObject::fromVariantMap(v.toMap()));
+        sendJson(socket, QJsonDocument(arr).toJson(QJsonDocument::Compact));
+        return;
+    }
+
+    // GET /api/library/thumbnail?id=X — serve thumbnail PNG
+    if (method == "GET" && path.startsWith("/api/library/thumbnail")) {
+        if (!m_widgetLibrary) {
+            sendResponse(socket, 404, "text/plain", "Not found");
+            return;
+        }
+        int qIdx = path.indexOf("?id=");
+        QString entryId = (qIdx >= 0) ? QUrl::fromPercentEncoding(path.mid(qIdx + 4).toUtf8()) : QString();
+        if (!entryId.isEmpty() && m_widgetLibrary->hasThumbnail(entryId)) {
+            sendFile(socket, m_widgetLibrary->thumbnailPath(entryId), "image/png");
+        } else {
+            sendResponse(socket, 404, "text/plain", "No thumbnail");
+        }
+        return;
+    }
+
+    // GET /api/library/entry?id=X — get full entry data
+    if (method == "GET" && path.startsWith("/api/library/entry")) {
+        if (!m_widgetLibrary) {
+            sendJson(socket, R"({"error":"Library not available"})");
+            return;
+        }
+        int qIdx = path.indexOf("?id=");
+        QString entryId = (qIdx >= 0) ? QUrl::fromPercentEncoding(path.mid(qIdx + 4).toUtf8()) : QString();
+        if (entryId.isEmpty()) {
+            sendResponse(socket, 400, "application/json", R"({"error":"Missing id parameter"})");
+            return;
+        }
+        QVariantMap data = m_widgetLibrary->getEntryData(entryId);
+        if (data.isEmpty()) {
+            sendResponse(socket, 404, "application/json", R"({"error":"Entry not found"})");
+            return;
+        }
+        sendJson(socket, QJsonDocument(QJsonObject::fromVariantMap(data)).toJson(QJsonDocument::Compact));
+        return;
+    }
+
+    // GET /api/community/browse — browse community entries (async)
+    if (method == "GET" && path.startsWith("/api/community/browse")) {
+        if (!m_librarySharing) {
+            sendJson(socket, R"({"error":"Community sharing not available"})");
+            return;
+        }
+        QUrl url("http://localhost" + path);
+        QUrlQuery query(url);
+        QString type = query.queryItemValue("type");
+        QString search = query.queryItemValue("search");
+        QString sort = query.queryItemValue("sort", QUrl::FullyDecoded);
+        int page = query.queryItemValue("page").toInt();
+        if (page < 1) page = 1;
+        if (sort.isEmpty()) sort = "newest";
+
+        m_pendingLibrarySocket = socket;
+
+        QMetaObject::Connection* browseConn = new QMetaObject::Connection();
+        QMetaObject::Connection* errorConn = new QMetaObject::Connection();
+
+        *browseConn = connect(m_librarySharing, &LibrarySharing::communityEntriesChanged, this, [=]() {
+            if (!m_pendingLibrarySocket) return;
+            QJsonObject resp;
+            resp["success"] = true;
+            QVariantList entries = m_librarySharing->communityEntries();
+            QJsonArray arr;
+            for (const QVariant& v : entries)
+                arr.append(QJsonObject::fromVariantMap(v.toMap()));
+            resp["entries"] = arr;
+            resp["total"] = m_librarySharing->totalCommunityResults();
+            sendJson(m_pendingLibrarySocket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+            m_pendingLibrarySocket = nullptr;
+            disconnect(*browseConn);
+            disconnect(*errorConn);
+            delete browseConn;
+            delete errorConn;
+        });
+        *errorConn = connect(m_librarySharing, &LibrarySharing::lastErrorChanged, this, [=]() {
+            if (!m_pendingLibrarySocket) return;
+            QString error = m_librarySharing->lastError();
+            if (error.isEmpty()) return;
+            QJsonObject resp;
+            resp["error"] = error;
+            sendJson(m_pendingLibrarySocket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+            m_pendingLibrarySocket = nullptr;
+            disconnect(*browseConn);
+            disconnect(*errorConn);
+            delete browseConn;
+            delete errorConn;
+        });
+
+        m_librarySharing->browseCommunity(type, QString(), QString(), search, sort, page);
+        return;
+    }
+
+    // All remaining layout/library/community endpoints are POST
     if (method != "POST") {
         sendResponse(socket, 405, "application/json", R"({"error":"Method not allowed"})");
         return;
@@ -261,6 +369,241 @@ void ShotServer::handleLayoutApi(QTcpSocket* socket, const QString& method, cons
 
         m_aiManager->analyze(systemPrompt, userPrompt);
     }
+    // ========== Library API (local, synchronous) ==========
+
+    else if (method == "POST" && path == "/api/library/save-item") {
+        if (!m_widgetLibrary) {
+            sendJson(socket, R"({"error":"Library not available"})");
+            return;
+        }
+        QString itemId = obj["itemId"].toString();
+        if (itemId.isEmpty()) {
+            sendResponse(socket, 400, "application/json", R"({"error":"Missing itemId"})");
+            return;
+        }
+        QString entryId = m_widgetLibrary->addItemFromLayout(itemId);
+        if (entryId.isEmpty()) {
+            sendJson(socket, R"({"error":"Failed to save item"})");
+            return;
+        }
+        QJsonObject resp;
+        resp["success"] = true;
+        resp["entryId"] = entryId;
+        sendJson(socket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+    }
+    else if (method == "POST" && path == "/api/library/save-zone") {
+        if (!m_widgetLibrary) {
+            sendJson(socket, R"({"error":"Library not available"})");
+            return;
+        }
+        QString zone = obj["zone"].toString();
+        if (zone.isEmpty()) {
+            sendResponse(socket, 400, "application/json", R"({"error":"Missing zone"})");
+            return;
+        }
+        QString entryId = m_widgetLibrary->addZoneFromLayout(zone);
+        if (entryId.isEmpty()) {
+            sendJson(socket, R"({"error":"Failed to save zone"})");
+            return;
+        }
+        QJsonObject resp;
+        resp["success"] = true;
+        resp["entryId"] = entryId;
+        sendJson(socket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+    }
+    else if (method == "POST" && path == "/api/library/save-layout") {
+        if (!m_widgetLibrary) {
+            sendJson(socket, R"({"error":"Library not available"})");
+            return;
+        }
+        QString entryId = m_widgetLibrary->addCurrentLayout(false);
+        if (entryId.isEmpty()) {
+            sendJson(socket, R"({"error":"Failed to save layout"})");
+            return;
+        }
+        QJsonObject resp;
+        resp["success"] = true;
+        resp["entryId"] = entryId;
+        sendJson(socket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+    }
+    else if (method == "POST" && path == "/api/library/apply") {
+        if (!m_widgetLibrary) {
+            sendJson(socket, R"({"error":"Library not available"})");
+            return;
+        }
+        QString entryId = obj["entryId"].toString();
+        QString targetZone = obj["zone"].toString();
+        if (entryId.isEmpty()) {
+            sendResponse(socket, 400, "application/json", R"({"error":"Missing entryId"})");
+            return;
+        }
+        // Determine type from entry metadata
+        QVariantMap meta = m_widgetLibrary->getEntry(entryId);
+        QString type = meta["type"].toString();
+        bool ok = false;
+        if (type == "item") {
+            if (targetZone.isEmpty()) {
+                sendResponse(socket, 400, "application/json", R"({"error":"Missing zone for item apply"})");
+                return;
+            }
+            ok = m_widgetLibrary->applyItem(entryId, targetZone);
+        } else if (type == "zone") {
+            if (targetZone.isEmpty()) {
+                sendResponse(socket, 400, "application/json", R"({"error":"Missing zone for zone apply"})");
+                return;
+            }
+            ok = m_widgetLibrary->applyZone(entryId, targetZone);
+        } else if (type == "layout") {
+            ok = m_widgetLibrary->applyLayout(entryId, false);
+        }
+        QJsonObject resp;
+        resp["success"] = ok;
+        sendJson(socket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+    }
+    else if (method == "POST" && path == "/api/library/delete") {
+        if (!m_widgetLibrary) {
+            sendJson(socket, R"({"error":"Library not available"})");
+            return;
+        }
+        QString entryId = obj["entryId"].toString();
+        if (entryId.isEmpty()) {
+            sendResponse(socket, 400, "application/json", R"({"error":"Missing entryId"})");
+            return;
+        }
+        bool ok = m_widgetLibrary->removeEntry(entryId);
+        QJsonObject resp;
+        resp["success"] = ok;
+        sendJson(socket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+    }
+
+    // ========== Community API (async, signal-based) ==========
+
+    else if (method == "POST" && path == "/api/community/download") {
+        if (!m_librarySharing) {
+            sendJson(socket, R"({"error":"Community sharing not available"})");
+            return;
+        }
+        QString serverId = obj["serverId"].toString();
+        if (serverId.isEmpty()) {
+            sendResponse(socket, 400, "application/json", R"({"error":"Missing serverId"})");
+            return;
+        }
+
+        m_pendingLibrarySocket = socket;
+
+        QMetaObject::Connection* doneConn = new QMetaObject::Connection();
+        QMetaObject::Connection* failConn = new QMetaObject::Connection();
+
+        *doneConn = connect(m_librarySharing, &LibrarySharing::downloadComplete, this, [=](const QString& localEntryId) {
+            if (!m_pendingLibrarySocket) return;
+            QJsonObject resp;
+            resp["success"] = true;
+            resp["localEntryId"] = localEntryId;
+            sendJson(m_pendingLibrarySocket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+            m_pendingLibrarySocket = nullptr;
+            disconnect(*doneConn);
+            disconnect(*failConn);
+            delete doneConn;
+            delete failConn;
+        });
+        *failConn = connect(m_librarySharing, &LibrarySharing::downloadFailed, this, [=](const QString& error) {
+            if (!m_pendingLibrarySocket) return;
+            QJsonObject resp;
+            resp["error"] = error;
+            sendJson(m_pendingLibrarySocket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+            m_pendingLibrarySocket = nullptr;
+            disconnect(*doneConn);
+            disconnect(*failConn);
+            delete doneConn;
+            delete failConn;
+        });
+
+        m_librarySharing->downloadEntry(serverId);
+    }
+    else if (method == "POST" && path == "/api/community/upload") {
+        if (!m_librarySharing) {
+            sendJson(socket, R"({"error":"Community sharing not available"})");
+            return;
+        }
+        QString entryId = obj["entryId"].toString();
+        if (entryId.isEmpty()) {
+            sendResponse(socket, 400, "application/json", R"({"error":"Missing entryId"})");
+            return;
+        }
+
+        m_pendingLibrarySocket = socket;
+
+        QMetaObject::Connection* successConn = new QMetaObject::Connection();
+        QMetaObject::Connection* failConn = new QMetaObject::Connection();
+
+        *successConn = connect(m_librarySharing, &LibrarySharing::uploadSuccess, this, [=](const QString& serverId) {
+            if (!m_pendingLibrarySocket) return;
+            QJsonObject resp;
+            resp["success"] = true;
+            resp["serverId"] = serverId;
+            sendJson(m_pendingLibrarySocket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+            m_pendingLibrarySocket = nullptr;
+            disconnect(*successConn);
+            disconnect(*failConn);
+            delete successConn;
+            delete failConn;
+        });
+        *failConn = connect(m_librarySharing, &LibrarySharing::uploadFailed, this, [=](const QString& error) {
+            if (!m_pendingLibrarySocket) return;
+            QJsonObject resp;
+            resp["error"] = error;
+            sendJson(m_pendingLibrarySocket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+            m_pendingLibrarySocket = nullptr;
+            disconnect(*successConn);
+            disconnect(*failConn);
+            delete successConn;
+            delete failConn;
+        });
+
+        m_librarySharing->uploadEntry(entryId);
+    }
+    else if (method == "POST" && path == "/api/community/delete") {
+        if (!m_librarySharing) {
+            sendJson(socket, R"({"error":"Community sharing not available"})");
+            return;
+        }
+        QString serverId = obj["serverId"].toString();
+        if (serverId.isEmpty()) {
+            sendResponse(socket, 400, "application/json", R"({"error":"Missing serverId"})");
+            return;
+        }
+
+        m_pendingLibrarySocket = socket;
+
+        QMetaObject::Connection* successConn = new QMetaObject::Connection();
+        QMetaObject::Connection* failConn = new QMetaObject::Connection();
+
+        *successConn = connect(m_librarySharing, &LibrarySharing::deleteSuccess, this, [=]() {
+            if (!m_pendingLibrarySocket) return;
+            QJsonObject resp;
+            resp["success"] = true;
+            sendJson(m_pendingLibrarySocket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+            m_pendingLibrarySocket = nullptr;
+            disconnect(*successConn);
+            disconnect(*failConn);
+            delete successConn;
+            delete failConn;
+        });
+        *failConn = connect(m_librarySharing, &LibrarySharing::deleteFailed, this, [=](const QString& error) {
+            if (!m_pendingLibrarySocket) return;
+            QJsonObject resp;
+            resp["error"] = error;
+            sendJson(m_pendingLibrarySocket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+            m_pendingLibrarySocket = nullptr;
+            disconnect(*successConn);
+            disconnect(*failConn);
+            delete successConn;
+            delete failConn;
+        });
+
+        m_librarySharing->deleteFromServer(serverId);
+    }
+
     else {
         sendResponse(socket, 404, "application/json", R"({"error":"Unknown layout endpoint"})");
     }
@@ -297,11 +640,13 @@ QString ShotServer::generateLayoutPage() const
         .editor-panel { }
         .zone-card {
             background: var(--surface);
-            border: 1px solid var(--border);
+            border: 2px solid var(--border);
             border-radius: 12px;
             padding: 1rem;
             margin-bottom: 1rem;
+            transition: border-color 0.15s;
         }
+        .zone-card.selected { border-color: var(--accent); }
         .zone-header {
             display: flex;
             align-items: center;
@@ -360,18 +705,18 @@ QString ShotServer::generateLayoutPage() const
         }
         .chip:hover { border-color: var(--accent); }
         .chip.selected {
-            background: var(--accent);
-            color: #000;
-            border-color: var(--accent);
+            border: 2px solid var(--accent);
         }
         .chip.special { color: orange; }
-        .chip.selected.special { color: #000; }
+        .chip.selected.special { color: orange; }
         .chip-arrow {
             cursor: pointer;
             font-size: 1rem;
             opacity: 0.8;
         }
         .chip-arrow:hover { opacity: 1; }
+)HTML";
+    html += R"HTML(
         .chip-remove {
             cursor: pointer;
             color: #f85149;
@@ -561,7 +906,8 @@ QString ShotServer::generateLayoutPage() const
         .btn-cancel:hover { border-color: var(--accent); }
         .btn-save { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
         .btn-save:hover { background: var(--accent-dim); }
-
+)HTML";
+    html += R"HTML(
         /* --- WYSIWYG Editor (matching tablet design) --- */
         .wysiwyg-editor {
             background: var(--bg);
@@ -657,7 +1003,8 @@ QString ShotServer::generateLayoutPage() const
         .emoji-cell:hover { background: var(--surface-hover); }
         .emoji-cell.selected { background: var(--accent); border-radius: 6px; }
         .emoji-cell img { width: 24px; height: 24px; filter: brightness(0) invert(1); }
-
+)HTML";
+    html += R"HTML(
         /* Row 2: Content + Preview */
         .editor-content-row {
             display: flex;
@@ -678,7 +1025,7 @@ QString ShotServer::generateLayoutPage() const
             letter-spacing: 0.05em;
         }
         .preview-full {
-            width: 120px;
+            min-width: 120px;
             height: 80px;
             border-radius: 8px;
             background: var(--bg);
@@ -706,7 +1053,7 @@ QString ShotServer::generateLayoutPage() const
             -webkit-box-orient: vertical;
         }
         .preview-bar {
-            width: 120px;
+            min-width: 120px;
             height: 32px;
             border-radius: 8px;
             background: var(--bg);
@@ -725,7 +1072,8 @@ QString ShotServer::generateLayoutPage() const
         .preview-bar img { width: 18px; height: 18px; filter: brightness(0) invert(1); }
         .preview-bar .pv-emoji { font-size: 1rem; }
         .preview-bar .pv-text { overflow: hidden; text-overflow: ellipsis; }
-
+)HTML";
+    html += R"HTML(
         /* Row 3: Format | Variables | Actions */
         .editor-tools-row {
             display: flex;
@@ -736,7 +1084,7 @@ QString ShotServer::generateLayoutPage() const
             flex: 0 0 auto;
         }
         .editor-tools-vars {
-            flex: 0 0 90px;
+            flex: 0 0 180px;
             min-width: 0;
             display: flex;
             flex-direction: column;
@@ -780,6 +1128,8 @@ QString ShotServer::generateLayoutPage() const
             gap: 6px;
             flex-wrap: wrap;
         }
+)HTML";
+    html += R"HTML(
         .color-swatch {
             width: 26px;
             height: 26px;
@@ -804,6 +1154,123 @@ QString ShotServer::generateLayoutPage() const
             background: none;
         }
         .color-swatch-x:hover { background: rgba(248,81,73,0.15); }
+)HTML";
+    html += R"HTML(
+        .color-popup-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        .color-popup-overlay.open { display: flex; }
+        .color-popup {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem;
+            min-width: 300px;
+            max-width: 400px;
+        }
+        .color-popup h4 {
+            color: var(--text);
+            margin: -0.5rem -0.5rem 0.75rem;
+            padding: 0.5rem;
+            font-size: 0.85rem;
+            text-align: center;
+            cursor: move;
+            user-select: none;
+            border-bottom: 1px solid var(--border);
+            border-radius: 12px 12px 0 0;
+        }
+        .color-popup h4:hover { background: var(--surface-hover); }
+        .color-popup-group {
+            margin-bottom: 0.5rem;
+        }
+        .color-popup-group-label {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .color-popup-grid {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .cp-swatch {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: transform 0.1s, border-color 0.1s;
+            position: relative;
+        }
+        .cp-swatch:hover { border-color: white; transform: scale(1.15); }
+        .cp-swatch[title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            pointer-events: none;
+        }
+)HTML";
+    html += R"HTML(
+        .color-popup-footer {
+            display: flex;
+            gap: 6px;
+            margin-top: 0.75rem;
+            justify-content: flex-end;
+        }
+        .color-popup-footer button {
+            padding: 0.3rem 0.75rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+        .color-popup-footer button:hover { border-color: var(--accent); }
+        .color-popup-footer .cp-custom-btn { border-color: var(--accent); color: var(--accent); }
+        .color-popup-footer .cp-apply-btn { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+        .color-popup-footer .cp-apply-btn:hover { filter: brightness(1.1); }
+        .cp-picker-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid var(--border);
+        }
+        .cp-picker-row #iroPickerContainer { flex-shrink: 0; }
+        .cp-picker-right { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+        .cp-hex-row { display: flex; align-items: center; gap: 6px; }
+        .cp-hex-row label { font-size: 0.7rem; color: var(--text-secondary); }
+        .cp-hex-input {
+            width: 80px;
+            padding: 4px 6px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--bg);
+            color: var(--text);
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+        .cp-hex-input:focus { border-color: var(--accent); outline: none; }
+        .cp-preview-swatch {
+            width: 36px; height: 36px;
+            border-radius: 6px;
+            border: 2px solid var(--border);
+        }
         .color-label {
             font-size: 0.75rem;
             color: var(--text-secondary);
@@ -860,7 +1327,197 @@ QString ShotServer::generateLayoutPage() const
             .editor-tools-row { flex-direction: column; }
             .editor-preview-col { flex-direction: row; gap: 0.5rem; }
         }
+
+        /* Library panel */
+        .main-wrapper {
+            display: flex;
+            gap: 0;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+        .main-wrapper .main-layout { flex: 1; min-width: 0; }
+        .library-panel {
+            width: 340px;
+            min-width: 340px;
+            background: var(--surface);
+            border-left: 1px solid var(--border);
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 60px);
+            overflow-y: auto;
+            position: sticky;
+            top: 60px;
+        }
+        .lib-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .lib-tab {
+            flex: 1;
+            padding: 0.5rem;
+            text-align: center;
+            cursor: pointer;
+            background: var(--bg);
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            font-weight: 600;
+            border: none;
+            transition: all 0.15s;
+        }
+        .lib-tab.active {
+            background: var(--accent);
+            color: #fff;
+        }
+        .lib-tab:hover:not(.active) { background: var(--surface-hover); }
+        .lib-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        .lib-action-btn {
+            padding: 0.35rem 0.6rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.15s;
+        }
+        .lib-action-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .lib-action-btn.accent { border-color: var(--accent); color: var(--accent); }
+        .lib-action-btn:disabled { opacity: 0.4; cursor: default; }
+        .lib-entries {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .lib-entry {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.6rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .lib-entry:hover { border-color: var(--accent); }
+        .lib-entry.selected { border: 2px solid var(--accent); }
+        .lib-entry-visual {
+            border-radius: 6px;
+            padding: 0.4rem 0.6rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            min-height: 32px;
+            position: relative;
+            overflow: hidden;
+        }
+        .lib-entry-visual img.lib-thumb {
+            width: 100%;
+            height: 48px;
+            object-fit: contain;
+            border-radius: 4px;
+        }
+        .lib-entry-visual .lib-item-emoji { width: 22px; height: 22px; flex-shrink: 0; }
+        .lib-entry-visual .lib-item-emoji img { width: 100%; height: 100%; filter: brightness(0) invert(1); }
+        .lib-entry-visual .lib-item-text {
+            color: white;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .lib-entry-visual .lib-zone-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+        }
+        .lib-zone-mini-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            color: white;
+            white-space: nowrap;
+        }
+        .lib-zone-mini-chip img { width: 12px; height: 12px; filter: brightness(0) invert(1); }
+        .lib-type-overlay {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            font-size: 0.55rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 1px 4px;
+            border-radius: 3px;
+            opacity: 0.85;
+            letter-spacing: 0.03em;
+        }
+        .lib-type-overlay.item { background: #1a3a5c; color: #4e85f4; }
+        .lib-type-overlay.zone { background: #3a3520; color: #c9a227; }
+        .lib-type-overlay.layout { background: #1a3a2a; color: #00cc6d; }
+        .lib-empty {
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 2rem 1rem;
+            font-size: 0.85rem;
+        }
+        .lib-community-filters {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .lib-filter-select, .lib-filter-input {
+            padding: 0.35rem 0.5rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 0.75rem;
+            flex: 1;
+            min-width: 0;
+        }
+        .lib-filter-input { flex: 2; }
+        .lib-load-more {
+            padding: 0.5rem;
+            text-align: center;
+            color: var(--accent);
+            cursor: pointer;
+            font-size: 0.8rem;
+            border: 1px dashed var(--border);
+            border-radius: 6px;
+            margin-top: 0.5rem;
+        }
+        .lib-load-more:hover { background: var(--surface-hover); }
+        .lib-toast {
+            position: fixed;
+            bottom: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent);
+            color: #fff;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        .lib-toast.show { opacity: 1; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/@jaames/iro@5"></script>
 </head>
 <body>
 )HTML";
@@ -907,6 +1564,7 @@ QString ShotServer::generateLayoutPage() const
         </div>
     </div>
 
+    <div class="main-wrapper">
     <div class="main-layout">
         <div class="zones-panel" id="zonesPanel"></div>
         <div class="editor-panel editor-hidden" id="editorPanel">
@@ -924,7 +1582,8 @@ QString ShotServer::generateLayoutPage() const
                     <div class="emoji-tabs" id="emojiTabs"></div>
                     <div class="emoji-grid" id="emojiGrid"></div>
                 </div>
-
+)HTML";
+    html += R"HTML(
                 <!-- ROW 2: WYSIWYG Content + Dual Preview -->
                 <div class="editor-content-row">
                     <div class="editor-content-col">
@@ -951,17 +1610,18 @@ QString ShotServer::generateLayoutPage() const
                         <div class="preview-bar" id="previewBar"></div>
                     </div>
                 </div>
-
+)HTML";
+    html += R"HTML(
                 <!-- ROW 3: Format/Color | Variables | Actions -->
                 <div class="editor-tools-row">
                     <div class="editor-tools-format">
                         <div class="color-row">
                             <span class="color-label">Color</span>
-                            <div class="color-swatch" id="textColorSwatch" style="background:#ffffff" onclick="document.getElementById('textColorInput').click()"></div>
+                            <div class="color-swatch" id="textColorSwatch" style="background:#ffffff" onclick="openColorPopup('text')"></div>
                             <input type="color" id="textColorInput" value="#ffffff" style="position:absolute;visibility:hidden;width:0;height:0" onchange="applyTextColor(this.value)">
                             <span class="color-swatch-x" onclick="clearTextColor()" title="Reset text color">&#10005;</span>
                             <span class="color-label" style="margin-left:6px">Bg</span>
-                            <div class="color-swatch" id="bgColorSwatch" style="background:transparent" onclick="document.getElementById('bgColorInput').click()">
+                            <div class="color-swatch" id="bgColorSwatch" style="background:transparent" onclick="openColorPopup('bg')">
                                 <span id="bgNoneX" style="color:var(--text-secondary);font-size:0.6rem">&#10005;</span>
                             </div>
                             <input type="color" id="bgColorInput" value="#555555" style="position:absolute;visibility:hidden;width:0;height:0" onchange="setBgColor(this.value)">
@@ -1015,9 +1675,134 @@ QString ShotServer::generateLayoutPage() const
                 <div class="editor-buttons">
                     <button class="btn btn-cancel" style="border-color:var(--accent);color:var(--accent)" onclick="openAiDialog()">&#10024; Ask AI</button>
                     <div style="flex:1"></div>
-                    <button class="btn btn-cancel" onclick="closeEditor()">Cancel</button>
-                    <button class="btn btn-save" onclick="saveText()">Save</button>
+                    <button class="btn btn-cancel" onclick="closeEditor()">Done</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Library Panel (right sidebar) -->
+    <div class="library-panel" id="libraryPanel">
+        <div class="lib-tabs">
+            <button class="lib-tab active" id="libTabLocal" onclick="switchLibTab('local')">My Library</button>
+            <button class="lib-tab" id="libTabCommunity" onclick="switchLibTab('community')">Community</button>
+        </div>
+
+        <!-- Local library content -->
+        <div id="libLocalContent">
+            <div class="lib-actions">
+                <button class="lib-action-btn" onclick="saveToLibrary('item')" title="Save selected widget">+ Item</button>
+                <button class="lib-action-btn" onclick="saveToLibrary('zone')" title="Save entire zone">+ Zone</button>
+                <button class="lib-action-btn" onclick="saveToLibrary('layout')" title="Save entire layout">+ Layout</button>
+                <button class="lib-action-btn accent" id="libApplyBtn" onclick="applyFromLibrary()" disabled title="Apply selected entry">Apply</button>
+                <button class="lib-action-btn" id="libUploadBtn" onclick="uploadToComm()" disabled title="Share to community">Share</button>
+                <button class="lib-action-btn" id="libDeleteBtn" onclick="deleteFromLibrary()" disabled style="color:#ff4444;border-color:#ff4444" title="Delete selected entry">Delete</button>
+            </div>
+            <div class="lib-entries" id="libLocalEntries">
+                <div class="lib-empty">No saved entries yet.<br>Select a widget and click "+ Item" to save it.</div>
+            </div>
+        </div>
+
+        <!-- Community content -->
+        <div id="libCommunityContent" style="display:none">
+            <div class="lib-actions">
+                <button class="lib-action-btn accent" id="commApplyBtn" onclick="applyFromLibrary()" disabled title="Download &amp; apply">Apply</button>
+                <button class="lib-action-btn" id="commDownloadBtn" onclick="downloadOnly()" disabled title="Download to My Library">Download</button>
+            </div>
+            <div class="lib-community-filters">
+                <select class="lib-filter-select" id="commTypeFilter" onchange="browseCommunity()">
+                    <option value="">All types</option>
+                    <option value="item">Items</option>
+                    <option value="zone">Zones</option>
+                    <option value="layout">Layouts</option>
+                </select>
+                <input class="lib-filter-input" id="commSearchInput" type="text" placeholder="Search..."
+                       onkeydown="if(event.key==='Enter')browseCommunity()">
+                <select class="lib-filter-select" id="commSortFilter" onchange="browseCommunity()">
+                    <option value="newest">Newest</option>
+                    <option value="popular">Popular</option>
+                    <option value="name">Name</option>
+                </select>
+            </div>
+            <div class="lib-entries" id="libCommunityEntries">
+                <div class="lib-empty">Click a tab or search to browse community entries.</div>
+            </div>
+            <div class="lib-load-more" id="commLoadMore" style="display:none" onclick="loadMoreCommunity()">Load more...</div>
+        </div>
+    </div>
+    </div><!-- end main-wrapper -->
+
+    <!-- Toast notification -->
+    <div class="lib-toast" id="libToast"></div>
+)HTML";
+    html += R"HTML(
+    <!-- Color picker popup with theme swatches -->
+    <div class="color-popup-overlay" id="colorPopupOverlay" onclick="if(event.target===this)closeColorPopup()">
+        <div class="color-popup" id="colorPopupBox">
+            <h4 id="colorPopupTitle">Text Color</h4>
+
+            <div class="color-popup-group">
+                <div class="color-popup-group-label">Text</div>
+                <div class="color-popup-grid">
+                    <div class="cp-swatch" style="background:#ffffff" title="White" onclick="pickColor('#ffffff')"></div>
+                    <div class="cp-swatch" style="background:#e6edf3" title="Light" onclick="pickColor('#e6edf3')"></div>
+                    <div class="cp-swatch" style="background:#c0c5e3" title="Secondary" onclick="pickColor('#c0c5e3')"></div>
+                    <div class="cp-swatch" style="background:#8b949e" title="Muted" onclick="pickColor('#8b949e')"></div>
+                    <div class="cp-swatch" style="background:#000000;border-color:var(--border)" title="Black" onclick="pickColor('#000000')"></div>
+                </div>
+            </div>
+
+            <div class="color-popup-group">
+                <div class="color-popup-group-label">UI</div>
+                <div class="color-popup-grid">
+                    <div class="cp-swatch" style="background:#4e85f4" title="Primary" onclick="pickColor('#4e85f4')"></div>
+                    <div class="cp-swatch" style="background:#e94560" title="Accent" onclick="pickColor('#e94560')"></div>
+                    <div class="cp-swatch" style="background:#c9a227" title="Gold" onclick="pickColor('#c9a227')"></div>
+                    <div class="cp-swatch" style="background:#00cc6d" title="Success" onclick="pickColor('#00cc6d')"></div>
+                    <div class="cp-swatch" style="background:#ffaa00" title="Warning" onclick="pickColor('#ffaa00')"></div>
+                    <div class="cp-swatch" style="background:#ff4444" title="Error" onclick="pickColor('#ff4444')"></div>
+                </div>
+            </div>
+
+            <div class="color-popup-group">
+                <div class="color-popup-group-label">Graph</div>
+                <div class="color-popup-grid">
+                    <div class="cp-swatch" style="background:#18c37e" title="Pressure" onclick="pickColor('#18c37e')"></div>
+                    <div class="cp-swatch" style="background:#69fdb3" title="Pressure Goal" onclick="pickColor('#69fdb3')"></div>
+                    <div class="cp-swatch" style="background:#4e85f4" title="Flow" onclick="pickColor('#4e85f4')"></div>
+                    <div class="cp-swatch" style="background:#7aaaff" title="Flow Goal" onclick="pickColor('#7aaaff')"></div>
+                    <div class="cp-swatch" style="background:#e73249" title="Temperature" onclick="pickColor('#e73249')"></div>
+                    <div class="cp-swatch" style="background:#ffa5a6" title="Temp Goal" onclick="pickColor('#ffa5a6')"></div>
+                    <div class="cp-swatch" style="background:#a2693d" title="Weight" onclick="pickColor('#a2693d')"></div>
+                </div>
+            </div>
+
+            <div class="color-popup-group">
+                <div class="color-popup-group-label">Extras</div>
+                <div class="color-popup-grid">
+                    <div class="cp-swatch" style="background:#9C27B0" title="Purple" onclick="pickColor('#9C27B0')"></div>
+                    <div class="cp-swatch" style="background:#FF9800" title="Orange" onclick="pickColor('#FF9800')"></div>
+                    <div class="cp-swatch" style="background:#6F4E37" title="Coffee" onclick="pickColor('#6F4E37')"></div>
+                    <div class="cp-swatch" style="background:#555555" title="Grey" onclick="pickColor('#555555')"></div>
+                    <div class="cp-swatch" style="background:#252538" title="Surface" onclick="pickColor('#252538')"></div>
+                    <div class="cp-swatch" style="background:#1a1a2e;border-color:var(--border)" title="Dark" onclick="pickColor('#1a1a2e')"></div>
+                </div>
+            </div>
+
+            <div class="cp-picker-row">
+                <div id="iroPickerContainer"></div>
+                <div class="cp-picker-right">
+                    <div class="cp-hex-row">
+                        <label>Hex</label>
+                        <input type="text" class="cp-hex-input" id="cpHexInput" value="#ffffff" maxlength="7"
+                               oninput="onHexInput(this.value)">
+                    </div>
+                    <div class="cp-preview-swatch" id="cpPreviewSwatch" style="background:#ffffff"></div>
+                </div>
+            </div>
+
+            <div class="color-popup-footer">
+                <button class="cp-apply-btn" onclick="applyPickerColor()">Apply</button>
             </div>
         </div>
     </div>
@@ -1126,15 +1911,18 @@ QString ShotServer::generateLayoutPage() const
         {id:"navigate:descaling",label:"Go to Descaling"},
         {id:"navigate:ai",label:"Go to AI Settings"},
         {id:"navigate:visualizer",label:"Go to Visualizer"},
+        {id:"navigate:autofavorites",label:"Go to Auto-Favorites"},
         {id:"command:sleep",label:"Sleep"},
         {id:"command:startEspresso",label:"Start Espresso"},
         {id:"command:startSteam",label:"Start Steam"},
         {id:"command:startHotWater",label:"Start Hot Water"},
         {id:"command:startFlush",label:"Start Flush"},
         {id:"command:idle",label:"Stop (Idle)"},
-        {id:"command:tare",label:"Tare Scale"}
+        {id:"command:tare",label:"Tare Scale"},
+        {id:"command:quit",label:"Quit App"}
     ];
-
+)HTML";
+    html += R"HTML(
     function loadLayout() {
         fetch("/api/layout").then(function(r){return r.json()}).then(function(data) {
             layoutData = data;
@@ -1174,7 +1962,8 @@ QString ShotServer::generateLayoutPage() const
         tmp.innerHTML = text;
         return tmp.textContent || tmp.innerText || "";
     }
-
+)HTML";
+    html += R"HTML(
     function renderZones() {
         var panel = document.getElementById("zonesPanel");
         var html = "";
@@ -1187,7 +1976,8 @@ QString ShotServer::generateLayoutPage() const
             var isPairEnd = (zone.key === "topRight" || zone.key === "bottomRight");
             if (isPairStart) html += '<div class="zone-row">';
 
-            html += '<div class="zone-card" style="' + (isPairStart || isPairEnd ? 'flex:1' : '') + '">';
+            var zoneSelected = selectedChip && selectedChip.zone === zone.key;
+            html += '<div class="zone-card' + (zoneSelected ? ' selected' : '') + '" style="' + (isPairStart || isPairEnd ? 'flex:1' : '') + '" onclick="zoneClick(\'' + zone.key + '\',event)">';
             html += '<div class="zone-header"><span class="zone-title">' + zone.label + '</span>';
 
             if (zone.hasOffset) {
@@ -1267,17 +2057,21 @@ QString ShotServer::generateLayoutPage() const
 
     // Part 5b: Layout editor JS - interaction handlers
     html += R"HTML(
+    function zoneClick(zoneKey, event) {
+        // Only handle clicks on the zone card itself, not on chips/buttons inside
+        if (event.target.closest('.chip, .add-btn, .add-dropdown, .offset-btn')) return;
+        if (selectedChip && selectedChip.zone === zoneKey && !selectedChip.id) {
+            selectedChip = null;
+        } else {
+            selectedChip = {id: null, zone: zoneKey};
+        }
+        renderZones();
+    }
+
     function chipClick(itemId, zone, type) {
         if (selectedChip && selectedChip.id === itemId) {
             // Deselect
             selectedChip = null;
-        } else if (selectedChip && selectedChip.zone !== zone) {
-            // Move to different zone
-            apiPost("/api/layout/move", {itemId: selectedChip.id, fromZone: selectedChip.zone, toZone: zone, toIndex: -1}, function() {
-                selectedChip = null;
-                loadLayout();
-            });
-            return;
         } else {
             selectedChip = {id: itemId, zone: zone};
             if (type === "custom") {
@@ -1376,15 +2170,120 @@ QString ShotServer::generateLayoutPage() const
     wysiwygEl.addEventListener("mouseup", saveSelection);
     wysiwygEl.addEventListener("keyup", saveSelection);
     wysiwygEl.addEventListener("blur", saveSelection);
+)HTML";
+    html += R"HTML(
+    // ---- Segment model (portable rich text format) ----
 
+    function rgbToHex(rgb) {
+        if (!rgb) return "";
+        if (rgb.charAt(0) === "#") return rgb;
+        var m = rgb.match(/(\d+)/g);
+        if (!m || m.length < 3) return rgb;
+        return "#" + ((1<<24)+(parseInt(m[0])<<16)+(parseInt(m[1])<<8)+parseInt(m[2])).toString(16).slice(1);
+    }
+
+    function domToSegments(el) {
+        var segments = [];
+        function walk(node, inherited) {
+            if (node.nodeType === 3) {
+                var text = node.textContent;
+                if (text) {
+                    var seg = {text: text};
+                    if (inherited.bold) seg.bold = true;
+                    if (inherited.italic) seg.italic = true;
+                    if (inherited.color) seg.color = inherited.color;
+                    if (inherited.size) seg.size = inherited.size;
+                    segments.push(seg);
+                }
+                return;
+            }
+            if (node.nodeType !== 1) return;
+            var tag = node.tagName.toLowerCase();
+            var fmt = {};
+            for (var k in inherited) fmt[k] = inherited[k];
+            if (tag === "b" || tag === "strong") fmt.bold = true;
+            if (tag === "i" || tag === "em") fmt.italic = true;
+            if (tag === "br") { segments.push({text: "\n"}); return; }
+            // Browsers create <div> or <p> on Enter — treat as line break before content
+            if ((tag === "div" || tag === "p") && segments.length > 0) {
+                var lastSeg = segments[segments.length - 1];
+                if (lastSeg.text !== "\n") segments.push({text: "\n"});
+            }
+            var st = node.style;
+            if (st.color) fmt.color = rgbToHex(st.color);
+            if (st.fontSize) { var px = parseInt(st.fontSize); if (px > 0) fmt.size = px; }
+            if (st.fontWeight === "bold" || parseInt(st.fontWeight) >= 700) fmt.bold = true;
+            if (st.fontStyle === "italic") fmt.italic = true;
+            if (tag === "font" && node.getAttribute("color")) fmt.color = rgbToHex(node.getAttribute("color"));
+            for (var i = 0; i < node.childNodes.length; i++) walk(node.childNodes[i], fmt);
+        }
+        walk(el, {});
+        return mergeAdjacentSegments(segments);
+    }
+
+    function mergeAdjacentSegments(segments) {
+        if (segments.length <= 1) return segments;
+        var result = [];
+        for (var i = 0; i < segments.length; i++) {
+            var cur = segments[i];
+            if (result.length === 0) { result.push({text:cur.text, bold:cur.bold, italic:cur.italic, color:cur.color, size:cur.size}); continue; }
+            var prev = result[result.length - 1];
+            if (prev.text !== "\n" && cur.text !== "\n" &&
+                !!prev.bold === !!cur.bold && !!prev.italic === !!cur.italic &&
+                (prev.color||"") === (cur.color||"") && (prev.size||0) === (cur.size||0)) {
+                prev.text += cur.text;
+            } else {
+                result.push({text:cur.text, bold:cur.bold, italic:cur.italic, color:cur.color, size:cur.size});
+            }
+        }
+        // Clean undefined values
+        for (var j = 0; j < result.length; j++) {
+            var s = result[j];
+            if (!s.bold) delete s.bold;
+            if (!s.italic) delete s.italic;
+            if (!s.color) delete s.color;
+            if (!s.size) delete s.size;
+        }
+        return result;
+    }
+
+    function segmentsToHtml(segments) {
+        var html = "";
+        for (var i = 0; i < segments.length; i++) {
+            var seg = segments[i];
+            var text = seg.text;
+            if (!text) continue;
+            if (text === "\n") { html += "<br>"; continue; }
+            var escaped = text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+            var styles = [];
+            if (seg.color) styles.push("color:" + seg.color);
+            if (seg.size) styles.push("font-size:" + seg.size + "px");
+            if (styles.length > 0) escaped = '<span style="' + styles.join("; ") + '">' + escaped + '</span>';
+            if (seg.bold) escaped = "<b>" + escaped + "</b>";
+            if (seg.italic) escaped = "<i>" + escaped + "</i>";
+            html += escaped;
+        }
+        return html || "Text";
+    }
+)HTML";
+    html += R"HTML(
     function openEditor(itemId, zone) {
+        // Flush any pending auto-save from previously edited item
+        if (editingItem && autoSaveTimer) {
+            clearTimeout(autoSaveTimer); autoSaveTimer = null; saveText();
+        }
         editingItem = {id: itemId, zone: zone};
         document.getElementById("emojiPickerArea").style.display = "none";
         document.getElementById("emojiToggleBtn").textContent = "Pick Icon";
         fetch("/api/layout/item?id=" + encodeURIComponent(itemId))
             .then(function(r){return r.json()})
             .then(function(props) {
-                wysiwygEl.innerHTML = props.content || "Text";
+                // Load segments if available, otherwise fall back to HTML content
+                if (props.segments && props.segments.length > 0) {
+                    wysiwygEl.innerHTML = segmentsToHtml(props.segments);
+                } else {
+                    wysiwygEl.innerHTML = props.content || "Text";
+                }
                 currentAlign = props.align || "center";
                 currentAction = props.action || "";
                 currentLongPressAction = props.longPressAction || "";
@@ -1406,21 +2305,30 @@ QString ShotServer::generateLayoutPage() const
     }
 
     function closeEditor() {
+        // Flush any pending auto-save before closing
+        if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; saveText(); }
         editingItem = null;
         document.getElementById("editorPanel").classList.add("editor-hidden");
     }
 
+    var autoSaveTimer = null;
+    function autoSave() {
+        if (autoSaveTimer) clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(function() { autoSaveTimer = null; saveText(); }, 500);
+    }
+
     function saveText() {
         if (!editingItem) return;
-        var content = wysiwygEl.innerHTML || "Text";
-        // Clean up browser contenteditable artifacts
-        content = content.replace(/<div>/g, "<br>").replace(/<\/div>/g, "");
-        if (content === "<br>") content = "Text";
+        // Extract segments from the contenteditable DOM and compile to HTML
+        var segments = domToSegments(wysiwygEl);
+        var content = segmentsToHtml(segments);
+        if (!content || content === "<br>") content = "Text";
         var id = editingItem.id;
         var done = 0;
-        var total = 7;
+        var total = 8;
         function check() { done++; if (done >= total) { itemPropsCache[id] = null; loadLayout(); } }
         apiPost("/api/layout/item", {itemId: id, key: "content", value: content}, check);
+        apiPost("/api/layout/item", {itemId: id, key: "segments", value: segments}, check);
         apiPost("/api/layout/item", {itemId: id, key: "align", value: currentAlign}, check);
         apiPost("/api/layout/item", {itemId: id, key: "action", value: currentAction}, check);
         apiPost("/api/layout/item", {itemId: id, key: "longPressAction", value: currentLongPressAction}, check);
@@ -1428,7 +2336,8 @@ QString ShotServer::generateLayoutPage() const
         apiPost("/api/layout/item", {itemId: id, key: "emoji", value: currentEmoji}, check);
         apiPost("/api/layout/item", {itemId: id, key: "backgroundColor", value: currentBgColor}, check);
     }
-
+)HTML";
+    html += R"HTML(
     // ---- WYSIWYG formatting (execCommand) ----
 
     function execBold() {
@@ -1436,6 +2345,7 @@ QString ShotServer::generateLayoutPage() const
         document.execCommand("bold", false, null);
         saveSelection();
         updatePreview();
+        autoSave();
     }
 
     function execItalic() {
@@ -1443,20 +2353,26 @@ QString ShotServer::generateLayoutPage() const
         document.execCommand("italic", false, null);
         saveSelection();
         updatePreview();
+        autoSave();
     }
 
     function execFontSize(px) {
         restoreSelection();
         var sel = window.getSelection();
         if (!sel.rangeCount || sel.isCollapsed) return;
-        // Wrap selection in span with font-size
-        var range = sel.getRangeAt(0);
-        var span = document.createElement("span");
-        span.style.fontSize = px + "px";
-        range.surroundContents(span);
-        sel.collapseToEnd();
+        // Use execCommand fontSize (handles cross-boundary selections correctly)
+        // then convert the <font size="7"> tags to proper <span style="font-size:...">
+        document.execCommand("fontSize", false, "7");
+        var fonts = wysiwygEl.querySelectorAll('font[size="7"]');
+        for (var i = 0; i < fonts.length; i++) {
+            var span = document.createElement("span");
+            span.style.fontSize = px + "px";
+            while (fonts[i].firstChild) span.appendChild(fonts[i].firstChild);
+            fonts[i].parentNode.replaceChild(span, fonts[i]);
+        }
         saveSelection();
         updatePreview();
+        autoSave();
     }
 
     function applyTextColor(color) {
@@ -1465,15 +2381,111 @@ QString ShotServer::generateLayoutPage() const
         saveSelection();
         updateTextColorUI(color);
         updatePreview();
+        autoSave();
     }
 
     function clearTextColor() {
         restoreSelection();
-        document.execCommand("removeFormat", false, null);
+        // Apply default color instead of removeFormat (which strips ALL formatting)
+        document.execCommand("foreColor", false, "#ffffff");
         saveSelection();
         updateTextColorUI("#ffffff");
         updatePreview();
+        autoSave();
     }
+)HTML";
+    html += R"HTML(
+    // --- Color popup with iro.js picker + theme swatches ---
+    var colorPopupMode = "text"; // "text" or "bg"
+    var iroPicker = null;
+    var iroPickerColor = "#ffffff";
+
+    function initIroPicker() {
+        if (iroPicker) return;
+        iroPicker = new iro.ColorPicker("#iroPickerContainer", {
+            width: 140,
+            color: "#ffffff",
+            borderWidth: 1,
+            borderColor: "#444",
+            layoutDirection: "vertical",
+            layout: [
+                { component: iro.ui.Wheel },
+                { component: iro.ui.Slider, options: { sliderType: "value" } }
+            ]
+        });
+        iroPicker.on("color:change", function(color) {
+            iroPickerColor = color.hexString;
+            document.getElementById("cpHexInput").value = iroPickerColor;
+            document.getElementById("cpPreviewSwatch").style.background = iroPickerColor;
+        });
+    }
+
+    function openColorPopup(mode) {
+        saveSelection();
+        colorPopupMode = mode;
+        document.getElementById("colorPopupTitle").textContent = mode === "text" ? "Text Color" : "Background Color";
+        // Reset dragged position so it centers
+        var box = document.getElementById("colorPopupBox");
+        box.style.position = "";
+        box.style.left = "";
+        box.style.top = "";
+        // Initialize iro.js picker (lazy, first open)
+        initIroPicker();
+        // Set picker to current color
+        var startColor = mode === "bg" ? (currentBgColor || "#555555") : "#ffffff";
+        iroPicker.color.hexString = startColor;
+        iroPickerColor = startColor;
+        document.getElementById("cpHexInput").value = startColor;
+        document.getElementById("cpPreviewSwatch").style.background = startColor;
+        document.getElementById("colorPopupOverlay").classList.add("open");
+    }
+
+    function closeColorPopup() {
+        document.getElementById("colorPopupOverlay").classList.remove("open");
+    }
+
+    function pickColor(color) {
+        if (colorPopupMode === "text") {
+            applyTextColor(color);
+        } else {
+            setBgColor(color);
+        }
+        closeColorPopup();
+    }
+
+    function applyPickerColor() {
+        pickColor(iroPickerColor);
+    }
+
+    function onHexInput(val) {
+        if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+            iroPickerColor = val;
+            iroPicker.color.hexString = val;
+            document.getElementById("cpPreviewSwatch").style.background = val;
+        }
+    }
+
+    // Make popup draggable
+    (function() {
+        var box = document.getElementById("colorPopupBox");
+        var dragging = false, startX, startY, origX, origY;
+        box.querySelector("h4").style.cursor = "move";
+        box.querySelector("h4").addEventListener("mousedown", function(e) {
+            dragging = true;
+            startX = e.clientX; startY = e.clientY;
+            var rect = box.getBoundingClientRect();
+            origX = rect.left; origY = rect.top;
+            box.style.position = "fixed";
+            box.style.margin = "0";
+            e.preventDefault();
+        });
+        document.addEventListener("mousemove", function(e) {
+            if (!dragging) return;
+            box.style.left = (origX + e.clientX - startX) + "px";
+            box.style.top = (origY + e.clientY - startY) + "px";
+        });
+        document.addEventListener("mouseup", function() { dragging = false; });
+    })();
 
     function updateTextColorUI(color) {
         document.getElementById("textColorSwatch").style.background = color;
@@ -1485,6 +2497,7 @@ QString ShotServer::generateLayoutPage() const
         document.execCommand("insertText", false, token);
         saveSelection();
         updatePreview();
+        autoSave();
     }
 
     function setAlign(a) {
@@ -1492,6 +2505,7 @@ QString ShotServer::generateLayoutPage() const
         wysiwygEl.style.textAlign = a;
         updateAlignButtons();
         updatePreview();
+        autoSave();
     }
 
     function updateAlignButtons() {
@@ -1500,19 +2514,22 @@ QString ShotServer::generateLayoutPage() const
             if (btn) btn.classList.toggle("active", currentAlign === d.toLowerCase());
         });
     }
-
+)HTML";
+    html += R"HTML(
     // ---- Background Color ----
 
     function setBgColor(color) {
         currentBgColor = color;
         updateBgColorUI();
         updatePreview();
+        autoSave();
     }
 
     function clearBgColor() {
         currentBgColor = "";
         updateBgColorUI();
         updatePreview();
+        autoSave();
     }
 
     function updateBgColorUI() {
@@ -1579,8 +2596,10 @@ QString ShotServer::generateLayoutPage() const
         updateActionSelectors();
         closeActionPicker();
         updatePreview();
+        autoSave();
     }
-
+)HTML";
+    html += R"HTML(
     // ---- Emoji / Icon Picker ----
 
     function toggleEmojiPicker() {
@@ -1637,6 +2656,7 @@ QString ShotServer::generateLayoutPage() const
         updateIconPreview();
         renderEmojiGrid();
         updatePreview();
+        autoSave();
     }
 
     function clearEmoji() {
@@ -1644,6 +2664,7 @@ QString ShotServer::generateLayoutPage() const
         updateIconPreview();
         renderEmojiGrid();
         updatePreview();
+        autoSave();
     }
 
     function updateIconPreview() {
@@ -1661,17 +2682,18 @@ QString ShotServer::generateLayoutPage() const
             clearBtn.style.display = "";
         }
     }
-
+)HTML";
+    html += R"HTML(
     // ---- Dual Preview (Full + Bar, matching tablet) ----
 
     function updatePreview() {
         var rawHtml = wysiwygEl.innerHTML || "";
-        var plainText = stripHtml(rawHtml);
-        var previewText = substitutePreview(plainText);
+        // Substitute variables in the formatted HTML (tokens are in text, not in tags)
+        var formattedPreview = substitutePreview(rawHtml);
         var hasAction = currentAction || currentLongPressAction || currentDoubleclickAction;
         var hasEmoji = currentEmoji !== "";
         var bgColor = currentBgColor || ((hasAction || hasEmoji) ? "#555555" : "");
-        var textColor = (hasAction || hasEmoji || currentBgColor) ? "white" : "var(--text)";
+        var defaultColor = (hasAction || hasEmoji || currentBgColor) ? "white" : "var(--text)";
 
         // Full preview (center zones: vertical emoji + text)
         var fullEl = document.getElementById("previewFull");
@@ -1683,7 +2705,7 @@ QString ShotServer::generateLayoutPage() const
                 fullHtml += '<span class="pv-emoji">' + currentEmoji + '</span>';
             }
         }
-        fullHtml += '<span class="pv-text" style="color:' + textColor + '">' + previewText + '</span>';
+        fullHtml += '<span class="pv-text" style="color:' + defaultColor + '">' + formattedPreview + '</span>';
         fullEl.innerHTML = fullHtml;
         fullEl.style.background = bgColor || "var(--bg)";
         fullEl.style.textAlign = currentAlign;
@@ -1699,7 +2721,7 @@ QString ShotServer::generateLayoutPage() const
                 barHtml += '<span class="pv-emoji">' + currentEmoji + '</span>';
             }
         }
-        barHtml += '<span class="pv-text" style="color:' + textColor + '">' + previewText + '</span>';
+        barHtml += '<span class="pv-text" style="color:' + defaultColor + '">' + formattedPreview + '</span>';
         barEl.innerHTML = barHtml;
         barEl.style.background = bgColor || "var(--bg)";
         barEl.className = "preview-bar" + (hasAction ? " has-action" : "");
@@ -1725,7 +2747,7 @@ QString ShotServer::generateLayoutPage() const
     }
 
     // Live preview updates on WYSIWYG input
-    wysiwygEl.addEventListener("input", updatePreview);
+    wysiwygEl.addEventListener("input", function() { updatePreview(); autoSave(); });
 
     function apiPost(url, data, cb) {
         fetch(url, {
@@ -1786,13 +2808,388 @@ QString ShotServer::generateLayoutPage() const
     }
 
     function escapeHtml(str) {
+        if (!str) return '';
         var div = document.createElement("div");
         div.textContent = str;
         return div.innerHTML;
     }
 
+    // ===== Library panel =====
+    var libCurrentTab = 'local';
+    var libLocalData = [];
+    var libCommunityData = [];
+    var libSelectedId = null;
+    var commPage = 1;
+    var commTotal = 0;
+
+    function switchLibTab(tab) {
+        libCurrentTab = tab;
+        document.getElementById('libTabLocal').classList.toggle('active', tab === 'local');
+        document.getElementById('libTabCommunity').classList.toggle('active', tab === 'community');
+        document.getElementById('libLocalContent').style.display = tab === 'local' ? '' : 'none';
+        document.getElementById('libCommunityContent').style.display = tab === 'community' ? '' : 'none';
+        libSelectedId = null;
+        updateLibButtons();
+        if (tab === 'local') loadLibrary();
+        else if (libCommunityData.length === 0) browseCommunity();
+    }
+
+    function loadLibrary() {
+        fetch('/api/library/entries').then(function(r){return r.json()}).then(function(entries) {
+            libLocalData = entries;
+            renderLocalEntries();
+        });
+    }
+
+    var SAMPLE_VARS = {
+        "%TEMP%":"93.2","%STEAM_TEMP%":"155.0","%PRESSURE%":"9.0","%FLOW%":"2.1",
+        "%WATER%":"78","%WATER_ML%":"850","%WEIGHT%":"36.2","%SHOT_TIME%":"28.5",
+        "%TARGET_WEIGHT%":"36.0","%VOLUME%":"42","%PROFILE%":"Profile","%STATE%":"Idle",
+        "%TARGET_TEMP%":"93.0","%SCALE%":"Scale","%RATIO%":"2.0","%DOSE%":"18.0",
+        "%TIME%":"12:30","%DATE%":"2025-01-15","%CONNECTED%":"Online",
+        "%CONNECTED_COLOR%":"#00cc6d","%DEVICES%":"Machine"
+    };
+
+    function resolveVars(text) {
+        if (!text) return '';
+        var r = text.replace(/<[^>]*>/g, '');
+        for (var k in SAMPLE_VARS) r = r.split(k).join(SAMPLE_VARS[k]);
+        return r;
+    }
+
+    function emojiImgHtml(emoji, cls) {
+        if (!emoji) return '';
+        if (emoji.indexOf('qrc:') === 0) {
+            return '<img class="' + (cls||'') + '" src="' + emoji.replace('qrc:','') + '">';
+        }
+        // Unicode emoji - just show as text
+        return '<span class="' + (cls||'') + '" style="font-size:1.1em">' + emoji + '</span>';
+    }
+
+    function renderItemVisual(item) {
+        var bg = item.backgroundColor || '';
+        var hasAction = (item.action||'') !== '' || (item.longPressAction||'') !== '' || (item.doubleclickAction||'') !== '';
+        var bgStyle = bg || (hasAction ? '#555555' : 'var(--bg)');
+        var html = '<div class="lib-entry-visual" style="background:' + bgStyle + '">';
+        if (item.emoji) html += '<span class="lib-item-emoji">' + emojiImgHtml(item.emoji) + '</span>';
+        var text = resolveVars(item.content || item.type || '');
+        html += '<span class="lib-item-text">' + escapeHtml(text) + '</span>';
+        html += '</div>';
+        return html;
+    }
+
+    function renderZoneVisual(data) {
+        var items = data.items || [];
+        var html = '<div class="lib-entry-visual" style="background:var(--bg)">';
+        html += '<div class="lib-zone-chips">';
+        for (var i = 0; i < items.length; i++) {
+            var it = items[i];
+            var bg = it.backgroundColor || '';
+            var hasAct = (it.action||'') !== '';
+            var chipBg = bg || (hasAct ? '#555555' : 'var(--surface)');
+            html += '<span class="lib-zone-mini-chip" style="background:' + chipBg + '">';
+            if (it.emoji) html += emojiImgHtml(it.emoji);
+            if (it.type !== 'custom') {
+                html += (DISPLAY_NAMES[it.type] || it.type);
+            } else {
+                var t = resolveVars(it.content || '');
+                html += escapeHtml(t.length > 10 ? t.substring(0,8)+'..' : (t||'Custom'));
+            }
+            html += '</span>';
+        }
+        html += '</div></div>';
+        return html;
+    }
+
+    function renderLayoutVisual(data) {
+        var layout = data.layout || {};
+        var zones = layout.zones || {};
+        var count = 0;
+        for (var z in zones) count += zones[z].length;
+        var html = '<div class="lib-entry-visual" style="background:var(--bg);flex-wrap:wrap">';
+        // Show a mini summary of all zones
+        for (var zn in zones) {
+            var zItems = zones[zn];
+            if (!zItems.length) continue;
+            for (var j = 0; j < Math.min(zItems.length, 4); j++) {
+                var it = zItems[j];
+                var bg = it.backgroundColor || '';
+                var hasAct = (it.action||'') !== '';
+                var chipBg = bg || (hasAct ? '#555555' : 'var(--surface)');
+                html += '<span class="lib-zone-mini-chip" style="background:' + chipBg + '">';
+                if (it.type !== 'custom') html += (DISPLAY_NAMES[it.type] || it.type);
+                else {
+                    var t = resolveVars(it.content || '');
+                    html += escapeHtml(t.length > 6 ? t.substring(0,5)+'..' : (t||'C'));
+                }
+                html += '</span>';
+            }
+            if (zItems.length > 4) html += '<span class="lib-zone-mini-chip" style="background:var(--surface)">+' + (zItems.length-4) + '</span>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    function renderEntryCard(entry, id, isLocal) {
+        var sel = id === libSelectedId ? ' selected' : '';
+        var onclick = isLocal ? "selectLibEntry('" + id + "')" : "selectCommEntry('" + id + "')";
+        var html = '<div class="lib-entry' + sel + '" onclick="' + onclick + '">';
+
+        // Type badge overlay
+        html += '<span class="lib-type-overlay ' + (entry.type||'') + '">' + (entry.type||'?') + '</span>';
+
+        // Check for server thumbnail (community)
+        var thumbUrl = entry.thumbnailFullUrl || '';
+        if (thumbUrl) {
+            html += '<div class="lib-entry-visual" style="background:var(--bg);justify-content:center">';
+            html += '<img class="lib-thumb" src="' + thumbUrl + '">';
+            html += '</div>';
+        } else if (isLocal) {
+            // Check for local thumbnail
+            html += '<img class="lib-thumb" src="/api/library/thumbnail?id=' + id + '" style="display:none" onload="this.style.display=\'\';this.nextElementSibling.style.display=\'none\'">';
+        }
+
+        // Visual preview (shown if no thumbnail, or as fallback)
+        var showFallback = !thumbUrl;
+        if (showFallback && entry.data) {
+            var fallbackId = 'lf_' + id.replace(/[^a-zA-Z0-9]/g,'_');
+            var wrap = isLocal ? ' id="' + fallbackId + '"' : '';
+            if (entry.type === 'item' && entry.data.item) {
+                html += '<div' + wrap + '>' + renderItemVisual(entry.data.item) + '</div>';
+            } else if (entry.type === 'zone' && entry.data.items) {
+                html += '<div' + wrap + '>' + renderZoneVisual(entry.data) + '</div>';
+            } else if (entry.type === 'layout') {
+                html += '<div' + wrap + '>' + renderLayoutVisual(entry.data) + '</div>';
+            }
+        }
+
+        html += '</div>';
+        return html;
+    }
+
+    function renderLocalEntries() {
+        var el = document.getElementById('libLocalEntries');
+        if (!libLocalData.length) {
+            el.innerHTML = '<div class="lib-empty">No saved entries yet.<br>Select a widget and click "+ Item" to save it.</div>';
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < libLocalData.length; i++) {
+            var e = libLocalData[i];
+            html += renderEntryCard(e, e.id, true);
+        }
+        el.innerHTML = html;
+    }
+
+    function selectLibEntry(id) {
+        libSelectedId = libSelectedId === id ? null : id;
+        if (libCurrentTab === 'local') renderLocalEntries();
+        else renderCommunityEntries();
+        updateLibButtons();
+    }
+
+    function updateLibButtons() {
+        var hasSelection = !!libSelectedId;
+        var applyBtn = document.getElementById('libApplyBtn');
+        var deleteBtn = document.getElementById('libDeleteBtn');
+        var uploadBtn = document.getElementById('libUploadBtn');
+        var commApplyBtn = document.getElementById('commApplyBtn');
+        var commDownloadBtn = document.getElementById('commDownloadBtn');
+        if (applyBtn) applyBtn.disabled = !hasSelection;
+        if (deleteBtn) deleteBtn.disabled = !hasSelection;
+        if (uploadBtn) uploadBtn.disabled = !hasSelection;
+        if (commApplyBtn) commApplyBtn.disabled = !hasSelection;
+        if (commDownloadBtn) commDownloadBtn.disabled = !hasSelection;
+    }
+
+    function saveToLibrary(type) {
+        if (type === 'item') {
+            if (!selectedChip || !selectedChip.id) { showLibToast('Select a widget first'); return; }
+            apiPost('/api/library/save-item', {itemId: selectedChip.id}, function(r) {
+                if (r.success) { showLibToast('Item saved to library'); loadLibrary(); }
+                else showLibToast(r.error || 'Failed to save');
+            });
+        } else if (type === 'zone') {
+            if (!selectedChip) { showLibToast('Select a zone first'); return; }
+            apiPost('/api/library/save-zone', {zone: selectedChip.zone}, function(r) {
+                if (r.success) { showLibToast('Zone saved to library'); loadLibrary(); }
+                else showLibToast(r.error || 'Failed to save');
+            });
+        } else if (type === 'layout') {
+            apiPost('/api/library/save-layout', {}, function(r) {
+                if (r.success) { showLibToast('Layout saved to library'); loadLibrary(); }
+                else showLibToast(r.error || 'Failed to save');
+            });
+        }
+    }
+
+    function applyFromLibrary() {
+        if (!libSelectedId) return;
+        var entry = null;
+        var list = libCurrentTab === 'local' ? libLocalData : libCommunityData;
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id === libSelectedId) { entry = list[i]; break; }
+        }
+        if (!entry) return;
+
+        // For community entries, download first then apply
+        if (libCurrentTab === 'community') {
+            downloadAndApply(entry);
+            return;
+        }
+
+        // Layout applies globally, item/zone apply to the selected chip's zone
+        if (entry.type === 'layout') {
+            apiPost('/api/library/apply', {entryId: libSelectedId}, function(r) {
+                if (r.success) { showLibToast('Layout applied'); loadLayout(); }
+                else showLibToast(r.error || 'Failed to apply');
+            });
+        } else {
+            if (!selectedChip) { showLibToast('Select a zone to apply to'); return; }
+            var zone = selectedChip.zone;
+            apiPost('/api/library/apply', {entryId: libSelectedId, zone: zone}, function(r) {
+                if (r.success) { showLibToast(entry.type + ' applied to ' + zone); loadLayout(); }
+                else showLibToast(r.error || 'Failed to apply');
+            });
+        }
+    }
+
+    function deleteFromLibrary() {
+        if (!libSelectedId) return;
+        if (!confirm('Delete this library entry?')) return;
+        apiPost('/api/library/delete', {entryId: libSelectedId}, function(r) {
+            if (r.success) {
+                showLibToast('Entry deleted');
+                libSelectedId = null;
+                loadLibrary();
+                updateLibButtons();
+            } else showLibToast(r.error || 'Failed to delete');
+        });
+    }
+
+    // Community
+    function browseCommunity() {
+        commPage = 1;
+        var type = document.getElementById('commTypeFilter').value;
+        var search = document.getElementById('commSearchInput').value;
+        var sort = document.getElementById('commSortFilter').value;
+        var url = '/api/community/browse?page=' + commPage + '&sort=' + encodeURIComponent(sort);
+        if (type) url += '&type=' + encodeURIComponent(type);
+        if (search) url += '&search=' + encodeURIComponent(search);
+
+        document.getElementById('libCommunityEntries').innerHTML = '<div class="lib-empty">Loading...</div>';
+
+        fetch(url).then(function(r){return r.json()}).then(function(data) {
+            if (data.error) {
+                document.getElementById('libCommunityEntries').innerHTML = '<div class="lib-empty">' + escapeHtml(data.error) + '</div>';
+                return;
+            }
+            libCommunityData = data.entries || [];
+            commTotal = data.total || 0;
+            renderCommunityEntries();
+        }).catch(function() {
+            document.getElementById('libCommunityEntries').innerHTML = '<div class="lib-empty">Failed to load community entries.</div>';
+        });
+    }
+
+    function loadMoreCommunity() {
+        commPage++;
+        var type = document.getElementById('commTypeFilter').value;
+        var search = document.getElementById('commSearchInput').value;
+        var sort = document.getElementById('commSortFilter').value;
+        var url = '/api/community/browse?page=' + commPage + '&sort=' + encodeURIComponent(sort);
+        if (type) url += '&type=' + encodeURIComponent(type);
+        if (search) url += '&search=' + encodeURIComponent(search);
+
+        fetch(url).then(function(r){return r.json()}).then(function(data) {
+            if (data.entries) {
+                libCommunityData = libCommunityData.concat(data.entries);
+                commTotal = data.total || commTotal;
+                renderCommunityEntries();
+            }
+        });
+    }
+
+    function renderCommunityEntries() {
+        var el = document.getElementById('libCommunityEntries');
+        if (!libCommunityData.length) {
+            el.innerHTML = '<div class="lib-empty">No community entries found.</div>';
+            document.getElementById('commLoadMore').style.display = 'none';
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < libCommunityData.length; i++) {
+            var e = libCommunityData[i];
+            var id = e.serverId || e.id || '';
+            html += renderEntryCard(e, id, false);
+        }
+        el.innerHTML = html;
+        document.getElementById('commLoadMore').style.display = libCommunityData.length < commTotal ? '' : 'none';
+    }
+
+    function selectCommEntry(id) {
+        libSelectedId = libSelectedId === id ? null : id;
+        renderCommunityEntries();
+        updateLibButtons();
+    }
+
+    function downloadOnly() {
+        if (!libSelectedId) return;
+        var entry = null;
+        for (var i = 0; i < libCommunityData.length; i++) {
+            var eid = libCommunityData[i].serverId || libCommunityData[i].id;
+            if (eid === libSelectedId) { entry = libCommunityData[i]; break; }
+        }
+        if (!entry) return;
+        var serverId = entry.serverId || entry.id;
+        showLibToast('Downloading...');
+        apiPost('/api/community/download', {serverId: serverId}, function(r) {
+            if (r.success) { showLibToast('Downloaded to My Library'); loadLibrary(); }
+            else showLibToast(r.error || 'Download failed');
+        });
+    }
+
+    function downloadAndApply(entry) {
+        var serverId = entry.serverId || entry.id;
+        if (entry.type !== 'layout' && !selectedChip) {
+            showLibToast('Select a zone to apply to');
+            return;
+        }
+        var zone = selectedChip ? selectedChip.zone : '';
+        showLibToast('Downloading...');
+        apiPost('/api/community/download', {serverId: serverId}, function(r) {
+            if (r.success && r.localEntryId) {
+                var localId = r.localEntryId;
+                apiPost('/api/library/apply', {entryId: localId, zone: zone}, function(r2) {
+                    if (r2.success) { showLibToast('Applied!'); loadLayout(); }
+                    else showLibToast(r2.error || 'Failed to apply');
+                });
+                loadLibrary(); // Refresh list in background, don't block apply
+            } else showLibToast(r.error || 'Download failed');
+        });
+    }
+
+    function uploadToComm() {
+        if (!libSelectedId) return;
+        if (!confirm('Share this entry to the community?')) return;
+        showLibToast('Uploading...');
+        apiPost('/api/community/upload', {entryId: libSelectedId}, function(r) {
+            if (r.success) showLibToast('Shared to community!');
+            else showLibToast(r.error || 'Upload failed');
+        });
+    }
+
+    function showLibToast(msg) {
+        var el = document.getElementById('libToast');
+        el.textContent = msg;
+        el.classList.add('show');
+        clearTimeout(window._toastTimer);
+        window._toastTimer = setTimeout(function() { el.classList.remove('show'); }, 3000);
+    }
+
     // Initial load
     loadLayout();
+    loadLibrary();
 
     </script>
 </body>

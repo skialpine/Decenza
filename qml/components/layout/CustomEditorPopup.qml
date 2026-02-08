@@ -19,7 +19,6 @@ Popup {
     property string textDoubleclickAction: ""
     property string textEmoji: ""
     property string textBackgroundColor: ""
-    property string textColorValue: "#ffffff"
     property bool aiPending: false
     property bool showEmojiPicker: false
 
@@ -74,13 +73,6 @@ Popup {
     function openForItem(id, zone, props) {
         itemId = id
         zoneName = zone
-        var rawContent = props.content || "Text"
-        textContent = sanitizeHtml(rawContent)
-        // Auto-fix malformed content in settings so CustomItem stops crashing
-        if (textContent !== rawContent) {
-            console.warn("[CustomEditorPopup] Auto-saved sanitized content for item:", id)
-            Settings.setItemProperty(id, "content", textContent)
-        }
         textAlign = props.align || "center"
         textAction = props.action || ""
         textLongPressAction = props.longPressAction || ""
@@ -89,14 +81,39 @@ Popup {
         textBackgroundColor = props.backgroundColor || ""
         aiPending = false
         showEmojiPicker = false
-        textColorValue = "#ffffff"
-        contentInput.text = textContent
+
+        // Load segments if available, otherwise fall back to HTML content
+        var segments = props.segments
+        console.log("[CustomEditorPopup] openForItem id:", id, "has segments:", segments ? segments.length : 0, "content:", (props.content || "").substring(0, 80))
+        if (segments && segments.length > 0) {
+            // Break the text binding before loading segments into the document
+            contentInput.text = ""
+            formatter.fromSegments(segments)
+            console.log("[CustomEditorPopup] Loaded from segments")
+        } else {
+            // Legacy item — load HTML into TextArea directly
+            var rawContent = props.content || "Text"
+            textContent = sanitizeHtml(rawContent)
+            if (textContent !== rawContent) {
+                console.warn("[CustomEditorPopup] Auto-saved sanitized content for item:", id)
+                Settings.setItemProperty(id, "content", textContent)
+            }
+            contentInput.text = textContent
+            console.log("[CustomEditorPopup] Loaded from HTML content:", textContent.substring(0, 80))
+        }
         open()
     }
 
     function doSave() {
-        textContent = cleanupHtml(contentInput.text)
+        // Extract segments from document and compile to HTML
+        var segments = formatter.toSegments()
+        var html = formatter.segmentsToHtml(segments)
+        console.log("[CustomEditorPopup] doSave segments:", JSON.stringify(segments))
+        console.log("[CustomEditorPopup] doSave html:", html)
+        textContent = html || "Text"
+
         Settings.setItemProperty(itemId, "content", textContent)
+        Settings.setItemProperty(itemId, "segments", segments)
         Settings.setItemProperty(itemId, "align", textAlign)
         Settings.setItemProperty(itemId, "action", textAction)
         Settings.setItemProperty(itemId, "longPressAction", textLongPressAction)
@@ -107,35 +124,10 @@ Popup {
         close()
     }
 
-    // --- WYSIWYG formatting helpers ---
-    // Uses RichText TextArea's insert() which interprets HTML correctly
-    function applyFormat(openTag, closeTag) {
-        var start = contentInput.selectionStart
-        var end = contentInput.selectionEnd
-        if (start === end) return  // need a selection
-        var selected = contentInput.selectedText
-        contentInput.remove(start, end)
-        contentInput.insert(start, openTag + selected + closeTag)
-        contentInput.forceActiveFocus()
-    }
-
-    function insertBold()         { applyFormat("<b>", "</b>") }
-    function insertItalic()       { applyFormat("<i>", "</i>") }
-    function insertColor(color)   { applyFormat('<span style="color:' + color + '">', '</span>') }
-    function insertFontSize(size) { applyFormat('<span style="font-size:' + size + 'px">', '</span>') }
-
     function insertVariable(token) {
         var pos = contentInput.cursorPosition
         contentInput.insert(pos, token)
         contentInput.forceActiveFocus()
-    }
-
-    // Strip Qt's verbose RichText document wrapper, keep just body content
-    function cleanupHtml(html) {
-        if (!html) return ""
-        var bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
-        if (bodyMatch) html = bodyMatch[1].trim()
-        return html || "Text"
     }
 
     // AI Advice: listen for response while this popup is open
@@ -408,6 +400,14 @@ Popup {
                             bottomPadding: 0
                             leftPadding: 0
                             rightPadding: 0
+
+                            DocumentFormatter {
+                                id: formatter
+                                document: contentInput.textDocument
+                                selectionStart: contentInput.selectionStart
+                                selectionEnd: contentInput.selectionEnd
+                                cursorPosition: contentInput.cursorPosition
+                            }
                         }
 
                         ScrollBar.vertical: ScrollBar {
@@ -541,28 +541,28 @@ Popup {
                         Rectangle {
                             width: Theme.scaled(30); height: Theme.scaled(30)
                             radius: Theme.scaled(4)
-                            color: boldMa.pressed ? Theme.primaryColor : Theme.backgroundColor
+                            color: formatter.bold ? Theme.primaryColor : (boldMa.pressed ? Qt.darker(Theme.backgroundColor, 1.3) : Theme.backgroundColor)
                             border.color: Theme.borderColor; border.width: 1
                             Text {
                                 anchors.centerIn: parent; text: "B"
-                                color: Theme.textColor; font.bold: true
+                                color: formatter.bold ? "white" : Theme.textColor; font.bold: true
                                 font.pixelSize: Theme.captionFont.pixelSize
                             }
-                            MouseArea { id: boldMa; anchors.fill: parent; onClicked: popup.insertBold() }
+                            MouseArea { id: boldMa; anchors.fill: parent; onClicked: formatter.toggleBold() }
                         }
 
                         // Italic
                         Rectangle {
                             width: Theme.scaled(30); height: Theme.scaled(30)
                             radius: Theme.scaled(4)
-                            color: italicMa.pressed ? Theme.primaryColor : Theme.backgroundColor
+                            color: formatter.italic ? Theme.primaryColor : (italicMa.pressed ? Qt.darker(Theme.backgroundColor, 1.3) : Theme.backgroundColor)
                             border.color: Theme.borderColor; border.width: 1
                             Text {
                                 anchors.centerIn: parent; text: "I"
-                                color: Theme.textColor; font.italic: true
+                                color: formatter.italic ? "white" : Theme.textColor; font.italic: true
                                 font.pixelSize: Theme.captionFont.pixelSize
                             }
-                            MouseArea { id: italicMa; anchors.fill: parent; onClicked: popup.insertItalic() }
+                            MouseArea { id: italicMa; anchors.fill: parent; onClicked: formatter.toggleItalic() }
                         }
 
                         Rectangle { width: 1; height: Theme.scaled(20); color: Theme.borderColor }
@@ -570,21 +570,22 @@ Popup {
                         // Font sizes
                         Repeater {
                             model: [
-                                { label: "S", size: "12" },
-                                { label: "M", size: "18" },
-                                { label: "L", size: "28" },
-                                { label: "XL", size: "48" }
+                                { label: "S", size: 12 },
+                                { label: "M", size: 18 },
+                                { label: "L", size: 28 },
+                                { label: "XL", size: 48 }
                             ]
                             Rectangle {
+                                readonly property bool isActive: formatter.currentFontSize === modelData.size
                                 width: Theme.scaled(30); height: Theme.scaled(30)
                                 radius: Theme.scaled(4)
-                                color: sizeMa.pressed ? Theme.primaryColor : Theme.backgroundColor
+                                color: isActive ? Theme.primaryColor : (sizeMa.pressed ? Qt.darker(Theme.backgroundColor, 1.3) : Theme.backgroundColor)
                                 border.color: Theme.borderColor; border.width: 1
                                 Text {
                                     anchors.centerIn: parent; text: modelData.label
-                                    color: Theme.textColor; font: Theme.captionFont
+                                    color: parent.isActive ? "white" : Theme.textColor; font: Theme.captionFont
                                 }
-                                MouseArea { id: sizeMa; anchors.fill: parent; onClicked: popup.insertFontSize(modelData.size) }
+                                MouseArea { id: sizeMa; anchors.fill: parent; onClicked: formatter.setFontSize(modelData.size) }
                             }
                         }
                     }
@@ -627,19 +628,19 @@ Popup {
                         Rectangle {
                             width: Theme.scaled(26); height: Theme.scaled(26)
                             radius: Theme.scaled(13)
-                            color: popup.textColorValue
+                            color: formatter.currentColor || "#ffffff"
                             border.color: Theme.borderColor; border.width: 1
                             MouseArea {
                                 anchors.fill: parent
                                 onClicked: {
                                     colorPickerPopup.mode = "text"
-                                    colorPickerPopup.initialColor = Qt.color(popup.textColorValue)
+                                    colorPickerPopup.initialColor = Qt.color(formatter.currentColor || "#ffffff")
                                     colorPickerPopup.open()
                                 }
                             }
                         }
 
-                        // Clear text color (reset selection to default white)
+                        // Clear text color (reset selection to default)
                         Rectangle {
                             width: Theme.scaled(22); height: Theme.scaled(22)
                             radius: Theme.scaled(11)
@@ -654,10 +655,7 @@ Popup {
                             MouseArea {
                                 id: clearFgMa
                                 anchors.fill: parent
-                                onClicked: {
-                                    popup.textColorValue = "#ffffff"
-                                    popup.insertColor("#ffffff")
-                                }
+                                onClicked: formatter.clearFormatting()
                             }
                         }
 
@@ -1023,7 +1021,7 @@ Popup {
         x: Theme.spacingSmall
         y: Theme.spacingSmall
         width: parent.width - Theme.spacingSmall * 2
-        height: parent.height * 0.33
+        height: parent.height * 0.38
 
         background: Rectangle {
             color: Theme.surfaceColor
@@ -1042,65 +1040,115 @@ Popup {
                 if (item && item.children.length > 0)
                     item.children[0].setColor(colorPickerPopup.initialColor)
             }
-            sourceComponent: RowLayout {
-                spacing: Theme.spacingMedium
+            sourceComponent: ColumnLayout {
+                spacing: Theme.scaled(6)
 
-                ColorEditor {
-                    id: cpEditorInner
+                RowLayout {
+                    spacing: Theme.spacingMedium
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    showBrightnessSlider: false
-                }
 
-                ColumnLayout {
-                    Layout.alignment: Qt.AlignVCenter
-                    spacing: Theme.scaled(8)
-
-                    Rectangle {
-                        width: Theme.scaled(48); height: Theme.scaled(48)
-                        radius: Theme.scaled(8)
-                        color: cpEditorInner.color
-                        border.color: "white"; border.width: 2
-                        Layout.alignment: Qt.AlignHCenter
+                    ColorEditor {
+                        id: cpEditorInner
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        showBrightnessSlider: false
                     }
 
-                    Text {
-                        text: colorPickerPopup.mode === "text" ? "Text Color" : "Background"
-                        color: Theme.textSecondaryColor
-                        font: Theme.captionFont
-                        Layout.alignment: Qt.AlignHCenter
-                    }
+                    ColumnLayout {
+                        Layout.alignment: Qt.AlignVCenter
+                        spacing: Theme.scaled(8)
 
-                    Rectangle {
-                        Layout.preferredWidth: Theme.scaled(80)
-                        height: Theme.scaled(32)
-                        radius: Theme.scaled(6)
-                        color: cpApplyMa.pressed ? Qt.darker(Theme.primaryColor, 1.2) : Theme.primaryColor
-                        Text { anchors.centerIn: parent; text: "Apply"; color: "white"; font: Theme.captionFont }
-                        MouseArea {
-                            id: cpApplyMa
-                            anchors.fill: parent
-                            onClicked: {
-                                var c = cpEditorInner.color.toString()
-                                if (colorPickerPopup.mode === "text") {
-                                    popup.textColorValue = c
-                                    popup.insertColor(c)
-                                } else {
-                                    popup.textBackgroundColor = c
+                        Rectangle {
+                            width: Theme.scaled(48); height: Theme.scaled(48)
+                            radius: Theme.scaled(8)
+                            color: cpEditorInner.color
+                            border.color: "white"; border.width: 2
+                            Layout.alignment: Qt.AlignHCenter
+                        }
+
+                        Text {
+                            text: colorPickerPopup.mode === "text" ? "Text Color" : "Background"
+                            color: Theme.textSecondaryColor
+                            font: Theme.captionFont
+                            Layout.alignment: Qt.AlignHCenter
+                        }
+
+                        Rectangle {
+                            Layout.preferredWidth: Theme.scaled(80)
+                            height: Theme.scaled(32)
+                            radius: Theme.scaled(6)
+                            color: cpApplyMa.pressed ? Qt.darker(Theme.primaryColor, 1.2) : Theme.primaryColor
+                            Text { anchors.centerIn: parent; text: "Apply"; color: "white"; font: Theme.captionFont }
+                            MouseArea {
+                                id: cpApplyMa
+                                anchors.fill: parent
+                                onClicked: {
+                                    var c = cpEditorInner.color.toString()
+                                    if (colorPickerPopup.mode === "text") {
+                                        formatter.setColor(c)
+                                    } else {
+                                        popup.textBackgroundColor = c
+                                    }
+                                    colorPickerPopup.close()
                                 }
-                                colorPickerPopup.close()
                             }
                         }
-                    }
 
-                    Rectangle {
-                        Layout.preferredWidth: Theme.scaled(80)
-                        height: Theme.scaled(32)
-                        radius: Theme.scaled(6)
-                        color: cpCloseMa.pressed ? Qt.darker(Theme.backgroundColor, 1.2) : Theme.backgroundColor
-                        border.color: Theme.borderColor; border.width: 1
-                        Text { anchors.centerIn: parent; text: "Close"; color: Theme.textColor; font: Theme.captionFont }
-                        MouseArea { id: cpCloseMa; anchors.fill: parent; onClicked: colorPickerPopup.close() }
+                        Rectangle {
+                            Layout.preferredWidth: Theme.scaled(80)
+                            height: Theme.scaled(32)
+                            radius: Theme.scaled(6)
+                            color: cpCloseMa.pressed ? Qt.darker(Theme.backgroundColor, 1.2) : Theme.backgroundColor
+                            border.color: Theme.borderColor; border.width: 1
+                            Text { anchors.centerIn: parent; text: "Close"; color: Theme.textColor; font: Theme.captionFont }
+                            MouseArea { id: cpCloseMa; anchors.fill: parent; onClicked: colorPickerPopup.close() }
+                        }
+                    }
+                }
+
+                // Theme color swatches — quick pick
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: Theme.scaled(4)
+
+                    Repeater {
+                        model: [
+                            { color: "#ffffff", label: "White" },
+                            { color: Theme.temperatureColor, label: "Temperature" },
+                            { color: Theme.errorColor, label: "Error" },
+                            { color: Theme.warningColor, label: "Warning" },
+                            { color: Theme.accentColor, label: "Accent" },
+                            { color: Theme.successColor, label: "Success" },
+                            { color: Theme.pressureColor, label: "Pressure" },
+                            { color: Theme.primaryColor, label: "Primary" },
+                            { color: Theme.flowColor, label: "Flow" },
+                            { color: Theme.weightColor, label: "Weight" },
+                            { color: Theme.textSecondaryColor, label: "Secondary" }
+                        ]
+                        Rectangle {
+                            required property var modelData
+                            width: Theme.scaled(22); height: Theme.scaled(22)
+                            radius: width / 2
+                            color: modelData.color
+                            border.color: swatchMa.containsMouse ? "white" : Theme.borderColor
+                            border.width: swatchMa.containsMouse ? 2 : 1
+
+                            MouseArea {
+                                id: swatchMa
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: {
+                                    var c = parent.modelData.color.toString()
+                                    if (colorPickerPopup.mode === "text") {
+                                        formatter.setColor(c)
+                                    } else {
+                                        popup.textBackgroundColor = c
+                                    }
+                                    colorPickerPopup.close()
+                                }
+                            }
+                        }
                     }
                 }
             }

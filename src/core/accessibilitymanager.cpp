@@ -306,13 +306,30 @@ void AccessibilityManager::updateTtsLocale()
 {
     if (!m_tts || !m_translationManager) return;
 
+    if (m_tts->state() != QTextToSpeech::Ready) {
+        qDebug() << "TTS not ready yet, skipping locale update";
+        return;
+    }
+
     QString langCode = m_translationManager->currentLanguage();
     QLocale locale(langCode);
 
-    // Check if this locale is available for TTS
+#ifdef Q_OS_ANDROID
+    // On Android, just set the locale directly without calling availableLocales().
+    // availableLocales() triggers getAvailableLocales() in Java which returns null
+    // on some devices (e.g. Decent tablets), causing a fatal JNI abort that
+    // C++ try/catch cannot intercept. setLocale() is safe — if the locale isn't
+    // supported, Android TTS silently falls back to the system default.
+    m_tts->setLocale(locale);
+    qDebug() << "TTS locale set to:" << locale.name() << "for language:" << langCode;
+#else
+    // On desktop, check available locales before setting
     QList<QLocale> availableLocales = m_tts->availableLocales();
+    if (availableLocales.isEmpty()) {
+        qDebug() << "No TTS locales available — using system default";
+        return;
+    }
 
-    // Try exact match first
     bool found = false;
     for (const QLocale& available : availableLocales) {
         if (available.language() == locale.language()) {
@@ -326,4 +343,5 @@ void AccessibilityManager::updateTtsLocale()
     if (!found) {
         qDebug() << "TTS locale not available for:" << langCode << "- using system default";
     }
+#endif
 }

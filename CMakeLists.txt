@@ -187,6 +187,7 @@ set(SOURCES
     src/network/librarysharing.cpp
     src/core/settingsserializer.cpp
     src/core/datamigrationclient.cpp
+    src/core/documentformatter.cpp
     src/weather/weathermanager.cpp
 )
 
@@ -271,6 +272,7 @@ set(HEADERS
     src/network/librarysharing.h
     src/core/settingsserializer.h
     src/core/datamigrationclient.h
+    src/core/documentformatter.h
     src/weather/weathermanager.h
 )
 

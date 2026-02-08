@@ -98,7 +98,10 @@ Item {
         var result = sanitizeHtml(text)
         // Machine
         result = result.replace(/%TEMP%/g, typeof DE1Device !== "undefined" ? DE1Device.temperature.toFixed(1) : "—")
-        result = result.replace(/%STEAM_TEMP%/g, typeof DE1Device !== "undefined" ? DE1Device.steamTemperature.toFixed(1) : "—")
+        var steamVal = typeof DE1Device !== "undefined" ? DE1Device.steamTemperature : -1
+        if (text.indexOf("%STEAM_TEMP%") >= 0)
+            console.log("[steam] CustomItem substitute: DE1Device.steamTemperature=" + steamVal + " content=" + text.substring(0, 60))
+        result = result.replace(/%STEAM_TEMP%/g, steamVal >= 0 ? steamVal.toFixed(1) : "—")
         result = result.replace(/%PRESSURE%/g, typeof DE1Device !== "undefined" ? DE1Device.pressure.toFixed(1) : "—")
         result = result.replace(/%FLOW%/g, typeof DE1Device !== "undefined" ? DE1Device.flow.toFixed(1) : "—")
         result = result.replace(/%WATER%/g, typeof DE1Device !== "undefined" ? DE1Device.waterLevel.toFixed(0) : "—")
@@ -204,16 +207,16 @@ Item {
         id: compactContent
         visible: root.isCompact
         anchors.fill: parent
-        implicitWidth: compactRow.implicitWidth + (root.hasAction || root.hasEmoji ? Theme.scaled(16) : 0)
+        implicitWidth: compactRow.implicitWidth + (root.hasAction || root.bgColor !== "" ? Theme.scaled(16) : 0)
         implicitHeight: Theme.bottomBarHeight
 
         Rectangle {
-            visible: root.hasAction || root.hasEmoji
+            visible: root.hasAction || root.bgColor !== ""
             anchors.fill: parent
             anchors.topMargin: Theme.spacingSmall
             anchors.bottomMargin: Theme.spacingSmall
             color: {
-                var base = root.bgColor || (root.hasAction ? "#555555" : Theme.surfaceColor)
+                var base = root.bgColor || "#555555"
                 return compactTap.isPressed ? Qt.darker(base, 1.2) : base
             }
             radius: Theme.cardRadius
@@ -237,7 +240,7 @@ Item {
             Text {
                 text: root.resolvedText
                 textFormat: Text.RichText
-                color: (root.hasAction || root.hasEmoji) ? "white" : Theme.textColor
+                color: (root.hasAction || root.bgColor !== "") ? "white" : Theme.textColor
                 font: Theme.bodyFont
                 horizontalAlignment: root.qtAlignment
                 elide: Text.ElideRight
@@ -262,8 +265,8 @@ Item {
         id: fullContent
         visible: !root.isCompact
         anchors.fill: parent
-        implicitWidth: root.hasEmoji ? Theme.scaled(150) : (fullText.implicitWidth + (root.hasAction ? Theme.scaled(24) : 0))
-        implicitHeight: root.hasEmoji ? Theme.scaled(120) : (fullText.implicitHeight + (root.hasAction ? Theme.scaled(16) : 0))
+        implicitWidth: root.hasEmoji ? Math.max(Theme.scaled(150), emojiText.implicitWidth + Theme.scaled(24)) : (fullText.implicitWidth + Theme.scaled(16) + (root.hasAction ? Theme.scaled(16) : 0))
+        implicitHeight: root.hasEmoji ? Theme.scaled(120) : (fullText.implicitHeight + Theme.scaled(16) + (root.hasAction ? Theme.scaled(8) : 0))
 
         Rectangle {
             visible: root.hasAction || root.hasEmoji
@@ -292,6 +295,7 @@ Item {
             }
 
             Text {
+                id: emojiText
                 text: root.resolvedText
                 textFormat: Text.RichText
                 color: (root.hasAction || root.hasEmoji) ? "white" : Theme.textColor

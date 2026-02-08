@@ -835,7 +835,8 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
     else if (path == "/layout") {
         sendHtml(socket, generateLayoutPage());
     }
-    else if (path == "/api/layout" || path.startsWith("/api/layout/") || path.startsWith("/api/layout?")) {
+    else if (path == "/api/layout" || path.startsWith("/api/layout/") || path.startsWith("/api/layout?")
+             || path.startsWith("/api/library") || path.startsWith("/api/community")) {
         qsizetype headerEndPos = request.indexOf("\r\n\r\n");
         QByteArray body = (headerEndPos >= 0) ? request.mid(headerEndPos + 4) : QByteArray();
         handleLayoutApi(socket, method, path, body);

@@ -45,6 +45,7 @@
 #include "network/webdebuglogger.h"
 #include "core/widgetlibrary.h"
 #include "network/librarysharing.h"
+#include "core/documentformatter.h"
 #include "weather/weathermanager.h"
 
 // GHC Simulator for Windows debug builds
@@ -204,7 +205,6 @@ int main(int argc, char *argv[])
     // Connect screensaver manager and AI manager to shot server
     mainController.shotServer()->setScreensaverVideoManager(&screensaverManager);
     mainController.shotServer()->setAIManager(&aiManager);
-
     // Connect screensaver manager to data migration client for media import
     mainController.dataMigration()->setScreensaverVideoManager(&screensaverManager);
 
@@ -217,6 +217,10 @@ int main(int argc, char *argv[])
 
     // Library sharing - upload/download widgets to/from decenza.coffee
     LibrarySharing librarySharing(&settings, &widgetLibrary);
+
+    // Connect widget library and sharing to shot server for web layout editor
+    mainController.shotServer()->setWidgetLibrary(&widgetLibrary);
+    mainController.shotServer()->setLibrarySharing(&librarySharing);
 
     // Weather forecast manager (hourly updates, region-aware API selection)
     WeatherManager weatherManager;
@@ -471,6 +475,9 @@ int main(int argc, char *argv[])
 
     // Register strange attractor renderer for attractor screensaver
     qmlRegisterType<StrangeAttractorRenderer>("DecenzaDE1", 1, 0, "StrangeAttractorRenderer");
+
+    // Register DocumentFormatter for rich text editing in layout editor
+    qmlRegisterType<DocumentFormatter>("DecenzaDE1", 1, 0, "DocumentFormatter");
 
     checkpoint("Context properties & type registration");
 

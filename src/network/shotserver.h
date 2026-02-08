@@ -16,6 +16,8 @@ class ScreensaverVideoManager;
 class Settings;
 class ProfileStorage;
 class AIManager;
+class WidgetLibrary;
+class LibrarySharing;
 
 struct PendingRequest {
     QByteArray headerData;          // Only headers stored in memory
@@ -60,6 +62,10 @@ public:
 
     // AI manager for layout AI assistant
     void setAIManager(AIManager* aiManager) { m_aiManager = aiManager; }
+
+    // Widget library and community sharing for layout editor
+    void setWidgetLibrary(WidgetLibrary* library) { m_widgetLibrary = library; }
+    void setLibrarySharing(LibrarySharing* sharing) { m_librarySharing = sharing; }
 
 signals:
     void runningChanged();
@@ -134,7 +140,10 @@ private:
     ProfileStorage* m_profileStorage = nullptr;
     MachineState* m_machineState = nullptr;
     AIManager* m_aiManager = nullptr;
+    WidgetLibrary* m_widgetLibrary = nullptr;
+    LibrarySharing* m_librarySharing = nullptr;
     QTcpSocket* m_pendingAiSocket = nullptr;  // Socket waiting for AI response
+    QTcpSocket* m_pendingLibrarySocket = nullptr;  // Socket waiting for community response
     QTimer* m_cleanupTimer = nullptr;
     int m_port = 8888;
     int m_activeMediaUploads = 0;
