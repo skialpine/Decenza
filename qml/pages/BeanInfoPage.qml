@@ -388,21 +388,34 @@ Page {
                                                 // Remove focus from any text fields first to ensure clean state
                                                 shotMetadataPage.forceActiveFocus()
 
-                                                // Save current values to the previously selected preset before switching
-                                                if (s.selectedBeanPreset >= 0 && s.selectedBeanPreset !== beanDelegate.beanIndex) {
-                                                    var oldPreset = s.getBeanPreset(s.selectedBeanPreset)
-                                                    s.updateBeanPreset(s.selectedBeanPreset,
+                                                var targetIndex = beanDelegate.beanIndex
+                                                var oldSelected = s.selectedBeanPreset
+
+                                                // Capture current DYE values before applyBeanPreset overwrites them
+                                                var oldBrand = s.dyeBeanBrand
+                                                var oldType = s.dyeBeanType
+                                                var oldRoastDate = s.dyeRoastDate
+                                                var oldRoastLevel = s.dyeRoastLevel
+                                                var oldGrinderModel = s.dyeGrinderModel
+                                                var oldGrinderSetting = s.dyeGrinderSetting
+
+                                                // Apply new preset FIRST — this is the critical operation that
+                                                // syncs DYE fields with the selected preset. Must happen before
+                                                // updateBeanPreset, which emits beanPresetsChanged and can
+                                                // destroy this delegate (Repeater model rebuild).
+                                                s.selectedBeanPreset = targetIndex
+                                                s.applyBeanPreset(targetIndex)
+
+                                                // Save old DYE values back to the previous preset (lower priority).
+                                                // This may trigger Repeater model rebuild and destroy this delegate,
+                                                // but all critical work is already done above.
+                                                if (oldSelected >= 0 && oldSelected !== targetIndex) {
+                                                    var oldPreset = s.getBeanPreset(oldSelected)
+                                                    s.updateBeanPreset(oldSelected,
                                                         oldPreset.name || "",
-                                                        s.dyeBeanBrand,
-                                                        s.dyeBeanType,
-                                                        s.dyeRoastDate,
-                                                        s.dyeRoastLevel,
-                                                        s.dyeGrinderModel,
-                                                        s.dyeGrinderSetting)
+                                                        oldBrand, oldType, oldRoastDate,
+                                                        oldRoastLevel, oldGrinderModel, oldGrinderSetting)
                                                 }
-                                                // Now select and apply the new preset
-                                                s.selectedBeanPreset = beanDelegate.beanIndex
-                                                s.applyBeanPreset(beanDelegate.beanIndex)
                                             }
                                             beanPill.Drag.drop()
                                             if (beanPresetsRow) beanPresetsRow.draggedIndex = -1
