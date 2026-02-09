@@ -147,6 +147,8 @@ Popup {
         result = result.replace(/%RATIO%/g, "2.0")
         result = result.replace(/%DOSE%/g, "18.0")
         result = result.replace(/%SCALE%/g, "Lunar")
+        result = result.replace(/%GRIND%/g, "1.8.0")
+        result = result.replace(/%GRINDER%/g, "Niche Zero")
         result = result.replace(/%CONNECTED%/g, "Online")
         result = result.replace(/%CONNECTED_COLOR%/g, Theme.successColor)
         result = result.replace(/%DEVICES%/g, "Machine + Scale")
@@ -720,6 +722,8 @@ Popup {
                             { token: "%DATE%", label: "Date" },
                             { token: "%RATIO%", label: "Brew Ratio" },
                             { token: "%DOSE%", label: "Dose (g)" },
+                            { token: "%GRIND%", label: "Grind Setting" },
+                            { token: "%GRINDER%", label: "Grinder Model" },
                             { token: "%CONNECTED%", label: "Online/Offline" },
                             { token: "%CONNECTED_COLOR%", label: "Status Color" },
                             { token: "%DEVICES%", label: "Devices" }

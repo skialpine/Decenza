@@ -57,6 +57,7 @@ Item {
         }
         if (typeof DE1Device !== "undefined") void(DE1Device.connected)
         if (typeof ScaleDevice !== "undefined") { void(ScaleDevice.name); void(ScaleDevice.connected) }
+        if (typeof Settings !== "undefined") { void(Settings.dyeGrinderSetting); void(Settings.dyeGrinderModel) }
         return substituteVariables(_c)
     }
 
@@ -116,6 +117,9 @@ Item {
         result = result.replace(/%DOSE%/g, typeof MainController !== "undefined" ? MainController.brewByRatioDose.toFixed(1) : "—")
         // Scale device
         result = result.replace(/%SCALE%/g, typeof ScaleDevice !== "undefined" ? ScaleDevice.name : "—")
+        // Grinder
+        result = result.replace(/%GRIND%/g, typeof Settings !== "undefined" && Settings.dyeGrinderSetting ? Settings.dyeGrinderSetting : "—")
+        result = result.replace(/%GRINDER%/g, typeof Settings !== "undefined" && Settings.dyeGrinderModel ? Settings.dyeGrinderModel : "—")
         // Connection status
         var machineOn = typeof DE1Device !== "undefined" && DE1Device.connected
         var scaleOn = typeof ScaleDevice !== "undefined" && ScaleDevice.connected
