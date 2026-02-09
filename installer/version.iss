@@ -1,4 +1,4 @@
-#define BuildNumber "2619"
+#define BuildNumber "2622"
 #define VersionNumber "1.4.1"
 #define TargetName "Decenza_DE1"
 #define TargetArch "x64"

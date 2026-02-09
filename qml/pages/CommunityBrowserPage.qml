@@ -21,34 +21,11 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: Theme.scaled(12)
+        anchors.topMargin: Theme.pageTopMargin
+        anchors.leftMargin: Theme.scaled(12)
+        anchors.rightMargin: Theme.scaled(12)
+        anchors.bottomMargin: Theme.bottomBarHeight
         spacing: Theme.spacingMedium
-
-        // Header with back button
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: Theme.spacingMedium
-
-            AccessibleButton {
-                text: "\u2190 Back"
-                accessibleName: "Back to settings"
-                onClicked: pageStack.pop()
-            }
-
-            Text {
-                text: "Community Library"
-                color: Theme.textColor
-                font: Theme.titleFont
-                Layout.fillWidth: true
-            }
-
-            Text {
-                visible: LibrarySharing.totalCommunityResults > 0
-                text: LibrarySharing.totalCommunityResults + " entries"
-                color: Theme.textSecondaryColor
-                font: Theme.captionFont
-            }
-        }
 
         // Filter bar
         RowLayout {
@@ -56,7 +33,7 @@ Item {
             spacing: Theme.scaled(8)
 
             // Type filter
-            ComboBox {
+            StyledComboBox {
                 id: typeFilter
                 Layout.preferredWidth: Theme.scaled(120)
                 model: ["All Types", "Items", "Zones", "Layouts"]
@@ -68,7 +45,7 @@ Item {
             }
 
             // Variable filter
-            ComboBox {
+            StyledComboBox {
                 id: variableFilter
                 Layout.preferredWidth: Theme.scaled(140)
                 model: ["Any Variable", "%TEMP%", "%STEAM_TEMP%", "%PRESSURE%",
@@ -82,7 +59,7 @@ Item {
             }
 
             // Action filter
-            ComboBox {
+            StyledComboBox {
                 id: actionFilter
                 Layout.preferredWidth: Theme.scaled(140)
                 model: ["Any Action", "navigate:settings", "navigate:history",
@@ -107,7 +84,7 @@ Item {
             }
 
             // Sort
-            ComboBox {
+            StyledComboBox {
                 id: sortFilter
                 Layout.preferredWidth: Theme.scaled(120)
                 model: ["Newest", "Most Popular", "Name A-Z"]
@@ -231,6 +208,14 @@ Item {
         id: downloadToastTimer
         interval: 3000
         onTriggered: downloadToast.visible = false
+    }
+
+    // Bottom navigation bar
+    BottomBar {
+        title: "Community Library"
+        rightText: LibrarySharing.totalCommunityResults > 0
+            ? LibrarySharing.totalCommunityResults + " entries" : ""
+        onBackClicked: pageStack.pop()
     }
 
     function refreshResults() {

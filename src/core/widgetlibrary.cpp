@@ -542,11 +542,24 @@ void WidgetLibrary::loadIndex()
     m_index.clear();
     QJsonArray arr = doc.array();
     bool needsRebuild = false;
+    QSet<QString> seenIds;
+    int duplicates = 0;
     for (const QJsonValue& val : arr) {
         QJsonObject obj = val.toObject();
         if (!obj.contains("data"))
             needsRebuild = true;
+        QString id = obj["id"].toString();
+        if (seenIds.contains(id)) {
+            duplicates++;
+            continue;  // Skip duplicate
+        }
+        seenIds.insert(id);
         m_index.append(obj.toVariantMap());
+    }
+
+    if (duplicates > 0) {
+        qDebug() << "WidgetLibrary: Removed" << duplicates << "duplicate entries from index";
+        saveIndex();  // Persist the cleaned-up index
     }
 
     if (needsRebuild && !arr.isEmpty()) {
@@ -631,7 +644,7 @@ QString WidgetLibrary::saveEntryFile(const QJsonObject& entry)
     file.write(QJsonDocument(entry).toJson(QJsonDocument::Compact));
     file.close();
 
-    // Add to index (includes data for preview rendering in QML)
+    // Build metadata for index (includes data for preview rendering in QML)
     QVariantMap meta;
     meta["id"] = entryId;
     meta["type"] = entry["type"].toString();
@@ -639,7 +652,17 @@ QString WidgetLibrary::saveEntryFile(const QJsonObject& entry)
     meta["tags"] = entry["tags"].toArray().toVariantList();
     meta["data"] = entry["data"].toObject().toVariantMap();
 
-    m_index.append(meta);
+    // Replace existing entry with same ID, or append if new
+    bool replaced = false;
+    for (int i = 0; i < m_index.size(); ++i) {
+        if (m_index[i].toMap()["id"].toString() == entryId) {
+            m_index[i] = meta;
+            replaced = true;
+            break;
+        }
+    }
+    if (!replaced)
+        m_index.append(meta);
     saveIndex();
     emit entriesChanged();
 
