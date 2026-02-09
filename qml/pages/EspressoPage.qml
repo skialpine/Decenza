@@ -518,11 +518,13 @@ Page {
                         radius: Theme.scaled(4)
                     }
 
-                    contentItem: Rectangle {
-                        width: weightVolumeProgressBar.visualPosition * parent.width
-                        height: parent.height
-                        radius: Theme.scaled(4)
-                        color: weightVolumeColumn.displayColor
+                    contentItem: Item {
+                        Rectangle {
+                            width: weightVolumeProgressBar.visualPosition * parent.width
+                            height: parent.height
+                            radius: Theme.scaled(4)
+                            color: weightVolumeColumn.displayColor
+                        }
                     }
                 }
             }
