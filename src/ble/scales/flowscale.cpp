@@ -18,32 +18,60 @@ void FlowScale::setSettings(Settings* settings) {
     m_settings = settings;
 }
 
+void FlowScale::setDose(double doseGrams) {
+    m_dose = doseGrams;
+}
+
 void FlowScale::tare() {
     m_accumulatedWeight = 0.0;
+    m_rawFlowIntegral = 0.0;
     setWeight(0.0);
     setFlowRate(0.0);
 }
 
 void FlowScale::addFlowSample(double flowRate, double deltaTime) {
-    // Integrate flow: weight += flow_rate * time * calibration
+    // Skip integration if FlowScale is disabled
+    if (m_settings && !m_settings->useFlowScale())
+        return;
+
+    // Integrate flow: raw_integral += flow_rate * time
     // flowRate is in mL/s, deltaTime is in seconds
-    // Calibration factor from settings (default 1.29 based on testing)
-    double calibrationFactor = m_settings ? m_settings->flowCalibrationFactor() : 1.29;
     if (deltaTime > 0 && deltaTime < 1.0) {  // Sanity check
-        // Track raw (uncalibrated) integral for calibration purposes
         double rawIncrement = flowRate * deltaTime;
         m_rawFlowIntegral += rawIncrement;
         emit rawFlowIntegralChanged();
 
-        // Apply calibration for displayed weight
-        m_accumulatedWeight += rawIncrement * calibrationFactor;
-        setWeight(m_accumulatedWeight);
-        setFlowRate(flowRate * calibrationFactor);
+        // Recalculate estimated cup weight
+        updateEstimatedWeight();
+        setFlowRate(flowRate);
     }
+}
+
+void FlowScale::updateEstimatedWeight() {
+    // Model: cup_weight = raw_flow_integral - puck_absorption
+    // Puck absorption = dose × 0.95 + 6.0
+    //
+    // Empirical testing with two dose sizes shows puck absorption has two components:
+    //   - Fixed base (~6g): water retained by group head, shower screen, basket
+    //   - Dose-proportional (~0.95× dose): water absorbed by the coffee puck
+    //
+    // Validated against:
+    //   - 22g dose: predicted 26.9g retention vs 26.6g actual (during active pour)
+    //   - 14.5g dose: predicted 19.8g retention vs 19.5g actual (during active pour)
+    //   - Gives ±0.5g accuracy during pouring
+    double puckAbsorption = m_dose * 0.95 + 6.0;
+
+    double estimatedCupWeight = m_rawFlowIntegral - puckAbsorption;
+    if (estimatedCupWeight < 0.0)
+        estimatedCupWeight = 0.0;
+
+    m_accumulatedWeight = estimatedCupWeight;
+    setWeight(estimatedCupWeight);
 }
 
 void FlowScale::reset() {
     m_accumulatedWeight = 0.0;
+    m_rawFlowIntegral = 0.0;
     setWeight(0.0);
     setFlowRate(0.0);
 }

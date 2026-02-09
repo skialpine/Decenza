@@ -7,9 +7,6 @@ import "../../components"
 Item {
     id: preferencesTab
 
-    // Signal to request opening flow calibration dialog (handled by parent)
-    signal openFlowCalibrationDialog()
-
     // Local property to track auto-sleep value
     property int autoSleepMinutes: Settings.value("autoSleepMinutes", 60)
 
@@ -443,111 +440,11 @@ Item {
             Item { Layout.fillHeight: true }
         }
 
-        // Right column: Flow Sensor Calibration
+        // Right column: Steam Heater Settings
         ColumnLayout {
             Layout.preferredWidth: Theme.scaled(350)
             Layout.fillHeight: true
             spacing: Theme.scaled(15)
-
-            // Flow Sensor Calibration
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: flowCalContent.implicitHeight + Theme.scaled(30)
-                color: Theme.surfaceColor
-                radius: Theme.cardRadius
-
-                ColumnLayout {
-                    id: flowCalContent
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.margins: Theme.scaled(15)
-                    spacing: Theme.scaled(10)
-
-                    Tr {
-                        key: "settings.preferences.flowSensorCalibration"
-                        fallback: "Flow Sensor Calibration"
-                        color: Theme.textColor
-                        font.pixelSize: Theme.scaled(16)
-                        font.bold: true
-                    }
-
-                    Tr {
-                        Layout.fillWidth: true
-                        key: "settings.preferences.flowSensorCalibrationDesc"
-                        fallback: "Calibrate the virtual scale for users without a BLE scale"
-                        color: Theme.textSecondaryColor
-                        font.pixelSize: Theme.scaled(12)
-                        wrapMode: Text.WordWrap
-                    }
-
-                    // Current factor display
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: Theme.scaled(10)
-
-                        Tr {
-                            key: "settings.preferences.currentFactor"
-                            fallback: "Current factor:"
-                            color: Theme.textSecondaryColor
-                        }
-
-                        Text {
-                            text: Settings.flowCalibrationFactor.toFixed(3)
-                            color: Theme.primaryColor
-                            font.bold: true
-                        }
-                    }
-
-                    // Calibration buttons
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: Theme.scaled(10)
-
-                        AccessibleButton {
-                            Layout.fillWidth: true
-                            text: TranslationManager.translate("settings.preferences.startCalibration", "Start Calibration")
-                            accessibleName: "Start flow sensor calibration"
-                            enabled: DE1Device.guiEnabled
-                            onClicked: preferencesTab.openFlowCalibrationDialog()
-                            background: Rectangle {
-                                radius: Theme.scaled(6)
-                                color: parent.enabled ? Theme.primaryColor : Theme.backgroundColor
-                                border.color: parent.enabled ? Theme.primaryColor : Theme.textSecondaryColor
-                                border.width: 1
-                            }
-                            contentItem: Text {
-                                text: parent.text
-                                color: parent.enabled ? "white" : Theme.textSecondaryColor
-                                font.pixelSize: Theme.scaled(14)
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                        }
-
-                        AccessibleButton {
-                            Layout.preferredWidth: Theme.scaled(80)
-                            text: TranslationManager.translate("settings.preferences.reset", "Reset")
-                            accessibleName: "Reset flow calibration to 1.0"
-                            enabled: Settings.flowCalibrationFactor !== 1.0
-                            onClicked: Settings.flowCalibrationFactor = 1.0
-                            background: Rectangle {
-                                radius: Theme.scaled(6)
-                                color: "transparent"
-                                border.color: parent.enabled ? Theme.textSecondaryColor : Theme.backgroundColor
-                                border.width: 1
-                            }
-                            contentItem: Text {
-                                text: parent.text
-                                color: parent.enabled ? Theme.textColor : Theme.textSecondaryColor
-                                font.pixelSize: Theme.scaled(14)
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                        }
-                    }
-                }
-            }
 
             // Steam Heater Settings
             Rectangle {
@@ -637,6 +534,57 @@ Item {
                             onValueModified: function(newValue) {
                                 Settings.steamAutoFlushSeconds = newValue
                             }
+                        }
+                    }
+                }
+            }
+
+            // Virtual Scale (FlowScale)
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: flowScaleContent.implicitHeight + Theme.scaled(30)
+                color: Theme.surfaceColor
+                radius: Theme.cardRadius
+
+                ColumnLayout {
+                    id: flowScaleContent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: Theme.scaled(15)
+                    spacing: Theme.scaled(10)
+
+                    Text {
+                        text: TranslationManager.translate("settings.preferences.virtualScale", "Virtual Scale")
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(16)
+                        font.bold: true
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: TranslationManager.translate("settings.preferences.virtualScaleDesc",
+                              "Estimate cup weight from the machine's flow sensor when no Bluetooth scale is connected. Accuracy depends on dose weight being set correctly.")
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: Theme.scaled(12)
+                        wrapMode: Text.WordWrap
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        Text {
+                            text: TranslationManager.translate("settings.preferences.useVirtualScale", "Enable virtual scale")
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(14)
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        StyledSwitch {
+                            checked: Settings.useFlowScale
+                            accessibleName: TranslationManager.translate("settings.preferences.useVirtualScale", "Enable virtual scale")
+                            onClicked: Settings.useFlowScale = checked
                         }
                     }
                 }

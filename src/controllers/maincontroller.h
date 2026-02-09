@@ -24,6 +24,7 @@ class Settings;
 class DE1Device;
 class MachineState;
 class BLEManager;
+class FlowScale;
 class ProfileStorage;
 class ShotDebugLogger;
 class LocationProvider;
@@ -68,7 +69,6 @@ class MainController : public QObject {
     Q_PROPERTY(AIManager* aiManager READ aiManager CONSTANT)
     Q_PROPERTY(ShotDataModel* shotDataModel READ shotDataModel CONSTANT)
     Q_PROPERTY(Profile* currentProfilePtr READ currentProfilePtr CONSTANT)
-    Q_PROPERTY(bool calibrationMode READ isCalibrationMode NOTIFY calibrationModeChanged)
     Q_PROPERTY(QString currentFrameName READ currentFrameName NOTIFY frameChanged)
     Q_PROPERTY(ShotHistoryStorage* shotHistory READ shotHistory CONSTANT)
     Q_PROPERTY(ShotImporter* shotImporter READ shotImporter CONSTANT)
@@ -117,10 +117,10 @@ public:
     AIManager* aiManager() const { return m_aiManager; }
     void setAiManager(AIManager* aiManager) { m_aiManager = aiManager; }
     void setBLEManager(BLEManager* bleManager) { m_bleManager = bleManager; }
+    void setFlowScale(FlowScale* flowScale) { m_flowScale = flowScale; }
     void setTimingController(ShotTimingController* controller) { m_timingController = controller; }
     ShotDataModel* shotDataModel() const { return m_shotDataModel; }
     Profile* currentProfilePtr() { return &m_currentProfile; }
-    bool isCalibrationMode() const { return m_calibrationMode; }
     bool isSawSettling() const;
     QString currentFrameName() const { return m_currentFrameName; }
     bool isCurrentProfileRecipe() const;
@@ -196,11 +196,6 @@ public slots:
     void applyHotWaterSettings();
     void applyFlushSettings();
 
-    // Flow sensor calibration
-    Q_INVOKABLE void startCalibrationDispense(double flowRate, double targetWeight);
-    Q_INVOKABLE void startVerificationDispense(double targetWeight);  // Uses FlowScale to stop
-    Q_INVOKABLE void restoreCurrentProfile();
-
     // Real-time steam setting updates
     void setSteamTemperatureImmediate(double temp);
     void setSteamFlowImmediate(int flow);
@@ -236,7 +231,6 @@ signals:
     void profileModifiedChanged();
     void targetWeightChanged();
     void profilesChanged();
-    void calibrationModeChanged();
     void sawSettlingChanged();
 
     // Accessibility: emitted when extraction frame changes
@@ -279,6 +273,7 @@ private:
     AIManager* m_aiManager = nullptr;
     ShotTimingController* m_timingController = nullptr;
     BLEManager* m_bleManager = nullptr;
+    FlowScale* m_flowScale = nullptr;  // Shadow FlowScale for comparison logging
 
     Profile m_currentProfile;
     QStringList m_availableProfiles;
@@ -297,7 +292,6 @@ private:
 
     QString m_baseProfileName;
     bool m_profileModified = false;
-    bool m_calibrationMode = false;
     QString m_currentFrameName;  // For accessibility announcements
 
     QTimer m_settingsTimer;  // Delayed settings application after connection

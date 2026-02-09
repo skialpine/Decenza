@@ -330,22 +330,27 @@ Item {
                     }
 
                     Tr {
-                        property bool isSimulated: ScaleDevice && (ScaleDevice.name === "Flow Scale" || ScaleDevice.name === "Simulated Scale")
+                        property bool isFlowScale: ScaleDevice && ScaleDevice.name === "Flow Scale" && Settings.useFlowScale
+                        property bool isSimulated: ScaleDevice && ScaleDevice.name === "Simulated Scale"
                         key: {
                             if (ScaleDevice && ScaleDevice.connected) {
-                                return isSimulated ? "settings.bluetooth.simulated" : "settings.bluetooth.connected"
+                                if (isFlowScale) return "settings.bluetooth.virtualScale"
+                                if (isSimulated) return "settings.bluetooth.simulated"
+                                return "settings.bluetooth.connected"
                             }
                             return BLEManager.scaleConnectionFailed ? "settings.bluetooth.notFound" : "settings.bluetooth.disconnected"
                         }
                         fallback: {
                             if (ScaleDevice && ScaleDevice.connected) {
-                                return isSimulated ? "Simulated" : "Connected"
+                                if (isFlowScale) return "Virtual Scale"
+                                if (isSimulated) return "Simulated"
+                                return "Connected"
                             }
                             return BLEManager.scaleConnectionFailed ? "Not found" : "Disconnected"
                         }
                         color: {
                             if (ScaleDevice && ScaleDevice.connected) {
-                                return isSimulated ? Theme.warningColor : Theme.successColor
+                                return (isFlowScale || isSimulated) ? Theme.warningColor : Theme.successColor
                             }
                             return BLEManager.scaleConnectionFailed ? Theme.errorColor : Theme.textSecondaryColor
                         }
@@ -364,7 +369,7 @@ Item {
                 // Connected scale name
                 RowLayout {
                     Layout.fillWidth: true
-                    visible: ScaleDevice && ScaleDevice.connected
+                    visible: ScaleDevice && ScaleDevice.connected && ScaleDevice.name !== "Flow Scale"
 
                     Tr {
                         key: "settings.bluetooth.connectedScale"
@@ -378,7 +383,30 @@ Item {
                     }
                 }
 
-                // Simulated scale notice (Flow Scale or Simulated Scale)
+                // Virtual scale notice (FlowScale active)
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: flowScaleNotice.implicitHeight + 16
+                    radius: Theme.scaled(6)
+                    color: Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.15)
+                    border.color: Theme.primaryColor
+                    border.width: 1
+                    visible: ScaleDevice && ScaleDevice.name === "Flow Scale" && Settings.useFlowScale
+
+                    Text {
+                        id: flowScaleNotice
+                        anchors.fill: parent
+                        anchors.margins: Theme.scaled(8)
+                        text: TranslationManager.translate("settings.bluetooth.flowScaleNotice",
+                              "Using Virtual Scale — estimating cup weight from flow data. Set your dose weight for best accuracy.")
+                        color: Theme.primaryColor
+                        font.pixelSize: Theme.scaled(12)
+                        wrapMode: Text.Wrap
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                // Simulated scale notice
                 Rectangle {
                     Layout.fillWidth: true
                     height: simScaleNotice.implicitHeight + 16
@@ -386,15 +414,13 @@ Item {
                     color: Qt.rgba(Theme.warningColor.r, Theme.warningColor.g, Theme.warningColor.b, 0.15)
                     border.color: Theme.warningColor
                     border.width: 1
-                    visible: ScaleDevice && (ScaleDevice.name === "Flow Scale" || ScaleDevice.name === "Simulated Scale")
+                    visible: ScaleDevice && ScaleDevice.name === "Simulated Scale"
 
                     Text {
                         id: simScaleNotice
                         anchors.fill: parent
                         anchors.margins: Theme.scaled(8)
-                        text: ScaleDevice && ScaleDevice.name === "Simulated Scale"
-                              ? TranslationManager.translate("settings.bluetooth.simulatedScaleNotice", "Using Simulated Scale (simulator mode)")
-                              : TranslationManager.translate("settings.bluetooth.flowScaleNotice", "Using Flow Scale (estimated weight from DE1 flow data)")
+                        text: TranslationManager.translate("settings.bluetooth.simulatedScaleNotice", "Using Simulated Scale (simulator mode)")
                         color: Theme.warningColor
                         font.pixelSize: Theme.scaled(12)
                         wrapMode: Text.Wrap

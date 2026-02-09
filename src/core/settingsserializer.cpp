@@ -30,11 +30,6 @@ QJsonObject SettingsSerializer::exportToJson(Settings* settings, bool includeSen
     scale["name"] = settings->scaleName();
     root["scale"] = scale;
 
-    // Calibration
-    QJsonObject calibration;
-    calibration["flowFactor"] = settings->flowCalibrationFactor();
-    root["calibration"] = calibration;
-
     // Espresso settings
     QJsonObject espresso;
     espresso["temperature"] = settings->espressoTemperature();
@@ -260,14 +255,6 @@ bool SettingsSerializer::importFromJson(Settings* settings, const QJsonObject& j
         if (scale.contains("address")) settings->setScaleAddress(scale["address"].toString());
         if (scale.contains("type")) settings->setScaleType(scale["type"].toString());
         if (scale.contains("name")) settings->setScaleName(scale["name"].toString());
-    }
-
-    // Calibration
-    if (json.contains("calibration") && !excludeKeys.contains("calibration")) {
-        QJsonObject calibration = json["calibration"].toObject();
-        if (calibration.contains("flowFactor")) {
-            settings->setFlowCalibrationFactor(calibration["flowFactor"].toDouble());
-        }
     }
 
     // Espresso settings

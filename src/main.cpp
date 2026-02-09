@@ -142,6 +142,7 @@ int main(int argc, char *argv[])
     machineState.setTimingController(&timingController);
     mainController.setTimingController(&timingController);
     mainController.setBLEManager(&bleManager);
+    mainController.setFlowScale(&flowScale);
 
     // Connect timing controller outputs to shot data model
     QObject::connect(&timingController, &ShotTimingController::weightSampleReady,
@@ -433,7 +434,7 @@ int main(int argc, char *argv[])
     context->setContextProperty("BLEManager", &bleManager);
     context->setContextProperty("DE1Device", &de1Device);
     context->setContextProperty("ScaleDevice", &flowScale);  // FlowScale initially, updated when physical scale connects
-    context->setContextProperty("FlowScale", &flowScale);  // Always available for calibration
+    context->setContextProperty("FlowScale", &flowScale);  // Always available for diagnostics
     context->setContextProperty("MachineState", &machineState);
     context->setContextProperty("ShotDataModel", &shotDataModel);
     context->setContextProperty("MainController", &mainController);

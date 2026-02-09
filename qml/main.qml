@@ -15,9 +15,6 @@ ApplicationWindow {
     title: "Decenza"
     color: Theme.backgroundColor
 
-    // Flag to prevent navigation during flow calibration
-    property bool calibrationInProgress: false
-
     // Debug flag to force live view on operation pages (for development)
     property bool debugLiveView: false
 
@@ -1707,12 +1704,12 @@ ApplicationWindow {
             // Update previous phase tracking
             root.previousPhase = phase
 
-            // Navigate to active operation pages (skip during calibration mode or page transition)
+            // Navigate to active operation pages (skip during page transition)
             if (phase === MachineStateType.Phase.EspressoPreheating ||
                 phase === MachineStateType.Phase.Preinfusion ||
                 phase === MachineStateType.Phase.Pouring ||
                 phase === MachineStateType.Phase.Ending) {
-                if (currentPage !== "espressoPage" && !root.calibrationInProgress && !pageStack.busy) {
+                if (currentPage !== "espressoPage" && !pageStack.busy) {
                     pageStack.replace(espressoPage)
                 }
             } else if (phase === MachineStateType.Phase.Steaming) {

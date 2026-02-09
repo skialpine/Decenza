@@ -19,8 +19,8 @@ class Settings : public QObject {
     Q_PROPERTY(QString scaleType READ scaleType WRITE setScaleType NOTIFY scaleTypeChanged)
     Q_PROPERTY(QString scaleName READ scaleName WRITE setScaleName NOTIFY scaleNameChanged)
 
-    // Flow sensor calibration
-    Q_PROPERTY(double flowCalibrationFactor READ flowCalibrationFactor WRITE setFlowCalibrationFactor NOTIFY flowCalibrationFactorChanged)
+    // FlowScale (virtual scale from flow data)
+    Q_PROPERTY(bool useFlowScale READ useFlowScale WRITE setUseFlowScale NOTIFY useFlowScaleChanged)
 
     // Espresso settings
     Q_PROPERTY(double espressoTemperature READ espressoTemperature WRITE setEspressoTemperature NOTIFY espressoTemperatureChanged)
@@ -205,9 +205,9 @@ public:
     QString scaleName() const;
     void setScaleName(const QString& name);
 
-    // Flow sensor calibration
-    double flowCalibrationFactor() const;
-    void setFlowCalibrationFactor(double factor);
+    // FlowScale
+    bool useFlowScale() const;
+    void setUseFlowScale(bool enabled);
 
     // Espresso settings
     double espressoTemperature() const;
@@ -584,7 +584,7 @@ signals:
     void scaleAddressChanged();
     void scaleTypeChanged();
     void scaleNameChanged();
-    void flowCalibrationFactorChanged();
+    void useFlowScaleChanged();
     void espressoTemperatureChanged();
     void targetWeightChanged();
     void lastUsedRatioChanged();

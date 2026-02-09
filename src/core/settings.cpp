@@ -170,15 +170,15 @@ void Settings::setScaleName(const QString& name) {
     }
 }
 
-// Flow sensor calibration
-double Settings::flowCalibrationFactor() const {
-    return m_settings.value("flow/calibrationFactor", 1.29).toDouble();
+// FlowScale
+bool Settings::useFlowScale() const {
+    return m_settings.value("flow/useFlowScale", true).toBool();
 }
 
-void Settings::setFlowCalibrationFactor(double factor) {
-    if (flowCalibrationFactor() != factor) {
-        m_settings.setValue("flow/calibrationFactor", factor);
-        emit flowCalibrationFactorChanged();
+void Settings::setUseFlowScale(bool enabled) {
+    if (useFlowScale() != enabled) {
+        m_settings.setValue("flow/useFlowScale", enabled);
+        emit useFlowScaleChanged();
     }
 }
 

@@ -19,6 +19,7 @@
 #include "../core/crashhandler.h"
 #include "../ble/blemanager.h"
 #include "../ble/scaledevice.h"
+#include "../ble/scales/flowscale.h"
 #include <QDir>
 #include <QFile>
 #include <QTextStream>
@@ -2217,116 +2218,6 @@ void MainController::softStopSteam() {
     qDebug() << "Soft stop steam: sent 1-second timeout to trigger natural stop";
 }
 
-void MainController::startCalibrationDispense(double flowRate, double targetWeight) {
-    if (!m_device || !m_device->isConnected() || !m_settings) return;
-
-    // Create a simple calibration profile with a single flow-controlled frame
-    Profile calibrationProfile;
-    calibrationProfile.setTitle("Calibration");
-    calibrationProfile.setTargetWeight(targetWeight);
-    calibrationProfile.setMode(Profile::Mode::FrameBased);
-
-    // Single frame: flow control at the target flow rate
-    // Use volume limit so DE1 stops based on its own flow sensor (what we're calibrating)
-    ProfileFrame frame;
-    frame.name = "Calibration";
-    frame.pump = "flow";           // Flow control mode
-    frame.flow = flowRate;         // Target flow rate in mL/s
-    frame.temperature = m_settings->waterTemperature();  // Use hot water temp
-    frame.sensor = "water";        // Use mix temp sensor (not basket/coffee)
-    frame.transition = "fast";     // Instant transition
-    frame.seconds = 120.0;         // 2 minutes max timeout
-    frame.volume = targetWeight;   // DE1 stops when its flow sensor thinks this much dispensed
-    frame.pressure = 0;            // Not used in flow mode
-    frame.maxFlowOrPressure = 0;   // No limiter needed
-
-    calibrationProfile.addStep(frame);
-    calibrationProfile.setPreinfuseFrameCount(0);  // No preinfusion
-
-    // Disable stop-at-weight during calibration - let DE1's volume limit stop instead
-    // Set a very high target so app's stop-at-weight doesn't interfere
-    if (m_machineState) {
-        m_machineState->setTargetWeight(999);
-    }
-
-    // Enter calibration mode (prevents navigation to espresso page)
-    m_calibrationMode = true;
-    emit calibrationModeChanged();
-
-    // Tare the scale for the user before starting
-    if (m_machineState) {
-        m_machineState->tareScale();
-    }
-
-    // Upload calibration profile (user must press espresso button on DE1)
-    m_device->uploadProfile(calibrationProfile);
-
-    qDebug() << "=== CALIBRATION READY: flow" << flowRate << "mL/s, target" << targetWeight << "g - press espresso button ===";
-}
-
-void MainController::startVerificationDispense(double targetWeight) {
-    if (!m_device || !m_device->isConnected() || !m_settings) return;
-
-    // Create verification profile - uses FlowScale (with calibration factor) to stop
-    Profile verificationProfile;
-    verificationProfile.setTitle("Verification");
-    verificationProfile.setTargetWeight(targetWeight);
-    verificationProfile.setMode(Profile::Mode::FrameBased);
-
-    // Single frame: flow control at medium rate, NO volume limit
-    // FlowScale's calibrated weight will trigger stop-at-weight
-    ProfileFrame frame;
-    frame.name = "Verification";
-    frame.pump = "flow";
-    frame.flow = 6.0;  // Medium flow rate
-    frame.temperature = m_settings->waterTemperature();
-    frame.sensor = "water";
-    frame.transition = "fast";
-    frame.seconds = 120.0;  // Long timeout - FlowScale will stop it
-    frame.volume = 0;       // NO volume limit - let FlowScale stop
-    frame.pressure = 0;
-    frame.maxFlowOrPressure = 0;
-
-    verificationProfile.addStep(frame);
-    verificationProfile.setPreinfuseFrameCount(0);
-
-    // Enable stop-at-weight using FlowScale's calibrated weight
-    if (m_machineState) {
-        m_machineState->setTargetWeight(targetWeight);
-    }
-
-    // Enter calibration mode (prevents navigation)
-    m_calibrationMode = true;
-    emit calibrationModeChanged();
-
-    // Tare the scale
-    if (m_machineState) {
-        m_machineState->tareScale();
-    }
-
-    // Upload profile
-    m_device->uploadProfile(verificationProfile);
-
-    qDebug() << "=== VERIFICATION READY: target" << targetWeight << "g using FlowScale - press espresso button ===";
-}
-
-void MainController::restoreCurrentProfile() {
-    // Exit calibration mode
-    m_calibrationMode = false;
-    emit calibrationModeChanged();
-
-    // Re-upload the user's actual profile after calibration
-    if (m_device && m_device->isConnected()) {
-        uploadCurrentProfile();
-
-        // Also restore the target weight from the profile
-        if (m_machineState) {
-            m_machineState->setTargetWeight(m_currentProfile.targetWeight());
-        }
-    }
-    qDebug() << "=== RESTORED PROFILE:" << m_currentProfile.title() << "===";
-}
-
 void MainController::onEspressoCycleStarted() {
     // Safety check: abort shot if user has a saved scale but it's not connected.
     // This prevents running a shot without weight tracking when the user expects it.
@@ -2358,6 +2249,13 @@ void MainController::onEspressoCycleStarted() {
     m_tareDone = true;
     if (m_shotDataModel) {
         m_shotDataModel->clear();
+    }
+
+    // Reset FlowScale and set dose for puck absorption compensation
+    if (m_flowScale) {
+        m_flowScale->reset();
+        double dose = m_settings ? m_settings->dyeBeanWeight() : 0.0;
+        m_flowScale->setDose(dose);
     }
 
     // Start timing controller and tare via it
@@ -2757,6 +2655,14 @@ void MainController::onShotSampleReceived(const ShotSample& sample) {
         double deltaTime = sample.timer - m_lastSampleTime;
         if (deltaTime > 0 && deltaTime < 1.0) {
             m_machineState->onFlowSample(sample.groupFlow, deltaTime);
+
+            // Shadow: feed FlowScale in parallel when a physical scale is active.
+            // When FlowScale IS the active scale, MachineState already feeds it,
+            // so only feed here when using a physical scale (to avoid double-counting).
+            if (m_flowScale && m_bleManager && m_bleManager->scaleDevice() &&
+                m_bleManager->scaleDevice()->isConnected()) {
+                m_flowScale->addFlowSample(sample.groupFlow, deltaTime);
+            }
         }
     }
     m_lastSampleTime = sample.timer;
@@ -2895,6 +2801,26 @@ void MainController::onShotSampleReceived(const ShotSample& sample) {
 void MainController::onScaleWeightChanged(double weight) {
     if (!m_machineState) {
         return;
+    }
+
+    // FlowScale comparison logging: log both physical scale and FlowScale estimated weight
+    // during espresso extraction to validate puck absorption model
+    if (m_flowScale && m_extractionStarted) {
+        MachineState::Phase phase = m_machineState->phase();
+        if (phase == MachineState::Phase::Preinfusion ||
+            phase == MachineState::Phase::Pouring ||
+            phase == MachineState::Phase::Ending) {
+            double estimatedWeight = m_flowScale->weight();
+            double rawFlow = m_flowScale->rawFlowIntegral();
+            double error = estimatedWeight - weight;
+            qDebug().nospace() << "[FlowScale Compare] "
+                << "time=" << QString::number(m_lastShotTime, 'f', 1) << "s"
+                << " scale=" << QString::number(weight, 'f', 1) << "g"
+                << " est=" << QString::number(estimatedWeight, 'f', 1) << "g"
+                << " raw=" << QString::number(rawFlow, 'f', 1) << "g"
+                << " err=" << QString::number(error, 'f', 1) << "g"
+                << " phase=" << (phase == MachineState::Phase::Preinfusion ? "PI" : "Pour");
+        }
     }
 
     // Forward to timing controller which handles stop-at-weight and graph data
