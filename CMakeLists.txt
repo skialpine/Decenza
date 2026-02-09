@@ -522,8 +522,10 @@ set_property(TARGET Decenza_DE1 APPEND PROPERTY SOURCES ${QML_FILES})
 if(ANDROID)
     set_target_properties(Decenza_DE1 PROPERTIES
         QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android"
-        QT_ANDROID_VERSION_CODE "${NEXT_VERSION_CODE}"
-        QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}"
+        # Note: versionCode and versionName are managed by IncrementVersionCode.cmake
+        # at build time (updates both AndroidManifest.xml and version.h in sync).
+        # Do NOT set QT_ANDROID_VERSION_CODE here — it freezes at configure time
+        # and diverges from version.h on rebuilds without reconfigure.
     )
     # Add OpenSSL libraries for HTTPS support
     add_android_openssl_libraries(Decenza_DE1)
