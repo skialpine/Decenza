@@ -140,6 +140,12 @@ private:
     bool m_browseIsIncremental = false;  // true when using since= param
     bool m_browseIsUnfiltered = false;   // true when no filters applied
     QString m_lastError;
+    // TODO: Replace QVariantList with QAbstractListModel for scalability.
+    // QVariantList forces QML to re-evaluate the entire model on every page append.
+    // With 1000+ entries, this causes jank and high memory usage. A proper model
+    // with beginInsertRows/endInsertRows would allow incremental delegate creation.
+    // Also: strip full entry "data" payload from model, only keep metadata + thumbnail URLs.
+    // Also: add cacheBuffer to GridView in CommunityBrowserPage.qml.
     QVariantList m_communityEntries;
     QVariantList m_featuredEntries;
     int m_totalCommunityResults = 0;

@@ -447,6 +447,7 @@ Rectangle {
             entryData: ({})
             isSelected: false
             showBadge: false
+            livePreview: true
         }
 
         LibraryItemCard {
@@ -457,10 +458,11 @@ Rectangle {
             entryData: ({})
             isSelected: false
             showBadge: false
+            livePreview: true
         }
     }
 
-    // Timer to allow thumbnail components to fully render before capture
+    // Timer to allow thumbnail components to fully render before capture (community upload)
     Timer {
         id: captureTimer
         interval: 200
@@ -470,6 +472,9 @@ Rectangle {
             thumbCardFull.grabToImage(function(fullResult) {
                 thumbCardCompact.grabToImage(function(compactResult) {
                     thumbContainer.visible = false
+                    // Save locally as well (caches for web editor + library panel)
+                    WidgetLibrary.saveThumbnail(captureEntryId, fullResult.image)
+                    WidgetLibrary.saveThumbnailCompact(captureEntryId, compactResult.image)
                     LibrarySharing.uploadEntryWithThumbnails(captureEntryId,
                         fullResult.image, compactResult.image)
                 }, Qt.size(Theme.scaled(280), thumbCardCompact.height))
@@ -477,7 +482,7 @@ Rectangle {
         }
     }
 
-    // Timer for local-only thumbnail capture (triggered by C++ signal, e.g. from web editor)
+    // Timer for local thumbnail capture (full + compact)
     Timer {
         id: localCaptureTimer
         interval: 200
@@ -486,26 +491,36 @@ Rectangle {
         onTriggered: {
             thumbCardFull.grabToImage(function(fullResult) {
                 WidgetLibrary.saveThumbnail(captureEntryId, fullResult.image)
-                thumbContainer.visible = false
+                thumbCardCompact.grabToImage(function(compactResult) {
+                    WidgetLibrary.saveThumbnailCompact(captureEntryId, compactResult.image)
+                    thumbContainer.visible = false
+                }, Qt.size(Theme.scaled(280), thumbCardCompact.height))
             }, Qt.size(Theme.scaled(280), thumbCardFull.height))
         }
     }
 
-    // Handle thumbnail capture requests from C++ (e.g. when web editor saves to library)
+    // Auto-capture thumbnails when entries are added or re-capture is requested
     Connections {
         target: WidgetLibrary
-        function onRequestThumbnailCapture(entryId) {
-            var entryData = WidgetLibrary.getEntryData(entryId)
-            if (!entryData || !entryData.type) return
-
-            thumbCardFull.entryData = entryData
-            thumbCardCompact.entryData = entryData
-            thumbContainer.z = -1
-            thumbContainer.visible = true
-
-            localCaptureTimer.captureEntryId = entryId
-            localCaptureTimer.start()
+        function onEntryAdded(entryId) {
+            triggerLocalCapture(entryId)
         }
+        function onRequestThumbnailCapture(entryId) {
+            triggerLocalCapture(entryId)
+        }
+    }
+
+    function triggerLocalCapture(entryId) {
+        var data = WidgetLibrary.getEntryData(entryId)
+        if (!data || !data.type) return
+
+        thumbCardFull.entryData = data
+        thumbCardCompact.entryData = data
+        thumbContainer.z = -1
+        thumbContainer.visible = true
+
+        localCaptureTimer.captureEntryId = entryId
+        localCaptureTimer.start()
     }
 
     // Track pending apply-after-download

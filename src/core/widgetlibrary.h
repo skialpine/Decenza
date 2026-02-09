@@ -6,6 +6,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QImage>
+#include <QSet>
 
 class Settings;
 
@@ -61,8 +62,11 @@ public:
 
     // Thumbnail management
     Q_INVOKABLE void saveThumbnail(const QString& entryId, const QImage& image);
+    Q_INVOKABLE void saveThumbnailCompact(const QString& entryId, const QImage& image);
     Q_INVOKABLE QString thumbnailPath(const QString& entryId) const;
+    Q_INVOKABLE QString thumbnailCompactPath(const QString& entryId) const;
     Q_INVOKABLE bool hasThumbnail(const QString& entryId) const;
+    Q_INVOKABLE bool hasThumbnailCompact(const QString& entryId) const;
 
     /// Request QML to capture a thumbnail for the given entry (async, fire-and-forget)
     Q_INVOKABLE void triggerThumbnailCapture(const QString& entryId);
@@ -79,6 +83,7 @@ signals:
     void entryAdded(const QString& entryId);
     void entryRemoved(const QString& entryId);
     void requestThumbnailCapture(const QString& entryId);
+    void thumbnailSaved(const QString& entryId);
 
 private:
     QString libraryPath() const;
@@ -93,7 +98,11 @@ private:
     QJsonObject buildEnvelope(const QString& type, const QJsonObject& data) const;
     QStringList extractTagsFromItem(const QJsonObject& item) const;
 
+    void populateThumbnailCache();
+
     Settings* m_settings;
     QVariantList m_index;
     QString m_selectedEntryId;
+    QSet<QString> m_thumbExists;         // entry IDs with full thumbnail
+    QSet<QString> m_thumbCompactExists;  // entry IDs with compact thumbnail
 };

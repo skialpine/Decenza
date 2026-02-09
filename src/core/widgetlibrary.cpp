@@ -18,6 +18,7 @@ WidgetLibrary::WidgetLibrary(Settings* settings, QObject* parent)
 {
     ensureDirectories();
     loadIndex();
+    populateThumbnailCache();
 }
 
 // --- Properties ---
@@ -158,10 +159,13 @@ bool WidgetLibrary::removeEntry(const QString& entryId)
     if (!deleteEntryFile(entryId))
         return false;
 
-    // Remove thumbnail if exists
+    // Remove thumbnails if they exist
+    m_thumbExists.remove(entryId);
+    m_thumbCompactExists.remove(entryId);
     QString thumbPath = thumbnailPath(entryId);
-    if (QFile::exists(thumbPath))
-        QFile::remove(thumbPath);
+    QFile::remove(thumbPath);  // no-op if absent
+    QString compactThumbPath = thumbnailCompactPath(entryId);
+    QFile::remove(compactThumbPath);
 
     // Remove from index
     for (int i = 0; i < m_index.size(); ++i) {
@@ -374,9 +378,23 @@ void WidgetLibrary::saveThumbnail(const QString& entryId, const QImage& image)
 {
     QString path = thumbnailPath(entryId);
     if (image.save(path, "PNG")) {
+        m_thumbExists.insert(entryId);
         qDebug() << "WidgetLibrary: Saved thumbnail for" << entryId;
+        emit thumbnailSaved(entryId);
     } else {
         qWarning() << "WidgetLibrary: Failed to save thumbnail:" << path;
+    }
+}
+
+void WidgetLibrary::saveThumbnailCompact(const QString& entryId, const QImage& image)
+{
+    QString path = thumbnailCompactPath(entryId);
+    if (image.save(path, "PNG")) {
+        m_thumbCompactExists.insert(entryId);
+        qDebug() << "WidgetLibrary: Saved compact thumbnail for" << entryId;
+        emit thumbnailSaved(entryId);
+    } else {
+        qWarning() << "WidgetLibrary: Failed to save compact thumbnail:" << path;
     }
 }
 
@@ -385,9 +403,19 @@ QString WidgetLibrary::thumbnailPath(const QString& entryId) const
     return thumbnailsPath() + "/" + entryId + ".png";
 }
 
+QString WidgetLibrary::thumbnailCompactPath(const QString& entryId) const
+{
+    return thumbnailsPath() + "/" + entryId + "_compact.png";
+}
+
 bool WidgetLibrary::hasThumbnail(const QString& entryId) const
 {
-    return QFile::exists(thumbnailPath(entryId));
+    return m_thumbExists.contains(entryId);
+}
+
+bool WidgetLibrary::hasThumbnailCompact(const QString& entryId) const
+{
+    return m_thumbCompactExists.contains(entryId);
 }
 
 void WidgetLibrary::triggerThumbnailCapture(const QString& entryId)
@@ -648,6 +676,23 @@ bool WidgetLibrary::deleteEntryFile(const QString& entryId)
         return false;
     }
     return QFile::remove(filePath);
+}
+
+void WidgetLibrary::populateThumbnailCache()
+{
+    QDir dir(thumbnailsPath());
+    const QStringList pngs = dir.entryList({"*.png"}, QDir::Files);
+    for (const QString& filename : pngs) {
+        // filename is e.g. "abc-123.png" or "abc-123_compact.png"
+        QString base = filename.chopped(4);  // strip ".png"
+        if (base.endsWith("_compact")) {
+            m_thumbCompactExists.insert(base.chopped(8));  // strip "_compact"
+        } else {
+            m_thumbExists.insert(base);
+        }
+    }
+    qDebug() << "WidgetLibrary: Thumbnail cache:" << m_thumbExists.size()
+             << "full," << m_thumbCompactExists.size() << "compact";
 }
 
 QJsonObject WidgetLibrary::buildEnvelope(const QString& type,
