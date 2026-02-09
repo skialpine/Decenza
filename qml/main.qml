@@ -917,6 +917,9 @@ ApplicationWindow {
             bleErrorDialog.open()
         }
         function onFlowScaleFallback() {
+            // Only show "No Scale Found" if user has a saved scale.
+            // Users without a saved scale expect FlowScale — no need to nag them.
+            if (!BLEManager.hasSavedScale) return
             if (screensaverActive) { queuePopup("flowScale"); return }
             if (root.justWokeFromSleep) return
             flowScaleDialog.open()
@@ -1034,6 +1037,63 @@ ApplicationWindow {
                 accessibleName: trDismissScaleDisc.text
                 anchors.horizontalCenter: parent.horizontalCenter
                 onClicked: scaleDisconnectedDialog.close()
+            }
+        }
+    }
+
+    // Shot aborted: scale not connected
+    Connections {
+        target: MainController
+        function onShotAbortedNoScale() {
+            noScaleAbortDialog.open()
+        }
+    }
+
+    Popup {
+        id: noScaleAbortDialog
+        modal: true
+        dim: true
+        anchors.centerIn: parent
+        padding: 24
+        onClosed: root.showNextPendingPopup()
+
+        background: Rectangle {
+            color: Theme.surfaceColor
+            radius: Theme.cardRadius
+            border.width: 2
+            border.color: Theme.errorColor
+        }
+
+        onOpened: {
+            if (AccessibilityManager.enabled) {
+                AccessibilityManager.announce("Shot stopped. Scale is not connected.", true)
+            }
+        }
+
+        contentItem: Column {
+            spacing: Theme.spacingMedium
+            width: Theme.dialogWidth
+
+            Text {
+                text: "Shot Stopped"
+                font: Theme.subtitleFont
+                color: Theme.textColor
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+
+            Text {
+                text: "Your saved scale is not connected.\n\nPlease turn on your scale and wait for it to connect before starting a shot.\n\nTo use the app without a scale, go to Settings \u2192 Bluetooth and tap \"Forget Scale\"."
+                wrapMode: Text.Wrap
+                width: parent.width
+                font: Theme.bodyFont
+                color: Theme.textColor
+            }
+
+            AccessibleButton {
+                text: "OK"
+                accessibleName: "Dismiss dialog"
+                anchors.horizontalCenter: parent.horizontalCenter
+                onClicked: noScaleAbortDialog.close()
             }
         }
     }

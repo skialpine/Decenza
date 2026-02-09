@@ -23,6 +23,7 @@
 class Settings;
 class DE1Device;
 class MachineState;
+class BLEManager;
 class ProfileStorage;
 class ShotDebugLogger;
 class LocationProvider;
@@ -115,6 +116,7 @@ public:
     ProfileStorage* profileStorage() const { return m_profileStorage; }
     AIManager* aiManager() const { return m_aiManager; }
     void setAiManager(AIManager* aiManager) { m_aiManager = aiManager; }
+    void setBLEManager(BLEManager* bleManager) { m_bleManager = bleManager; }
     void setTimingController(ShotTimingController* controller) { m_timingController = controller; }
     ShotDataModel* shotDataModel() const { return m_shotDataModel; }
     Profile* currentProfilePtr() { return &m_currentProfile; }
@@ -244,6 +246,9 @@ signals:
     void shotEndedShowMetadata();
     void lastSavedShotIdChanged();
 
+    // Shot aborted because saved scale is not connected
+    void shotAbortedNoScale();
+
     // Auto-wake: emitted when scheduled wake time is reached
     void autoWakeTriggered();
 
@@ -273,6 +278,7 @@ private:
     VisualizerImporter* m_visualizerImporter = nullptr;
     AIManager* m_aiManager = nullptr;
     ShotTimingController* m_timingController = nullptr;
+    BLEManager* m_bleManager = nullptr;
 
     Profile m_currentProfile;
     QStringList m_availableProfiles;

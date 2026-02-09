@@ -17,6 +17,8 @@
 #include "../network/shotserver.h"
 #include "../network/locationprovider.h"
 #include "../core/crashhandler.h"
+#include "../ble/blemanager.h"
+#include "../ble/scaledevice.h"
 #include <QDir>
 #include <QFile>
 #include <QTextStream>
@@ -2326,6 +2328,24 @@ void MainController::restoreCurrentProfile() {
 }
 
 void MainController::onEspressoCycleStarted() {
+    // Safety check: abort shot if user has a saved scale but it's not connected.
+    // This prevents running a shot without weight tracking when the user expects it.
+    // The machine may have been started from the group head button, so we can only
+    // abort here (during preheat) — before any water flows.
+    if (m_bleManager && m_bleManager->hasSavedScale()) {
+        // Check if the physical scale is actually connected
+        // (BLEManager's scaleDevice is null or disconnected when no physical scale)
+        ScaleDevice* physicalScale = m_bleManager->scaleDevice();
+        if (!physicalScale || !physicalScale->isConnected()) {
+            qWarning() << "Shot aborted: saved scale is not connected";
+            if (m_device) {
+                m_device->requestState(DE1::State::Idle);
+            }
+            emit shotAbortedNoScale();
+            return;
+        }
+    }
+
     // Clear the graph when entering espresso preheating (new cycle from idle)
     m_shotStartTime = 0;
     m_lastShotTime = 0;

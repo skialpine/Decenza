@@ -48,6 +48,8 @@ Rectangle {
                 text: root.zoneLabel
                 color: Theme.textSecondaryColor
                 font: Theme.labelFont
+                Accessible.role: Accessible.Heading
+                Accessible.name: root.zoneLabel + " zone"
             }
 
             Item { Layout.fillWidth: true }
@@ -69,6 +71,11 @@ Rectangle {
                 color: upMa.pressed ? Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.2) : "transparent"
                 border.color: Theme.borderColor
                 border.width: 1
+
+                Accessible.role: Accessible.Button
+                Accessible.name: "Move " + root.zoneLabel + " up"
+                Accessible.focusable: true
+                Accessible.onPressAction: root.moveUp()
 
                 Text {
                     anchors.centerIn: parent
@@ -93,6 +100,11 @@ Rectangle {
                 color: downMa.pressed ? Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.2) : "transparent"
                 border.color: Theme.borderColor
                 border.width: 1
+
+                Accessible.role: Accessible.Button
+                Accessible.name: "Move " + root.zoneLabel + " down"
+                Accessible.focusable: true
+                Accessible.onPressAction: root.moveDown()
 
                 Text {
                     anchors.centerIn: parent
@@ -127,6 +139,16 @@ Rectangle {
 
                     property bool isSelected: modelData.id === root.selectedItemId
 
+                    Accessible.role: Accessible.Button
+                    Accessible.name: {
+                        var name = modelData.type === "custom"
+                            ? root.getTextChipLabel(modelData)
+                            : getItemDisplayName(modelData.type)
+                        return name + " widget" + (isSelected ? ", selected" : "")
+                    }
+                    Accessible.focusable: true
+                    Accessible.onPressAction: root.itemTapped(modelData.id)
+
                     RowLayout {
                         id: chipRow
                         anchors.centerIn: parent
@@ -138,6 +160,12 @@ Rectangle {
                             text: "\u25C0"
                             color: "white"
                             font.pixelSize: Theme.scaled(24)
+
+                            Accessible.role: Accessible.Button
+                            Accessible.name: "Move left"
+                            Accessible.focusable: true
+                            Accessible.onPressAction: root.moveLeft(modelData.id)
+
                             MouseArea {
                                 anchors.fill: parent
                                 anchors.margins: -Theme.scaled(4)
@@ -183,6 +211,12 @@ Rectangle {
                             text: "\u25B6"
                             color: "white"
                             font.pixelSize: Theme.scaled(24)
+
+                            Accessible.role: Accessible.Button
+                            Accessible.name: "Move right"
+                            Accessible.focusable: true
+                            Accessible.onPressAction: root.moveRight(modelData.id)
+
                             MouseArea {
                                 anchors.fill: parent
                                 anchors.margins: -Theme.scaled(4)
@@ -197,6 +231,12 @@ Rectangle {
                             color: Theme.errorColor
                             font.pixelSize: Theme.scaled(20)
                             font.bold: true
+
+                            Accessible.role: Accessible.Button
+                            Accessible.name: "Remove widget"
+                            Accessible.focusable: true
+                            Accessible.onPressAction: root.itemRemoved(modelData.id)
+
                             MouseArea {
                                 anchors.fill: parent
                                 anchors.margins: -Theme.scaled(4)
@@ -226,6 +266,11 @@ Rectangle {
                 color: "transparent"
                 border.color: Theme.primaryColor
                 border.width: 1
+
+                Accessible.role: Accessible.Button
+                Accessible.name: "Add widget to " + root.zoneLabel
+                Accessible.focusable: true
+                Accessible.onPressAction: addPopup.open()
 
                 Text {
                     anchors.centerIn: parent
@@ -323,6 +368,14 @@ Rectangle {
                             height: Theme.scaled(36)
                             color: delegateMa.containsMouse ? Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.12) : "transparent"
                             radius: Theme.scaled(4)
+
+                            Accessible.role: Accessible.MenuItem
+                            Accessible.name: "Add " + modelData.label
+                            Accessible.focusable: true
+                            Accessible.onPressAction: {
+                                root.addItemRequested(modelData.type)
+                                addPopup.close()
+                            }
 
                             Text {
                                 anchors.left: parent.left

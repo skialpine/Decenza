@@ -57,6 +57,7 @@ public:
     Q_INVOKABLE QString getScaleType(const QString& address) const;
     Q_INVOKABLE void connectToScale(const QString& address);  // Manual scale selection
 
+    ScaleDevice* scaleDevice() const { return m_scaleDevice; }
     void setScaleDevice(ScaleDevice* scale);
 
     // Scale address management

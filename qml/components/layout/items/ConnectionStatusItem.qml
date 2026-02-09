@@ -11,6 +11,20 @@ Item {
     implicitWidth: isCompact ? compactContent.implicitWidth : fullContent.implicitWidth
     implicitHeight: isCompact ? compactContent.implicitHeight : fullContent.implicitHeight
 
+    // Accessibility: expose connection status to screen readers
+    Accessible.role: Accessible.StaticText
+    Accessible.name: {
+        var status = DE1Device.connected ? "Machine connected" : "Machine disconnected"
+        if (ScaleDevice && ScaleDevice.connected) {
+            if (ScaleDevice.name === "Flow Scale")
+                status += ". Using simulated scale"
+            else
+                status += ". Scale: " + ScaleDevice.name
+        }
+        return status
+    }
+    Accessible.focusable: true
+
     // --- COMPACT MODE ---
     Item {
         id: compactContent

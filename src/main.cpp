@@ -141,6 +141,7 @@ int main(int argc, char *argv[])
     timingController.setMachineState(&machineState);
     machineState.setTimingController(&timingController);
     mainController.setTimingController(&timingController);
+    mainController.setBLEManager(&bleManager);
 
     // Connect timing controller outputs to shot data model
     QObject::connect(&timingController, &ShotTimingController::weightSampleReady,

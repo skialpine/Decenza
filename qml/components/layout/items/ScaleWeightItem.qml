@@ -18,6 +18,25 @@ Item {
     implicitWidth: isCompact ? compactContent.implicitWidth : fullContent.implicitWidth
     implicitHeight: isCompact ? compactContent.implicitHeight : fullContent.implicitHeight
 
+    // Accessibility: expose weight/status to screen readers
+    Accessible.role: Accessible.Button
+    Accessible.name: root.accessibleDescription()
+    Accessible.focusable: true
+    Accessible.onPressAction: {
+        if (root.scaleConnected)
+            MachineState.tareScale()
+        else if (root.showScaleWarning)
+            BLEManager.scanForScales()
+    }
+
+    function accessibleDescription() {
+        if (root.showScaleWarning && !root.scaleConnected)
+            return BLEManager.scaleConnectionFailed ? "Scale not found. Tap to scan" : "Scale connecting"
+        if (root.scaleConnected)
+            return "Scale weight: " + root.weightText() + ". Tap to tare"
+        return "No scale connected"
+    }
+
     // Shared color logic
     function scaleColor(pressed) {
         if (pressed) return Theme.accentColor
