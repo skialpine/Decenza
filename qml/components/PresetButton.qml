@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import DecenzaDE1
 
 /**
  * PresetButton - A styled button for recipe presets

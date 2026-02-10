@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import DecenzaDE1
 
 Rectangle {
     id: root
