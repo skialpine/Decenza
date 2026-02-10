@@ -43,7 +43,7 @@ sudo apt install -y \
     libgl1-mesa-dev
 ```
 
-This installs Qt 6.8.2 from Debian repositories (close to the project's target of 6.10.1).
+This installs Qt 6.8.2 from Debian repositories (close to the project's target of 6.10.2).
 
 ## 3. Clone and Build
 
