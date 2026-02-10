@@ -957,10 +957,11 @@ Popup {
             id: cpLoader
             active: false
             onLoaded: {
-                if (item && item.children.length > 0)
-                    item.children[0].setColor(colorPickerPopup.initialColor)
+                if (item && typeof item.setColor === "function")
+                    item.setColor(colorPickerPopup.initialColor)
             }
             sourceComponent: ColumnLayout {
+                function setColor(c) { cpEditorInner.setColor(c) }
                 spacing: Theme.scaled(6)
 
                 RowLayout {
