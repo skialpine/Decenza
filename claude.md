@@ -95,19 +95,30 @@ open build/Qt_6_10_1_for_macOS/Decenza_DE1.xcodeproj
 
 Then in Xcode: Product → Archive for App Store submission.
 
-## iOS CI/CD (Build from PC via GitHub Actions)
+## CI/CD (GitHub Actions)
 
-**No Mac required!** iOS builds can be triggered from any machine using GitHub Actions.
+All platforms build automatically when a `v*` tag is pushed. Each workflow can also be triggered manually via `workflow_dispatch`.
 
-**Full documentation:** `docs/IOS_CI_FOR_CLAUDE.md`
+### Workflows
 
-**Quick commands:**
+| Platform | Workflow | Runner | Output |
+|----------|----------|--------|--------|
+| Android | `android-release.yml` | ubuntu-24.04 | Signed APK |
+| iOS | `ios-release.yml` | macos-15 | IPA → App Store |
+| macOS | `macos-release.yml` | macos-15 | Signed + notarized DMG |
+| Windows | `windows-release.yml` | windows-latest | Inno Setup installer |
+| Linux | `linux-release.yml` | ubuntu-24.04 | AppImage |
+
+All workflows upload artifacts to the same GitHub Release when triggered by a `v*` tag.
+
+### Quick commands
 ```bash
-# Trigger iOS build with App Store upload
-gh workflow run ios-release.yml --repo Kulitorum/de1-qt
-
-# Trigger build without upload (testing)
+# Trigger individual platform builds
+gh workflow run android-release.yml --repo Kulitorum/de1-qt -f upload_to_release=false
 gh workflow run ios-release.yml --repo Kulitorum/de1-qt -f upload_to_appstore=false
+gh workflow run windows-release.yml --repo Kulitorum/de1-qt -f upload_to_release=false
+gh workflow run macos-release.yml --repo Kulitorum/de1-qt -f upload_to_release=false
+gh workflow run linux-release.yml --repo Kulitorum/de1-qt -f upload_to_release=false
 
 # Check build status
 gh run list --repo Kulitorum/de1-qt --limit 5
@@ -119,18 +130,35 @@ gh run watch --repo Kulitorum/de1-qt
 gh run view --repo Kulitorum/de1-qt --log-failed
 ```
 
-**How it works:**
-1. GitHub spins up a macOS VM with Xcode
-2. Qt 6.10.1 for iOS is installed (cached)
-3. Signing credentials from GitHub Secrets are used
-4. App is built, archived, and uploaded to App Store Connect
+### Release all platforms at once
+```bash
+# Push a version tag — all 5 workflows trigger simultaneously
+git tag v1.4.4
+git push origin v1.4.4
+```
 
-**Important:**
-- iOS bundle ID is `io.github.kulitorum.decenza` (Android uses `io.github.kulitorum.decenza_de1`)
-- Certificate type: **iPhone Distribution** (not Apple Distribution)
-- Profile name: **Decenza App Store**
-- Signing credentials stored in GitHub Secrets (expire yearly)
-- See `docs/IOS_CI_FOR_CLAUDE.md` for troubleshooting and credential renewal
+### GitHub Secrets
+
+**Android:**
+- `ANDROID_KEYSTORE_BASE64` — Base64-encoded `.jks` keystore
+- `ANDROID_KEYSTORE_PASSWORD` — Keystore password
+
+**iOS:**
+- `P12_CERTIFICATE_BASE64`, `P12_PASSWORD` — iPhone Distribution certificate
+- `PROVISIONING_PROFILE_BASE64`, `PROVISIONING_PROFILE_NAME` — App Store profile
+- `KEYCHAIN_PASSWORD` — Temporary keychain password
+- `APPLE_TEAM_ID` — Apple Developer Team ID
+- `APP_STORE_CONNECT_API_KEY_ID`, `APP_STORE_CONNECT_API_ISSUER_ID`, `APP_STORE_CONNECT_API_KEY_BASE64` — App Store upload
+
+**macOS:**
+- `MACOS_DEVELOPER_ID_P12_BASE64`, `MACOS_DEVELOPER_ID_P12_PASSWORD` — Developer ID cert
+- `APPLE_ID`, `APPLE_ID_APP_PASSWORD` — For notarization
+
+### Platform notes
+- iOS bundle ID: `io.github.kulitorum.decenza` (differs from Android: `io.github.kulitorum.decenza_de1`)
+- iOS signing credentials expire yearly — see `docs/IOS_CI_FOR_CLAUDE.md` for renewal
+- Android keystore path is configurable via `ANDROID_KEYSTORE_PATH` env var (falls back to local path)
+- Android build uses `build.gradle` post-build hook for signing and versioned APK naming
 
 ## Project Structure
 
@@ -511,32 +539,26 @@ The tablet lacks Google certification, so:
 ## Android Build & Signing
 
 ### Build Process
-- **Build tool**: Qt's `androiddeployqt.exe` handles APK creation and signing
-- **Keystore**: `C:/CODE/Android APK keystore.jks` (configured in Qt Creator, stored in `CMakeLists.txt.user`)
+- **Local**: Qt Creator runs `androiddeployqt` with `--sign` flag
+- **CI**: GitHub Actions workflow (`android-release.yml`) on ubuntu-24.04
+- **Keystore**: `C:/CODE/Android APK keystore.jks` locally, `ANDROID_KEYSTORE_BASE64` secret on CI
 - **Key alias**: `de1-key`
-- **Signing**: Automatic during release build via `--sign` flag
+- **Keystore path**: `build.gradle` reads `ANDROID_KEYSTORE_PATH` env var, falls back to local path
 
 ### How Signing & Renaming Works
-1. Qt Creator triggers `androiddeployqt` with `--sign` flag
-2. Gradle builds unsigned APK (`android-build-Decenza_DE1-release-unsigned.apk`)
-3. `gradle.buildFinished` hook in `android/build.gradle` triggers:
+1. Build creates unsigned APK (`android-build-Decenza_DE1-release-unsigned.apk`)
+2. `gradle.buildFinished` hook in `android/build.gradle` triggers:
    - Finds unsigned APK
-   - Signs it with `apksigner` from Android SDK build-tools
+   - Signs it with `apksigner` from Android SDK build-tools (cross-platform: `.bat` on Windows, no extension on Linux)
    - Outputs as `Decenza_DE1_<version>.apk`
-4. `androiddeployqt` also signs the original (creates `-signed.apk`)
-5. For AAB: same hook copies and signs with `jarsigner` to `Decenza_DE1-<version>.aab`
+3. For AAB: same hook copies (via `java.nio.file.Files.copy`) and signs with `jarsigner` to `Decenza_DE1-<version>.aab`
+4. On CI, a fallback step signs the APK manually if the gradle hook fails
 
 ### Output Files
-- **APK output**: `build/Qt_6_10_1_for_Android_arm64_v8a-Release/android-build-Decenza_DE1/build/outputs/apk/release/`
-  - `android-build-Decenza_DE1-release-signed.apk` (original name)
-  - `Decenza_DE1_1.0.XXX.apk` (versioned copy)
-- **AAB output**: `build/Qt_6_10_1_for_Android_arm64_v8a-Release/android-build-Decenza_DE1/build/outputs/bundle/release/`
-  - `Decenza_DE1-1.0.XXX.aab` (versioned, for Play Store)
-
-### Gradle Tasks
-- `assembleRelease`: Builds signed APK
-- `bundleRelease`: Builds signed AAB (for Play Store)
-- Post-build hooks in `android/build.gradle` handle versioned naming
+- **APK output**: `build/.../android-build-Decenza_DE1/build/outputs/apk/release/`
+  - `Decenza_DE1_X.Y.Z.apk` (versioned, signed)
+- **AAB output**: `build/.../android-build-Decenza_DE1/build/outputs/bundle/release/`
+  - `Decenza_DE1-X.Y.Z.aab` (versioned, for Play Store)
 
 ## Publishing Releases
 
@@ -634,6 +656,7 @@ EOF
 - APK files are for direct distribution (sideloading)
 - AAB files are only for Google Play Store uploads
 - Users cannot install AAB files directly
+- **CI builds**: When creating a release with a `v*` tag, all 5 platform workflows trigger automatically and upload their artifacts to the release. You only need to manually attach the APK if building locally.
 
 ## QML Navigation System
 
