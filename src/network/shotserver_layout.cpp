@@ -1762,7 +1762,7 @@ QString ShotServer::generateLayoutPage() const
                     <svg viewBox="0 0 24 24" fill="none"><g transform="translate(24,0) scale(-1,1)"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.293 4.293a1 1 0 011.414 0l7 7a1 1 0 010 1.414l-7 7a1 1 0 01-1.414-1.414L17.586 13H4a1 1 0 110-2h13.586l-5.293-5.293a1 1 0 010-1.414z" fill="currentColor"/></g></svg>
                 </button>
                 <button class="lib-icon-btn" id="libUploadBtn" onclick="uploadToComm()" disabled title="Share to community">
-                    <svg viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M8 10a4 4 0 118 0v1h1a3.5 3.5 0 010 7h-1a1 1 0 110-2h1a1.5 1.5 0 000-3H8V10zm7.707 3.293l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L11 13.414V19a1 1 0 102 0v-5.586l1.293 1.293a1 1 0 001.414-1.414z" fill="currentColor"/></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3m0 0l-4 4m4-4l4 4"/><path d="M2 17l.621 2.485A2 2 0 004.561 21h14.878a2 2 0 001.94-1.515L22 17"/></svg>
                 </button>
                 <button class="lib-icon-btn danger" id="libDeleteBtn" onclick="deleteFromLibrary()" disabled title="Delete selected entry">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
