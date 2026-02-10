@@ -349,6 +349,10 @@ int main(int argc, char *argv[])
                 // Disconnect FlowScale from graph to prevent duplicate data
                 QObject::disconnect(&flowScale, &ScaleDevice::weightChanged,
                                     &mainController, &MainController::onScaleWeightChanged);
+                // Notify MQTT
+                if (mainController.mqttClient()) {
+                    mainController.mqttClient()->onScaleConnectedChanged(true);
+                }
                 qDebug() << "Scale connected - switched to physical scale";
             } else if (physicalScale) {
                 // Scale disconnected - fall back to FlowScale
@@ -358,6 +362,10 @@ int main(int argc, char *argv[])
                 // Reconnect FlowScale to graph
                 QObject::connect(&flowScale, &ScaleDevice::weightChanged,
                                  &mainController, &MainController::onScaleWeightChanged);
+                // Notify MQTT
+                if (mainController.mqttClient()) {
+                    mainController.mqttClient()->onScaleConnectedChanged(false);
+                }
                 emit bleManager.scaleDisconnected();
                 qDebug() << "Scale disconnected - switched to FlowScale";
             }
