@@ -135,8 +135,11 @@ void VariaAkuScale::onCharacteristicsDiscoveryFinished(const QBluetoothUuid& ser
         enableNotifications();
         startWatchdog();
 
-        setConnected(true);
-        VARIA_LOG("Connected, waiting for weight data");
+        // Don't call setConnected(true) here — wait until the first weight
+        // update actually arrives (in tickleWatchdog). This prevents the
+        // scale from appearing "connected" when notifications never work,
+        // which would fool the shot-abort-no-scale safety check.
+        VARIA_LOG("Notifications enabled, waiting for first weight data before reporting connected");
     });
 }
 
@@ -163,6 +166,12 @@ void VariaAkuScale::tickleWatchdog() {
         m_updatesReceived = true;
         m_watchdogTimer->stop();
         VARIA_LOG("First weight update received! Watchdog stopped.");
+
+        // NOW we can report connected — we have proof the scale is functional
+        if (!isConnected()) {
+            setConnected(true);
+            VARIA_LOG("Scale confirmed working, reporting connected");
+        }
     }
 
     // Reset the tickle timer - if no updates for TICKLE_TIMEOUT_MS, log warning
@@ -185,6 +194,7 @@ void VariaAkuScale::onWatchdogTimeout() {
 
     if (m_watchdogRetries >= MAX_WATCHDOG_RETRIES) {
         VARIA_LOG(QString("WARNING: No weight updates after %1 retries, giving up").arg(MAX_WATCHDOG_RETRIES));
+        setConnected(false);
         emit errorOccurred("Varia Aku scale not sending weight updates");
         return;
     }
