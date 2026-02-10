@@ -84,6 +84,7 @@ void ShotServer::handleBackupManifest(QTcpSocket* socket)
         qint64 profilesSize = 0;
         QSet<QString> seenFiles;  // Avoid counting duplicates (keyed by subdir/filename)
 
+        // Helper to count profiles in a directory
         auto countProfiles = [&](const QString& basePath, const QString& subdir) {
             QString dirPath = subdir.isEmpty() ? basePath : basePath + "/" + subdir;
             QDir dir(dirPath);
@@ -177,6 +178,7 @@ void ShotServer::handleBackupProfilesList(QTcpSocket* socket)
     QJsonArray profiles;
     QSet<QString> seenFiles;  // Keyed by subdir/filename to avoid duplicates
 
+    // Helper to add profiles from a directory
     auto addProfiles = [&](const QString& basePath, const QString& category, const QString& subdir) {
         QString dirPath = subdir.isEmpty() ? basePath : basePath + "/" + subdir;
         QDir dir(dirPath);
@@ -188,6 +190,7 @@ void ShotServer::handleBackupProfilesList(QTcpSocket* socket)
                 if (!seenFiles.contains(key)) {
                     seenFiles.insert(key);
                     QJsonObject profile;
+                    // Category encodes both storage type and subdirectory for download
                     profile["category"] = subdir.isEmpty() ? category : category + "/" + subdir;
                     profile["filename"] = fi.fileName();
                     profile["size"] = fi.size();
@@ -237,6 +240,7 @@ void ShotServer::handleBackupProfileFile(QTcpSocket* socket, const QString& cate
         return;
     }
 
+    // Only allow known subdirectories
     if (!subdir.isEmpty() && subdir != "user" && subdir != "downloaded") {
         sendResponse(socket, 400, "application/json", R"({"error":"Invalid category"})");
         return;
