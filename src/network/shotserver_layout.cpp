@@ -1177,9 +1177,15 @@ QString ShotServer::generateLayoutPage() const
             display: flex;
             flex-direction: column;
             height: calc(100vh - 60px);
-            overflow-y: auto;
+            overflow: hidden;
             position: sticky;
             top: 60px;
+        }
+        #libLocalContent, #libCommunityContent {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
         }
         .lib-tabs {
             display: flex;
@@ -1608,7 +1614,7 @@ QString ShotServer::generateLayoutPage() const
     </div>
 
     <!-- Library Panel (right sidebar) -->
-    <div class="library-panel" id="libraryPanel" style="position:relative">
+    <div class="library-panel" id="libraryPanel">
         <div class="lib-spinner-overlay" id="libSpinner"><div class="lib-spinner"></div><div class="lib-spinner-text" id="libSpinnerText">Loading...</div></div>
         <div class="lib-tabs">
             <button class="lib-tab active" id="libTabLocal" onclick="switchLibTab('local')">My Library</button>
@@ -1649,6 +1655,9 @@ QString ShotServer::generateLayoutPage() const
             <div class="lib-actions">
                 <button class="lib-action-btn accent" id="commApplyBtn" onclick="applyFromLibrary()" disabled title="Download &amp; apply">Apply</button>
                 <button class="lib-action-btn" id="commDownloadBtn" onclick="downloadOnly()" disabled title="Download to My Library">Download</button>
+                <span style="flex:1"></span>
+                <button class="lib-display-toggle active" id="commModeFull" onclick="setLibDisplayMode(0)" title="Full preview">&#x25A3;</button>
+                <button class="lib-display-toggle" id="commModeCompact" onclick="setLibDisplayMode(1)" title="Compact list">&#x2630;</button>
             </div>
             <div class="lib-community-filters">
                 <select class="lib-filter-select" id="commTypeFilter" onchange="browseCommunity()">
@@ -2948,6 +2957,8 @@ QString ShotServer::generateLayoutPage() const
         libDisplayMode = mode;
         document.getElementById('libModeFull').classList.toggle('active', mode === 0);
         document.getElementById('libModeCompact').classList.toggle('active', mode === 1);
+        document.getElementById('commModeFull').classList.toggle('active', mode === 0);
+        document.getElementById('commModeCompact').classList.toggle('active', mode === 1);
         if (libCurrentTab === 'local') renderLocalEntries();
         else renderCommunityEntries();
     }
@@ -2980,6 +2991,7 @@ QString ShotServer::generateLayoutPage() const
         updateLibButtons();
         if (tab === 'local') loadLibrary();
         else if (libCommunityData.length === 0) browseCommunity();
+        else renderCommunityEntries();
     }
 
     function loadLibrary() {
