@@ -3643,6 +3643,12 @@ QString ShotServer::generateLayoutPage() const
     loadLayout();
     loadLibrary();
 
+    // Poll for external changes (e.g. layout reset on tablet)
+    setInterval(function() {
+        if (editingItem || ssEditingItem) return;
+        loadLayout();
+    }, 3000);
+
     </script>
 </body>
 </html>
