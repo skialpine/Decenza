@@ -660,6 +660,7 @@ QString ShotServer::generateLayoutPage() const
             top: 100%;
             left: 0;
             margin-top: 0.25rem;
+            margin-bottom: 0.25rem;
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 8px;
@@ -2391,7 +2392,29 @@ QString ShotServer::generateLayoutPage() const
         document.querySelectorAll(".add-dropdown.open").forEach(function(d) {
             if (d !== dropdown) d.classList.remove("open");
         });
+        // Reset position before measuring
+        dropdown.style.top = "";
+        dropdown.style.bottom = "";
+        dropdown.style.maxHeight = "";
         dropdown.classList.toggle("open");
+        if (dropdown.classList.contains("open")) {
+            // Check if dropdown overflows the viewport and flip upward if needed
+            var rect = dropdown.getBoundingClientRect();
+            var viewH = window.innerHeight;
+            if (rect.bottom > viewH) {
+                var spaceBelow = viewH - rect.top;
+                var spaceAbove = rect.top;
+                if (spaceAbove > spaceBelow) {
+                    // Open upward
+                    dropdown.style.top = "auto";
+                    dropdown.style.bottom = "100%";
+                    dropdown.style.maxHeight = Math.min(400, spaceAbove - 8) + "px";
+                } else {
+                    // Keep downward but clamp height
+                    dropdown.style.maxHeight = Math.max(120, spaceBelow - 8) + "px";
+                }
+            }
+        }
     }
 
     // Close dropdowns when clicking outside
