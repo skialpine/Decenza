@@ -78,13 +78,23 @@ void ShotServer::handleLayoutApi(QTcpSocket* socket, const QString& method, cons
         }
         QVariantList entries = m_widgetLibrary->entries();
         QJsonArray arr;
-        for (const QVariant& v : entries)
-            arr.append(QJsonObject::fromVariantMap(v.toMap()));
+        for (const QVariant& v : entries) {
+            QJsonObject obj = QJsonObject::fromVariantMap(v.toMap());
+            QString id = obj["id"].toString();
+            if (!id.isEmpty()) {
+                QString encodedId = QString::fromLatin1(QUrl::toPercentEncoding(id));
+                if (m_widgetLibrary->hasThumbnail(id))
+                    obj["thumbnailFullUrl"] = "/api/library/thumbnail?id=" + encodedId;
+                if (m_widgetLibrary->hasThumbnailCompact(id))
+                    obj["thumbnailCompactUrl"] = "/api/library/thumbnail?id=" + encodedId + "&compact=1";
+            }
+            arr.append(obj);
+        }
         sendJson(socket, QJsonDocument(arr).toJson(QJsonDocument::Compact));
         return;
     }
 
-    // GET /api/library/thumbnail?id=X — serve thumbnail PNG
+    // GET /api/library/thumbnail?id=X[&compact=1] — serve thumbnail PNG
     if (method == "GET" && path.startsWith("/api/library/thumbnail")) {
         if (!m_widgetLibrary) {
             sendResponse(socket, 404, "text/plain", "Not found");
@@ -95,8 +105,25 @@ void ShotServer::handleLayoutApi(QTcpSocket* socket, const QString& method, cons
         int ampIdx = rawId.indexOf('&');
         if (ampIdx >= 0) rawId = rawId.left(ampIdx);
         QString entryId = QUrl::fromPercentEncoding(rawId.toUtf8());
-        if (!entryId.isEmpty() && m_widgetLibrary->hasThumbnail(entryId)) {
-            sendFile(socket, m_widgetLibrary->thumbnailPath(entryId), "image/png");
+        bool compact = path.contains("&compact=1");
+        QString thumbPath;
+        bool exists = false;
+        if (!entryId.isEmpty()) {
+            if (compact && m_widgetLibrary->hasThumbnailCompact(entryId)) {
+                thumbPath = m_widgetLibrary->thumbnailCompactPath(entryId);
+                exists = true;
+            } else if (m_widgetLibrary->hasThumbnail(entryId)) {
+                thumbPath = m_widgetLibrary->thumbnailPath(entryId);
+                exists = true;
+            }
+        }
+        if (exists) {
+            QFile file(thumbPath);
+            if (file.open(QIODevice::ReadOnly)) {
+                sendResponse(socket, 200, "image/png", file.readAll());
+            } else {
+                sendResponse(socket, 404, "text/plain", "No thumbnail");
+            }
         } else {
             sendResponse(socket, 404, "text/plain", "No thumbnail");
         }
@@ -3446,23 +3473,28 @@ QString ShotServer::generateLayoutPage() const
             ? (entry.thumbnailCompactUrl || entry.thumbnailFullUrl || '')
             : (entry.thumbnailFullUrl || '');
 
+        // thumbMode: 'known' = URL from server (thumbnail exists), 'probe' = try loading (might not exist yet)
+        var thumbMode = '';
         if (thumbUrl) {
+            thumbMode = 'known';
             html += '<div class="lib-entry-visual" style="background:var(--bg);justify-content:center">';
-            html += '<img class="lib-thumb" src="' + thumbUrl + '">';
+            html += '<img class="lib-thumb" src="' + thumbUrl + '" onerror="this.parentElement.style.display=\'none\';var fb=this.parentElement.nextElementSibling;if(fb)fb.style.display=\'\'">';
             html += '</div>';
         } else if (isLocal) {
-            // Check for local thumbnail (hidden until loaded, then hides fallback)
-            // Cache-bust to avoid browser caching a 404; retry once after 800ms for newly-saved entries
+            thumbMode = 'probe';
+            // Thumbnail might not exist yet (newly saved) — probe with retry
             var thumbSrc = '/api/library/thumbnail?id=' + encodeURIComponent(id) + '&t=' + Date.now();
             html += '<div class="lib-entry-visual" style="background:var(--bg);justify-content:center;display:none">';
-            html += '<img class="lib-thumb" src="' + thumbSrc + '" onload="var p=this.parentElement;p.style.display=\'\';if(p.nextElementSibling)p.nextElementSibling.style.display=\'none\'" onerror="if(!this.dataset.retried){this.dataset.retried=1;var img=this;setTimeout(function(){img.src=img.src+\'&r=\'+Date.now()},800)}">';
+            html += '<img class="lib-thumb" src="' + thumbSrc + '" onload="var p=this.parentElement;p.style.display=\'\';if(p.nextElementSibling)p.nextElementSibling.style.display=\'none\'" onerror="if(!this.dataset.retried){this.dataset.retried=\'1\';var img=this;setTimeout(function(){img.src=\'/api/library/thumbnail?id=' + encodeURIComponent(id) + '&t=\'+Date.now()},1000)}">';
             html += '</div>';
         }
 
-        // Visual preview (shown if no thumbnail, or as fallback when thumbnail fails to load)
+        // Visual preview (fallback when thumbnail fails or is not available)
         if (entry.data) {
             var fallbackId = 'lf_' + id.replace(/[^a-zA-Z0-9]/g,'_');
             var wrap = isLocal ? ' id="' + fallbackId + '"' : '';
+            // Hide fallback when a known thumbnail URL exists (shown on thumbnail error)
+            var fallbackHide = thumbMode === 'known' ? ' style="display:none"' : '';
             if (compact) {
                 // Compact mode: show type name and brief summary
                 var summary = '';
@@ -3476,14 +3508,15 @@ QString ShotServer::generateLayoutPage() const
                     var cnt = 0; for (var zk in lz) cnt += lz[zk].length;
                     summary = cnt + ' widgets';
                 }
-                html += '<div' + wrap + ' style="flex:1;font-size:0.8rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(summary) + '</div>';
+                var compactStyle = (thumbMode === 'known' ? 'display:none;' : '') + 'flex:1;font-size:0.8rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+                html += '<div' + wrap + ' style="' + compactStyle + '">' + escapeHtml(summary) + '</div>';
             } else {
                 if (entry.type === 'item' && entry.data.item) {
-                    html += '<div' + wrap + '>' + renderItemVisual(entry.data.item) + '</div>';
+                    html += '<div' + wrap + fallbackHide + '>' + renderItemVisual(entry.data.item) + '</div>';
                 } else if (entry.type === 'zone' && entry.data.items) {
-                    html += '<div' + wrap + '>' + renderZoneVisual(entry.data) + '</div>';
+                    html += '<div' + wrap + fallbackHide + '>' + renderZoneVisual(entry.data) + '</div>';
                 } else if (entry.type === 'layout') {
-                    html += '<div' + wrap + '>' + renderLayoutVisual(entry.data) + '</div>';
+                    html += '<div' + wrap + fallbackHide + '>' + renderLayoutVisual(entry.data) + '</div>';
                 }
             }
         }
