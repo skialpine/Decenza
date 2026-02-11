@@ -3499,12 +3499,14 @@ QString ShotServer::generateLayoutPage() const
             el.innerHTML = '<div class="lib-empty">No saved entries yet.<br>Select a widget and click <b>+</b> to save it.</div>';
             return;
         }
+        var scrollTop = el.scrollTop;
         var html = '';
         for (var i = 0; i < libLocalData.length; i++) {
             var e = libLocalData[i];
             html += renderEntryCard(e, e.id, true);
         }
         el.innerHTML = html;
+        el.scrollTop = scrollTop;
     }
 
     function selectLibEntry(id) {
@@ -3649,6 +3651,7 @@ QString ShotServer::generateLayoutPage() const
             document.getElementById('commLoadMore').style.display = 'none';
             return;
         }
+        var scrollTop = el.scrollTop;
         var html = '';
         for (var i = 0; i < libCommunityData.length; i++) {
             var e = libCommunityData[i];
@@ -3656,6 +3659,7 @@ QString ShotServer::generateLayoutPage() const
             html += renderEntryCard(e, id, false);
         }
         el.innerHTML = html;
+        el.scrollTop = scrollTop;
         document.getElementById('commLoadMore').style.display = libCommunityData.length < commTotal ? '' : 'none';
     }
 
