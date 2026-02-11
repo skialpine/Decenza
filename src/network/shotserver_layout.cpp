@@ -3436,7 +3436,7 @@ QString ShotServer::generateLayoutPage() const
         var sel = id === libSelectedId ? ' selected' : '';
         var compactCls = compact ? ' compact' : '';
         var onclick = isLocal ? "selectLibEntry('" + id + "')" : "selectCommEntry('" + id + "')";
-        var html = '<div class="lib-entry' + sel + compactCls + '" onclick="' + onclick + '">';
+        var html = '<div class="lib-entry' + sel + compactCls + '" data-entry-id="' + id + '" onclick="' + onclick + '">';
 
         // Type badge overlay
         html += '<span class="lib-type-overlay ' + (entry.type||'') + '">' + (entry.type||'?') + '</span>';
@@ -3510,9 +3510,22 @@ QString ShotServer::generateLayoutPage() const
     }
 
     function selectLibEntry(id) {
+        var prev = libSelectedId;
         libSelectedId = libSelectedId === id ? null : id;
-        if (libCurrentTab === 'local') renderLocalEntries();
-        else renderCommunityEntries();
+        // Toggle selection classes in-place without rebuilding the list
+        var container = libCurrentTab === 'local'
+            ? document.getElementById('libLocalEntries')
+            : document.getElementById('libCommunityEntries');
+        if (container) {
+            if (prev) {
+                var prevEl = container.querySelector('[data-entry-id="' + prev + '"]');
+                if (prevEl) prevEl.classList.remove('selected');
+            }
+            if (libSelectedId) {
+                var newEl = container.querySelector('[data-entry-id="' + id + '"]');
+                if (newEl) newEl.classList.add('selected');
+            }
+        }
         updateLibButtons();
     }
 
@@ -3664,8 +3677,20 @@ QString ShotServer::generateLayoutPage() const
     }
 
     function selectCommEntry(id) {
+        var prev = libSelectedId;
         libSelectedId = libSelectedId === id ? null : id;
-        renderCommunityEntries();
+        // Toggle selection classes in-place without rebuilding the list
+        var container = document.getElementById('libCommunityEntries');
+        if (container) {
+            if (prev) {
+                var prevEl = container.querySelector('[data-entry-id="' + prev + '"]');
+                if (prevEl) prevEl.classList.remove('selected');
+            }
+            if (libSelectedId) {
+                var newEl = container.querySelector('[data-entry-id="' + id + '"]');
+                if (newEl) newEl.classList.add('selected');
+            }
+        }
         updateLibButtons();
     }
 
