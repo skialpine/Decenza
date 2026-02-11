@@ -1426,7 +1426,6 @@ QString ShotServer::generateLayoutPage() const
             align-items: center;
             gap: 0.4rem;
             min-height: 32px;
-            position: relative;
             overflow: hidden;
         }
         .lib-entry-visual img.lib-thumb {
