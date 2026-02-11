@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Window
+import DecenzaDE1
 
 Window {
     id: ghcWindow

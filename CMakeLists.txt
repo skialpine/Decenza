@@ -160,8 +160,6 @@ set(SOURCES
     src/controllers/directcontroller.cpp
     src/controllers/shottimingcontroller.cpp
     src/screensaver/screensavervideomanager.cpp
-    src/screensaver/pipegeometry.cpp
-    src/screensaver/strangeattractorrenderer.cpp
     src/network/visualizeruploader.cpp
     src/network/visualizerimporter.cpp
     src/ai/aimanager.cpp
@@ -252,8 +250,6 @@ set(HEADERS
     src/controllers/directcontroller.h
     src/controllers/shottimingcontroller.h
     src/screensaver/screensavervideomanager.h
-    src/screensaver/pipegeometry.h
-    src/screensaver/strangeattractorrenderer.h
     src/network/visualizeruploader.h
     src/network/visualizerimporter.h
     src/ai/aimanager.h
@@ -324,9 +320,16 @@ target_link_libraries(Decenza_DE1 PRIVATE
     paho-mqtt3a-static
 )
 
-# Optionally link Quick3D
+# Optionally link Quick3D and add 3D screensaver sources
 if(ENABLE_QUICK3D AND Qt6Quick3D_FOUND)
     target_link_libraries(Decenza_DE1 PRIVATE Qt6::Quick3D)
+    target_compile_definitions(Decenza_DE1 PRIVATE ENABLE_QUICK3D)
+    target_sources(Decenza_DE1 PRIVATE
+        src/screensaver/pipegeometry.cpp
+        src/screensaver/pipegeometry.h
+        src/screensaver/strangeattractorrenderer.cpp
+        src/screensaver/strangeattractorrenderer.h
+    )
 endif()
 
 # iOS/macOS: Use Darwin multimedia plugin (AVFoundation-based)
@@ -488,6 +491,7 @@ qt_add_qml_module(Decenza_DE1
     URI DecenzaDE1
     VERSION 1.1
     QML_FILES ${QML_FILES}
+    NO_GENERATE_EXTRA_QMLDIRS
 )
 
 # Increment version code on every build
