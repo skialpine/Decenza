@@ -9,9 +9,11 @@ import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
+import android.bluetooth.BluetoothStatusCodes;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
 
@@ -124,9 +126,17 @@ public class DeviceShutdownService extends Service {
                             BluetoothGattCharacteristic characteristic =
                                 service.getCharacteristic(DE1_REQUESTED_STATE_UUID);
                             if (characteristic != null) {
-                                characteristic.setValue(new byte[]{DE1_STATE_SLEEP});
-                                characteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
-                                boolean writeResult = gatt.writeCharacteristic(characteristic);
+                                boolean writeResult;
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    int result = gatt.writeCharacteristic(characteristic,
+                                        new byte[]{DE1_STATE_SLEEP},
+                                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+                                    writeResult = (result == BluetoothStatusCodes.SUCCESS);
+                                } else {
+                                    characteristic.setValue(new byte[]{DE1_STATE_SLEEP});
+                                    characteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+                                    writeResult = gatt.writeCharacteristic(characteristic);
+                                }
                                 Log.d(TAG, "Write initiated: " + writeResult);
                             } else {
                                 Log.e(TAG, "RequestedState characteristic not found");
