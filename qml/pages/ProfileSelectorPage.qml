@@ -48,6 +48,7 @@ Page {
                             TranslationManager.translate("profileselector.filter.all", "All Profiles")
                         ]
                         currentIndex: 0
+                        onCurrentIndexChanged: profileSearchField.text = ""
 
                         background: Rectangle {
                             radius: Theme.scaled(6)
@@ -117,7 +118,18 @@ Page {
                         }
                     }
 
-                    Item { Layout.fillWidth: true }
+                    // Search bar for "All Profiles" view
+                    StyledTextField {
+                        id: profileSearchField
+                        visible: viewFilter.currentIndex === 5  // Only on "All Profiles" view
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Theme.scaled(44)
+                        placeholder: TranslationManager.translate("profileselector.search.placeholder", "Search profiles...")
+                        font.pixelSize: Theme.scaled(16)
+                        onTextChanged: allProfilesList.searchFilter = text.toLowerCase()
+                    }
+
+                    Item { Layout.fillWidth: true; visible: viewFilter.currentIndex !== 5 }
 
                     AccessibleButton {
                         visible: viewFilter.currentIndex === 1  // Cleaning/Descale view
@@ -128,23 +140,51 @@ Page {
                     }
 
                     AccessibleButton {
-                        text: TranslationManager.translate("profileselector.button.import_visualizer", "From Visualizer")
+                        visible: viewFilter.currentIndex !== 1 && viewFilter.currentIndex !== 5
+                        text: TranslationManager.translate("profileselector.button.import_visualizer_short", "Visualizer")
                         accessibleName: TranslationManager.translate("profileSelector.importFromVisualizer", "Import profiles from Visualizer website")
                         primary: true
                         Layout.preferredHeight: Theme.scaled(44)
+                        leftPadding: Theme.scaled(10)
+                        rightPadding: Theme.scaled(10)
                         onClicked: root.goToVisualizerBrowser()
                     }
 
                     AccessibleButton {
+                        visible: viewFilter.currentIndex !== 1 && viewFilter.currentIndex !== 5
                         text: Qt.platform.os === "ios" ?
-                              TranslationManager.translate("profileselector.button.import_file", "Import File") :
-                              TranslationManager.translate("profileselector.button.import_tablet", "From Tablet")
+                              TranslationManager.translate("profileselector.button.import_file_short", "File") :
+                              TranslationManager.translate("profileselector.button.import_tablet_short", "Tablet")
                         accessibleName: Qt.platform.os === "ios" ?
                               TranslationManager.translate("profileSelector.importFromFiles", "Import a profile file from Files app") :
                               TranslationManager.translate("profileSelector.importFromTablet", "Import profiles from Decent tablet")
                         primary: true
                         Layout.preferredHeight: Theme.scaled(44)
+                        leftPadding: Theme.scaled(10)
+                        rightPadding: Theme.scaled(10)
                         onClicked: root.goToProfileImport()
+                    }
+
+                    AccessibleButton {
+                        visible: viewFilter.currentIndex !== 1 && viewFilter.currentIndex !== 5
+                        text: "+"
+                        accessibleName: TranslationManager.translate("profileSelector.createNewProfile", "Create new profile")
+                        primary: true
+                        Layout.preferredHeight: Theme.scaled(44)
+                        Layout.preferredWidth: Theme.scaled(44)
+                        leftPadding: Theme.scaled(4)
+                        rightPadding: Theme.scaled(4)
+                        contentItem: Text {
+                            text: "+"
+                            font.pixelSize: Theme.scaled(22)
+                            font.bold: true
+                            font.family: Theme.bodyFont.family
+                            color: "white"
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            Accessible.ignored: true
+                        }
+                        onClicked: newProfileDialog.open()
                     }
                 }
 
@@ -153,14 +193,28 @@ Page {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     clip: true
+
+                    property string searchFilter: ""
+
                     model: {
+                        var filter = searchFilter  // Create binding dependency
                         switch (viewFilter.currentIndex) {
                             case 0: return MainController.selectedProfiles      // "Selected"
                             case 1: return MainController.cleaningProfiles      // "Cleaning/Descale"
                             case 2: return MainController.allBuiltInProfiles    // "Decent Built-in"
                             case 3: return MainController.downloadedProfiles    // "Downloaded"
                             case 4: return MainController.userCreatedProfiles   // "User Created"
-                            case 5: return MainController.allProfilesList       // "All Profiles"
+                            case 5: {
+                                var all = MainController.allProfilesList
+                                if (filter === "") return all
+                                var result = []
+                                for (var i = 0; i < all.length; i++) {
+                                    if (all[i].title.toLowerCase().indexOf(filter) >= 0) {
+                                        result.push(all[i])
+                                    }
+                                }
+                                return result
+                            }
                             default: return MainController.selectedProfiles
                         }
                     }
@@ -197,8 +251,13 @@ Page {
                         property bool isUserCreated: profileSource === 2
                         // Use binding blocks to ensure re-evaluation when lists change
                         property bool isSelected: {
-                            var list = Settings.selectedBuiltInProfiles  // Create dependency
-                            return Settings.isSelectedBuiltInProfile(modelData.name)
+                            if (isBuiltIn) {
+                                var list = Settings.selectedBuiltInProfiles  // Create dependency
+                                return Settings.isSelectedBuiltInProfile(modelData.name)
+                            } else {
+                                var hidden = Settings.hiddenProfiles  // Create dependency
+                                return !Settings.isHiddenProfile(modelData.name)
+                            }
                         }
                         property bool isFavorite: {
                             var list = Settings.favoriteProfiles  // Create dependency
@@ -271,10 +330,10 @@ Page {
                                 }
                             }
 
-                            // === "Decent Built-in" view: Select/Unselect toggle ===
+                            // === Select/Unselect toggle (add/remove from "Selected" list) ===
                             StyledIconButton {
                                 id: selectToggleButton
-                                visible: viewFilter.currentIndex === 2  // Only in "Decent Built-in"
+                                visible: viewFilter.currentIndex !== 0  // All views except "Selected"
                                 Layout.preferredWidth: Theme.scaled(40)
                                 Layout.preferredHeight: Theme.scaled(40)
                                 Layout.alignment: Qt.AlignVCenter
@@ -283,10 +342,22 @@ Page {
                                 accessibleName: profileDelegate.isSelected ? TranslationManager.translate("profileselector.accessible.remove_from_selected", "Remove from selected") : TranslationManager.translate("profileselector.accessible.add_to_selected", "Add to selected")
 
                                 onClicked: {
-                                    if (profileDelegate.isSelected) {
-                                        Settings.removeSelectedBuiltInProfile(modelData.name)
+                                    if (profileDelegate.isBuiltIn) {
+                                        if (profileDelegate.isSelected) {
+                                            Settings.removeSelectedBuiltInProfile(modelData.name)
+                                            AccessibilityManager.announce("Removed from selected")
+                                        } else {
+                                            Settings.addSelectedBuiltInProfile(modelData.name)
+                                            AccessibilityManager.announce("Added to selected")
+                                        }
                                     } else {
-                                        Settings.addSelectedBuiltInProfile(modelData.name)
+                                        if (profileDelegate.isSelected) {
+                                            Settings.addHiddenProfile(modelData.name)
+                                            AccessibilityManager.announce("Removed from selected")
+                                        } else {
+                                            Settings.removeHiddenProfile(modelData.name)
+                                            AccessibilityManager.announce("Added to selected")
+                                        }
                                     }
                                 }
                             }
@@ -319,10 +390,10 @@ Page {
                                 }
                             }
 
-                            // === "Selected" view: Overflow menu button ===
+                            // === Overflow menu button (edit, remove, delete) ===
                             StyledIconButton {
                                 id: overflowButton
-                                visible: viewFilter.currentIndex === 0  // Only in "Selected" view
+                                visible: true  // All views
                                 Layout.preferredWidth: Theme.scaled(40)
                                 Layout.preferredHeight: Theme.scaled(40)
                                 Layout.alignment: Qt.AlignVCenter
@@ -373,6 +444,7 @@ Page {
                             }
 
                             MenuSeparator {
+                                visible: viewFilter.currentIndex === 0 || !profileDelegate.isBuiltIn
                                 contentItem: Rectangle {
                                     implicitHeight: Theme.scaled(1)
                                     color: Theme.borderColor
@@ -380,15 +452,13 @@ Page {
                             }
 
                             MenuItem {
-                                text: profileDelegate.isBuiltIn ? "\u2212  " + TranslationManager.translate("profileselector.menu.remove_from_selected", "Remove from Selected") : "\u2717  " + TranslationManager.translate("profileselector.menu.delete", "Delete Profile")
+                                visible: viewFilter.currentIndex === 0  // Only on "Selected" view
+                                text: "\u2212  " + TranslationManager.translate("profileselector.menu.remove_from_selected", "Remove from Selected")
                                 onTriggered: {
                                     if (profileDelegate.isBuiltIn) {
                                         Settings.removeSelectedBuiltInProfile(modelData.name)
                                     } else {
-                                        deleteDialog.profileName = modelData.name
-                                        deleteDialog.profileTitle = modelData.title
-                                        deleteDialog.isFavorite = profileDelegate.isFavorite
-                                        deleteDialog.open()
+                                        Settings.addHiddenProfile(modelData.name)
                                     }
                                 }
 
@@ -403,7 +473,31 @@ Page {
                                 }
 
                                 Accessible.role: Accessible.MenuItem
-                                Accessible.name: profileDelegate.isBuiltIn ? TranslationManager.translate("profileselector.accessible.remove_from_list", "Remove from selected list") : TranslationManager.translate("profileselector.accessible.delete_permanently", "Delete profile permanently")
+                                Accessible.name: TranslationManager.translate("profileselector.accessible.remove_from_list", "Remove from selected list")
+                            }
+
+                            MenuItem {
+                                visible: !profileDelegate.isBuiltIn
+                                text: "\u2717  " + TranslationManager.translate("profileselector.menu.delete", "Delete Profile")
+                                onTriggered: {
+                                    deleteDialog.profileName = modelData.name
+                                    deleteDialog.profileTitle = modelData.title
+                                    deleteDialog.isFavorite = profileDelegate.isFavorite
+                                    deleteDialog.open()
+                                }
+
+                                contentItem: Text {
+                                    text: parent.text
+                                    color: Theme.errorColor
+                                    font: Theme.bodyFont
+                                    leftPadding: Theme.scaled(8)
+                                }
+                                background: Rectangle {
+                                    color: parent.highlighted ? Qt.rgba(Theme.errorColor.r, Theme.errorColor.g, Theme.errorColor.b, 0.2) : "transparent"
+                                }
+
+                                Accessible.role: Accessible.MenuItem
+                                Accessible.name: TranslationManager.translate("profileselector.accessible.delete_permanently", "Delete profile permanently")
                             }
                         }
 
@@ -593,8 +687,9 @@ Page {
 
                                         onReleased: {
                                             favoritePill.anchors.fill = favoriteDelegate
-                                            // Calculate new position based on Y
-                                            var newIndex = Math.floor((favoritePill.y + favoritePill.height/2) / (Theme.scaled(60) + Theme.scaled(8)))
+                                            // Calculate new position based on Y (pill.y is relative to delegate, so add delegate.y for list position)
+                                            var contentPos = favoriteDelegate.y + favoritePill.y
+                                            var newIndex = Math.floor((contentPos + favoritePill.height/2) / (Theme.scaled(60) + Theme.scaled(8)))
                                             newIndex = Math.max(0, Math.min(newIndex, Settings.favoriteProfiles.length - 1))
                                             if (newIndex !== startIndex && startIndex >= 0) {
                                                 Settings.moveFavoriteProfile(startIndex, newIndex)
@@ -726,6 +821,80 @@ Page {
                     onClicked: {
                         MainController.deleteProfile(deleteDialog.profileName)
                         deleteDialog.close()
+                    }
+                }
+            }
+        }
+
+        background: Rectangle {
+            color: Theme.surfaceColor
+            radius: Theme.scaled(8)
+            border.color: Theme.borderColor
+        }
+    }
+
+    // New profile type picker dialog
+    Dialog {
+        id: newProfileDialog
+        title: TranslationManager.translate("profileselector.newProfile.title", "New Profile")
+        anchors.centerIn: parent
+        width: Theme.scaled(350)
+        modal: true
+
+        contentItem: ColumnLayout {
+            spacing: Theme.scaled(8)
+
+            Repeater {
+                model: [
+                    { label: TranslationManager.translate("profileselector.newProfile.pressure", "Pressure Profile"), type: "pressure" },
+                    { label: TranslationManager.translate("profileselector.newProfile.flow", "Flow Profile"), type: "flow" },
+                    { label: TranslationManager.translate("profileselector.newProfile.dflow", "D-Flow"), type: "dflow" },
+                    { label: TranslationManager.translate("profileselector.newProfile.aflow", "A-Flow"), type: "aflow" },
+                    { label: TranslationManager.translate("profileselector.newProfile.advanced", "Advanced"), type: "advanced" }
+                ]
+
+                delegate: Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Theme.scaled(48)
+                    radius: Theme.scaled(6)
+                    color: typeMouseArea.containsMouse ? Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.2) : Theme.backgroundColor
+                    Accessible.role: Accessible.Button
+                    Accessible.name: modelData.label
+
+                    Text {
+                        anchors.fill: parent
+                        anchors.leftMargin: Theme.scaled(16)
+                        text: modelData.label
+                        color: Theme.textColor
+                        font: Theme.bodyFont
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    MouseArea {
+                        id: typeMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        Accessible.ignored: true
+                        onClicked: {
+                            newProfileDialog.close()
+                            var profileType = modelData.type
+                            if (profileType === "pressure") {
+                                MainController.createNewPressureProfile("New Pressure Profile")
+                                root.goToProfileEditor()
+                            } else if (profileType === "flow") {
+                                MainController.createNewFlowProfile("New Flow Profile")
+                                root.goToProfileEditor()
+                            } else if (profileType === "dflow") {
+                                MainController.createNewRecipe("D-Flow / New Recipe")
+                                root.goToProfileEditor()
+                            } else if (profileType === "aflow") {
+                                MainController.createNewAFlowRecipe("A-Flow / New Recipe")
+                                root.goToProfileEditor()
+                            } else {
+                                MainController.createNewProfile("New Profile")
+                                root.goToProfileEditor()
+                            }
+                        }
                     }
                 }
             }

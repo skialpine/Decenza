@@ -8,15 +8,19 @@ ChartView {
     backgroundColor: Qt.darker(Theme.surfaceColor, 1.3)
     plotAreaColor: Qt.darker(Theme.surfaceColor, 1.3)
     legend.visible: false
+    Accessible.role: Accessible.Graphic
+    Accessible.name: "Profile graph"
 
     margins.top: 0
-    margins.bottom: 0
+    margins.bottom: Theme.scaled(32)
     margins.left: 0
     margins.right: 0
 
     // Properties
     property var frames: []
     property int selectedFrameIndex: -1
+    property double targetWeight: 0
+    property double targetVolume: 0
 
     // Signals
     signal frameSelected(int index)
@@ -31,11 +35,59 @@ ChartView {
         frameRepeater.model = savedFrames
     }
 
-    // Calculate total duration from frames
+    // Estimate display duration for a frame.
+    // De1app plugins use: shotendtime = target / pour_flow + 16
+    // We approximate per-frame to match that holistic estimate.
+    function estimateFrameSeconds(frame, index) {
+        var secs = frame.seconds || 0
+        if (secs <= 0) return 0
+
+        // Machine-side exit conditions — frame exits before its timeout
+        if (frame.exit_if) {
+            // Flow-pump preinfusion (exits on pressure_over): typically 3-8s
+            if (frame.pump === "flow" && secs > 8) {
+                return 8
+            }
+            // Other exit types (pressure ramps, etc.): cap at 15s
+            if (secs > 15) {
+                return 15
+            }
+        }
+
+        // App-side weight exit: frame exits when scale reaches target grams
+        if ((frame.exit_weight || 0) > 0 && secs > 5) {
+            return 5
+        }
+
+        // Long-timeout flow frames: estimate pour duration from target weight/volume
+        if (secs >= 60 && frame.pump === "flow") {
+            var flowRate = frame.flow || 0
+            // flow=0 with smooth = continue at previous rate; fast = actual pause
+            if (flowRate <= 0 && frame.transition === "smooth") {
+                for (var j = index - 1; j >= 0; j--) {
+                    if (frames[j].pump === "flow" && (frames[j].flow || 0) > 0) {
+                        flowRate = frames[j].flow
+                        break
+                    }
+                }
+            }
+            if (flowRate > 0) {
+                var target = targetWeight > 0 ? targetWeight : targetVolume
+                if (target > 0) {
+                    return Math.min(secs, Math.max(target / flowRate, 10))
+                }
+            }
+            return 60  // No target or flow rate — cap at 60s
+        }
+
+        return secs
+    }
+
+    // Calculate total duration using estimated frame durations
     property double totalDuration: {
         var total = 0
         for (var i = 0; i < frames.length; i++) {
-            total += frames[i].seconds || 0
+            total += estimateFrameSeconds(frames[i], i)
         }
         return Math.max(total, 5)  // Minimum 5 seconds
     }
@@ -49,7 +101,7 @@ ChartView {
         labelFormat: "%.0f"
         labelsColor: Theme.textSecondaryColor
         labelsFont.pixelSize: Theme.scaled(12)
-        gridLineColor: Qt.rgba(255, 255, 255, 0.1)
+        gridLineColor: Qt.rgba(1, 1, 1, 0.1)
     }
 
     // Pressure/Flow axis (left Y)
@@ -61,7 +113,7 @@ ChartView {
         labelFormat: "%.0f"
         labelsColor: Theme.textSecondaryColor
         labelsFont.pixelSize: Theme.scaled(12)
-        gridLineColor: Qt.rgba(255, 255, 255, 0.1)
+        gridLineColor: Qt.rgba(1, 1, 1, 0.1)
     }
 
     // Temperature axis (right Y)
@@ -76,56 +128,22 @@ ChartView {
         gridLineColor: "transparent"
     }
 
-    // Static pressure series (up to 3 segments for discontinuous curves)
+    // Pressure curve (continuous across entire shot)
     LineSeries {
         id: pressureSeries0
         name: "Pressure"
         color: Theme.pressureGoalColor
-        width: Theme.graphLineWidth
-        style: Qt.DashLine
-        axisX: timeAxis
-        axisY: pressureAxis
-    }
-    LineSeries {
-        id: pressureSeries1
-        color: Theme.pressureGoalColor
-        width: Theme.graphLineWidth
-        style: Qt.DashLine
-        axisX: timeAxis
-        axisY: pressureAxis
-    }
-    LineSeries {
-        id: pressureSeries2
-        color: Theme.pressureGoalColor
-        width: Theme.graphLineWidth
-        style: Qt.DashLine
+        width: Theme.graphLineWidth * 3
         axisX: timeAxis
         axisY: pressureAxis
     }
 
-    // Static flow series (up to 3 segments for discontinuous curves)
+    // Flow curve (continuous across entire shot)
     LineSeries {
         id: flowSeries0
         name: "Flow"
         color: Theme.flowGoalColor
-        width: Theme.graphLineWidth
-        style: Qt.DashLine
-        axisX: timeAxis
-        axisY: pressureAxis
-    }
-    LineSeries {
-        id: flowSeries1
-        color: Theme.flowGoalColor
-        width: Theme.graphLineWidth
-        style: Qt.DashLine
-        axisX: timeAxis
-        axisY: pressureAxis
-    }
-    LineSeries {
-        id: flowSeries2
-        color: Theme.flowGoalColor
-        width: Theme.graphLineWidth
-        style: Qt.DashLine
+        width: Theme.graphLineWidth * 3
         axisX: timeAxis
         axisY: pressureAxis
     }
@@ -135,15 +153,11 @@ ChartView {
         id: temperatureGoalSeries
         name: "Temperature"
         color: Theme.temperatureGoalColor
-        width: Math.max(2, Theme.graphLineWidth - 1)
+        width: Theme.graphLineWidth * 2
         style: Qt.DashLine
         axisX: timeAxis
         axisYRight: tempAxis
     }
-
-    // Arrays to track which static series to use
-    property var pressureSeriesPool: [pressureSeries0, pressureSeries1, pressureSeries2]
-    property var flowSeriesPool: [flowSeries0, flowSeries1, flowSeries2]
 
     // Frame region overlays
     Item {
@@ -160,14 +174,19 @@ ChartView {
                 required property int index
                 required property var modelData
                 property var frame: modelData
+
+                Accessible.role: Accessible.ListItem
+                Accessible.name: (frame ? (frame.name || ("Frame " + (index + 1))) : "") +
+                                 (index === selectedFrameIndex ? ", selected" : "")
+                Accessible.focusable: true
                 property double frameStart: {
                     var start = 0
                     for (var i = 0; i < index; i++) {
-                        start += frames[i].seconds || 0
+                        start += estimateFrameSeconds(frames[i], i)
                     }
                     return start
                 }
-                property double frameDuration: frame ? frame.seconds || 0 : 0
+                property double frameDuration: frame ? estimateFrameSeconds(frame, index) : 0
 
                 x: chart.plotArea.x + (frameStart / (totalDuration * 1.1)) * chart.plotArea.width
                 y: chart.plotArea.y
@@ -181,21 +200,12 @@ ChartView {
                             return Qt.rgba(Theme.accentColor.r, Theme.accentColor.g, Theme.accentColor.b, 0.3)
                         }
                         return index % 2 === 0 ?
-                            Qt.rgba(255, 255, 255, 0.05) :
-                            Qt.rgba(255, 255, 255, 0.02)
+                            Qt.rgba(1, 1, 1, 0.05) :
+                            Qt.rgba(1, 1, 1, 0.02)
                     }
                     border.width: index === selectedFrameIndex ? Theme.scaled(2) : Theme.scaled(1)
                     border.color: index === selectedFrameIndex ?
-                        Theme.accentColor : Qt.rgba(255, 255, 255, 0.2)
-
-                    Rectangle {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        height: Theme.scaled(4)
-                        color: frame && frame.pump === "flow" ? Theme.flowColor : Theme.pressureColor
-                        opacity: 0.8
-                    }
+                        Theme.accentColor : Qt.rgba(1, 1, 1, 0.2)
                 }
 
                 Item {
@@ -223,6 +233,7 @@ ChartView {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
+                        Accessible.ignored: true
                         onClicked: {
                             selectedFrameIndex = index
                             frameSelected(index)
@@ -236,6 +247,7 @@ ChartView {
                 MouseArea {
                     anchors.fill: parent
                     z: -1
+                    Accessible.ignored: true
                     onClicked: {
                         selectedFrameIndex = index
                         frameSelected(index)
@@ -248,15 +260,15 @@ ChartView {
         }
     }
 
-    // Generate target curves from frames
+    // Generate simulation curves from frames.
+    // Shows BOTH pressure and flow as continuous curves across the entire shot.
+    // Handles multiple profile patterns:
+    //   - D-Flow: declining pressure during flow control (explicit flow rate)
+    //   - A-Flow: flat pressure at limiter during flow control (flow=0 + limiter)
+    //   - Simple profiles: pressure/flow preinfusion + extraction
     function updateCurves() {
-        // Clear all static series
-        for (var p = 0; p < pressureSeriesPool.length; p++) {
-            pressureSeriesPool[p].clear()
-        }
-        for (var f = 0; f < flowSeriesPool.length; f++) {
-            flowSeriesPool[f].clear()
-        }
+        pressureSeries0.clear()
+        flowSeries0.clear()
         temperatureGoalSeries.clear()
 
         if (frames.length === 0) {
@@ -264,73 +276,142 @@ ChartView {
         }
 
         var time = 0
-        var pressureSeriesIndex = 0
-        var flowSeriesIndex = 0
-        var currentPressureSeries = null
-        var currentFlowSeries = null
+        var peakPressure = 0   // highest pressure seen (for D-Flow decline simulation)
+        var lastPressure = 0   // last pressure value for curve continuity
+        var lastFlow = 0       // last flow value for curve continuity
+        var hadPreinfusionSim = false  // whether we've shown the absorption curve
+
+        // Preinfusion simulation data from de1app D-Flow demo_graph
+        // (de1plus/plugins/D_Flow_Espresso_Profile/demo_graph.tcl)
+        // simTimeFracs: normalized time positions within the frame
+        // simPressureFactors: pressure build-up (0→1) as puck saturates
+        // simFlowValues: flow absorption curve (mL/s) — water rushes in then drops as puck resists
+        var simTimeFracs = [0, 0.067, 0.133, 0.2, 0.267, 0.333, 0.4, 0.467, 0.6, 0.7, 1.0]
+        var simPressureFactors = [0, 0, 0, 0, 0.7, 0.93, 1.0, 1.0, 1.0, 1.0, 1.0]
+        var simFlowValues = [0, 5.6, 7.6, 8.3, 8.2, 6.0, 2.9, 1.3, 0.6, 0.4, 0.3]
 
         for (var i = 0; i < frames.length; i++) {
             var frame = frames[i]
+            var duration = estimateFrameSeconds(frame, i)
             var startTime = time
-            var endTime = time + (frame.seconds || 0)
+            var endTime = time + duration
             var isSmooth = frame.transition === "smooth"
 
-            var prevFrame = i > 0 ? frames[i-1] : null
-            var prevSamePump = prevFrame && prevFrame.pump === frame.pump
+            // Skip zero-duration frames (transition markers like "Pressure Decline" in A-Flow).
+            // Don't let them poison tracking variables or add spurious curve points.
+            if (duration <= 0) {
+                if (frame.pump === "flow" && (frame.flow || 0) > 0) {
+                    lastFlow = frame.flow
+                }
+                time = endTime
+                continue
+            }
 
-            var prevPressure = prevSamePump ? prevFrame.pressure : frame.pressure
-            var prevFlow = prevSamePump ? prevFrame.flow : frame.flow
-            var prevTemp = i > 0 ? frames[i-1].temperature : frame.temperature
-
-            // Pressure curve (only for pressure-control frames)
             if (frame.pump === "pressure") {
-                // Need new series if coming from flow mode
-                if (!currentPressureSeries || (prevFrame && prevFrame.pump !== "pressure")) {
-                    if (pressureSeriesIndex < pressureSeriesPool.length) {
-                        currentPressureSeries = pressureSeriesPool[pressureSeriesIndex]
-                        pressureSeriesIndex++
+                var sp = frame.pressure || 0
+                peakPressure = Math.max(peakPressure, sp)
+
+                if (!hadPreinfusionSim && duration >= 3 && lastPressure <= 0) {
+                    // First pressure frame starting from unpressurized:
+                    // simulate preinfusion with absorption curve (D-Flow pattern)
+                    hadPreinfusionSim = true
+
+                    // Find pour flow target by looking ahead to next flow frame
+                    var pourFlow = 1.0
+                    for (var j = i + 1; j < frames.length; j++) {
+                        if (frames[j].pump === "flow" && (frames[j].flow || 0) > 0) {
+                            pourFlow = frames[j].flow
+                            break
+                        }
                     }
+
+                    for (var k = 0; k < simTimeFracs.length; k++) {
+                        var t = startTime + simTimeFracs[k] * duration
+                        pressureSeries0.append(t, simPressureFactors[k] * sp)
+                        // Flow: absorption curve, but cap declining portion at pour flow
+                        var fv = k < 3 ? simFlowValues[k] : Math.max(simFlowValues[k], pourFlow)
+                        flowSeries0.append(t, fv)
+                    }
+                    lastPressure = sp
+                    lastFlow = pourFlow
+                } else {
+                    // Already pressurized or short frame: simple ramp/hold
+                    var startP = (isSmooth && lastPressure > 0) ? lastPressure : sp
+                    pressureSeries0.append(startTime, startP)
+                    pressureSeries0.append(endTime, sp)
+                    lastPressure = sp
+
+                    // Flow during pressure frames: residual at pour rate
+                    var residualFlow = 1.0
+                    for (var j2 = i + 1; j2 < frames.length; j2++) {
+                        if (frames[j2].pump === "flow" && (frames[j2].flow || 0) > 0) {
+                            residualFlow = frames[j2].flow
+                            break
+                        }
+                    }
+                    flowSeries0.append(startTime, residualFlow)
+                    flowSeries0.append(endTime, residualFlow)
+                    lastFlow = residualFlow
                 }
 
-                if (currentPressureSeries) {
-                    if (isSmooth) {
-                        var startPressure = prevSamePump ? prevPressure : 0
-                        currentPressureSeries.append(startTime, startPressure)
-                    } else {
-                        currentPressureSeries.append(startTime, frame.pressure)
+            } else if (frame.pump === "flow") {
+                var targetFlow = frame.flow || 0
+
+                // flow=0 with smooth transition = continue at previous rate (A-Flow pattern)
+                // flow=0 with fast transition = stop flow (bloom pause pattern)
+                var effectiveFlow = targetFlow
+                if (targetFlow <= 0 && isSmooth) {
+                    for (var jf = i - 1; jf >= 0; jf--) {
+                        if (frames[jf].pump === "flow" && (frames[jf].flow || 0) > 0) {
+                            effectiveFlow = frames[jf].flow
+                            break
+                        }
                     }
-                    currentPressureSeries.append(endTime, frame.pressure)
+                    if (effectiveFlow <= 0) effectiveFlow = lastFlow
+                }
+
+                // Flow curve
+                var startFlow = (isSmooth && lastFlow > 0) ? lastFlow : effectiveFlow
+                flowSeries0.append(startTime, startFlow)
+                flowSeries0.append(endTime, effectiveFlow)
+                lastFlow = effectiveFlow
+
+                // Pressure during flow frames — depends on profile pattern
+                var limiter = frame.max_flow_or_pressure || 0
+                var exitP = frame.exit_pressure_over || 0
+
+                if (frame.exit_if && exitP > 0 && lastPressure < exitP) {
+                    // Fill pattern: pressure builds toward exit target
+                    pressureSeries0.append(startTime, lastPressure)
+                    pressureSeries0.append(endTime, exitP)
+                    lastPressure = exitP
+                    peakPressure = Math.max(peakPressure, exitP)
+                } else if (targetFlow <= 0 && limiter >= 3) {
+                    // A-Flow limiter pattern: flow=0 means machine drives pressure
+                    // to the limiter value (max_flow_or_pressure on flow frames = pressure cap)
+                    var pStart = isSmooth ? lastPressure : limiter
+                    pressureSeries0.append(startTime, pStart)
+                    pressureSeries0.append(endTime, limiter)
+                    lastPressure = limiter
+                    peakPressure = Math.max(peakPressure, limiter)
+                } else {
+                    // D-Flow pattern: explicit flow rate, pressure declines from peak
+                    var pDecStart = lastPressure > 0 ? lastPressure : (peakPressure > 0 ? peakPressure : 6)
+                    var pDecEnd = (peakPressure > 0 ? peakPressure : 6) * 0.4
+                    pressureSeries0.append(startTime, pDecStart)
+                    pressureSeries0.append(endTime, pDecEnd)
+                    lastPressure = pDecEnd
                 }
             }
 
-            // Flow curve (only for flow-control frames)
-            if (frame.pump === "flow") {
-                // Need new series if coming from pressure mode
-                if (!currentFlowSeries || (prevFrame && prevFrame.pump !== "flow")) {
-                    if (flowSeriesIndex < flowSeriesPool.length) {
-                        currentFlowSeries = flowSeriesPool[flowSeriesIndex]
-                        flowSeriesIndex++
-                    }
-                }
-
-                if (currentFlowSeries) {
-                    if (isSmooth) {
-                        var startFlow = prevSamePump ? prevFlow : 0
-                        currentFlowSeries.append(startTime, startFlow)
-                    } else {
-                        currentFlowSeries.append(startTime, frame.flow)
-                    }
-                    currentFlowSeries.append(endTime, frame.flow)
-                }
-            }
-
-            // Temperature curve (always shown, continuous across all frames)
+            // Temperature curve (always shown, continuous)
+            var prevTemp = i > 0 ? (frames[i-1].temperature || frame.temperature || 0) : (frame.temperature || 0)
             if (isSmooth && i > 0) {
                 temperatureGoalSeries.append(startTime, prevTemp)
             } else {
-                temperatureGoalSeries.append(startTime, frame.temperature)
+                temperatureGoalSeries.append(startTime, frame.temperature || 0)
             }
-            temperatureGoalSeries.append(endTime, frame.temperature)
+            temperatureGoalSeries.append(endTime, frame.temperature || 0)
 
             time = endTime
         }
@@ -341,17 +422,10 @@ ChartView {
         updateCurves()
     }
 
-    // Timer for delayed initial update (ensures chart is fully ready)
-    Timer {
-        id: initialUpdateTimer
-        interval: 100
-        onTriggered: updateCurves()
-    }
-
     Component.onCompleted: {
         updateCurves()
-        // Also schedule a delayed update to catch any initialization issues
-        initialUpdateTimer.start()
+        // Deferred update to catch initialization timing (per CLAUDE.md: no timer guards)
+        Qt.callLater(updateCurves)
     }
 
     // Custom legend - horizontal, below graph

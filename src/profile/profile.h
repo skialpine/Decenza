@@ -4,6 +4,7 @@
 #include <QList>
 #include <QJsonDocument>
 #include <QByteArray>
+#include <QDebug>
 #include "profileframe.h"
 #include "recipeparams.h"
 
@@ -27,6 +28,7 @@ public:
     };
 
     // Stop-at modes (what triggers end of shot)
+    // NOTE: Must stay in sync with MachineState::StopAtType
     enum class StopAtType {
         Weight,         // Stop when scale reaches target weight (brown curve)
         Volume          // Stop when flow meter reaches target volume (blue curve)
@@ -92,16 +94,61 @@ public:
     double minimumPressure() const { return m_minimumPressure; }
     void setMinimumPressure(double pressure) { m_minimumPressure = pressure; }
 
+    // === Advanced Limits (de1app settings_2c2) ===
+    double tankDesiredWaterTemperature() const { return m_tankDesiredWaterTemperature; }
+    void setTankDesiredWaterTemperature(double temp) { m_tankDesiredWaterTemperature = temp; }
+
+    double maximumFlowRangeAdvanced() const { return m_maximumFlowRangeAdvanced; }
+    void setMaximumFlowRangeAdvanced(double range) { m_maximumFlowRangeAdvanced = range; }
+
+    double maximumPressureRangeAdvanced() const { return m_maximumPressureRangeAdvanced; }
+    void setMaximumPressureRangeAdvanced(double range) { m_maximumPressureRangeAdvanced = range; }
+
     // === Steps/Frames ===
     const QList<ProfileFrame>& steps() const { return m_steps; }
-    QList<ProfileFrame>& steps() { return m_steps; }
-    void setSteps(const QList<ProfileFrame>& steps) { m_steps = steps; }
-    void addStep(const ProfileFrame& step) { m_steps.append(step); }
-    void insertStep(int index, const ProfileFrame& step) { m_steps.insert(index, step); }
-    void removeStep(int index) { m_steps.removeAt(index); }
+    void setSteps(const QList<ProfileFrame>& steps) {
+        if (steps.size() > MAX_FRAMES) {
+            qWarning() << "Profile::setSteps: truncating" << steps.size() << "frames to MAX_FRAMES" << MAX_FRAMES;
+            m_steps = steps.mid(0, MAX_FRAMES);
+        } else {
+            m_steps = steps;
+        }
+    }
+    bool addStep(const ProfileFrame& step) {
+        if (m_steps.size() >= MAX_FRAMES) {
+            qWarning() << "Profile::addStep: already at MAX_FRAMES" << MAX_FRAMES;
+            return false;
+        }
+        m_steps.append(step);
+        return true;
+    }
+    bool insertStep(int index, const ProfileFrame& step) {
+        if (m_steps.size() >= MAX_FRAMES) {
+            qWarning() << "Profile::insertStep: already at MAX_FRAMES" << MAX_FRAMES;
+            return false;
+        }
+        if (index < 0 || index > m_steps.size()) {
+            qWarning() << "Profile::insertStep: index" << index << "out of range [0," << m_steps.size() << "]";
+            return false;
+        }
+        m_steps.insert(index, step);
+        return true;
+    }
+    bool removeStep(int index) {
+        if (index < 0 || index >= m_steps.size()) {
+            qWarning() << "Profile::removeStep: index" << index << "out of range [0," << m_steps.size() << ")";
+            return false;
+        }
+        m_steps.removeAt(index);
+        return true;
+    }
     void moveStep(int from, int to);
     void setStepAt(int index, const ProfileFrame& step) {
-        if (index >= 0 && index < m_steps.size()) m_steps[index] = step;
+        if (index < 0 || index >= m_steps.size()) {
+            qWarning() << "Profile::setStepAt: index" << index << "out of range [0," << m_steps.size() << ")";
+            return;
+        }
+        m_steps[index] = step;
     }
 
     int preinfuseFrameCount() const { return m_preinfuseFrameCount; }
@@ -158,6 +205,9 @@ public:
     bool isValid() const;
     QStringList validationErrors() const;
 
+    // Count consecutive leading frames with exit conditions (preinfusion frames)
+    static int countPreinfuseFrames(const QList<ProfileFrame>& steps);
+
 private:
     // Metadata
     QString m_title = "Default";
@@ -183,6 +233,26 @@ private:
     double m_maximumPressure = 12.0;
     double m_maximumFlow = 6.0;
     double m_minimumPressure = 0.0;
+
+    // Advanced limits (de1app settings_2c2)
+    double m_tankDesiredWaterTemperature = 0.0;
+    double m_maximumFlowRangeAdvanced = 0.6;
+    double m_maximumPressureRangeAdvanced = 0.6;
+
+    // Simple profile parameters (settings_2a/2b scalar params for frame generation)
+    // Stored in JSON so frames can be regenerated when loading profiles with empty steps
+    double m_preinfusionTime = 5.0;
+    double m_preinfusionFlowRate = 4.0;
+    double m_preinfusionStopPressure = 4.0;
+    double m_espressoPressure = 9.2;        // settings_2a only
+    double m_espressoHoldTime = 10.0;
+    double m_espressoDeclineTime = 25.0;
+    double m_pressureEnd = 4.0;             // settings_2a only
+    double m_flowProfileHold = 2.0;         // settings_2b only
+    double m_flowProfileDecline = 1.2;      // settings_2b only
+    double m_maximumFlowRangeDefault = 1.0; // settings_2a limiter range
+    double m_maximumPressureRangeDefault = 0.9; // settings_2b limiter range
+    bool m_tempStepsEnabled = false;
 
     // Frames
     int m_preinfuseFrameCount = 0;

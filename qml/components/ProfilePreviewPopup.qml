@@ -112,6 +112,9 @@ Dialog {
                 height: Theme.scaled(36)
                 radius: width / 2
                 color: closeMouseArea.pressed ? Qt.darker(Theme.surfaceColor, 1.2) : "transparent"
+                Accessible.role: Accessible.Button
+                Accessible.name: "Close preview"
+                Accessible.focusable: true
 
                 Text {
                     anchors.centerIn: parent
@@ -123,6 +126,7 @@ Dialog {
                 MouseArea {
                     id: closeMouseArea
                     anchors.fill: parent
+                    Accessible.ignored: true
                     onClicked: root.close()
                 }
             }
@@ -147,6 +151,8 @@ Dialog {
                 anchors.fill: parent
                 frames: []
                 selectedFrameIndex: -1  // No selection in preview mode
+                targetWeight: root.profileData ? (root.profileData.target_weight || 0) : 0
+                targetVolume: root.profileData ? (root.profileData.target_volume || 0) : 0
             }
 
             // No data message

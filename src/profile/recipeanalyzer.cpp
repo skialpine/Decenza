@@ -4,9 +4,10 @@
 bool RecipeAnalyzer::canConvertToRecipe(const Profile& profile) {
     const auto& steps = profile.steps();
 
-    // Need at least 2 frames (Fill + Pour) and at most 6 frames
-    // Pattern: Fill → [Bloom] → [Infuse] → [Ramp] → Pour → [Decline]
-    if (steps.size() < 2 || steps.size() > 6) {
+    // Need at least 2 frames (Fill + Pour) and at most 9 frames
+    // D-Flow: Fill → [Bloom] → [Infuse] → [Ramp] → Pour → [Decline]
+    // A-Flow: Fill → [Infuse] → [2ndFill] → [Pause] → [RampUp] → [RampDown] → PourStart → Pour
+    if (steps.size() < 2 || steps.size() > 9) {
         return false;
     }
 
@@ -47,8 +48,9 @@ RecipeParams RecipeAnalyzer::extractRecipeParams(const Profile& profile) {
         return params;
     }
 
-    // Extract target weight from profile
+    // Extract targets from profile
     params.targetWeight = profile.targetWeight();
+    params.targetVolume = profile.targetVolume();
 
     // Default temperatures from profile
     double profileTemp = profile.espressoTemperature();
@@ -131,13 +133,13 @@ RecipeParams RecipeAnalyzer::extractRecipeParams(const Profile& profile) {
         const auto& pourFrame = steps[pourIndex];
 
         if (pourFrame.pump == "flow") {
-            params.pourStyle = "flow";
             params.pourFlow = extractPourFlow(pourFrame);
-            params.pressureLimit = extractPressureLimit(pourFrame);
+            params.pourPressure = extractPressureLimit(pourFrame);
+            if (params.pourPressure <= 0) params.pourPressure = 9.0;
         } else {
-            params.pourStyle = "pressure";
             params.pourPressure = extractPourPressure(pourFrame);
-            params.flowLimit = extractFlowLimit(pourFrame);
+            double flowLimit = extractFlowLimit(pourFrame);
+            params.pourFlow = flowLimit > 0 ? flowLimit : 2.0;
         }
 
         // Use pour frame temperature
@@ -146,11 +148,18 @@ RecipeParams RecipeAnalyzer::extractRecipeParams(const Profile& profile) {
         }
     }
 
-    // Extract decline parameters
+    // Extract decline parameters (decline is now flow-based: declineTo = target flow in mL/s)
     if (declineIndex >= 0 && declineIndex < steps.size()) {
+        const auto& declineFrame = steps[declineIndex];
         params.declineEnabled = true;
-        params.declineTo = extractDeclinePressure(steps[declineIndex]);
-        params.declineTime = extractDeclineTime(steps[declineIndex]);
+        // New model: decline is flow reduction. Extract target flow from decline frame.
+        if (declineFrame.pump == "flow" && declineFrame.flow > 0) {
+            params.declineTo = declineFrame.flow;
+        } else {
+            // Legacy pressure-mode decline: approximate flow decline from pour flow
+            params.declineTo = params.pourFlow * 0.5;
+        }
+        params.declineTime = extractDeclineTime(declineFrame);
     } else {
         params.declineEnabled = false;
     }
@@ -242,13 +251,13 @@ void RecipeAnalyzer::forceConvertToRecipe(Profile& profile) {
         if (foundFill && (isPourFrame(frame) || frame.pressure >= 6.0 || frame.pump == "flow")) {
             foundPour = true;
             if (frame.pump == "flow") {
-                params.pourStyle = "flow";
                 params.pourFlow = extractPourFlow(frame);
-                params.pressureLimit = extractPressureLimit(frame);
+                params.pourPressure = extractPressureLimit(frame);
+                if (params.pourPressure <= 0) params.pourPressure = 9.0;
             } else {
-                params.pourStyle = "pressure";
                 params.pourPressure = extractPourPressure(frame);
-                params.flowLimit = extractFlowLimit(frame);
+                double flowLimit = extractFlowLimit(frame);
+                params.pourFlow = flowLimit > 0 ? flowLimit : 2.0;
             }
             if (frame.temperature > 0) {
                 params.pourTemperature = frame.temperature;
@@ -258,7 +267,11 @@ void RecipeAnalyzer::forceConvertToRecipe(Profile& profile) {
                 const auto& nextFrame = steps[i + 1];
                 if (isDeclineFrame(nextFrame, &frame)) {
                     params.declineEnabled = true;
-                    params.declineTo = extractDeclinePressure(nextFrame);
+                    if (nextFrame.pump == "flow" && nextFrame.flow > 0) {
+                        params.declineTo = nextFrame.flow;
+                    } else {
+                        params.declineTo = params.pourFlow * 0.5;
+                    }
                     params.declineTime = extractDeclineTime(nextFrame);
                 }
             }
@@ -270,11 +283,11 @@ void RecipeAnalyzer::forceConvertToRecipe(Profile& profile) {
     if (!foundPour && steps.size() > 0) {
         const auto& lastFrame = steps.last();
         if (lastFrame.pump == "flow") {
-            params.pourStyle = "flow";
             params.pourFlow = lastFrame.flow > 0 ? lastFrame.flow : 2.0;
+            params.pourPressure = lastFrame.maxFlowOrPressure > 0 ? lastFrame.maxFlowOrPressure : 9.0;
         } else {
-            params.pourStyle = "pressure";
             params.pourPressure = lastFrame.pressure > 0 ? lastFrame.pressure : 9.0;
+            params.pourFlow = 2.0;
         }
         if (lastFrame.temperature > 0) {
             params.pourTemperature = lastFrame.temperature;
@@ -403,9 +416,12 @@ bool RecipeAnalyzer::isDeclineFrame(const ProfileFrame& frame, const ProfileFram
         return true;
     }
 
-    // Heuristic: smooth transition to lower pressure
-    if (frame.transition == "smooth" && frame.pump == "pressure" && previousFrame) {
-        if (frame.pressure < previousFrame->pressure) {
+    // Heuristic: smooth transition to lower pressure or lower flow
+    if (frame.transition == "smooth" && previousFrame) {
+        if (frame.pump == "pressure" && frame.pressure < previousFrame->pressure) {
+            return true;
+        }
+        if (frame.pump == "flow" && frame.flow < previousFrame->flow) {
             return true;
         }
     }

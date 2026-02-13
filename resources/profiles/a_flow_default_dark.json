@@ -8,7 +8,7 @@
     "minimum_pressure": 0,
     "mode": "frame_based",
     "notes": "A-Flow: an alternative profile for D-Flow",
-    "preinfuse_frame_count": 1,
+    "preinfuse_frame_count": 2,
     "profile_type": "settings_2c",
     "recipe": {
         "bloomEnabled": false,
@@ -22,7 +22,6 @@
         "fillPressure": 3,
         "fillTemperature": 93,
         "fillTimeout": 15,
-        "flowLimit": 0,
         "infuseByWeight": false,
         "infuseEnabled": true,
         "infusePressure": 3,
@@ -31,11 +30,9 @@
         "infuseWeight": 4,
         "pourFlow": 2,
         "pourPressure": 9,
-        "pourStyle": "flow",
         "pourTemperature": 88,
-        "pressureLimit": 9,
-        "rampEnabled": true,
         "rampTime": 5,
+        "editorType": "aflow",
         "targetWeight": 36
     },
     "steps": [

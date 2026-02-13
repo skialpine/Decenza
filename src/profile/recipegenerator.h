@@ -9,45 +9,44 @@ class Profile;
 /**
  * RecipeGenerator converts high-level RecipeParams into DE1 frames.
  *
- * This is the core of the Recipe Editor functionality, providing
- * a D-Flow-style simplified interface. Users edit intuitive parameters
- * like "infuse pressure" and "pour flow", and this class generates
- * the underlying machine frames.
+ * Supports four editor types:
  *
- * Generated frame structure:
- *   Frame 0: Fill      - Flow mode fill to saturate puck
- *   Frame 1: Bloom     - Optional pause for CO2 release
- *   Frame 2: Infuse    - Hold at low pressure (preinfusion/soak)
- *   Frame 3: Ramp      - Smooth transition to pour setpoint
- *   Frame 4: Pour      - Main extraction phase
- *   Frame 5: Decline   - Optional pressure/flow ramp-down
+ * D-Flow (Damian Brakel):
+ *   Fill -> [Bloom] -> [Infuse] -> [Ramp] -> Pour -> [Decline]
+ *   Flow-driven extraction with pressure limit.
  *
- * Based on the D-Flow plugin by Damian Brakel.
+ * A-Flow (Janek, forked from D-Flow):
+ *   Fill -> [Infuse] -> Pressure Up -> Pressure Decline -> Flow Start -> Flow Extraction
+ *   Hybrid pressure-then-flow extraction.
+ *
+ * Pressure (settings_2a):
+ *   Preinfusion -> [Forced Rise] -> Hold -> Decline
+ *   Matches de1app's pressure_to_advanced_list().
+ *
+ * Flow (settings_2b):
+ *   Preinfusion -> Hold -> Decline
+ *   Matches de1app's flow_to_advanced_list().
  */
 class RecipeGenerator {
 public:
-    /**
-     * Generate frames from recipe parameters.
-     * @param recipe The recipe parameters to convert
-     * @return List of ProfileFrame objects ready for upload
-     */
     static QList<ProfileFrame> generateFrames(const RecipeParams& recipe);
 
-    /**
-     * Create a complete Profile from recipe parameters.
-     * @param recipe The recipe parameters
-     * @param title Profile title (default: "Recipe Profile")
-     * @return Complete Profile object with frames and metadata
-     */
     static Profile createProfile(const RecipeParams& recipe,
                                   const QString& title = "Recipe Profile");
 
 private:
-    // Individual frame generators
+    // D-Flow frame generators
     static ProfileFrame createFillFrame(const RecipeParams& recipe);
     static ProfileFrame createBloomFrame(const RecipeParams& recipe);
     static ProfileFrame createInfuseFrame(const RecipeParams& recipe);
     static ProfileFrame createRampFrame(const RecipeParams& recipe);
     static ProfileFrame createPourFrame(const RecipeParams& recipe);
     static ProfileFrame createDeclineFrame(const RecipeParams& recipe);
+
+    // A-Flow frame generation
+    static QList<ProfileFrame> generateAFlowFrames(const RecipeParams& recipe);
+
+    // Simple pressure/flow profile generators
+    static QList<ProfileFrame> generatePressureFrames(const RecipeParams& recipe);
+    static QList<ProfileFrame> generateFlowFrames(const RecipeParams& recipe);
 };
