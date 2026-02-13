@@ -60,7 +60,7 @@ class MainController : public QObject {
     Q_PROPERTY(double brewByRatio READ brewByRatio NOTIFY targetWeightChanged)
     Q_PROPERTY(QVariantList availableProfiles READ availableProfiles NOTIFY profilesChanged)
     Q_PROPERTY(QVariantList selectedProfiles READ selectedProfiles NOTIFY profilesChanged)
-    Q_PROPERTY(QVariantList allBuiltInProfiles READ allBuiltInProfiles NOTIFY profilesChanged)
+    Q_PROPERTY(QVariantList allBuiltInProfiles READ allBuiltInProfiles NOTIFY allBuiltInProfileListChanged)
     Q_PROPERTY(QVariantList cleaningProfiles READ cleaningProfiles NOTIFY profilesChanged)
     Q_PROPERTY(QVariantList downloadedProfiles READ downloadedProfiles NOTIFY profilesChanged)
     Q_PROPERTY(QVariantList userCreatedProfiles READ userCreatedProfiles NOTIFY profilesChanged)
@@ -239,6 +239,7 @@ signals:
     void profileModifiedChanged();
     void targetWeightChanged();
     void profilesChanged();
+    void allBuiltInProfileListChanged();
     void sawSettlingChanged();
 
     // Accessibility: emitted when extraction frame changes

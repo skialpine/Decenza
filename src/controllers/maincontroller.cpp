@@ -493,9 +493,6 @@ QVariantList MainController::selectedProfiles() const {
 QVariantList MainController::allBuiltInProfiles() const {
     QVariantList result;
 
-    // Get selected built-in profile names from settings
-    QStringList selectedBuiltIns = m_settings ? m_settings->selectedBuiltInProfiles() : QStringList();
-
     for (const ProfileInfo& info : m_allProfiles) {
         if (info.source == ProfileSource::BuiltIn) {
             QVariantMap profile;
@@ -503,7 +500,6 @@ QVariantList MainController::allBuiltInProfiles() const {
             profile["title"] = info.title;
             profile["beverageType"] = info.beverageType;
             profile["source"] = static_cast<int>(info.source);
-            profile["isSelected"] = selectedBuiltIns.contains(info.filename);
             profile["isRecipeMode"] = info.isRecipeMode;
             result.append(profile);
         }
@@ -1220,6 +1216,7 @@ void MainController::refreshProfiles() {
     }
 
     emit profilesChanged();
+    emit allBuiltInProfileListChanged();
 }
 
 void MainController::uploadCurrentProfile() {
@@ -1595,6 +1592,7 @@ void MainController::createNewProfileWithEditorType(EditorType type, const QStri
     emit profileModifiedChanged();
     emit targetWeightChanged();
     emit profilesChanged();
+    emit allBuiltInProfileListChanged();
 
     uploadCurrentProfile();
     qDebug() << "Created new" << editorTypeToString(type) << "profile:" << title;
