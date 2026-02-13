@@ -84,6 +84,7 @@ public class DeviceShutdownService extends Service {
         stopSelf();
     }
 
+    @SuppressWarnings("deprecation")
     private void sendDe1Sleep(String address) {
         if (mBluetoothAdapter == null) {
             Log.e(TAG, "Bluetooth not available");
