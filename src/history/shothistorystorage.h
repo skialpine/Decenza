@@ -6,6 +6,7 @@
 #include <QVector>
 #include <QPointF>
 #include <QDateTime>
+#include <atomic>
 
 class ShotDataModel;
 class Profile;
@@ -173,8 +174,8 @@ public:
     // Export debug log for bug report
     Q_INVOKABLE QString exportShotData(qint64 shotId);
 
-    // Export database to Downloads folder (for debugging)
-    Q_INVOKABLE QString exportDatabase();
+    // Create backup at specified path (for scheduled backups)
+    Q_INVOKABLE QString createBackup(const QString& destPath);
 
     // Import database from file path (merge=true adds new entries, merge=false replaces all)
     Q_INVOKABLE bool importDatabase(const QString& filePath, bool merge);
@@ -227,12 +228,18 @@ private:
     // Helper for converting QVector<QPointF> to JSON object with t/v arrays
     static QJsonObject pointsToJsonObject(const QVector<QPointF>& points);
 
+    // Core backup helper: checkpoint + close + copy + reopen
+    // Returns true on success, false on failure
+    bool performDatabaseCopy(const QString& destPath);
+
     QSqlDatabase m_db;
     QString m_dbPath;
     bool m_ready = false;
     int m_totalShots = 0;
     int m_schemaVersion = 1;
     qint64 m_lastSavedShotId = 0;
+    std::atomic<bool> m_backupInProgress{false};  // Prevent concurrent backup/export operations (thread-safe)
+    std::atomic<bool> m_importInProgress{false};   // Prevent concurrent import/restore operations (thread-safe)
 
     static const QString DB_CONNECTION_NAME;
 };

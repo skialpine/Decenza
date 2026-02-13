@@ -135,6 +135,9 @@ class Settings : public QObject {
     Q_PROPERTY(bool autoCheckUpdates READ autoCheckUpdates WRITE setAutoCheckUpdates NOTIFY autoCheckUpdatesChanged)
     Q_PROPERTY(bool betaUpdatesEnabled READ betaUpdatesEnabled WRITE setBetaUpdatesEnabled NOTIFY betaUpdatesEnabledChanged)
 
+    // Daily backup settings
+    Q_PROPERTY(int dailyBackupHour READ dailyBackupHour WRITE setDailyBackupHour NOTIFY dailyBackupHourChanged)
+
     // Water level display setting
     Q_PROPERTY(QString waterLevelDisplayUnit READ waterLevelDisplayUnit WRITE setWaterLevelDisplayUnit NOTIFY waterLevelDisplayUnitChanged)
 
@@ -489,6 +492,10 @@ public:
     bool betaUpdatesEnabled() const;
     void setBetaUpdatesEnabled(bool enabled);
 
+    // Daily backup
+    int dailyBackupHour() const;
+    void setDailyBackupHour(int hour);
+
     // Water level display
     QString waterLevelDisplayUnit() const;
     void setWaterLevelDisplayUnit(const QString& unit);
@@ -665,6 +672,7 @@ signals:
     void autoFavoritesMaxItemsChanged();
     void autoCheckUpdatesChanged();
     void betaUpdatesEnabledChanged();
+    void dailyBackupHourChanged();
     void waterLevelDisplayUnitChanged();
     void waterRefillPointChanged();
     void refillKitOverrideChanged();
