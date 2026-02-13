@@ -994,10 +994,6 @@ KeyboardAwareContainer {
         modal: true
         title: TranslationManager.translate("settings.data.restoredialog", "Restore Backup?")
 
-        Accessible.role: Accessible.Dialog
-        Accessible.name: title + ". " + TranslationManager.translate("settings.data.dialogdesc",
-            "Choose restore mode and confirm operation")
-
         background: Rectangle {
             color: Theme.surfaceColor
             radius: Theme.cardRadius
@@ -1230,6 +1226,7 @@ KeyboardAwareContainer {
     Dialog {
         id: restartDialog
         anchors.centerIn: parent
+        width: Theme.scaled(350)
         modal: true
         title: TranslationManager.translate("settings.data.restartneeded", "Restart Required")
         closePolicy: Popup.NoAutoClose
