@@ -139,6 +139,9 @@ public slots:
     // Water refill level (write StartFillLevel to machine via WaterLevels characteristic)
     void setWaterRefillLevel(int refillPointMm);
 
+    // Flow calibration multiplier (MMR 0x80383C: value = int(1000 * multiplier))
+    void setFlowCalibrationMultiplier(double multiplier);
+
     // Refill kit control (MMR 0x80385C: 0=off, 1=on, 2=auto-detect)
     void setRefillKitPresent(int value);
     void requestRefillKitStatus();

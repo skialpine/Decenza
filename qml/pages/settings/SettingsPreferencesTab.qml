@@ -437,6 +437,49 @@ Item {
                 }
             }
 
+            // Flow Calibration
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: flowCalContent.implicitHeight + Theme.scaled(20)
+                color: Theme.surfaceColor
+                radius: Theme.cardRadius
+
+                ColumnLayout {
+                    id: flowCalContent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: Theme.scaled(10)
+                    spacing: Theme.scaled(6)
+
+                    Text {
+                        text: TranslationManager.translate("settings.preferences.flowCalibration", "Flow Calibration")
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(16)
+                        font.bold: true
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        Text {
+                            text: TranslationManager.translate("settings.preferences.currentMultiplier", "Current:") + " " + Settings.flowCalibrationMultiplier.toFixed(2)
+                            color: Theme.textSecondaryColor
+                            font.pixelSize: Theme.scaled(12)
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        AccessibleButton {
+                            accessibleName: TranslationManager.translate("settings.preferences.openFlowCalibration", "Open Flow Calibration")
+                            text: TranslationManager.translate("settings.preferences.calibrate", "Calibrate")
+                            primary: true
+                            onClicked: pageStack.push(Qt.resolvedUrl("../FlowCalibrationPage.qml"))
+                        }
+                    }
+                }
+            }
+
             Item { Layout.fillHeight: true }
         }
 

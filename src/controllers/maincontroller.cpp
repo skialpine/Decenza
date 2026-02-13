@@ -105,6 +105,12 @@ MainController::MainController(Settings* settings, DE1Device* device,
                 this, &MainController::applyRefillKitOverride);
     }
 
+    // Apply flow calibration multiplier when setting changes
+    if (m_settings && m_device) {
+        connect(m_settings, &Settings::flowCalibrationMultiplierChanged,
+                this, &MainController::applyFlowCalibration);
+    }
+
     // Connect to machine state events
     if (m_machineState) {
         connect(m_machineState, &MachineState::espressoCycleStarted,
@@ -2041,6 +2047,9 @@ void MainController::applyAllSettings() {
 
     // 6. Apply refill kit override
     applyRefillKitOverride();
+
+    // 7. Apply flow calibration multiplier
+    applyFlowCalibration();
 }
 
 void MainController::applyWaterRefillLevel() {
@@ -2055,6 +2064,12 @@ void MainController::applyRefillKitOverride() {
     int override = m_settings->refillKitOverride();
     // Values match de1app: 0=force off, 1=force on, 2=auto-detect
     m_device->setRefillKitPresent(override);
+}
+
+void MainController::applyFlowCalibration() {
+    if (!m_device || !m_device->isConnected() || !m_settings) return;
+
+    m_device->setFlowCalibrationMultiplier(m_settings->flowCalibrationMultiplier());
 }
 
 double MainController::getGroupTemperature() const {

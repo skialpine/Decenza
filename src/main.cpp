@@ -49,6 +49,7 @@
 #include "network/librarysharing.h"
 #include "core/documentformatter.h"
 #include "weather/weathermanager.h"
+#include "models/flowcalibrationmodel.h"
 
 // GHC Simulator for Windows debug builds
 #if (defined(Q_OS_WIN) || defined(Q_OS_MACOS)) && defined(QT_DEBUG)
@@ -442,6 +443,13 @@ int main(int argc, char *argv[])
     context->setContextProperty("CrashReporter", &crashReporter);
     context->setContextProperty("WidgetLibrary", &widgetLibrary);
     context->setContextProperty("LibrarySharing", &librarySharing);
+
+    FlowCalibrationModel flowCalibrationModel;
+    flowCalibrationModel.setStorage(mainController.shotHistory());
+    flowCalibrationModel.setSettings(&settings);
+    flowCalibrationModel.setDevice(&de1Device);
+    context->setContextProperty("FlowCalibrationModel", &flowCalibrationModel);
+
     context->setContextProperty("PreviousCrashLog", previousCrashLog);
     context->setContextProperty("PreviousDebugLogTail", previousDebugLogTail);
     context->setContextProperty("AppVersion", VERSION_STRING);

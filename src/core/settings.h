@@ -162,6 +162,9 @@ class Settings : public QObject {
     Q_PROPERTY(bool autoWakeStayAwakeEnabled READ autoWakeStayAwakeEnabled WRITE setAutoWakeStayAwakeEnabled NOTIFY autoWakeStayAwakeEnabledChanged)
     Q_PROPERTY(int autoWakeStayAwakeMinutes READ autoWakeStayAwakeMinutes WRITE setAutoWakeStayAwakeMinutes NOTIFY autoWakeStayAwakeMinutesChanged)
 
+    // Flow calibration
+    Q_PROPERTY(double flowCalibrationMultiplier READ flowCalibrationMultiplier WRITE setFlowCalibrationMultiplier NOTIFY flowCalibrationMultiplierChanged)
+
     // SAW (Stop-at-Weight) learning
     Q_PROPERTY(double sawLearnedLag READ sawLearnedLag NOTIFY sawLearnedLagChanged)
 
@@ -551,6 +554,10 @@ public:
     QString mqttClientId() const;
     void setMqttClientId(const QString& clientId);
 
+    // Flow calibration
+    double flowCalibrationMultiplier() const;
+    void setFlowCalibrationMultiplier(double multiplier);
+
     // SAW (Stop-at-Weight) learning
     double sawLearnedLag() const;  // Average lag for display in QML (calculated from drip/flow)
     double getExpectedDrip(double currentFlowRate) const;  // Predicts drip based on flow and history
@@ -679,6 +686,7 @@ signals:
     void mqttRetainMessagesChanged();
     void mqttHomeAssistantDiscoveryChanged();
     void mqttClientIdChanged();
+    void flowCalibrationMultiplierChanged();
     void sawLearnedLagChanged();
     void layoutConfigurationChanged();
     void valueChanged(const QString& key);

@@ -2320,6 +2320,20 @@ void Settings::setMqttClientId(const QString& clientId) {
     }
 }
 
+// Flow calibration
+
+double Settings::flowCalibrationMultiplier() const {
+    return m_settings.value("calibration/flowMultiplier", 1.0).toDouble();
+}
+
+void Settings::setFlowCalibrationMultiplier(double multiplier) {
+    multiplier = qBound(0.35, multiplier, 2.0);
+    if (qAbs(flowCalibrationMultiplier() - multiplier) > 0.001) {
+        m_settings.setValue("calibration/flowMultiplier", multiplier);
+        emit flowCalibrationMultiplierChanged();
+    }
+}
+
 // SAW (Stop-at-Weight) learning
 
 // Returns average lag for display in QML settings (calculated from stored drip/flow)

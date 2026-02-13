@@ -1114,6 +1114,12 @@ void DE1Device::setWaterRefillLevel(int refillPointMm) {
     });
 }
 
+void DE1Device::setFlowCalibrationMultiplier(double multiplier) {
+    uint32_t value = static_cast<uint32_t>(1000.0 * multiplier);
+    qDebug() << "DE1Device: Setting flow calibration multiplier to" << multiplier << "(MMR value:" << value << ")";
+    writeMMR(DE1::MMR::FLOW_CALIBRATION, value);
+}
+
 void DE1Device::setRefillKitPresent(int value) {
     // Write refill kit override to machine via MMR (0x80385C)
     // 0 = force off (no refill kit), 1 = force on, 2 = auto-detect

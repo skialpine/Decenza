@@ -133,6 +133,7 @@ namespace MMR {
     constexpr uint32_t SERIAL_NUMBER        = 0x803830;
     constexpr uint32_t HEATER_VOLTAGE       = 0x803834;
     constexpr uint32_t USB_CHARGER          = 0x803854;  // USB charger on/off (1=on, 0=off)
+    constexpr uint32_t FLOW_CALIBRATION     = 0x80383C;  // Flow calibration multiplier (value = int(1000 * multiplier))
     constexpr uint32_t REFILL_KIT           = 0x80385C;
 }
 

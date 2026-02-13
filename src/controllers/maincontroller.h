@@ -261,6 +261,7 @@ private:
     void applyAllSettings();
     void applyWaterRefillLevel();
     void applyRefillKitOverride();
+    void applyFlowCalibration();
     double getGroupTemperature() const;
 
     Settings* m_settings = nullptr;

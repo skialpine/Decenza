@@ -171,6 +171,7 @@ set(SOURCES
     src/history/shotfileparser.cpp
     src/history/shotimporter.cpp
     src/models/shotcomparisonmodel.cpp
+    src/models/flowcalibrationmodel.cpp
     src/network/shotserver.cpp
     src/network/shotserver_shots.cpp
     src/network/shotserver_upload.cpp
@@ -259,6 +260,7 @@ set(HEADERS
     src/history/shotfileparser.h
     src/history/shotimporter.h
     src/models/shotcomparisonmodel.h
+    src/models/flowcalibrationmodel.h
     src/network/shotserver.h
     src/network/mqttclient.h
     src/network/webdebuglogger.h
@@ -372,6 +374,7 @@ set(QML_FILES
     qml/pages/AutoFavoritesPage.qml
     qml/pages/ShotDetailPage.qml
     qml/pages/ShotComparisonPage.qml
+    qml/pages/FlowCalibrationPage.qml
     qml/pages/ProfileInfoPage.qml
     qml/pages/settings/SettingsBluetoothTab.qml
     qml/pages/settings/SettingsPreferencesTab.qml
