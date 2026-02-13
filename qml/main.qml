@@ -458,6 +458,7 @@ ApplicationWindow {
         z: 10000  // Above everything
         enabled: typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled
         propagateComposedEvents: true
+        Accessible.ignored: true
 
         // Check if an item or any ancestor is interactive (Button, focusable, etc.)
         function isInsideInteractive(item) {
