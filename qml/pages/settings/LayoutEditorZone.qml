@@ -436,6 +436,7 @@ Rectangle {
                             { type: "steam", label: "Steam" },
                             { type: "steamTemperature", label: "Steam Temp" },
                             { type: "temperature", label: "Temperature" },
+                            { type: "mixTemperature", label: "Mix Temp" },
                             { type: "waterLevel", label: "Water Level" },
                             // Utility (orange)
                             { type: "custom", label: "Custom" },
@@ -552,7 +553,7 @@ Rectangle {
             "espresso": "Espresso", "steam": "Steam", "hotwater": "Hot Water",
             "flush": "Flush", "beans": "Beans", "history": "History",
             "autofavorites": "Favorites", "sleep": "Sleep", "settings": "Settings",
-            "temperature": "Temp", "steamTemperature": "Steam Temp",
+            "temperature": "Temp", "mixTemperature": "Mix Temp", "steamTemperature": "Steam Temp",
             "waterLevel": "Water",
             "connectionStatus": "Connection", "scaleWeight": "Scale",
             "shotPlan": "Shot Plan", "pageTitle": "Page Title",

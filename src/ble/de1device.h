@@ -45,6 +45,7 @@ class DE1Device : public QObject {
     Q_PROPERTY(double pressure READ pressure NOTIFY shotSampleReceived)
     Q_PROPERTY(double flow READ flow NOTIFY shotSampleReceived)
     Q_PROPERTY(double temperature READ temperature NOTIFY shotSampleReceived)
+    Q_PROPERTY(double mixTemperature READ mixTemperature NOTIFY shotSampleReceived)
     Q_PROPERTY(double steamTemperature READ steamTemperature NOTIFY shotSampleReceived)
     Q_PROPERTY(double waterLevel READ waterLevel NOTIFY waterLevelChanged)
     Q_PROPERTY(double waterLevelMm READ waterLevelMm NOTIFY waterLevelChanged)

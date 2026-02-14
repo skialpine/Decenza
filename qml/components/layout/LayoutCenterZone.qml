@@ -17,6 +17,7 @@ Item {
             case "custom":
             case "shotPlan":
             case "temperature":
+            case "mixTemperature":
             case "waterLevel":
             case "connectionStatus":
             case "steamTemperature":

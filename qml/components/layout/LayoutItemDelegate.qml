@@ -141,6 +141,7 @@ Item {
             case "sleep":            return "Sleep"
             case "quit":             return "Quit"
             case "temperature":      return "Temperature"
+            case "mixTemperature":   return "Mix Temperature"
             case "waterLevel":       return "Water Level"
             case "connectionStatus": return "Connection Status"
             case "scaleWeight":      return "Scale Weight"
@@ -183,6 +184,7 @@ Item {
                 case "sleep":            src = "items/SleepItem.qml"; break
                 case "settings":         src = "items/SettingsItem.qml"; break
                 case "temperature":      src = "items/TemperatureItem.qml"; break
+                case "mixTemperature":   src = "items/MixTemperatureItem.qml"; break
                 case "waterLevel":       src = "items/WaterLevelItem.qml"; break
                 case "connectionStatus": src = "items/ConnectionStatusItem.qml"; break
                 case "scaleWeight":      src = "items/ScaleWeightItem.qml"; break

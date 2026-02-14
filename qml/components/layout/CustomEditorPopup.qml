@@ -135,6 +135,7 @@ Popup {
         if (!text) return ""
         var result = text
         result = result.replace(/%TEMP%/g, "92.3")
+        result = result.replace(/%MIX_TEMP%/g, "91.8")
         result = result.replace(/%STEAM_TEMP%/g, "155\u00B0")
         result = result.replace(/%PRESSURE%/g, "9.0")
         result = result.replace(/%FLOW%/g, "2.1")
@@ -733,6 +734,7 @@ Popup {
 
                         model: [
                             { token: "%TEMP%", label: "Temp (°C)" },
+                            { token: "%MIX_TEMP%", label: "Mix Temp (°C)" },
                             { token: "%STEAM_TEMP%", label: "Steam (°C)" },
                             { token: "%PRESSURE%", label: "Pressure (bar)" },
                             { token: "%FLOW%", label: "Flow (ml/s)" },
