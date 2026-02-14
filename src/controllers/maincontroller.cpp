@@ -1075,6 +1075,11 @@ void MainController::loadShotWithMetadata(qint64 shotId) {
         if (shotRecord.yieldOverride > 0) {
             m_settings->setBrewYieldOverride(shotRecord.yieldOverride);
             hasOverrides = true;
+        } else if (shotRecord.summary.finalWeight > 0 && m_currentProfile.targetWeight() <= 0) {
+            // Old shots from volume/timer-based profiles were saved with yieldOverride=0.
+            // Use the actual yield so the user gets a meaningful weight target.
+            m_settings->setBrewYieldOverride(shotRecord.summary.finalWeight);
+            hasOverrides = true;
         }
 
         qDebug() << "Loaded shot metadata - brand:" << shotRecord.summary.beanBrand
@@ -1082,7 +1087,10 @@ void MainController::loadShotWithMetadata(qint64 shotId) {
                  << "grinder:" << shotRecord.grinderModel << shotRecord.grinderSetting
                  << "beanPresetIndex:" << beanPresetIndex
                  << "brewOverrides - temp:" << (shotRecord.temperatureOverride > 0 ? QString::number(shotRecord.temperatureOverride) : "none")
-                 << "yield:" << (shotRecord.yieldOverride > 0 ? QString::number(shotRecord.yieldOverride) : "none");
+                 << "yield:" << (shotRecord.yieldOverride > 0 ? QString::number(shotRecord.yieldOverride)
+                    : (shotRecord.summary.finalWeight > 0 && m_currentProfile.targetWeight() <= 0
+                       ? QString::number(shotRecord.summary.finalWeight) + " (from actual)"
+                       : "none"));
 
         // Re-upload profile with history overrides applied
         // loadProfile() already uploaded with profile defaults; now we have the actual overrides
@@ -2437,10 +2445,10 @@ void MainController::onShotEnded() {
             shotTemperatureOverride = m_currentProfile.espressoTemperature();
         }
 
-        // Yield: user override OR profile's target weight
+        // Yield: user override OR profile's target weight (0 for volume-based profiles)
         if (m_settings->hasBrewYieldOverride()) {
             shotYieldOverride = m_settings->brewYieldOverride();
-        } else {
+        } else if (m_currentProfile.targetWeight() > 0) {
             shotYieldOverride = m_currentProfile.targetWeight();
         }
     }
@@ -2497,6 +2505,12 @@ void MainController::onShotEnded() {
     metadata.espressoEnjoyment = m_settings->dyeEspressoEnjoyment();
     metadata.espressoNotes = m_settings->dyeShotNotes();
     metadata.barista = m_settings->dyeBarista();
+
+    // For volume/timer-based profiles (targetWeight=0), use the actual final weight
+    // so favorites can restore a meaningful yield target
+    if (shotYieldOverride <= 0 && finalWeight > 0) {
+        shotYieldOverride = finalWeight;
+    }
 
     // Always save shot to local history
     qDebug() << "[metadata] Saving shot - shotHistory:" << (m_shotHistory ? "exists" : "null")
