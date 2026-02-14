@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QPointer>
 #include <QTimer>
 #include "../ble/protocol/de1characteristics.h"
 
@@ -120,7 +121,7 @@ private:
     void checkStopAtTime();
 
     DE1Device* m_device = nullptr;
-    ScaleDevice* m_scale = nullptr;  // Either FlowScale (fallback) or physical BLE scale
+    QPointer<ScaleDevice> m_scale;  // Auto-nulls when scale is destroyed (prevents dangling pointer)
     Settings* m_settings = nullptr;
     ShotTimingController* m_timingController = nullptr;
 

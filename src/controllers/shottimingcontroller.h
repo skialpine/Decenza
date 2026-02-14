@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QPointer>
 #include <QTimer>
 #include <QDateTime>
 #include <QSet>
@@ -105,7 +106,7 @@ private:
     void checkPerFrameWeight(int frameNumber);
 
     DE1Device* m_device = nullptr;
-    ScaleDevice* m_scale = nullptr;
+    QPointer<ScaleDevice> m_scale;
     Settings* m_settings = nullptr;
     MachineState* m_machineState = nullptr;
     const Profile* m_currentProfile = nullptr;
