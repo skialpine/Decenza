@@ -119,9 +119,12 @@ int main(int argc, char *argv[])
     checkpoint("TranslationManager");
     BLEManager bleManager;
 
-    // Disable BLE early in simulator mode to prevent real device connections
-#if (defined(Q_OS_WIN) || defined(Q_OS_MACOS)) && defined(QT_DEBUG)
+    // Windows debug: always disable BLE (existing behavior)
+    // Mac debug: disable BLE based on simulation setting (runtime-controllable)
+#if defined(Q_OS_WIN) && defined(QT_DEBUG)
     bleManager.setDisabled(true);
+#elif defined(Q_OS_MACOS) && defined(QT_DEBUG)
+    bleManager.setDisabled(settings.simulationMode());
 #endif
 
     DE1Device de1Device;
@@ -524,12 +527,15 @@ int main(int argc, char *argv[])
     engine.load(url);
     checkpoint("engine.load(main.qml) returned");
 
-    // GHC Simulator window for Windows debug builds
+    // GHC Simulator window for debug builds
 #if (defined(Q_OS_WIN) || defined(Q_OS_MACOS)) && defined(QT_DEBUG)
-    qDebug() << "Creating DE1 Simulator and GHC window...";
-
-    // Enable simulation mode on DE1Device - this makes it appear "connected"
+    // Windows: always run simulator (existing behavior)
+    // Mac: only run simulator when simulation mode is on (runtime-controllable)
+#ifdef Q_OS_WIN
     de1Device.setSimulationMode(true);
+#endif
+    if (settings.simulationMode()) {
+    qDebug() << "Creating DE1 Simulator and GHC window...";
 
     // Create the DE1 machine simulator
     DE1Simulator de1Simulator;
@@ -609,6 +615,7 @@ int main(int argc, char *argv[])
 
     const QUrl ghcUrl(u"qrc:/qt/qml/DecenzaDE1/qml/simulator/GHCSimulatorWindow.qml"_s);
     ghcEngine.load(ghcUrl);
+    } // settings.simulationMode()
 #endif
 
 #ifdef Q_OS_ANDROID
