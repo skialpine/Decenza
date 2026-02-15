@@ -92,6 +92,14 @@ Page {
         profileOptions = [TranslationManager.translate("shothistory.allprofiles", "All Profiles")].concat(profiles)
         roasterOptions = [TranslationManager.translate("shothistory.allroasters", "All Roasters")].concat(roasters)
         beanOptions = [TranslationManager.translate("shothistory.allbeans", "All Beans")].concat(beans)
+
+        // Restore ComboBox indices from preserved selection values (e.g. after returning from shot detail)
+        var pIdx = selectedProfile ? profileOptions.indexOf(selectedProfile) : 0
+        profileFilter.currentIndex = pIdx >= 0 ? pIdx : 0
+        var rIdx = selectedRoaster ? roasterOptions.indexOf(selectedRoaster) : 0
+        roasterFilter.currentIndex = rIdx >= 0 ? rIdx : 0
+        var bIdx = selectedBean ? beanOptions.indexOf(selectedBean) : 0
+        beanFilter.currentIndex = bIdx >= 0 ? bIdx : 0
     }
 
     function updateCascadingFilters(changedFilter) {

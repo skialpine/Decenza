@@ -416,7 +416,7 @@ Popup {
                                 id: fpEmojiText
                                 text: previewCol.previewHtml
                                 textFormat: Text.RichText
-                                color: (!popup.textHideBackground && (previewCol.hasAction || previewCol.hasEmoji)) ? "white" : Theme.textColor
+                                color: Theme.textColor
                                 font: Theme.bodyFont
                                 horizontalAlignment: Text.AlignHCenter
                                 anchors.horizontalCenter: parent.horizontalCenter
@@ -476,7 +476,7 @@ Popup {
                             Text {
                                 text: previewCol.previewHtml
                                 textFormat: Text.RichText
-                                color: (!popup.textHideBackground && (previewCol.hasAction || popup.textBackgroundColor !== "")) ? "white" : Theme.textColor
+                                color: Theme.textColor
                                 font: Theme.bodyFont
                                 elide: Text.ElideRight
                                 maximumLineCount: 1

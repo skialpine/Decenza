@@ -19,7 +19,11 @@ Page {
     // Enable keyboard focus for the page
     focus: true
 
-    Component.onCompleted: root.currentPageTitle = MainController.currentProfileName
+    Component.onCompleted: {
+        // Only set title if this page is actually in the StackView (not during preload)
+        if (StackView.status === StackView.Active)
+            root.currentPageTitle = MainController.currentProfileName
+    }
     StackView.onActivated: {
         root.currentPageTitle = MainController.currentProfileName
         espressoPage.forceActiveFocus()  // Ensure keyboard focus

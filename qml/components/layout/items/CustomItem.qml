@@ -263,7 +263,7 @@ Item {
             Text {
                 text: root.resolvedText
                 textFormat: Text.RichText
-                color: (!root.hideBackground && (root.hasAction || root.bgColor !== "")) ? "white" : Theme.textColor
+                color: Theme.textColor
                 font: Theme.bodyFont
                 horizontalAlignment: root.qtAlignment
                 elide: Text.ElideRight
@@ -323,7 +323,7 @@ Item {
                 id: emojiText
                 text: root.resolvedText
                 textFormat: Text.RichText
-                color: (!root.hideBackground && (root.hasAction || root.hasEmoji)) ? "white" : Theme.textColor
+                color: Theme.textColor
                 font: Theme.bodyFont
                 horizontalAlignment: Text.AlignHCenter
                 anchors.horizontalCenter: parent.horizontalCenter
