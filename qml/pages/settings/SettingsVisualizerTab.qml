@@ -419,7 +419,7 @@ KeyboardAwareContainer {
 
                     RatingInput {
                         id: defaultRatingInput
-                        Layout.fillWidth: true
+                        Layout.preferredWidth: Theme.scaled(220)
                         height: Theme.scaled(40)
                         compact: true
                         value: Settings.defaultShotRating

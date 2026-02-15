@@ -1010,46 +1010,26 @@ KeyboardAwareContainer {
                 Rectangle { Layout.fillWidth: true; height: 1; color: Theme.borderColor }
 
                 // Heater idle temperature
-                RowLayout { Layout.fillWidth: true
-                    Text { text: TranslationManager.translate("settings.calibration.heaterIdleTemp", "Heater idle temperature"); font: Theme.captionFont; color: Theme.textSecondaryColor }
-                    Item { Layout.fillWidth: true }
-                    Text { text: (Settings.heaterIdleTemp * 0.1).toFixed(1) + " °C"; font.family: Theme.captionFont.family; font.pixelSize: Theme.captionFont.pixelSize; font.bold: true; color: Theme.temperatureColor }
-                }
-                StepSlider { id: heaterIdleTempSlider; Layout.fillWidth: true; accessibleName: TranslationManager.translate("settings.calibration.heaterIdleTemp", "Heater idle temperature"); from: 0; to: 990; stepSize: 5; value: Settings.heaterIdleTemp; onMoved: Settings.heaterIdleTemp = Math.round(value); KeyNavigation.tab: heaterWarmupFlowSlider; KeyNavigation.backtab: doneButton }
+                Text { text: TranslationManager.translate("settings.calibration.heaterIdleTemp", "Heater idle temperature"); font: Theme.captionFont; color: Theme.temperatureColor }
+                ValueInput { id: heaterIdleTempSlider; Layout.fillWidth: true; valueColor: Theme.temperatureColor; accessibleName: TranslationManager.translate("settings.calibration.heaterIdleTemp", "Heater idle temperature"); from: 0; to: 990; stepSize: 5; value: Settings.heaterIdleTemp; onValueModified: function(newValue) { Settings.heaterIdleTemp = Math.round(newValue) }; KeyNavigation.tab: heaterWarmupFlowSlider; KeyNavigation.backtab: doneButton }
 
                 // Heater warmup flow rate
-                RowLayout { Layout.fillWidth: true
-                    Text { text: TranslationManager.translate("settings.calibration.heaterWarmupFlow", "Heater warmup flow rate"); font: Theme.captionFont; color: Theme.textSecondaryColor }
-                    Item { Layout.fillWidth: true }
-                    Text { text: (Settings.heaterWarmupFlow * 0.1).toFixed(1) + " mL/s"; font.family: Theme.captionFont.family; font.pixelSize: Theme.captionFont.pixelSize; font.bold: true; color: Theme.primaryColor }
-                }
-                StepSlider { id: heaterWarmupFlowSlider; Layout.fillWidth: true; accessibleName: TranslationManager.translate("settings.calibration.heaterWarmupFlow", "Heater warmup flow rate"); from: 5; to: 60; stepSize: 1; value: Settings.heaterWarmupFlow; onMoved: Settings.heaterWarmupFlow = Math.round(value); KeyNavigation.tab: heaterTestFlowSlider; KeyNavigation.backtab: heaterIdleTempSlider }
+                Text { text: TranslationManager.translate("settings.calibration.heaterWarmupFlow", "Heater warmup flow rate"); font: Theme.captionFont; color: Theme.flowColor }
+                ValueInput { id: heaterWarmupFlowSlider; Layout.fillWidth: true; valueColor: Theme.flowColor; accessibleName: TranslationManager.translate("settings.calibration.heaterWarmupFlow", "Heater warmup flow rate"); from: 5; to: 60; stepSize: 1; value: Settings.heaterWarmupFlow; onValueModified: function(newValue) { Settings.heaterWarmupFlow = Math.round(newValue) }; KeyNavigation.tab: heaterTestFlowSlider; KeyNavigation.backtab: heaterIdleTempSlider }
 
                 // Heater test flow rate
-                RowLayout { Layout.fillWidth: true
-                    Text { text: TranslationManager.translate("settings.calibration.heaterTestFlow", "Heater test flow rate"); font: Theme.captionFont; color: Theme.textSecondaryColor }
-                    Item { Layout.fillWidth: true }
-                    Text { text: (Settings.heaterTestFlow * 0.1).toFixed(1) + " mL/s"; font.family: Theme.captionFont.family; font.pixelSize: Theme.captionFont.pixelSize; font.bold: true; color: Theme.primaryColor }
-                }
-                StepSlider { id: heaterTestFlowSlider; Layout.fillWidth: true; accessibleName: TranslationManager.translate("settings.calibration.heaterTestFlow", "Heater test flow rate"); from: 5; to: 80; stepSize: 1; value: Settings.heaterTestFlow; onMoved: Settings.heaterTestFlow = Math.round(value); KeyNavigation.tab: heaterTestTimeoutSlider; KeyNavigation.backtab: heaterWarmupFlowSlider }
+                Text { text: TranslationManager.translate("settings.calibration.heaterTestFlow", "Heater test flow rate"); font: Theme.captionFont; color: Theme.flowColor }
+                ValueInput { id: heaterTestFlowSlider; Layout.fillWidth: true; valueColor: Theme.flowColor; accessibleName: TranslationManager.translate("settings.calibration.heaterTestFlow", "Heater test flow rate"); from: 5; to: 80; stepSize: 1; value: Settings.heaterTestFlow; onValueModified: function(newValue) { Settings.heaterTestFlow = Math.round(newValue) }; KeyNavigation.tab: heaterTestTimeoutSlider; KeyNavigation.backtab: heaterWarmupFlowSlider }
 
                 // Heater test time-out
-                RowLayout { Layout.fillWidth: true
-                    Text { text: TranslationManager.translate("settings.calibration.heaterTestTimeout", "Heater test time-out"); font: Theme.captionFont; color: Theme.textSecondaryColor }
-                    Item { Layout.fillWidth: true }
-                    Text { text: (Settings.heaterWarmupTimeout * 0.1).toFixed(1) + " s"; font.family: Theme.captionFont.family; font.pixelSize: Theme.captionFont.pixelSize; font.bold: true; color: Theme.primaryColor }
-                }
-                StepSlider { id: heaterTestTimeoutSlider; Layout.fillWidth: true; accessibleName: TranslationManager.translate("settings.calibration.heaterTestTimeout", "Heater test time-out"); from: 10; to: 300; stepSize: 1; value: Settings.heaterWarmupTimeout; onMoved: Settings.heaterWarmupTimeout = Math.round(value); KeyNavigation.tab: hotWaterFlowRateSlider; KeyNavigation.backtab: heaterTestFlowSlider }
+                Text { text: TranslationManager.translate("settings.calibration.heaterTestTimeout", "Heater test time-out"); font: Theme.captionFont; color: Theme.textSecondaryColor }
+                ValueInput { id: heaterTestTimeoutSlider; Layout.fillWidth: true; accessibleName: TranslationManager.translate("settings.calibration.heaterTestTimeout", "Heater test time-out"); from: 10; to: 300; stepSize: 1; value: Settings.heaterWarmupTimeout; onValueModified: function(newValue) { Settings.heaterWarmupTimeout = Math.round(newValue) }; KeyNavigation.tab: hotWaterFlowRateSlider; KeyNavigation.backtab: heaterTestFlowSlider }
 
                 Rectangle { Layout.fillWidth: true; height: 1; color: Theme.borderColor }
 
                 // Hot water flow rate
-                RowLayout { Layout.fillWidth: true
-                    Text { text: TranslationManager.translate("settings.calibration.hotWaterFlowRate", "Hot water flow rate"); font: Theme.captionFont; color: Theme.textSecondaryColor }
-                    Item { Layout.fillWidth: true }
-                    Text { text: (Settings.hotWaterFlowRate * 0.1).toFixed(1) + " mL/s"; font.family: Theme.captionFont.family; font.pixelSize: Theme.captionFont.pixelSize; font.bold: true; color: Theme.primaryColor }
-                }
-                StepSlider { id: hotWaterFlowRateSlider; Layout.fillWidth: true; accessibleName: TranslationManager.translate("settings.calibration.hotWaterFlowRate", "Hot water flow rate"); from: 5; to: 80; stepSize: 1; value: Settings.hotWaterFlowRate; onMoved: Settings.hotWaterFlowRate = Math.round(value); KeyNavigation.tab: steamTwoTapSwitch; KeyNavigation.backtab: heaterTestTimeoutSlider }
+                Text { text: TranslationManager.translate("settings.calibration.hotWaterFlowRate", "Hot water flow rate"); font: Theme.captionFont; color: Theme.flowColor }
+                ValueInput { id: hotWaterFlowRateSlider; Layout.fillWidth: true; valueColor: Theme.flowColor; accessibleName: TranslationManager.translate("settings.calibration.hotWaterFlowRate", "Hot water flow rate"); from: 5; to: 80; stepSize: 1; value: Settings.hotWaterFlowRate; onValueModified: function(newValue) { Settings.hotWaterFlowRate = Math.round(newValue) }; KeyNavigation.tab: steamTwoTapSwitch; KeyNavigation.backtab: heaterTestTimeoutSlider }
 
                 // Steam two-tap stop
                 RowLayout { Layout.fillWidth: true

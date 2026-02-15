@@ -425,7 +425,7 @@ ChartView {
     Component.onCompleted: {
         updateCurves()
         // Deferred update to catch initialization timing (per CLAUDE.md: no timer guards)
-        Qt.callLater(updateCurves)
+        Qt.callLater(function() { if (chart) updateCurves() })
     }
 
     // Custom legend - horizontal, below graph

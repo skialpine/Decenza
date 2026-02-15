@@ -72,14 +72,14 @@ Item {
     }
 
     // Auto-size based on content
-    // Buttons: 32 each, margins: 4 each side, spacing: 2 each side = 76 total fixed
-    implicitWidth: sc(76) + textMetrics.width + sc(24)
-    implicitHeight: sc(56)
+    // Buttons: 24 each, margins: 2 each side, spacing: 2 each side = 56 total fixed
+    implicitWidth: sc(56) + textMetrics.width + sc(16)
+    implicitHeight: sc(36)
 
     // Measure the text width for auto-sizing
     TextMetrics {
         id: textMetrics
-        font.pixelSize: sc(24)
+        font.pixelSize: sc(16)
         font.bold: true
         text: root.displayText || (root.value.toFixed(root.decimals) + root.suffix)
     }
@@ -100,21 +100,21 @@ Item {
     Rectangle {
         id: valueDisplay
         anchors.fill: parent
-        radius: sc(12)
+        radius: sc(8)
         color: Theme.surfaceColor
         border.width: 1
         border.color: Theme.textSecondaryColor
 
         RowLayout {
             anchors.fill: parent
-            anchors.margins: sc(4)
+            anchors.margins: sc(2)
             spacing: sc(2)
 
             // Minus button - immediate response, Flickable handles scroll detection
             Rectangle {
-                Layout.preferredWidth: sc(32)
+                Layout.preferredWidth: sc(24)
                 Layout.fillHeight: true
-                radius: sc(8)
+                radius: sc(6)
                 color: minusArea.pressed ? Qt.darker(Theme.surfaceColor, 1.3) : "transparent"
 
                 Accessible.role: Accessible.Button
@@ -124,7 +124,7 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     text: "\u2212"
-                    font.pixelSize: sc(20)
+                    font.pixelSize: sc(16)
                     font.bold: true
                     color: root.value <= root.from ? Theme.textSecondaryColor : Theme.textColor
                 }
@@ -159,7 +159,7 @@ Item {
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
                     text: root.displayText || (root.value.toFixed(root.decimals) + root.suffix)
-                    font.pixelSize: sc(24)
+                    font.pixelSize: sc(16)
                     font.bold: true
                     color: root.valueColor
                     elide: Text.ElideRight
@@ -168,6 +168,7 @@ Item {
                 MouseArea {
                     id: valueDragArea
                     anchors.fill: parent
+                    preventStealing: isDragging
 
                     property real startX: 0
                     property real startY: 0
@@ -318,9 +319,9 @@ Item {
 
             // Plus button - immediate response, Flickable handles scroll detection
             Rectangle {
-                Layout.preferredWidth: sc(32)
+                Layout.preferredWidth: sc(24)
                 Layout.fillHeight: true
-                radius: sc(8)
+                radius: sc(6)
                 color: plusArea.pressed ? Qt.darker(Theme.surfaceColor, 1.3) : "transparent"
 
                 Accessible.role: Accessible.Button
@@ -330,7 +331,7 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     text: "+"
-                    font.pixelSize: sc(20)
+                    font.pixelSize: sc(16)
                     font.bold: true
                     color: root.value >= root.to ? Theme.textSecondaryColor : Theme.textColor
                 }
@@ -470,6 +471,7 @@ Item {
                         MouseArea {
                             id: popupDragArea
                             anchors.fill: parent
+                            preventStealing: isDragging
 
                             property real startX: 0
                             property real startY: 0
