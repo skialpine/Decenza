@@ -107,6 +107,24 @@ if(IOS)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -x objective-c++")
 endif()
 
+# Address Sanitizer - enabled for single-config Debug builds (Makefiles, Ninja).
+# Multi-config generators (Visual Studio, Xcode) don't set CMAKE_BUILD_TYPE at
+# configure time, so flags would leak into Release builds. Android requires special
+# ASan packaging (wrap.sh + shared lib in APK) that isn't handled here.
+if(NOT CMAKE_CONFIGURATION_TYPES AND CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT ANDROID)
+    if(MSVC)
+        message(STATUS ">>> ASan ENABLED for debug build (MSVC) <<<")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /fsanitize=address")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fsanitize=address")
+    else()
+        message(STATUS ">>> ASan ENABLED for debug build <<<")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=address")
+    endif()
+endif()
+
 # Enable parallel builds
 if(NOT DEFINED CMAKE_BUILD_PARALLEL_LEVEL)
     include(ProcessorCount)

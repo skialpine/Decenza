@@ -35,6 +35,7 @@ double ShotTimingController::shotTime() const
 
 void ShotTimingController::setScale(ScaleDevice* scale)
 {
+    // Signal connections to scale are managed externally in main.cpp
     m_scale = scale;
 }
 
