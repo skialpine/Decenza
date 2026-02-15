@@ -271,15 +271,13 @@ Page {
         z: 0
     }
 
-    // Shot Map screensaver (requires Quick3D)
-    Loader {
-        id: shotMapLoader
+    // Shot Map screensaver (flat map works without Quick3D, globe loaded conditionally)
+    ShotMapScreensaver {
+        id: shotMapScreensaver
         anchors.fill: parent
-        active: Settings.hasQuick3D && isShotMapMode
         visible: isShotMapMode
+        running: isShotMapMode && screensaverPage.visible
         z: 0
-        source: "qrc:/qt/qml/DecenzaDE1/qml/components/ShotMapScreensaver.qml"
-        onLoaded: item.running = Qt.binding(function() { return isShotMapMode && screensaverPage.visible })
     }
 
     // Fallback: show a subtle animation while no cached media (videos mode only)

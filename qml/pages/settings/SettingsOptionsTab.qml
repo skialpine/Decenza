@@ -341,22 +341,13 @@ KeyboardAwareContainer {
                         Loader {
                             id: mapLoader
                             anchors.fill: parent
-                            active: mapTestPopup.visible && Settings.hasQuick3D
+                            active: mapTestPopup.visible
                             source: "qrc:/qt/qml/DecenzaDE1/qml/components/ShotMapScreensaver.qml"
                             onLoaded: {
                                 item.testMode = true
                                 item.testLatitude = Qt.binding(function() { return MainController.shotReporter ? MainController.shotReporter.latitude : 0 })
                                 item.testLongitude = Qt.binding(function() { return MainController.shotReporter ? MainController.shotReporter.longitude : 0 })
                             }
-                        }
-
-                        // Fallback when Quick3D is not available
-                        Text {
-                            anchors.centerIn: parent
-                            visible: !Settings.hasQuick3D
-                            text: TranslationManager.translate("settings.options.quick3dRequired", "3D Map requires Qt Quick3D\n(not available on this platform)")
-                            color: Theme.textSecondaryColor
-                            horizontalAlignment: Text.AlignHCenter
                         }
                     }
 

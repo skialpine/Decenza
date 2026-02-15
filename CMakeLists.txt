@@ -179,6 +179,7 @@ set(SOURCES
     src/controllers/directcontroller.cpp
     src/controllers/shottimingcontroller.cpp
     src/screensaver/screensavervideomanager.cpp
+    src/screensaver/strangeattractorrenderer.cpp
     src/network/visualizeruploader.cpp
     src/network/visualizerimporter.cpp
     src/ai/aimanager.cpp
@@ -270,6 +271,7 @@ set(HEADERS
     src/controllers/directcontroller.h
     src/controllers/shottimingcontroller.h
     src/screensaver/screensavervideomanager.h
+    src/screensaver/strangeattractorrenderer.h
     src/network/visualizeruploader.h
     src/network/visualizerimporter.h
     src/ai/aimanager.h
@@ -348,8 +350,6 @@ if(ENABLE_QUICK3D AND Qt6Quick3D_FOUND)
     target_sources(Decenza_DE1 PRIVATE
         src/screensaver/pipegeometry.cpp
         src/screensaver/pipegeometry.h
-        src/screensaver/strangeattractorrenderer.cpp
-        src/screensaver/strangeattractorrenderer.h
     )
 endif()
 
@@ -460,6 +460,7 @@ set(QML_FILES
     qml/components/StyledTabButton.qml
     qml/components/FlipClockScreensaver.qml
     qml/components/StrangeAttractorScreensaver.qml
+    qml/components/ShotMapScreensaver.qml
     qml/components/UnsavedChangesDialog.qml
     qml/components/SwipeableArea.qml
     qml/components/CrashReportDialog.qml
@@ -511,7 +512,7 @@ endif()
 if(ENABLE_QUICK3D AND Qt6Quick3D_FOUND)
     list(APPEND QML_FILES
         qml/components/PipesScreensaver.qml
-        qml/components/ShotMapScreensaver.qml
+        qml/components/ShotMapGlobe.qml
     )
 endif()
 

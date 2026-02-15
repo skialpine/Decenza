@@ -22,7 +22,7 @@ Item {
     }
 
     readonly property bool requiresQuick3D:
-        screensaverSubtype === "pipes" || screensaverSubtype === "shotmap"
+        screensaverSubtype === "pipes"
 
     readonly property bool canRender: !requiresQuick3D || Settings.hasQuick3D
 
@@ -121,10 +121,10 @@ Item {
                 })
             }
 
-            // Shot Map preview (Quick3D) — only create when compact to avoid duplicate View3D
+            // Shot Map preview — only create when compact to avoid duplicate instances
             Loader {
                 anchors.fill: parent
-                active: Settings.hasQuick3D && root.screensaverSubtype === "shotmap" && root.isCompact
+                active: root.screensaverSubtype === "shotmap" && root.isCompact
                 visible: root.screensaverSubtype === "shotmap"
                 source: "qrc:/qt/qml/DecenzaDE1/qml/components/ShotMapScreensaver.qml"
                 onLoaded: {
@@ -212,10 +212,10 @@ Item {
                 })
             }
 
-            // Shot Map — Loader with qrc path (requires Quick3D)
+            // Shot Map — Loader with qrc path (flat map works without Quick3D)
             Loader {
                 anchors.fill: parent
-                active: Settings.hasQuick3D && root.screensaverSubtype === "shotmap" && !root.isCompact
+                active: root.screensaverSubtype === "shotmap" && !root.isCompact
                 visible: root.screensaverSubtype === "shotmap"
                 source: "qrc:/qt/qml/DecenzaDE1/qml/components/ShotMapScreensaver.qml"
                 onLoaded: {

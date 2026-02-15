@@ -622,6 +622,7 @@ Item {
 
                     RowLayout {
                         spacing: Theme.scaled(8)
+                        visible: Settings.hasQuick3D  // Globe requires Quick3D; hide selector without it
 
                         Tr {
                             key: "settings.screensaver.shotmap.shape"

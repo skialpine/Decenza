@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick3D
 import DecenzaDE1
 
 Item {
@@ -8,7 +7,9 @@ Item {
 
     property bool running: true
     property bool widgetMode: false  // When true: no overlays, smaller dots
-    property string mapShape: ScreensaverManager.shotMapShape  // "flat", "globe"
+    // Fall back to flat when Quick3D unavailable
+    property string mapShape: (!Settings.hasQuick3D && ScreensaverManager.shotMapShape === "globe")
+                              ? "flat" : ScreensaverManager.shotMapShape
     property string mapTexture: ScreensaverManager.shotMapTexture  // "dark", "bright", "satellite"
     property bool showClock: widgetMode ? false : ScreensaverManager.shotMapShowClock
     property bool showProfiles: widgetMode ? false : ScreensaverManager.shotMapShowProfiles
@@ -294,137 +295,23 @@ Item {
         }
     }
 
-    // ==================== 3D GLOBE VIEW ====================
-    Item {
-        id: globeView
+    // ==================== 3D GLOBE VIEW (loaded only when Quick3D available) ====================
+    Loader {
+        id: globeLoader
         anchors.fill: parent
+        active: Settings.hasQuick3D && mapShape === "globe"
         visible: mapShape === "globe"
-
-        View3D {
-            id: view3d
-            anchors.fill: parent
-            camera: globeCamera
-            environment: globeEnvironment
-
-            SceneEnvironment {
-                id: globeEnvironment
-                clearColor: "#0a0a12"
-                backgroundMode: SceneEnvironment.Color
-                antialiasingMode: SceneEnvironment.MSAA
-                antialiasingQuality: SceneEnvironment.High
-            }
-
-            // Camera positioned to view the globe
-            PerspectiveCamera {
-                id: globeCamera
-                position: Qt.vector3d(0, 0, 400)
-                eulerRotation.x: 0
-                clipNear: 10
-                clipFar: 1000
-                fieldOfView: 45
-            }
-
-            // Ambient light for overall illumination
-            DirectionalLight {
-                eulerRotation.x: -30
-                eulerRotation.y: 30
-                brightness: 0.8
-                ambientColor: Qt.rgba(0.4, 0.4, 0.4, 1.0)
-                color: "white"
-            }
-
-            // Secondary fill light
-            DirectionalLight {
-                eulerRotation.x: 20
-                eulerRotation.y: -60
-                brightness: 0.3
-                color: "#aabbcc"
-            }
-
-            // Rotating node containing earth and all markers
-            Node {
-                id: globeRoot
-                eulerRotation.y: -globeRotation
-
-                // Earth sphere
-                Model {
-                    id: earthModel
-                    source: "#Sphere"
-                    scale: Qt.vector3d(globeRadius / 50, globeRadius / 50, globeRadius / 50)
-
-                    materials: DefaultMaterial {
-                        diffuseMap: Texture {
-                            source: root.textureSource
-                        }
-                        specularAmount: 0.1
-                        specularRoughness: 0.8
-                    }
-                }
-
-                // Shot markers on globe (3D spheres)
-                Repeater3D {
-                    model: shots
-
-                    Node {
-                        id: globeShotMarker
-                        property var pos3d: latLonTo3D(modelData.lat, modelData.lon, globeRadius + 3)
-                        property real ageHours: modelData.age || 0
-                        property real shotOpacity: getOpacityFromAge(ageHours)
-                        position: Qt.vector3d(pos3d.x, pos3d.y, pos3d.z)
-
-                        // Glow sphere
-                        Model {
-                            source: "#Sphere"
-                            property real s: root.widgetMode ? 0.06 : 0.2
-                            scale: Qt.vector3d(s, s, s)
-                            materials: DefaultMaterial {
-                                diffuseColor: mapTexture === "bright" ? "#ff6b35" : "#4a9eff"
-                                opacity: 0.3 * globeShotMarker.shotOpacity
-                            }
-                        }
-
-                        // Inner marker
-                        Model {
-                            source: "#Sphere"
-                            property real s: root.widgetMode ? 0.03 : 0.08
-                            scale: Qt.vector3d(s, s, s)
-                            materials: DefaultMaterial {
-                                diffuseColor: mapTexture === "bright" ? "#ff6b35" : "#4a9eff"
-                                opacity: globeShotMarker.shotOpacity
-                                specularAmount: 0.5
-                            }
-                        }
-                    }
-                }
-
-                // Test marker on globe
-                Node {
-                    id: globeTestMarker
-                    visible: testMode && testLatitude !== 0 && testLongitude !== 0
-                    property var pos3d: latLonTo3D(testLatitude, testLongitude, globeRadius + 5)
-                    position: Qt.vector3d(pos3d.x, pos3d.y, pos3d.z)
-
-                    // Outer glow
-                    Model {
-                        source: "#Sphere"
-                        scale: Qt.vector3d(0.3, 0.3, 0.3)
-                        materials: DefaultMaterial {
-                            diffuseColor: "#ff6b35"
-                            opacity: 0.4
-                        }
-                    }
-
-                    // Inner marker
-                    Model {
-                        source: "#Sphere"
-                        scale: Qt.vector3d(0.15, 0.15, 0.15)
-                        materials: DefaultMaterial {
-                            diffuseColor: "#ff6b35"
-                            specularAmount: 0.6
-                        }
-                    }
-                }
-            }
+        source: "qrc:/qt/qml/DecenzaDE1/qml/components/ShotMapGlobe.qml"
+        onLoaded: {
+            item.shots = Qt.binding(function() { return root.shots })
+            item.mapTexture = Qt.binding(function() { return root.mapTexture })
+            item.textureSource = Qt.binding(function() { return root.textureSource })
+            item.globeRotation = Qt.binding(function() { return root.globeRotation })
+            item.globeRadius = Qt.binding(function() { return root.globeRadius })
+            item.testMode = Qt.binding(function() { return root.testMode })
+            item.testLatitude = Qt.binding(function() { return root.testLatitude })
+            item.testLongitude = Qt.binding(function() { return root.testLongitude })
+            item.widgetMode = Qt.binding(function() { return root.widgetMode })
         }
     }
 

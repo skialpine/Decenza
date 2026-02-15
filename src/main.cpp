@@ -42,9 +42,9 @@
 #include "ai/aimanager.h"
 #include "ai/aiconversation.h"
 #include "screensaver/screensavervideomanager.h"
+#include "screensaver/strangeattractorrenderer.h"
 #ifdef ENABLE_QUICK3D
 #include "screensaver/pipegeometry.h"
-#include "screensaver/strangeattractorrenderer.h"
 #endif
 #include "network/webdebuglogger.h"
 #include "core/widgetlibrary.h"
@@ -496,15 +496,15 @@ int main(int argc, char *argv[])
     qmlRegisterUncreatableType<AIConversation>("DecenzaDE1", 1, 0, "AIConversationType",
         "AIConversation is created in C++");
 
+    // Register strange attractor renderer (QQuickPaintedItem, no Quick3D dependency)
+    qmlRegisterType<StrangeAttractorRenderer>("DecenzaDE1", 1, 0, "StrangeAttractorRenderer");
+
 #ifdef ENABLE_QUICK3D
     // Register pipe geometry types for 3D pipes screensaver
     qmlRegisterType<PipeCylinderGeometry>("DecenzaDE1", 1, 0, "PipeCylinderGeometry");
     qmlRegisterType<PipeElbowGeometry>("DecenzaDE1", 1, 0, "PipeElbowGeometry");
     qmlRegisterType<PipeCapGeometry>("DecenzaDE1", 1, 0, "PipeCapGeometry");
     qmlRegisterType<PipeSphereGeometry>("DecenzaDE1", 1, 0, "PipeSphereGeometry");
-
-    // Register strange attractor renderer for attractor screensaver
-    qmlRegisterType<StrangeAttractorRenderer>("DecenzaDE1", 1, 0, "StrangeAttractorRenderer");
 #endif
 
     // Register DocumentFormatter for rich text editing in layout editor
