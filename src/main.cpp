@@ -30,6 +30,7 @@
 #include "network/crashreporter.h"
 #include "core/profilestorage.h"
 #include "ble/blemanager.h"
+#include "ble/blerefresher.h"
 #include "ble/de1device.h"
 #include "ble/scaledevice.h"
 #include "ble/scales/scalefactory.h"
@@ -251,6 +252,11 @@ int main(int argc, char *argv[])
     });
     autoWakeManager.start();
 
+    // BLE health refresh - cycles BLE connections on wake from sleep (and every 5 hours)
+    // to prevent Android Bluetooth stack degradation over long uptimes
+    BleRefresher bleRefresher(&de1Device, &bleManager, &machineState);
+    bleRefresher.startPeriodicRefresh(5);
+
     // Database backup manager for scheduled daily backups
     DatabaseBackupManager backupManager(&settings, mainController.shotHistory());
     mainController.setBackupManager(&backupManager);
@@ -451,6 +457,7 @@ int main(int argc, char *argv[])
     context->setContextProperty("MainController", &mainController);
     context->setContextProperty("ScreensaverManager", &screensaverManager);
     context->setContextProperty("BatteryManager", &batteryManager);
+    context->setContextProperty("BleRefresher", &bleRefresher);
     context->setContextProperty("AccessibilityManager", &accessibilityManager);
     context->setContextProperty("ProfileStorage", &profileStorage);
     context->setContextProperty("WeatherManager", &weatherManager);
@@ -720,12 +727,9 @@ int main(int argc, char *argv[])
     QObject::connect(&machineState, &MachineState::phaseChanged,
                      [&physicalScale, &machineState, &de1EverAwake]() {
         auto phase = machineState.phase();
-        if (phase != MachineState::Phase::Sleep && phase != MachineState::Phase::Disconnected) {
-            de1EverAwake = true;
-        } else if (phase == MachineState::Phase::Disconnected) {
+        if (phase == MachineState::Phase::Disconnected) {
             de1EverAwake = false;
-        }
-        if (phase == MachineState::Phase::Sleep) {
+        } else if (phase == MachineState::Phase::Sleep) {
             if (de1EverAwake && physicalScale && physicalScale->isConnected()) {
                 qDebug() << "DE1 going to sleep - disabling scale LCD";
                 physicalScale->disableLcd();
@@ -735,6 +739,9 @@ int main(int argc, char *argv[])
                 qDebug() << "DE1 woke up - waking scale LCD";
                 physicalScale->wake();
             }
+            de1EverAwake = true;
+        } else {
+            de1EverAwake = true;
         }
     });
 
