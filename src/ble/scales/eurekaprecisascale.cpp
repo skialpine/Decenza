@@ -156,6 +156,11 @@ void EurekaPrecisaScale::sendCommand(const QByteArray& cmd) {
                                      ScaleBleTransport::WriteType::WithoutResponse);
 }
 
+void EurekaPrecisaScale::sendKeepAlive() {
+    if (m_transport && m_characteristicsReady)
+        m_transport->enableNotifications(Scale::Generic::SERVICE, Scale::Generic::STATUS);
+}
+
 void EurekaPrecisaScale::tare() {
     sendCommand(QByteArray::fromHex("AA023131"));
 }

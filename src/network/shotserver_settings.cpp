@@ -412,8 +412,8 @@ QString ShotServer::generateSettingsPage() const
                 document.getElementById('geminiApiKey').value = data.geminiApiKey || '';
                 document.getElementById('openrouterApiKey').value = data.openrouterApiKey || '';
                 document.getElementById('openrouterModel').value = data.openrouterModel || '';
-                document.getElementById('ollamaEndpoint').value = data.ollamaEndpoint || 'http://localhost:11434';
-                document.getElementById('ollamaModel').value = data.ollamaModel || 'llama3.2';
+                document.getElementById('ollamaEndpoint').value = data.ollamaEndpoint || '';
+                document.getElementById('ollamaModel').value = data.ollamaModel || '';
                 updateAiFields();
 
                 // MQTT

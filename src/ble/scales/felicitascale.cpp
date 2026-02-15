@@ -164,6 +164,11 @@ void FelicitaScale::sendCommand(uint8_t cmd) {
     m_transport->writeCharacteristic(Scale::Felicita::SERVICE, Scale::Felicita::CHARACTERISTIC, packet);
 }
 
+void FelicitaScale::sendKeepAlive() {
+    if (m_transport && m_characteristicsReady)
+        m_transport->enableNotifications(Scale::Felicita::SERVICE, Scale::Felicita::CHARACTERISTIC);
+}
+
 void FelicitaScale::tare() {
     sendCommand(0x54);  // 'T'
 }

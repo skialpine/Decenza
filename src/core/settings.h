@@ -42,6 +42,9 @@ class Settings : public QObject {
     // Headless machine settings
     Q_PROPERTY(bool headlessSkipPurgeConfirm READ headlessSkipPurgeConfirm WRITE setHeadlessSkipPurgeConfirm NOTIFY headlessSkipPurgeConfirmChanged)
 
+    // Launcher mode (Android only - register as home screen)
+    Q_PROPERTY(bool launcherMode READ launcherMode WRITE setLauncherMode NOTIFY launcherModeChanged)
+
     // Profile favorites
     Q_PROPERTY(QVariantList favoriteProfiles READ favoriteProfiles NOTIFY favoriteProfilesChanged)
     Q_PROPERTY(int selectedFavoriteProfile READ selectedFavoriteProfile WRITE setSelectedFavoriteProfile NOTIFY selectedFavoriteProfileChanged)
@@ -263,6 +266,10 @@ public:
     // Headless machine settings
     bool headlessSkipPurgeConfirm() const;
     void setHeadlessSkipPurgeConfirm(bool skip);
+
+    // Launcher mode (Android only)
+    bool launcherMode() const;
+    void setLauncherMode(bool enabled);
 
     // Profile favorites (max 5)
     QVariantList favoriteProfiles() const;
@@ -635,6 +642,7 @@ signals:
     void steamPitcherPresetsChanged();
     void selectedSteamPitcherChanged();
     void headlessSkipPurgeConfirmChanged();
+    void launcherModeChanged();
     void favoriteProfilesChanged();
     void selectedFavoriteProfileChanged();
     void selectedBuiltInProfilesChanged();

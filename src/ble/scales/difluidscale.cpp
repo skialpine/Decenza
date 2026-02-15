@@ -142,6 +142,11 @@ void DifluidScale::sendCommand(const QByteArray& cmd) {
     m_transport->writeCharacteristic(Scale::DiFluid::SERVICE, Scale::DiFluid::CHARACTERISTIC, cmd);
 }
 
+void DifluidScale::sendKeepAlive() {
+    if (m_transport && m_characteristicsReady)
+        m_transport->enableNotifications(Scale::DiFluid::SERVICE, Scale::DiFluid::CHARACTERISTIC);
+}
+
 void DifluidScale::enableNotifications() {
     // Enable auto-notifications message
     sendCommand(QByteArray::fromHex("DFDF01000101C1"));

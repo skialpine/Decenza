@@ -49,7 +49,7 @@ Page {
         onCurrentIndexChanged: {
             if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
                 // Build tab names based on which tabs are visible
-                var tabNames = ["Bluetooth", "Preferences", "Options", "Screensaver", "Visualizer", "AI", "Accessibility", "Themes", "Layout", "Language", "History", "Data", "MQTT"]
+                var tabNames = ["Bluetooth", "Preferences", "Screensaver", "Visualizer", "AI", "Accessibility", "Themes", "Layout", "Language", "History", "Data", "MQTT"]
                 if (MainController.updateChecker.canCheckForUpdates) tabNames.push("Update")
                 tabNames.push("About")
                 if (Settings.isDebugBuild) tabNames.push("Debug")
@@ -94,12 +94,6 @@ Page {
             id: preferencesTabButton
             text: TranslationManager.translate("settings.tab.preferences", "Preferences")
             tabLabel: TranslationManager.translate("settings.tab.preferences", "Preferences")
-        }
-
-        StyledTabButton {
-            id: optionsTabButton
-            text: TranslationManager.translate("settings.tab.options", "Options")
-            tabLabel: TranslationManager.translate("settings.tab.options", "Options")
         }
 
         StyledTabButton {
@@ -246,15 +240,7 @@ Page {
             source: "settings/SettingsPreferencesTab.qml"
         }
 
-        // Tab 2: Options - preloads async in background
-        Loader {
-            id: optionsLoader
-            active: true
-            asynchronous: true
-            source: "settings/SettingsOptionsTab.qml"
-        }
-
-        // Tab 3: Screensaver/Network - preloads async in background
+        // Tab 2: Screensaver/Network - preloads async in background
         Loader {
             id: screensaverLoader
             active: true
@@ -262,7 +248,7 @@ Page {
             source: "settings/SettingsScreensaverTab.qml"
         }
 
-        // Tab 4: Visualizer - preloads async in background
+        // Tab 3: Visualizer - preloads async in background
         Loader {
             id: visualizerLoader
             active: true
@@ -270,7 +256,7 @@ Page {
             source: "settings/SettingsVisualizerTab.qml"
         }
 
-        // Tab 5: AI - preloads async in background
+        // Tab 4: AI - preloads async in background
         Loader {
             id: aiLoader
             active: true
@@ -278,7 +264,7 @@ Page {
             source: "settings/SettingsAITab.qml"
         }
 
-        // Tab 6: Accessibility - preloads async in background
+        // Tab 5: Accessibility - preloads async in background
         Loader {
             id: accessibilityLoader
             active: true
@@ -286,7 +272,7 @@ Page {
             source: "settings/SettingsAccessibilityTab.qml"
         }
 
-        // Tab 7: Themes - preloads async in background
+        // Tab 6: Themes - preloads async in background
         Loader {
             id: themesLoader
             active: true
@@ -299,7 +285,7 @@ Page {
             }
         }
 
-        // Tab 8: Layout - preloads async in background
+        // Tab 7: Layout - preloads async in background
         Loader {
             id: layoutLoader
             active: true
@@ -307,7 +293,7 @@ Page {
             source: "settings/SettingsLayoutTab.qml"
         }
 
-        // Tab 9: Language - preloads async in background
+        // Tab 8: Language - preloads async in background
         Loader {
             id: languageLoader
             active: true
@@ -347,7 +333,7 @@ Page {
             source: "settings/SettingsUpdateTab.qml"
         }
 
-        // Tab 12: About
+        // Tab 13: About
         Loader {
             id: aboutLoader
             active: true

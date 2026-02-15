@@ -15,8 +15,8 @@ BleRefresher::BleRefresher(DE1Device* de1, BLEManager* bleManager,
     connect(&m_periodicTimer, &QTimer::timeout, this, &BleRefresher::scheduleRefresh);
 
     // Detect wake from sleep: when phase leaves Sleep, schedule a refresh.
-    // The first Sleep->non-Sleep transition (initial connect) is harmless
-    // because the debounce timer hasn't had 60s to elapse yet.
+    // The 60-minute debounce prevents treating the initial Disconnected→Sleep→Idle
+    // transition (normal first connect) as a wake-from-sleep event.
     connect(m_machineState, &MachineState::phaseChanged, this, [this]() {
         auto phase = m_machineState->phase();
         if (phase == MachineState::Phase::Sleep) {

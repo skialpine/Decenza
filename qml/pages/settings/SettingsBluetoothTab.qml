@@ -12,7 +12,7 @@ Item {
         id: shareLogDialog
         modal: true
         anchors.centerIn: parent
-        width: Theme.scaled(400)
+        width: Math.min(parent.width * 0.85, Theme.scaled(400))
         padding: 0
 
         background: Rectangle {

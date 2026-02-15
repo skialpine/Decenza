@@ -37,30 +37,11 @@ void BatteryManager::setSettings(Settings* settings) {
         // Load charging mode from settings
         m_chargingMode = m_settings->value("smartBatteryCharging", On).toInt();
 
-        // IMPORTANT: Samsung tablets don't support smart charging properly
-        // The de1app explicitly disables it for Samsung devices
-        if (m_isSamsungTablet && m_chargingMode != Off) {
-            qDebug() << "BatteryManager: Samsung tablet detected - disabling smart charging";
-            m_chargingMode = Off;
-            m_settings->setValue("smartBatteryCharging", Off);
-            // Emit signal so UI can show a notification
-            emit samsungTabletDetected();
-        }
-
         emit chargingModeChanged();
     }
 }
 
 void BatteryManager::setChargingMode(int mode) {
-    // IMPORTANT: Samsung tablets don't support smart charging properly
-    // Force mode to Off and warn user if they try to enable it
-    if (m_isSamsungTablet && mode != Off) {
-        qDebug() << "BatteryManager: Cannot enable smart charging on Samsung tablet";
-        // Emit signal to warn user, but don't change mode
-        emit samsungTabletDetected();
-        return;
-    }
-
     if (m_chargingMode == mode) {
         return;
     }
@@ -360,6 +341,70 @@ void BatteryManager::checkSamsungTablet() {
 
 bool BatteryManager::isSamsungTablet() const {
     return m_isSamsungTablet;
+}
+
+bool BatteryManager::showSamsungWarning() const {
+    if (!m_isSamsungTablet || !m_settings) {
+        return false;
+    }
+    return !m_settings->value("samsungFastChargeWarningShown", false).toBool();
+}
+
+void BatteryManager::dismissSamsungWarning() {
+    if (m_settings) {
+        m_settings->setValue("samsungFastChargeWarningShown", true);
+    }
+}
+
+void BatteryManager::openSamsungBatterySettings() {
+#ifdef Q_OS_ANDROID
+    QJniObject activity = QNativeInterface::QAndroidApplication::context();
+    if (!activity.isValid()) return;
+
+    // Try Samsung Device Care activities in order of specificity.
+    // Qt's callMethod clears JNI exceptions internally, so we use PackageManager
+    // to verify each component exists before attempting to start it.
+    struct { const char* pkg; const char* cls; } targets[] = {
+        // Charging settings page (has Fast Charging toggle directly)
+        {"com.samsung.android.lool", "com.samsung.android.sm.battery.ui.BatteryAdvancedMenuActivity"},
+        // Main battery page (has "Charging settings" sub-item)
+        {"com.samsung.android.lool", "com.samsung.android.sm.battery.ui.BatteryActivity"},
+    };
+
+    QJniObject pm = activity.callObjectMethod("getPackageManager",
+        "()Landroid/content/pm/PackageManager;");
+
+    for (const auto& t : targets) {
+        QJniObject intent("android/content/Intent");
+        QJniObject component("android/content/ComponentName",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            QJniObject::fromString(t.pkg).object<jstring>(),
+            QJniObject::fromString(t.cls).object<jstring>());
+        intent.callObjectMethod("setComponent",
+            "(Landroid/content/ComponentName;)Landroid/content/Intent;",
+            component.object());
+        intent.callMethod<QJniObject>("addFlags", "(I)Landroid/content/Intent;", 0x10000000);
+
+        // queryIntentActivities returns a non-empty list if the activity actually exists
+        QJniObject matches = pm.callObjectMethod("queryIntentActivities",
+            "(Landroid/content/Intent;I)Ljava/util/List;",
+            intent.object(), 0);
+        if (matches.isValid() && matches.callMethod<jint>("size") > 0) {
+            qDebug() << "BatteryManager: Opening" << t.cls;
+            activity.callMethod<void>("startActivity", "(Landroid/content/Intent;)V", intent.object());
+            return;
+        }
+    }
+
+    // Fallback: standard Android battery settings
+    qDebug() << "BatteryManager: Samsung activities not found, opening standard battery settings";
+    QJniObject action = QJniObject::fromString("android.intent.action.POWER_USAGE_SUMMARY");
+    QJniObject fallback("android/content/Intent", "(Ljava/lang/String;)V", action.object<jstring>());
+    fallback.callMethod<QJniObject>("addFlags", "(I)Landroid/content/Intent;", 0x10000000);
+    if (fallback.isValid()) {
+        activity.callMethod<void>("startActivity", "(Landroid/content/Intent;)V", fallback.object());
+    }
+#endif
 }
 
 void BatteryManager::ensureChargerOn() {

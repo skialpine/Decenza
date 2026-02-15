@@ -14,6 +14,7 @@ class BatteryManager : public QObject {
     Q_PROPERTY(int chargingMode READ chargingMode WRITE setChargingMode NOTIFY chargingModeChanged)
     Q_PROPERTY(bool batteryOptimizationIgnored READ isBatteryOptimizationIgnored NOTIFY batteryOptimizationChanged)
     Q_PROPERTY(bool isSamsungTablet READ isSamsungTablet CONSTANT)
+    Q_PROPERTY(bool showSamsungWarning READ showSamsungWarning CONSTANT)
 
 public:
     // Charging modes (matching de1app)
@@ -34,6 +35,7 @@ public:
     int chargingMode() const { return m_chargingMode; }
     bool isBatteryOptimizationIgnored() const;
     bool isSamsungTablet() const;
+    bool showSamsungWarning() const;
 
     // Ensure charger is ON - call on app exit/suspend for safety
     void ensureChargerOn();
@@ -42,13 +44,14 @@ public slots:
     void setChargingMode(int mode);
     void checkBattery();
     Q_INVOKABLE void requestIgnoreBatteryOptimization();
+    Q_INVOKABLE void openSamsungBatterySettings();
+    Q_INVOKABLE void dismissSamsungWarning();
 
 signals:
     void batteryPercentChanged();
     void isChargingChanged();
     void chargingModeChanged();
     void batteryOptimizationChanged();
-    void samsungTabletDetected();  // Emitted when Samsung tablet is detected and smart charging disabled
 
 private:
     int readPlatformBatteryPercent();

@@ -26,13 +26,12 @@ KeyboardAwareContainer {
     // Full-width card
     Rectangle {
         anchors.fill: parent
-        anchors.margins: Theme.scaled(8)
         color: Theme.surfaceColor
         radius: Theme.cardRadius
 
         Flickable {
             anchors.fill: parent
-            anchors.margins: Theme.scaled(16)
+            anchors.margins: Theme.scaled(12)
             contentHeight: aiTabContent.implicitHeight
             clip: true
             boundsBehavior: Flickable.StopAtBounds
@@ -240,7 +239,6 @@ KeyboardAwareContainer {
                     StyledTextField {
                         id: ollamaEndpointField
                         Layout.fillWidth: true
-                        placeholderText: "http://localhost:11434"
                         text: Settings.ollamaEndpoint
                         inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase | Qt.ImhUrlCharactersOnly
                         onTextChanged: Settings.ollamaEndpoint = text

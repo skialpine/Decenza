@@ -295,6 +295,43 @@ void Settings::setHeadlessSkipPurgeConfirm(bool skip) {
     }
 }
 
+// Launcher mode (Android only)
+bool Settings::launcherMode() const {
+    return m_settings.value("app/launcherMode", false).toBool();
+}
+
+void Settings::setLauncherMode(bool enabled) {
+    bool changed = (launcherMode() != enabled);
+    m_settings.setValue("app/launcherMode", enabled);
+
+#ifdef Q_OS_ANDROID
+    // Enable/disable the LauncherAlias activity-alias at runtime
+    QJniObject activity = QNativeInterface::QAndroidApplication::context();
+    if (activity.isValid()) {
+        QJniObject pm = activity.callObjectMethod(
+            "getPackageManager", "()Landroid/content/pm/PackageManager;");
+        QJniObject pkgName = activity.callObjectMethod(
+            "getPackageName", "()Ljava/lang/String;");
+        QJniObject aliasName = QJniObject::fromString(
+            "io.github.kulitorum.decenza_de1.LauncherAlias");
+
+        QJniObject componentName("android/content/ComponentName",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            pkgName.object<jstring>(), aliasName.object<jstring>());
+
+        // COMPONENT_ENABLED_STATE_ENABLED = 1, COMPONENT_ENABLED_STATE_DISABLED = 2
+        // DONT_KILL_APP = 1
+        int state = enabled ? 1 : 2;
+        pm.callMethod<void>("setComponentEnabledSetting",
+            "(Landroid/content/ComponentName;II)V",
+            componentName.object(), state, 1);
+    }
+#endif
+
+    if (changed)
+        emit launcherModeChanged();
+}
+
 // Steam pitcher presets
 QVariantList Settings::steamPitcherPresets() const {
     QByteArray data = m_settings.value("steam/pitcherPresets").toByteArray();
@@ -1176,7 +1213,7 @@ QString Settings::skinPath() const {
 }
 
 QString Settings::currentProfile() const {
-    return m_settings.value("profile/current", "default").toString();
+    return m_settings.value("profile/current", "Adaptive v2").toString();
 }
 
 void Settings::setCurrentProfile(const QString& profile) {
@@ -1715,7 +1752,7 @@ void Settings::setGeminiApiKey(const QString& key) {
 }
 
 QString Settings::ollamaEndpoint() const {
-    return m_settings.value("ai/ollamaEndpoint", "http://localhost:11434").toString();
+    return m_settings.value("ai/ollamaEndpoint", "").toString();
 }
 
 void Settings::setOllamaEndpoint(const QString& endpoint) {

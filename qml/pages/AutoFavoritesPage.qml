@@ -306,7 +306,7 @@ Page {
         id: settingsPopup
         parent: Overlay.overlay
         anchors.centerIn: parent
-        width: Theme.scaled(320)
+        width: Math.min(parent.width * 0.85, Theme.scaled(320))
         modal: true
         padding: Theme.scaled(20)
 

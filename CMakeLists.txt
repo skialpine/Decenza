@@ -402,7 +402,6 @@ set(QML_FILES
     qml/pages/ProfileInfoPage.qml
     qml/pages/settings/SettingsBluetoothTab.qml
     qml/pages/settings/SettingsPreferencesTab.qml
-    qml/pages/settings/SettingsOptionsTab.qml
     qml/pages/settings/SettingsScreensaverTab.qml
     qml/pages/settings/SettingsVisualizerTab.qml
     qml/pages/settings/SettingsAITab.qml

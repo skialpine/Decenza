@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
     CrashHandler::install();
 
     // Include wall clock in all log messages on all platforms
-    qSetMessagePattern("[%{time HH:mm:ss.zzz}] %{message}");
+    qSetMessagePattern("[LOG] [%{time HH:mm:ss.zzz}] %{message}");
 
 #ifdef Q_OS_IOS
     // Use basic (single-threaded) render loop on iOS to avoid threading issues
@@ -291,7 +291,8 @@ int main(int argc, char *argv[])
         if (!de1Device.isConnected() && !de1Device.isConnecting()) {
             de1Device.connectToDevice(device);
             // Only stop scan if we're not still looking for a scale
-            if (!bleManager.hasSavedScale() || (physicalScale && physicalScale->isConnected())) {
+            bool lookingForScale = bleManager.hasSavedScale() || bleManager.isScanningForScales();
+            if (!lookingForScale || (physicalScale && physicalScale->isConnected())) {
                 bleManager.stopScan();
             }
         }
@@ -647,6 +648,9 @@ int main(int argc, char *argv[])
             }
         });
     }
+
+    // Sync launcher alias with persisted setting (APK updates reset component states)
+    settings.setLauncherMode(settings.launcherMode());
 #endif
 
     // Cross-platform lifecycle handling: manage scale when app is suspended/resumed

@@ -142,6 +142,11 @@ void HiroiaScale::onCharacteristicChanged(const QBluetoothUuid& characteristicUu
     }
 }
 
+void HiroiaScale::sendKeepAlive() {
+    if (m_transport && m_characteristicsReady)
+        m_transport->enableNotifications(Scale::HiroiaJimmy::SERVICE, Scale::HiroiaJimmy::STATUS);
+}
+
 void HiroiaScale::tare() {
     if (!m_transport || !m_characteristicsReady) return;
 

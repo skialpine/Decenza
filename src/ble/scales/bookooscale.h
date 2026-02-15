@@ -20,6 +20,7 @@ public slots:
     void startTimer() override;
     void stopTimer() override;
     void resetTimer() override;
+    void sendKeepAlive() override;
 
 private slots:
     void onTransportConnected();

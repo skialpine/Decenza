@@ -79,7 +79,7 @@ void AIManager::createProviders()
     m_openrouterProvider.reset(openrouter);
 
     // Create Ollama provider
-    QString ollamaEndpoint = m_settings->value("ai/ollamaEndpoint", "http://localhost:11434").toString();
+    QString ollamaEndpoint = m_settings->value("ai/ollamaEndpoint", "").toString();
     QString ollamaModel = m_settings->value("ai/ollamaModel").toString();
     auto* ollama = new OllamaProvider(m_networkManager, ollamaEndpoint, ollamaModel, this);
     connect(ollama, &AIProvider::analysisComplete, this, &AIManager::onAnalysisComplete);
@@ -511,7 +511,7 @@ void AIManager::onSettingsChanged()
 
     auto* ollama = dynamic_cast<OllamaProvider*>(m_ollamaProvider.get());
     if (ollama) {
-        ollama->setEndpoint(m_settings->value("ai/ollamaEndpoint", "http://localhost:11434").toString());
+        ollama->setEndpoint(m_settings->value("ai/ollamaEndpoint", "").toString());
         ollama->setModel(m_settings->value("ai/ollamaModel").toString());
     }
 

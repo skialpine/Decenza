@@ -5,6 +5,7 @@
 #include <QLowEnergyController>
 #include <QLowEnergyService>
 #include <QList>
+#include <QTimer>
 
 class ScaleDevice : public QObject {
     Q_OBJECT
@@ -40,6 +41,7 @@ public slots:
     virtual void sleep() {}  // Put scale to sleep (battery power saving - full power off)
     virtual void wake() {}   // Wake scale from sleep (enable LCD)
     virtual void disableLcd() {}  // Turn off LCD but keep scale powered (for screensaver)
+    virtual void sendKeepAlive() {}  // Override to send BLE keepalive (e.g., re-enable notifications)
     virtual void disconnectFromScale();  // Disconnect BLE from scale
     void resetFlowCalculation();  // Call after tare to avoid flow rate spikes
 
@@ -79,4 +81,5 @@ private:
     qint64 m_prevTimestamp = 0;
     QList<double> m_flowHistory;
     static const int FLOW_HISTORY_SIZE = 5;
+    QTimer m_keepAliveTimer;
 };

@@ -46,6 +46,7 @@ public:
     ~BLEManager();
 
     bool isScanning() const;
+    bool isScanningForScales() const { return m_scanningForScales; }
     bool isDisabled() const { return m_disabled; }
     void setDisabled(bool disabled);  // Disable all BLE operations (for simulator mode)
     QVariantList discoveredDevices() const;

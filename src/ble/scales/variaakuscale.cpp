@@ -269,6 +269,11 @@ void VariaAkuScale::sendCommand(const QByteArray& cmd) {
     m_transport->writeCharacteristic(Scale::VariaAku::SERVICE, Scale::VariaAku::CMD, cmd);
 }
 
+void VariaAkuScale::sendKeepAlive() {
+    if (m_transport && m_characteristicsReady)
+        m_transport->enableNotifications(Scale::VariaAku::SERVICE, Scale::VariaAku::STATUS);
+}
+
 void VariaAkuScale::tare() {
     VARIA_LOG("Sending tare command");
     sendCommand(QByteArray::fromHex("FA82010182"));

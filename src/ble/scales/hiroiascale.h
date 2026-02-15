@@ -16,6 +16,7 @@ public:
 
 public slots:
     void tare() override;
+    void sendKeepAlive() override;
 
 private slots:
     void onTransportConnected();

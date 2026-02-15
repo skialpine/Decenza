@@ -166,6 +166,13 @@ void SkaleScale::sendCommand(uint8_t cmd) {
     m_transport->writeCharacteristic(Scale::Skale::SERVICE, Scale::Skale::CMD, packet);
 }
 
+void SkaleScale::sendKeepAlive() {
+    if (m_transport && m_characteristicsReady) {
+        m_transport->enableNotifications(Scale::Skale::SERVICE, Scale::Skale::WEIGHT);
+        m_transport->enableNotifications(Scale::Skale::SERVICE, Scale::Skale::BUTTON);
+    }
+}
+
 void SkaleScale::tare() {
     sendCommand(0x10);
 }

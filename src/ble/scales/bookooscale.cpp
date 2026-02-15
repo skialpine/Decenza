@@ -167,6 +167,11 @@ void BookooScale::sendCommand(const QByteArray& cmd) {
     m_transport->writeCharacteristic(Scale::Bookoo::SERVICE, Scale::Bookoo::CMD, cmd);
 }
 
+void BookooScale::sendKeepAlive() {
+    if (m_transport && m_characteristicsReady)
+        m_transport->enableNotifications(Scale::Bookoo::SERVICE, Scale::Bookoo::STATUS);
+}
+
 void BookooScale::tare() {
     sendCommand(QByteArray::fromHex("030A01000008"));
 }

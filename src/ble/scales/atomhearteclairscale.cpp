@@ -158,6 +158,11 @@ void AtomheartEclairScale::sendCommand(const QByteArray& cmd) {
     m_transport->writeCharacteristic(Scale::AtomheartEclair::SERVICE, Scale::AtomheartEclair::CMD, cmd);
 }
 
+void AtomheartEclairScale::sendKeepAlive() {
+    if (m_transport && m_characteristicsReady)
+        m_transport->enableNotifications(Scale::AtomheartEclair::SERVICE, Scale::AtomheartEclair::STATUS);
+}
+
 void AtomheartEclairScale::tare() {
     sendCommand(QByteArray::fromHex("540101"));
 }

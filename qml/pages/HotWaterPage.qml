@@ -478,7 +478,7 @@ Page {
                             id: volumeInput
                             Layout.preferredWidth: Theme.scaled(180)
                             value: getCurrentVesselVolume()
-                            from: 50
+                            from: 10
                             to: isVolumeMode ? 255 : 500
                             stepSize: 10
                             suffix: isVolumeMode ? " ml" : " g"

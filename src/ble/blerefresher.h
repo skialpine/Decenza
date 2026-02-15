@@ -54,7 +54,7 @@ private:
     QMetaObject::Connection m_phaseConn;
     QMetaObject::Connection m_de1ConnConn;
 
-    static constexpr int MIN_REFRESH_INTERVAL_MS = 60 * 1000;  // 1 minute debounce
+    static constexpr int MIN_REFRESH_INTERVAL_MS = 60 * 60 * 1000;  // 60 minute debounce
 };
 
 #endif // BLEREFRESHER_H

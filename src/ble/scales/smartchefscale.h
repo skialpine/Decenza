@@ -16,6 +16,7 @@ public:
 
 public slots:
     void tare() override;  // SmartChef doesn't support software tare
+    void sendKeepAlive() override;
 
 private slots:
     void onTransportConnected();

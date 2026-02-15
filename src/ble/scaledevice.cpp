@@ -4,6 +4,8 @@
 ScaleDevice::ScaleDevice(QObject* parent)
     : QObject(parent)
 {
+    m_keepAliveTimer.setInterval(30000);
+    connect(&m_keepAliveTimer, &QTimer::timeout, this, &ScaleDevice::sendKeepAlive);
 }
 
 ScaleDevice::~ScaleDevice() {
@@ -39,6 +41,7 @@ void ScaleDevice::setSimulationMode(bool enabled) {
 }
 
 void ScaleDevice::disconnectFromScale() {
+    m_keepAliveTimer.stop();
     if (m_service) {
         // Disconnect signals first to prevent callbacks during deletion
         m_service->disconnect();
@@ -67,6 +70,10 @@ void ScaleDevice::disconnectFromScale() {
 void ScaleDevice::setConnected(bool connected) {
     if (m_connected != connected) {
         m_connected = connected;
+        if (connected)
+            m_keepAliveTimer.start();
+        else
+            m_keepAliveTimer.stop();
         emit connectedChanged();
     }
 }

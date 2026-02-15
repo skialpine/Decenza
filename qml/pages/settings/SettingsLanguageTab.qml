@@ -37,7 +37,7 @@ Item {
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.maximumWidth: 300
+            Layout.maximumWidth: Theme.scaled(300)
             color: Theme.surfaceColor
             radius: Theme.cardRadius
 
@@ -343,6 +343,7 @@ Item {
         id: deleteConfirmPopup
         parent: Overlay.overlay
         anchors.centerIn: parent
+        width: Math.min(parent.width * 0.85, Theme.scaled(320))
         modal: true
         dim: true
         padding: Theme.spacingMedium
@@ -357,7 +358,6 @@ Item {
 
         contentItem: Column {
             spacing: Theme.spacingMedium
-            width: Theme.scaled(280)
 
             Text {
                 width: parent.width
@@ -437,6 +437,7 @@ Item {
         id: submitResultPopup
         parent: Overlay.overlay
         anchors.centerIn: parent
+        width: Math.min(parent.width * 0.85, Theme.scaled(340))
         modal: true
         dim: true
         padding: Theme.spacingMedium
@@ -454,7 +455,6 @@ Item {
 
         contentItem: Column {
             spacing: Theme.spacingMedium
-            width: Theme.scaled(300)
 
             Text {
                 width: parent.width
@@ -488,6 +488,7 @@ Item {
         id: retryStatusPopup
         parent: Overlay.overlay
         anchors.centerIn: parent
+        width: Math.min(parent.width * 0.85, Theme.scaled(320))
         modal: false
         dim: false
         padding: Theme.spacingMedium
@@ -505,7 +506,6 @@ Item {
 
         contentItem: Column {
             spacing: Theme.spacingSmall
-            width: Theme.scaled(280)
 
             Text {
                 width: parent.width

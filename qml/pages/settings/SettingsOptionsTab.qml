@@ -110,6 +110,71 @@ KeyboardAwareContainer {
                 }
             }
 
+            // Launcher Mode (Android only)
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: launcherContent.implicitHeight + Theme.scaled(30)
+                color: Theme.surfaceColor
+                radius: Theme.cardRadius
+                visible: Qt.platform.os === "android"
+
+                ColumnLayout {
+                    id: launcherContent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: Theme.scaled(15)
+                    spacing: Theme.scaled(8)
+
+                    Tr {
+                        key: "settings.options.launcherMode"
+                        fallback: "Launcher Mode"
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(16)
+                        font.bold: true
+                    }
+
+                    Tr {
+                        Layout.fillWidth: true
+                        key: "settings.options.launcherModeDesc"
+                        fallback: "Set Decenza as the Android home screen. Press Home to return here instead of the default launcher."
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: Theme.scaled(12)
+                        wrapMode: Text.WordWrap
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        Tr {
+                            key: "settings.options.useAsLauncher"
+                            fallback: "Use as Home Screen"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(14)
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        StyledSwitch {
+                            checked: Settings.launcherMode
+                            accessibleName: TranslationManager.translate(
+                                "settings.options.useAsLauncher", "Use as Home Screen")
+                            onToggled: Settings.launcherMode = checked
+                        }
+                    }
+
+                    Tr {
+                        Layout.fillWidth: true
+                        visible: Settings.launcherMode
+                        key: "settings.options.launcherModeHint"
+                        fallback: "Android will ask you to choose a default launcher. Select Decenza and tap \"Always\"."
+                        color: Theme.warningColor
+                        font.pixelSize: Theme.scaled(11)
+                        wrapMode: Text.WordWrap
+                    }
+                }
+            }
+
             // Shot Map Settings
             Rectangle {
                 Layout.fillWidth: true
