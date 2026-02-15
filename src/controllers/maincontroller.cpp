@@ -2399,21 +2399,35 @@ void MainController::softStopSteam() {
 }
 
 void MainController::onEspressoCycleStarted() {
-    // Safety check: abort shot if user has a saved scale but it's not connected.
+    // Safety check: abort shot if user has a saved scale but it's not connected,
+    // AND the current profile actually uses weight (stop-at-weight or frame exit weights).
     // This prevents running a shot without weight tracking when the user expects it.
     // The machine may have been started from the group head button, so we can only
     // abort here (during preheat) — before any water flows.
+    // Volume-based profiles can proceed without a physical scale.
     if (m_bleManager && m_bleManager->hasSavedScale()) {
-        // Check if the physical scale is actually connected
-        // (BLEManager's scaleDevice is null or disconnected when no physical scale)
         ScaleDevice* physicalScale = m_bleManager->scaleDevice();
         if (!physicalScale || !physicalScale->isConnected()) {
-            qWarning() << "Shot aborted: saved scale is not connected";
-            if (m_device) {
-                m_device->requestState(DE1::State::Idle);
+            // Check if the profile actually needs a scale
+            bool profileNeedsScale = (m_currentProfile.stopAtType() == Profile::StopAtType::Weight);
+            if (!profileNeedsScale) {
+                // Also check per-frame exit weights
+                for (const auto& step : m_currentProfile.steps()) {
+                    if (step.exitWeight > 0) {
+                        profileNeedsScale = true;
+                        break;
+                    }
+                }
             }
-            emit shotAbortedNoScale();
-            return;
+            if (profileNeedsScale) {
+                qWarning() << "Shot aborted: saved scale is not connected and profile uses weight";
+                if (m_device) {
+                    m_device->requestState(DE1::State::Idle);
+                }
+                emit shotAbortedNoScale();
+                return;
+            }
+            qDebug() << "Scale not connected but profile doesn't use weight - proceeding with shot";
         }
     }
 
