@@ -427,6 +427,13 @@ ApplicationWindow {
             checkStorageSetup()
         }
 
+        // Show Samsung Fast Charging warning on first launch (if Samsung tablet)
+        if (BatteryManager.showSamsungWarning) {
+            Qt.callLater(function() {
+                samsungFastChargeDialog.open()
+            })
+        }
+
         // Initialize sleep countdowns (fresh app start, not auto-woken)
         if (root.autoSleepMinutes > 0) {
             root.sleepCountdownNormal = root.autoSleepMinutes
@@ -448,6 +455,10 @@ ApplicationWindow {
 
         // Apply global multiplier and per-page multiplier
         Theme.scale = autoScale * Theme.scaleMultiplier * Theme.pageScaleMultiplier
+
+        // Update window dimensions for responsive sizing (dialogs, popups)
+        Theme.windowWidth = width
+        Theme.windowHeight = height
     }
 
     // Global tap handler for accessibility - announces any Text tapped
@@ -845,7 +856,8 @@ ApplicationWindow {
         modal: true
         dim: true
         anchors.centerIn: parent
-        padding: 24
+        width: Theme.dialogWidth + 2 * padding
+        padding: Theme.dialogPadding
         onClosed: root.showNextPendingPopup()
 
         property string errorMessage: ""
@@ -870,7 +882,6 @@ ApplicationWindow {
 
         contentItem: Column {
             spacing: Theme.spacingMedium
-            width: Theme.dialogWidth
 
             Text {
                 text: trEnableLocation.text
@@ -960,7 +971,8 @@ ApplicationWindow {
         modal: true
         dim: true
         anchors.centerIn: parent
-        padding: 24
+        width: Theme.dialogWidth + 2 * padding
+        padding: Theme.dialogPadding
         onClosed: root.showNextPendingPopup()
 
         background: Rectangle {
@@ -981,7 +993,6 @@ ApplicationWindow {
 
         contentItem: Column {
             spacing: Theme.spacingMedium
-            width: Theme.dialogWidth
 
             Text {
                 text: trNoScaleFoundTitle.text
@@ -1015,7 +1026,8 @@ ApplicationWindow {
         modal: true
         dim: true
         anchors.centerIn: parent
-        padding: 24
+        width: Theme.dialogWidth + 2 * padding
+        padding: Theme.dialogPadding
         onClosed: root.showNextPendingPopup()
 
         background: Rectangle {
@@ -1036,7 +1048,6 @@ ApplicationWindow {
 
         contentItem: Column {
             spacing: Theme.spacingMedium
-            width: Theme.dialogWidth
 
             Text {
                 text: trScaleDisconnectedTitle.text
@@ -1077,7 +1088,8 @@ ApplicationWindow {
         modal: true
         dim: true
         anchors.centerIn: parent
-        padding: 24
+        width: Theme.dialogWidth + 2 * padding
+        padding: Theme.dialogPadding
         onClosed: root.showNextPendingPopup()
 
         background: Rectangle {
@@ -1095,7 +1107,6 @@ ApplicationWindow {
 
         contentItem: Column {
             spacing: Theme.spacingMedium
-            width: Theme.dialogWidth
 
             Text {
                 text: "Shot Stopped"
@@ -1127,8 +1138,9 @@ ApplicationWindow {
         modal: true
         dim: true
         anchors.centerIn: parent
+        width: Theme.dialogWidth + 2 * padding
         closePolicy: Popup.NoAutoClose
-        padding: 24
+        padding: Theme.dialogPadding
         onClosed: root.showNextPendingPopup()
 
         background: Rectangle {
@@ -1149,7 +1161,6 @@ ApplicationWindow {
 
         contentItem: Column {
             spacing: Theme.spacingMedium
-            width: Theme.dialogWidth
 
             Text {
                 text: trRefillTitle.text
@@ -1190,13 +1201,106 @@ ApplicationWindow {
         }
     }
 
+    // Samsung Fast Charging warning dialog
+    Popup {
+        id: samsungFastChargeDialog
+        modal: true
+        dim: true
+        anchors.centerIn: parent
+        width: Theme.dialogWidth + 2 * padding
+        padding: Theme.dialogPadding
+        onClosed: root.showNextPendingPopup()
+
+        background: Rectangle {
+            color: Theme.surfaceColor
+            radius: Theme.cardRadius
+            border.width: 2
+            border.color: "white"
+        }
+
+        onOpened: {
+            BatteryManager.dismissSamsungWarning()
+            if (AccessibilityManager.enabled) {
+                AccessibilityManager.announce("Samsung tablet detected. Please disable Fast Charging in your device settings for best results with smart battery charging.", true)
+            }
+        }
+
+        contentItem: Column {
+            spacing: Theme.spacingMedium
+
+            Text {
+                text: "Samsung Tablet Detected"
+                font: Theme.subtitleFont
+                color: Theme.textColor
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+
+            Text {
+                text: "For smart battery charging to work correctly, please disable Fast Charging on your Samsung tablet.\n\nTap \"Open Settings\" below, then turn off \"Fast charging\"."
+                wrapMode: Text.Wrap
+                width: parent.width
+                font: Theme.bodyFont
+                color: Theme.textColor
+            }
+
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: Theme.scaled(12)
+
+                AccessibleButton {
+                    text: "Open Settings"
+                    accessibleName: "Open Samsung battery settings"
+                    onClicked: {
+                        BatteryManager.openSamsungBatterySettings()
+                        samsungFastChargeDialog.close()
+                    }
+                    background: Rectangle {
+                        implicitWidth: Theme.scaled(140)
+                        implicitHeight: Theme.scaled(44)
+                        radius: Theme.buttonRadius
+                        color: parent.down ? Qt.darker(Theme.primaryColor, 1.2) : Theme.primaryColor
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        font: Theme.bodyFont
+                        color: "white"
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                AccessibleButton {
+                    text: "OK"
+                    accessibleName: "Dismiss Samsung fast charging warning"
+                    onClicked: samsungFastChargeDialog.close()
+                    background: Rectangle {
+                        implicitWidth: Theme.scaled(80)
+                        implicitHeight: Theme.scaled(44)
+                        radius: Theme.buttonRadius
+                        color: "transparent"
+                        border.width: 1
+                        border.color: Theme.primaryColor
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        font: Theme.bodyFont
+                        color: Theme.primaryColor
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+            }
+        }
+    }
+
     // Update notification dialog
     Popup {
         id: updateDialog
         modal: true
         dim: true
         anchors.centerIn: parent
-        padding: 24
+        width: Theme.dialogWidth + 2 * padding
+        padding: Theme.dialogPadding
         onClosed: root.showNextPendingPopup()
 
         background: Rectangle {
@@ -1208,7 +1312,6 @@ ApplicationWindow {
 
         contentItem: Column {
             spacing: Theme.spacingMedium
-            width: Theme.dialogWidth
 
             Row {
                 spacing: 10
@@ -1262,8 +1365,8 @@ ApplicationWindow {
                             MainController.updateChecker.downloadAndInstall()
                         }
                         updateDialog.close()
-                        // Navigate to settings Update tab (index 13)
-                        goToSettings(13)
+                        // Navigate to settings Update tab (index 12)
+                        goToSettings(12)
                     }
                 }
             }
@@ -1533,8 +1636,9 @@ ApplicationWindow {
         modal: true
         dim: true
         anchors.centerIn: parent
+        width: Theme.dialogWidth + 2 * padding
         closePolicy: Popup.NoAutoClose
-        padding: 24
+        padding: Theme.dialogPadding
 
         background: Rectangle {
             color: Theme.surfaceColor
@@ -1547,7 +1651,6 @@ ApplicationWindow {
 
         contentItem: Column {
             spacing: Theme.spacingLarge
-            width: Theme.dialogWidth
 
             Text {
                 text: trWelcomeTitle.text
@@ -1585,8 +1688,9 @@ ApplicationWindow {
         modal: true
         dim: true
         anchors.centerIn: parent
+        width: Theme.dialogWidth + 2 * padding
         closePolicy: Popup.NoAutoClose
-        padding: 24
+        padding: Theme.dialogPadding
 
         background: Rectangle {
             color: Theme.surfaceColor
@@ -1599,7 +1703,6 @@ ApplicationWindow {
 
         contentItem: Column {
             spacing: Theme.spacingLarge
-            width: Theme.dialogWidth
 
             Text {
                 text: trStorageTitle.text
@@ -2513,7 +2616,8 @@ ApplicationWindow {
         modal: true
         dim: true
         anchors.centerIn: parent
-        padding: 24
+        width: Theme.dialogWidth + 2 * padding
+        padding: Theme.dialogPadding
         closePolicy: Popup.NoAutoClose
 
         background: Rectangle {
@@ -2525,7 +2629,6 @@ ApplicationWindow {
 
         contentItem: Column {
             spacing: Theme.spacingMedium
-            width: Theme.dialogWidth
 
             Text {
                 text: TranslationManager.translate("main.emptydb.title", "Restore Backup?")
@@ -2563,7 +2666,7 @@ ApplicationWindow {
                     onClicked: {
                         emptyDatabaseDialog.close();
                         startBluetoothScan();
-                        goToSettings(11);  // Navigate to Data tab
+                        goToSettings(10);  // Navigate to Data tab
                     }
                 }
             }

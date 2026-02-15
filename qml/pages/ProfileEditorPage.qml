@@ -979,7 +979,7 @@ Page {
         standardButtons: Dialog.Yes | Dialog.No
 
         Tr {
-            width: overwriteDialog.availableWidth
+            width: parent.width
             key: "profileeditor.dialog.overwriteconfirm"
             fallback: "A profile with this name already exists.\nDo you want to overwrite it?"
             font: Theme.bodyFont
@@ -1007,7 +1007,7 @@ Page {
         standardButtons: Dialog.Ok
 
         Tr {
-            width: saveErrorDialog.availableWidth
+            width: parent.width
             key: "profileeditor.dialog.saveerror"
             fallback: "Could not save the profile. Please try again or use Save As with a different name."
             font: Theme.bodyFont

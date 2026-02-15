@@ -610,7 +610,7 @@ Page {
         standardButtons: Dialog.Ok
 
         contentItem: Text {
-            width: saveErrorDialog.availableWidth
+            width: parent.width
             text: TranslationManager.translate("recipeEditor.saveErrorMessage", "Could not save the profile. Please try again or use Save As with a different name.")
             font: Theme.bodyFont
             color: Theme.textColor
@@ -750,7 +750,7 @@ Page {
         standardButtons: Dialog.Yes | Dialog.No
 
         contentItem: Text {
-            width: overwriteDialog.availableWidth
+            width: parent.width
             text: TranslationManager.translate("recipeEditor.overwriteConfirm", "A profile with this name already exists.\nDo you want to overwrite it?")
             font: Theme.bodyFont
             color: Theme.textColor

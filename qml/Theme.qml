@@ -9,6 +9,10 @@ QtObject {
     // Scale factor - set from main.qml based on window size
     property real scale: 1.0
 
+    // Actual window dimensions - set from main.qml for responsive sizing
+    property real windowWidth: 960
+    property real windowHeight: 600
+
     // Debug: scale multiplier (1.0 = auto, <1 = smaller, >1 = larger)
     property real scaleMultiplier: 1.0
 
@@ -43,7 +47,7 @@ QtObject {
 
     // Dynamic colors - bind to Settings with fallback defaults
     property color backgroundColor: Settings.customThemeColors.backgroundColor || "#1a1a2e"
-    property color surfaceColor: Settings.customThemeColors.surfaceColor || "#252538"
+    property color surfaceColor: Settings.customThemeColors.surfaceColor || "#303048"
     property color primaryColor: Settings.customThemeColors.primaryColor || "#4e85f4"
     property color secondaryColor: Settings.customThemeColors.secondaryColor || "#c0c5e3"
     property color textColor: Settings.customThemeColors.textColor || "#ffffff"
@@ -103,8 +107,9 @@ QtObject {
     readonly property int spacingMedium: scaled(16)
     readonly property int spacingLarge: scaled(24)
 
-    // Dialogs
-    readonly property int dialogWidth: scaled(380)
+    // Dialogs — responsive: 40% of window width
+    readonly property int dialogWidth: Math.max(scaled(280), windowWidth * 0.4)
+    readonly property int dialogPadding: scaled(24)
 
     // Settings columns
     readonly property int settingsColumnMin: scaled(280)
