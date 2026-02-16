@@ -23,6 +23,7 @@ class MachineState : public QObject {
     Q_PROPERTY(double targetVolume READ targetVolume WRITE setTargetVolume NOTIFY targetVolumeChanged)
     Q_PROPERTY(double scaleWeight READ scaleWeight NOTIFY scaleWeightChanged)
     Q_PROPERTY(double scaleFlowRate READ scaleFlowRate NOTIFY scaleWeightChanged)
+    Q_PROPERTY(double smoothedScaleFlowRate READ smoothedScaleFlowRate NOTIFY scaleWeightChanged)
     Q_PROPERTY(double cumulativeVolume READ cumulativeVolume NOTIFY cumulativeVolumeChanged)
     Q_PROPERTY(double preinfusionVolume READ preinfusionVolume NOTIFY preinfusionVolumeChanged)
     Q_PROPERTY(double pourVolume READ pourVolume NOTIFY pourVolumeChanged)
@@ -81,6 +82,7 @@ public:
     // Scale accessors (forward from current scale)
     double scaleWeight() const;
     double scaleFlowRate() const;
+    double smoothedScaleFlowRate() const;
 
     // Called by MainController when shot samples arrive
     void onFlowSample(double flowRate, double deltaTime);
@@ -141,6 +143,15 @@ private:
     bool m_stopAtTimeTriggered = false;
     bool m_tareCompleted = false;
     bool m_waitingForTare = false;  // True after tare sent, waiting for scale to report ~0g
+
+    // Weight flow rate: computed as slope of weight over a 1-second window
+    // (avoids differentiating noisy scale data — differentiation amplifies BLE timing jitter)
+    struct WeightSample {
+        qint64 timestamp;
+        double weight;
+    };
+    QList<WeightSample> m_weightSamples;
+    void recordWeightSample();
 
     // Auto-tare on cup removal detection
     double m_lastIdleWeight = 0.0;

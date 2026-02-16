@@ -153,7 +153,7 @@ void ShotTimingController::onShotSample(const ShotSample& sample, double pressur
     double time = (QDateTime::currentMSecsSinceEpoch() - m_displayTimeBase) / 1000.0;
     m_currentTime = time;
 
-    emit shotTimeChanged();
+    // shotTimeChanged deferred to ShotDataModel's 33ms flush timer (avoid blocking BLE handler)
 
     // Emit unified sample with consistent timestamp
     emit sampleReady(time, sample.groupPressure, sample.groupFlow, sample.headTemp,
@@ -161,8 +161,10 @@ void ShotTimingController::onShotSample(const ShotSample& sample, double pressur
 
     // Emit weight sample with same timestamp as other curves (perfect sync)
     // Weight value is cached from onWeightSample, emitted here for graph alignment
+    // During settling (!m_shotActive), emit 0 for flow rate — the scale derivative
+    // is dominated by drip noise and produces wild oscillations on the chart
     if (m_extractionStarted && m_weight >= 0.1) {
-        emit weightSampleReady(time, m_weight, m_flowRate);
+        emit weightSampleReady(time, m_weight, m_shotActive ? m_flowRate : 0.0);
     }
 }
 
@@ -252,10 +254,9 @@ void ShotTimingController::onTareTimeout()
 
 void ShotTimingController::updateDisplayTimer()
 {
-    // Just emit the signal - shotTime() calculates from wall clock
-    emit shotTimeChanged();
+    // shotTimeChanged deferred to ShotDataModel's 33ms flush timer
 
-    // Also check settling stability here (in case scale stops sending samples)
+    // Check settling stability here (in case scale stops sending samples)
     if (m_settlingTimer.isActive() && m_lastWeightChangeTime > 0) {
         qint64 stableMs = QDateTime::currentMSecsSinceEpoch() - m_lastWeightChangeTime;
         if (stableMs >= 1000) {

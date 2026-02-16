@@ -461,6 +461,28 @@ Page {
                 }
             }
 
+            // Weight flow rate (delta weight from scale)
+            ColumnLayout {
+                Layout.preferredWidth: Theme.scaled(80)
+                spacing: Theme.scaled(2)
+
+                Accessible.role: Accessible.StaticText
+                Accessible.name: TranslationManager.translate("espresso.accessible.weightFlow", "Weight flow:") + " " + MachineState.smoothedScaleFlowRate.toFixed(1) + " " + TranslationManager.translate("espresso.accessible.gramsPerSecond", "grams per second")
+
+                Text {
+                    text: MachineState.smoothedScaleFlowRate.toFixed(1)
+                    color: Theme.weightFlowColor
+                    font.pixelSize: Theme.scaled(28)
+                    font.weight: Font.Medium
+                }
+                Tr {
+                    key: "espresso.unit.weightFlow"
+                    fallback: "g/s"
+                    color: Theme.textSecondaryColor
+                    font: Theme.captionFont
+                }
+            }
+
             // Divider
             Rectangle {
                 Layout.preferredWidth: Theme.scaled(1)
@@ -509,25 +531,58 @@ Page {
                     }
                 }
 
-                ProgressBar {
-                    id: weightVolumeProgressBar
+                RowLayout {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Theme.spacingSmall
-                    from: 0
-                    to: weightVolumeColumn.targetValue
-                    value: weightVolumeColumn.currentValue
+                    spacing: Theme.spacingSmall
 
-                    background: Rectangle {
-                        color: Theme.surfaceColor
-                        radius: Theme.scaled(4)
+                    ProgressBar {
+                        id: weightVolumeProgressBar
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Theme.spacingSmall
+                        from: 0
+                        to: weightVolumeColumn.targetValue
+                        value: weightVolumeColumn.currentValue
+
+                        background: Rectangle {
+                            color: Theme.surfaceColor
+                            radius: Theme.scaled(4)
+                        }
+
+                        contentItem: Item {
+                            Rectangle {
+                                width: weightVolumeProgressBar.visualPosition * parent.width
+                                height: parent.height
+                                radius: Theme.scaled(4)
+                                color: weightVolumeColumn.displayColor
+                            }
+                        }
                     }
 
-                    contentItem: Item {
-                        Rectangle {
-                            width: weightVolumeProgressBar.visualPosition * parent.width
-                            height: parent.height
-                            radius: Theme.scaled(4)
-                            color: weightVolumeColumn.displayColor
+                    // Skip to next profile frame
+                    Rectangle {
+                        id: skipFrameButton
+                        Layout.preferredWidth: Theme.scaled(56)
+                        Layout.preferredHeight: Theme.scaled(24)
+                        radius: Theme.scaled(12)
+                        color: skipFrameTapHandler.pressed ? Qt.darker(Theme.accentColor, 1.3) : Theme.accentColor
+                        visible: MachineState.phase === MachineStateType.Phase.Preinfusion ||
+                                 MachineState.phase === MachineStateType.Phase.Pouring
+
+                        Accessible.role: Accessible.Button
+                        Accessible.name: TranslationManager.translate("espresso.accessible.skipFrame", "Skip to next frame")
+                        Accessible.focusable: true
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Skip"
+                            color: "white"
+                            font.pixelSize: Theme.scaled(11)
+                            font.weight: Font.Medium
+                        }
+
+                        TapHandler {
+                            id: skipFrameTapHandler
+                            onTapped: DE1Device.skipToNextFrame()
                         }
                     }
                 }

@@ -78,12 +78,14 @@ void MachineState::setScale(ScaleDevice* scale) {
     }
 
     m_scale = scale;
+    m_weightSamples.clear();
 
     if (m_scale) {
         connect(m_scale, &ScaleDevice::weightChanged,
                 this, &MachineState::onScaleWeightChanged);
         // Relay weight changes to QML via scaleWeightChanged signal
-        connect(m_scale, &ScaleDevice::weightChanged, this, [this](double) {
+        connect(m_scale, &ScaleDevice::weightChanged, this, [this](double weight) {
+            recordWeightSample();
             emit scaleWeightChanged();
         });
         // Emit immediately so QML picks up current weight
@@ -564,6 +566,31 @@ double MachineState::scaleWeight() const {
 
 double MachineState::scaleFlowRate() const {
     return m_scale ? m_scale->flowRate() : 0.0;
+}
+
+void MachineState::recordWeightSample() {
+    if (!m_scale) return;
+    // Only accumulate during active extraction — after the shot ends the scale
+    // readings are dominated by drip noise / settling vibrations
+    if (m_phase != Phase::Preinfusion && m_phase != Phase::Pouring) {
+        m_weightSamples.clear();
+        return;
+    }
+    qint64 now = QDateTime::currentMSecsSinceEpoch();
+    m_weightSamples.append({now, m_scale->weight()});
+    // Prune samples older than 1 second
+    while (!m_weightSamples.isEmpty() && (now - m_weightSamples.first().timestamp) > 1000) {
+        m_weightSamples.removeFirst();
+    }
+}
+
+double MachineState::smoothedScaleFlowRate() const {
+    if (m_weightSamples.size() < 2) return 0.0;
+    // Wait until the buffer spans ~1 second before reporting
+    double dt = (m_weightSamples.last().timestamp - m_weightSamples.first().timestamp) / 1000.0;
+    if (dt < 0.8) return 0.0;
+    // Weight gained over a 1-second window = g/s (buffer is pruned to 1s)
+    return qMax(0.0, m_weightSamples.last().weight - m_weightSamples.first().weight);
 }
 
 void MachineState::tareScale() {
