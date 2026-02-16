@@ -455,6 +455,7 @@ void ShotDataModel::flushToChart() {
     }
 
     m_dirty = false;
+    emit flushed();
 }
 
 double ShotDataModel::finalWeight() const {

@@ -52,9 +52,10 @@ ChartView {
         gridLineColor: Qt.rgba(255, 255, 255, 0.1)
         // Title moved inside graph to save vertical space
 
-        Behavior on max {
-            NumberAnimation { duration: 100; easing.type: Easing.Linear }
-        }
+        // Animation disabled: causes visible lag and curves extending past plot area
+        // Behavior on max {
+        //     NumberAnimation { duration: 100; easing.type: Easing.Linear }
+        // }
     }
 
     // Pressure/Flow axis (left Y)

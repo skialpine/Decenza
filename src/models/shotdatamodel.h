@@ -88,6 +88,7 @@ signals:
     void stopTimeChanged();
     void weightAtStopChanged();
     void finalWeightChanged();
+    void flushed();  // Emitted after 33ms timer flushes new data to renderers
 
 private slots:
     void flushToChart();  // Called by timer - batched update to chart

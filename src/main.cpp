@@ -155,6 +155,11 @@ int main(int argc, char *argv[])
     QObject::connect(&timingController, &ShotTimingController::weightSampleReady,
                      &shotDataModel, qOverload<double, double, double>(&ShotDataModel::addWeightSample));
 
+    // Batch shotTimeChanged onto the 33ms flush timer (signal-to-signal connection)
+    // This avoids expensive QML binding evaluation in the BLE signal handler
+    QObject::connect(&shotDataModel, &ShotDataModel::flushed,
+                     &timingController, &ShotTimingController::shotTimeChanged);
+
     // Connect stop-at-weight signal to DE1
     QObject::connect(&timingController, &ShotTimingController::stopAtWeightReached,
                      &de1Device, &DE1Device::stopOperation);
