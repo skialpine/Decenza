@@ -897,7 +897,7 @@ Page {
         standardButtons: Dialog.Ok
 
         Tr {
-            anchors.left: parent.left; anchors.right: parent.right
+            width: saveErrorDialog.availableWidth
             key: "profileeditor.dialog.saveerror"
             fallback: "Could not save the profile. Please try again or use Save As with a different name."
             font: Theme.bodyFont
