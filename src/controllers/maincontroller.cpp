@@ -1535,6 +1535,12 @@ void MainController::uploadRecipeProfile(const QVariantMap& recipeParams) {
     m_currentProfile.setRecipeParams(recipe);
     m_currentProfile.regenerateFromRecipe();
 
+    // Sync temperature override so uploadCurrentProfile doesn't apply wrong delta
+    // and shot plan text shows correct temperature (not stale override)
+    if (m_settings) {
+        m_settings->setTemperatureOverride(m_currentProfile.espressoTemperature());
+    }
+
     // Mark as modified
     if (!m_profileModified) {
         m_profileModified = true;
