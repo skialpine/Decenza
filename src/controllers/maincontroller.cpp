@@ -2084,12 +2084,19 @@ void MainController::sendMachineSettings() {
 
     double groupTemp = getGroupTemperature();
 
+    // Hot water volume: only send actual ml in volume mode (machine auto-stops via flowmeter).
+    // In weight mode send 0 so the app controls stop via scale instead.
+    int hotWaterVolume = 0;
+    if (m_settings->waterVolumeMode() == "volume") {
+        hotWaterVolume = qMin(m_settings->waterVolume(), 255);  // BLE uint8 max
+    }
+
     // 1. ShotSettings (single write with all temperatures)
     m_device->setShotSettings(
         steamTemp,
         m_settings->steamTimeout(),
         m_settings->waterTemperature(),
-        m_settings->waterVolume(),
+        hotWaterVolume,
         groupTemp
     );
 
