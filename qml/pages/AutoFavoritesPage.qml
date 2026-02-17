@@ -444,9 +444,9 @@ Page {
                     Accessible.ignored: true
                 }
 
-                Switch {
+                StyledSwitch {
                     checked: Settings.autoFavoritesHideUnrated
-                    Accessible.name: TranslationManager.translate("autofavorites.hideUnrated", "Hide unrated favorites")
+                    accessibleName: TranslationManager.translate("autofavorites.hideUnrated", "Hide unrated favorites")
                     onToggled: {
                         Settings.autoFavoritesHideUnrated = checked
                         loadFavorites()
@@ -468,9 +468,9 @@ Page {
                     Accessible.ignored: true
                 }
 
-                Switch {
+                StyledSwitch {
                     checked: Settings.autoFavoritesOpenBrewSettings
-                    Accessible.name: TranslationManager.translate("autofavorites.openBrewSettings", "Open brew settings after load")
+                    accessibleName: TranslationManager.translate("autofavorites.openBrewSettings", "Open brew settings after load")
                     onToggled: Settings.autoFavoritesOpenBrewSettings = checked
                 }
             }

@@ -37,6 +37,7 @@ Dialog {
     property string beanBrand: ""
     property string beanType: ""
     property string selectedProfileTitle: ""
+    property string originalProfileFilename: ""
 
     function getBeanBrandSuggestions() {
         var suggestions = MainController.shotHistory ? MainController.shotHistory.getDistinctBeanBrands() : []
@@ -109,6 +110,13 @@ Dialog {
         }
     }
 
+    onRejected: {
+        // Restore the original profile if the user changed it via the profile picker
+        if (originalProfileFilename.length > 0 && Settings.currentProfile !== originalProfileFilename) {
+            MainController.loadProfile(originalProfileFilename)
+        }
+    }
+
     onAboutToShow: {
         // Announce dialog for accessibility
         if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
@@ -133,6 +141,7 @@ Dialog {
         beanBrand = Settings.dyeBeanBrand
         beanType = Settings.dyeBeanType
         selectedProfileTitle = MainController.currentProfileName
+        originalProfileFilename = Settings.currentProfile
         showScaleWarning = false
 
         // Yield: use override if active, otherwise use profile default

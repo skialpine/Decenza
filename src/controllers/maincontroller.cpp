@@ -1535,10 +1535,11 @@ void MainController::uploadRecipeProfile(const QVariantMap& recipeParams) {
     m_currentProfile.setRecipeParams(recipe);
     m_currentProfile.regenerateFromRecipe();
 
-    // Sync temperature override so uploadCurrentProfile doesn't apply wrong delta
-    // and shot plan text shows correct temperature (not stale override)
+    // Sync overrides so uploadCurrentProfile doesn't apply wrong delta
+    // and shot plan text shows correct values (not stale overrides)
     if (m_settings) {
         m_settings->setTemperatureOverride(m_currentProfile.espressoTemperature());
+        m_settings->setBrewYieldOverride(m_currentProfile.targetWeight());
     }
 
     // Mark as modified
