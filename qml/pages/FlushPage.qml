@@ -545,7 +545,7 @@ Page {
                     inputMethodHints: Qt.ImhNoPredictiveText
                     Accessible.role: Accessible.EditableText
                     Accessible.name: TranslationManager.translate("flush.placeholder.presetName", "Preset name")
-                    Accessible.value: text
+                    Accessible.description: text
                     Accessible.focusable: true
 
                     Tr {
@@ -656,7 +656,7 @@ Page {
                     inputMethodHints: Qt.ImhNoPredictiveText
                     Accessible.role: Accessible.EditableText
                     Accessible.name: TranslationManager.translate("flush.placeholder.presetName", "Preset name")
-                    Accessible.value: text
+                    Accessible.description: text
                     Accessible.focusable: true
 
                     Tr {

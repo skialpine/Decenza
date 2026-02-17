@@ -336,7 +336,7 @@ Popup {
                             background: null
                             Accessible.role: Accessible.EditableText
                             Accessible.name: "Enter text"
-                            Accessible.value: text
+                            Accessible.description: text
                             topPadding: 0
                             bottomPadding: 0
                             leftPadding: 0

@@ -137,7 +137,7 @@ Item {
 
         Accessible.role: Accessible.EditableText
         Accessible.name: root.accessibleName.length > 0 ? root.accessibleName : root.label
-        Accessible.value: text
+        Accessible.description: text
     }
 
     // Buttons row (stacked horizontally on the right)

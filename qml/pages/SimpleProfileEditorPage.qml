@@ -262,7 +262,7 @@ Page {
                             id: notesField
                             Accessible.role: Accessible.EditableText
                             Accessible.name: "Profile description"
-                            Accessible.value: text
+                            Accessible.description: text
                             text: profile ? (profile.profile_notes || "") : ""
                             font: Theme.labelFont
                             color: Theme.textColor

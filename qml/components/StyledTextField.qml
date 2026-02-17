@@ -16,7 +16,7 @@ TextField {
     // Accessibility: expose as editable text with label and current value
     Accessible.role: Accessible.EditableText
     Accessible.name: placeholder
-    Accessible.value: text
+    Accessible.description: text
     Accessible.focusable: true
 
     // Disable Material's floating label completely

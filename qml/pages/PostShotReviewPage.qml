@@ -654,7 +654,6 @@ Page {
 
                         Accessible.role: Accessible.EditableText
                         Accessible.name: TranslationManager.translate("postshotreview.label.notes", "Notes")
-                        Accessible.value: text
                         Accessible.description: text.length > 0 ? text : TranslationManager.translate("postshotreview.accessible.empty", "Empty")
 
                         onActiveFocusChanged: {
@@ -968,7 +967,6 @@ Page {
 
             Accessible.role: Accessible.EditableText
             Accessible.name: parent.label
-            Accessible.value: text
             Accessible.description: text.length > 0 ? text : TranslationManager.translate("postshotreview.accessible.empty", "Empty")
         }
     }

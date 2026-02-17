@@ -199,7 +199,7 @@ Dialog {
                     background: null
                     Accessible.role: Accessible.EditableText
                     Accessible.name: TranslationManager.translate("crashReport.userNotes", "What were you doing?")
-                    Accessible.value: text
+                    Accessible.description: text
                 }
             }
 

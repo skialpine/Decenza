@@ -283,7 +283,7 @@ KeyboardAwareContainer {
 | Element | Use instead | If raw, must set |
 |---------|-------------|------------------|
 | Button (Rectangle+MouseArea) | `AccessibleButton` | `Accessible.role: Accessible.Button` + `name` + `focusable` + `onPressAction` |
-| Text input | `StyledTextField` | `Accessible.role: Accessible.EditableText` + `name` + `value: text` + `focusable` |
+| Text input | `StyledTextField` | `Accessible.role: Accessible.EditableText` + `name` + `description: text` + `focusable` |
 | Autocomplete field | `SuggestionField` | (same as text input) |
 | Checkbox | Qt `CheckBox` | `Accessible.name` + `Accessible.checked: checked` + `focusable` |
 | Dropdown | `StyledComboBox` | `Accessible.role: Accessible.ComboBox` + `name` (use label, not displayText) + `focusable` |
@@ -291,7 +291,7 @@ KeyboardAwareContainer {
 
 Common mistakes:
 - **Rectangle+MouseArea without accessibility**: TalkBack cannot see it. Use `AccessibleButton` or add all four properties (`role`, `name`, `focusable`, `onPressAction`).
-- **Text input missing `Accessible.value: text`**: Field sounds "Empty" even when it contains text. `StyledTextField` and `SuggestionField` set this automatically.
+- **Text input missing `Accessible.description: text`**: Field sounds "Empty" even when it contains text. `StyledTextField` and `SuggestionField` set this automatically. Note: `Accessible.value` does not exist in Qt QML — use `Accessible.description` instead.
 - **ComboBox `Accessible.name` set to `displayText`**: Announces the selected value instead of the field label. Override with the label text.
 - **List row with no accessibility**: Only child elements (e.g. CheckBox) are discoverable; the row itself and its primary action are invisible.
 

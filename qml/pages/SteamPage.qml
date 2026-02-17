@@ -880,7 +880,7 @@ Page {
                     inputMethodHints: Qt.ImhNoPredictiveText
                     Accessible.role: Accessible.EditableText
                     Accessible.name: pitcherNamePlaceholder.text
-                    Accessible.value: text
+                    Accessible.description: text
                     Accessible.focusable: true
 
                     Text {
@@ -999,7 +999,7 @@ Page {
                     inputMethodHints: Qt.ImhNoPredictiveText
                     Accessible.role: Accessible.EditableText
                     Accessible.name: addPitcherNamePlaceholder.text
-                    Accessible.value: text
+                    Accessible.description: text
                     Accessible.focusable: true
 
                     Text {

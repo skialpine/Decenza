@@ -623,7 +623,7 @@ Page {
                     inputMethodHints: Qt.ImhNoPredictiveText
                     Accessible.role: Accessible.EditableText
                     Accessible.name: TranslationManager.translate("hotwater.placeholder.vesselName", "Vessel name")
-                    Accessible.value: text
+                    Accessible.description: text
                     Accessible.focusable: true
 
                     Tr {
@@ -734,7 +734,7 @@ Page {
                     inputMethodHints: Qt.ImhNoPredictiveText
                     Accessible.role: Accessible.EditableText
                     Accessible.name: TranslationManager.translate("hotwater.placeholder.vesselName", "Vessel name")
-                    Accessible.value: text
+                    Accessible.description: text
                     Accessible.focusable: true
 
                     Tr {
