@@ -137,6 +137,16 @@ Item {
             result = result.replace(/%DEVICES%/g, "Machine + Simulated Scale")
         else
             result = result.replace(/%DEVICES%/g, "Machine")
+        // Individual connection indicators (✅ = emoji/2705, ❌ = icons/cross-filled)
+        var statusIconSize = Theme.bodyFont.pixelSize
+        var statusConnected = "qrc:/emoji/2705.svg"
+        var statusDisconnected = "qrc:/icons/cross-filled.svg"
+        if (result.indexOf("%MACHINE_CONNECTED%") >= 0)
+            result = result.replace(/%MACHINE_CONNECTED%/g,
+                "<img src=\"" + (machineOn ? statusConnected : statusDisconnected) + "\" width=\"" + statusIconSize + "\" height=\"" + statusIconSize + "\">")
+        if (result.indexOf("%SCALE_CONNECTED%") >= 0)
+            result = result.replace(/%SCALE_CONNECTED%/g,
+                "<img src=\"" + ((scaleOn && !flowScale) ? statusConnected : statusDisconnected) + "\" width=\"" + statusIconSize + "\" height=\"" + statusIconSize + "\">")
         // Time
         var now = new Date()
         result = result.replace(/%TIME%/g, Qt.formatTime(now, "hh:mm"))
@@ -216,6 +226,14 @@ Item {
                 case "tare":
                     if (typeof MachineState !== "undefined")
                         MachineState.tareScale()
+                    break
+                case "scanDE1":
+                    if (typeof BLEManager !== "undefined")
+                        BLEManager.startScan()
+                    break
+                case "scanScale":
+                    if (typeof BLEManager !== "undefined")
+                        BLEManager.scanForScales()
                     break
                 case "quit":
                     Qt.quit()

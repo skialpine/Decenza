@@ -758,7 +758,9 @@ Popup {
                             { token: "%GRINDER%", label: "Grinder Model" },
                             { token: "%CONNECTED%", label: "Online/Offline" },
                             { token: "%CONNECTED_COLOR%", label: "Status Color" },
-                            { token: "%DEVICES%", label: "Devices" }
+                            { token: "%DEVICES%", label: "Devices" },
+                            { token: "%MACHINE_CONNECTED%", label: "Machine ✓/✗" },
+                            { token: "%SCALE_CONNECTED%", label: "Scale ✓/✗" }
                         ]
 
                         delegate: Rectangle {
@@ -1246,6 +1248,8 @@ Popup {
             { id: "command:startFlush",      label: "Start Flush",          contexts: ["idle"] },
             { id: "command:idle",            label: "Stop (Idle)",          contexts: ["idle", "espresso", "steam", "hotwater", "flush"] },
             { id: "command:tare",            label: "Tare Scale",           contexts: ["idle", "espresso", "all"] },
+            { id: "command:scanDE1",         label: "Scan for DE1",         contexts: ["idle", "all"] },
+            { id: "command:scanScale",       label: "Scan for Scale",       contexts: ["idle", "all"] },
             { id: "command:quit",            label: "Quit App",             contexts: ["idle"] }
         ]
         var ctx = popup.pageContext
