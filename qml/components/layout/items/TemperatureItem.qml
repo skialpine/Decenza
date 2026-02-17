@@ -11,6 +11,8 @@ Item {
     readonly property double effectiveTargetTemp: Settings.hasTemperatureOverride
         ? Settings.temperatureOverride
         : MainController.profileTargetTemperature
+    readonly property bool isRealOverride: Settings.hasTemperatureOverride &&
+        Math.abs(Settings.temperatureOverride - MainController.profileTargetTemperature) > 0.1
 
     implicitWidth: isCompact ? compactContent.implicitWidth : fullContent.implicitWidth
     implicitHeight: isCompact ? compactContent.implicitHeight : fullContent.implicitHeight
@@ -18,7 +20,7 @@ Item {
     Accessible.role: Accessible.StaticText
     Accessible.name: {
         var text = "Group temperature: " + DE1Device.temperature.toFixed(1) + " degrees, target: " + root.effectiveTargetTemp.toFixed(0) + " degrees"
-        if (Settings.hasTemperatureOverride) text += " (override active)"
+        if (root.isRealOverride) text += " (override active)"
         return text
     }
     Accessible.focusable: true
@@ -47,7 +49,7 @@ Item {
                 MachineState.tareScale()
                 if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
                     var announcement = "Group temperature: " + DE1Device.temperature.toFixed(1) + " degrees, target: " + root.effectiveTargetTemp.toFixed(0) + " degrees"
-                    if (Settings.hasTemperatureOverride) announcement += " (override active)"
+                    if (root.isRealOverride) announcement += " (override active)"
                     AccessibilityManager.announceLabel(announcement)
                 }
             }
@@ -79,7 +81,7 @@ Item {
                 Text {
                     anchors.baseline: parent.children[0].baseline
                     text: "/ " + root.effectiveTargetTemp.toFixed(1) + "\u00B0C"
-                    color: Settings.hasTemperatureOverride ? Theme.primaryColor : Theme.textSecondaryColor
+                    color: root.isRealOverride ? Theme.primaryColor : Theme.textSecondaryColor
                     font.family: Theme.valueFont.family
                     font.pixelSize: Theme.valueFont.pixelSize / 2
                     Accessible.ignored: true
@@ -97,7 +99,7 @@ Item {
                     Accessible.ignored: true
                 }
                 Text {
-                    visible: Settings.hasTemperatureOverride
+                    visible: root.isRealOverride
                     text: "(override)"
                     color: Theme.primaryColor
                     font: Theme.labelFont
@@ -111,7 +113,7 @@ Item {
             onClicked: {
                 if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
                     var announcement = "Group temperature: " + DE1Device.temperature.toFixed(1) + " degrees, target: " + root.effectiveTargetTemp.toFixed(0) + " degrees"
-                    if (Settings.hasTemperatureOverride) announcement += " (override active)"
+                    if (root.isRealOverride) announcement += " (override active)"
                     AccessibilityManager.announceLabel(announcement)
                 }
             }
