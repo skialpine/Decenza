@@ -1474,7 +1474,7 @@ KeyboardAwareContainer {
                                     anchors.fill: parent
                                     anchors.margins: -Theme.scaled(4)
                                     accessibleName: TranslationManager.translate("settings.calibration.openCalibration", "Open heater calibration")
-                                    onClicked: calibrationPopup.open()
+                                    onClicked: calibrationWarningDialog.open()
                                 }
                             }
                         }
@@ -1612,6 +1612,66 @@ KeyboardAwareContainer {
         }
     }
 
+    // Heater Calibration Warning Dialog
+    Popup {
+        id: calibrationWarningDialog
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(parent.width * 0.85, Theme.scaled(400))
+        modal: true
+        dim: true
+        padding: Theme.scaled(20)
+
+        background: Rectangle {
+            color: Theme.surfaceColor
+            radius: Theme.cardRadius
+            border.color: Theme.warningColor
+            border.width: 1
+        }
+
+        contentItem: ColumnLayout {
+            spacing: Theme.scaled(15)
+
+            Text {
+                text: TranslationManager.translate("settings.calibration.warningTitle", "Heater Calibration")
+                color: Theme.warningColor
+                font.pixelSize: Theme.scaled(16)
+                font.bold: true
+            }
+
+            Text {
+                Layout.fillWidth: true
+                text: TranslationManager.translate("settings.calibration.warningMessage", "Bad calibration settings might make your espresso machine unusable. Only proceed if you know what you are doing.")
+                color: Theme.textColor
+                font.pixelSize: Theme.scaled(13)
+                wrapMode: Text.Wrap
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.scaled(12)
+
+                AccessibleButton {
+                    text: TranslationManager.translate("common.cancel", "Cancel")
+                    accessibleName: TranslationManager.translate("settings.calibration.cancelWarning", "Cancel calibration")
+                    onClicked: calibrationWarningDialog.close()
+                }
+
+                Item { Layout.fillWidth: true }
+
+                AccessibleButton {
+                    primary: true
+                    text: TranslationManager.translate("settings.calibration.proceed", "Proceed")
+                    accessibleName: TranslationManager.translate("settings.calibration.proceedWarning", "Proceed to calibration")
+                    onClicked: {
+                        calibrationWarningDialog.close()
+                        calibrationPopup.open()
+                    }
+                }
+            }
+        }
+    }
+
     // Heater Calibration Popup
     Popup {
         id: calibrationPopup
@@ -1643,43 +1703,12 @@ KeyboardAwareContainer {
                 width: parent.width
                 spacing: Theme.scaled(16)
 
-                // Title row
-                RowLayout {
-                    Layout.fillWidth: true
-
-                    Text {
-                        text: TranslationManager.translate("settings.calibration.title", "Heater Calibration")
-                        color: Theme.textColor
-                        font.pixelSize: Theme.scaled(18)
-                        font.bold: true
-                    }
-
-                    Item { Layout.fillWidth: true }
-
-                    Rectangle {
-                        width: Theme.scaled(30)
-                        height: Theme.scaled(30)
-                        radius: Theme.scaled(15)
-                        color: closeMouseArea.containsMouse ? Theme.borderColor : "transparent"
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "\u2715"
-                            color: Theme.textSecondaryColor
-                            font.pixelSize: Theme.scaled(16)
-                        }
-
-                        MouseArea {
-                            id: closeMouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: calibrationPopup.close()
-                            Accessible.role: Accessible.Button
-                            Accessible.name: TranslationManager.translate("settings.calibration.close", "Close")
-                            Accessible.focusable: true
-                            Accessible.onPressAction: calibrationPopup.close()
-                        }
-                    }
+                // Title
+                Text {
+                    text: TranslationManager.translate("settings.calibration.title", "Heater Calibration")
+                    color: Theme.textColor
+                    font.pixelSize: Theme.scaled(18)
+                    font.bold: true
                 }
 
                 Rectangle { Layout.fillWidth: true; height: 1; color: Theme.borderColor }
@@ -1698,13 +1727,7 @@ KeyboardAwareContainer {
 
                 // Heater test time-out
                 Text { text: TranslationManager.translate("settings.calibration.heaterTestTimeout", "Heater test time-out"); font: Theme.captionFont; color: Theme.textSecondaryColor }
-                ValueInput { id: heaterTestTimeoutSlider; Layout.fillWidth: true; accessibleName: TranslationManager.translate("settings.calibration.heaterTestTimeout", "Heater test time-out"); from: 10; to: 300; stepSize: 1; value: Settings.heaterWarmupTimeout; onValueModified: function(newValue) { Settings.heaterWarmupTimeout = Math.round(newValue) }; KeyNavigation.tab: hotWaterFlowRateSlider; KeyNavigation.backtab: heaterTestFlowSlider }
-
-                Rectangle { Layout.fillWidth: true; height: 1; color: Theme.borderColor }
-
-                // Hot water flow rate
-                Text { text: TranslationManager.translate("settings.calibration.hotWaterFlowRate", "Hot water flow rate"); font: Theme.captionFont; color: Theme.flowColor }
-                ValueInput { id: hotWaterFlowRateSlider; Layout.fillWidth: true; valueColor: Theme.flowColor; accessibleName: TranslationManager.translate("settings.calibration.hotWaterFlowRate", "Hot water flow rate"); from: 5; to: 80; stepSize: 1; value: Settings.hotWaterFlowRate; onValueModified: function(newValue) { Settings.hotWaterFlowRate = Math.round(newValue) }; KeyNavigation.tab: steamTwoTapSwitch; KeyNavigation.backtab: heaterTestTimeoutSlider }
+                ValueInput { id: heaterTestTimeoutSlider; Layout.fillWidth: true; accessibleName: TranslationManager.translate("settings.calibration.heaterTestTimeout", "Heater test time-out"); from: 10; to: 300; stepSize: 1; value: Settings.heaterWarmupTimeout; onValueModified: function(newValue) { Settings.heaterWarmupTimeout = Math.round(newValue) }; KeyNavigation.tab: steamTwoTapSwitch; KeyNavigation.backtab: heaterTestFlowSlider }
 
                 // Steam two-tap stop
                 RowLayout { Layout.fillWidth: true
@@ -1716,7 +1739,7 @@ KeyboardAwareContainer {
                         checked: Settings.steamTwoTapStop
                         onToggled: Settings.steamTwoTapStop = checked
                         KeyNavigation.tab: defaultsButton
-                        KeyNavigation.backtab: hotWaterFlowRateSlider
+                        KeyNavigation.backtab: heaterTestTimeoutSlider
                     }
                 }
                 Text {
@@ -1741,22 +1764,32 @@ KeyboardAwareContainer {
                         Settings.heaterWarmupFlow = 20
                         Settings.heaterTestFlow = 40
                         Settings.heaterWarmupTimeout = 10
-                        Settings.hotWaterFlowRate = 10
                         Settings.steamTwoTapStop = false
                     }
                     KeyNavigation.tab: doneButton
                     KeyNavigation.backtab: steamTwoTapSwitch
                 }
 
-                // Done button
-                AccessibleButton {
-                    id: doneButton
+                RowLayout {
                     Layout.fillWidth: true
-                    text: TranslationManager.translate("settings.calibration.done", "Done")
-                    accessibleName: TranslationManager.translate("settings.calibration.closeCalibration", "Close heater calibration")
-                    onClicked: calibrationPopup.close()
-                    KeyNavigation.tab: heaterIdleTempSlider
-                    KeyNavigation.backtab: defaultsButton
+                    spacing: Theme.scaled(12)
+
+                    AccessibleButton {
+                        text: TranslationManager.translate("common.cancel", "Cancel")
+                        accessibleName: TranslationManager.translate("settings.calibration.cancelCalibration", "Cancel calibration")
+                        onClicked: calibrationPopup.close()
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    AccessibleButton {
+                        id: doneButton
+                        text: TranslationManager.translate("settings.calibration.done", "Done")
+                        accessibleName: TranslationManager.translate("settings.calibration.closeCalibration", "Close heater calibration")
+                        onClicked: calibrationPopup.close()
+                        KeyNavigation.tab: heaterIdleTempSlider
+                        KeyNavigation.backtab: defaultsButton
+                    }
                 }
             }
         }

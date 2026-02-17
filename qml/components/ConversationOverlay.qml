@@ -451,6 +451,7 @@ Rectangle {
         property string beverageType: ""
         title: TranslationManager.translate("shotdetail.unsupportedbeverage.title", "AI Not Available")
         anchors.centerIn: parent
+        width: Math.min(parent.width * 0.85, Theme.scaled(400))
         modal: true
 
         background: Rectangle {

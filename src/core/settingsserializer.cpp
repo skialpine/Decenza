@@ -313,7 +313,8 @@ bool SettingsSerializer::importFromJson(Settings* settings, const QJsonObject& j
             QJsonArray presets = water["vesselPresets"].toArray();
             for (const QJsonValue& v : presets) {
                 QJsonObject p = v.toObject();
-                settings->addWaterVesselPreset(p["name"].toString(), p["volume"].toInt());
+                settings->addWaterVesselPreset(p["name"].toString(), p["volume"].toInt(),
+                                               p["mode"].toString("weight"), p["flowRate"].toInt(40));
             }
         }
     }

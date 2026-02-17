@@ -13,6 +13,7 @@ Page {
         // Sync Settings with selected preset
         Settings.waterVolume = getCurrentVesselVolume()
         Settings.waterVolumeMode = getCurrentVesselMode()
+        Settings.hotWaterFlowRate = getCurrentVesselFlowRate()
         MainController.applyHotWaterSettings()
         // Tare immediately so display shows 0g instead of current scale weight
         // (scale will tare again when hot water flow actually starts)
@@ -46,11 +47,16 @@ Page {
         return (preset && preset.mode) ? preset.mode : "weight"
     }
 
-    // Save current vessel with new volume
-    function saveCurrentVessel(volume) {
+    function getCurrentVesselFlowRate() {
+        var preset = Settings.getWaterVesselPreset(Settings.selectedWaterVessel)
+        return (preset && preset.flowRate !== undefined) ? preset.flowRate : 40
+    }
+
+    // Save current vessel with all parameters
+    function saveCurrentVessel(volume, flowRate) {
         var name = getCurrentVesselName()
         if (name) {
-            Settings.updateWaterVesselPreset(Settings.selectedWaterVessel, name, volume, Settings.waterVolumeMode)
+            Settings.updateWaterVesselPreset(Settings.selectedWaterVessel, name, volume, Settings.waterVolumeMode, flowRate)
         }
     }
 
@@ -98,6 +104,7 @@ Page {
                                 Settings.selectedWaterVessel = index
                                 Settings.waterVolume = modelData.volume
                                 Settings.waterVolumeMode = (modelData.mode || "weight")
+                                Settings.hotWaterFlowRate = (modelData.flowRate !== undefined) ? modelData.flowRate : 40
                                 MainController.applyHotWaterSettings()
                             }
                         }
@@ -302,8 +309,10 @@ Page {
                                                 // Simple click - select the vessel
                                                 Settings.selectedWaterVessel = vesselDelegate.vesselIndex
                                                 volumeInput.value = modelData.volume
+                                                flowRateInput.value = (modelData.flowRate !== undefined) ? modelData.flowRate : 40
                                                 Settings.waterVolume = modelData.volume
                                                 Settings.waterVolumeMode = (modelData.mode || "weight")
+                                                Settings.hotWaterFlowRate = (modelData.flowRate !== undefined) ? modelData.flowRate : 40
                                                 MainController.applyHotWaterSettings()
                                             }
                                             vesselPill.Drag.drop()
@@ -432,7 +441,7 @@ Page {
                                     anchors.fill: parent
                                     onClicked: {
                                         Settings.waterVolumeMode = "weight"
-                                        saveCurrentVessel(volumeInput.value)
+                                        saveCurrentVessel(volumeInput.value, flowRateInput.value)
                                         MainController.applyHotWaterSettings()
                                     }
                                 }
@@ -462,9 +471,9 @@ Page {
                                         if (volumeInput.value > 255) {
                                             volumeInput.value = 255
                                             Settings.waterVolume = 255
-                                            saveCurrentVessel(255)
+                                            saveCurrentVessel(255, flowRateInput.value)
                                         } else {
-                                            saveCurrentVessel(volumeInput.value)
+                                            saveCurrentVessel(volumeInput.value, flowRateInput.value)
                                         }
                                         MainController.applyHotWaterSettings()
                                     }
@@ -490,7 +499,7 @@ Page {
                             onValueModified: function(newValue) {
                                 volumeInput.value = newValue
                                 Settings.waterVolume = newValue
-                                saveCurrentVessel(newValue)
+                                saveCurrentVessel(newValue, flowRateInput.value)
                                 MainController.applyHotWaterSettings()
                             }
                         }
@@ -531,6 +540,41 @@ Page {
                         }
                     }
 
+                    Rectangle { Layout.fillWidth: true; height: 1; color: Theme.textSecondaryColor; opacity: 0.3 }
+
+                    // Flow Rate (per-preset, stored as tenths of mL/s)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.scaled(16)
+
+                        Tr {
+                            key: "hotwater.label.flowRate"
+                            fallback: "Flow Rate"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(24)
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        ValueInput {
+                            id: flowRateInput
+                            Layout.preferredWidth: Theme.scaled(180)
+                            value: getCurrentVesselFlowRate()
+                            from: 5
+                            to: 80
+                            stepSize: 5
+                            displayText: (value / 10).toFixed(1) + " mL/s"
+                            valueColor: Theme.flowColor
+                            accessibleName: TranslationManager.translate("hotwater.label.flowRate", "Flow Rate")
+
+                            onValueModified: function(newValue) {
+                                flowRateInput.value = Math.round(newValue)
+                                Settings.hotWaterFlowRate = Math.round(newValue)
+                                saveCurrentVessel(volumeInput.value, Math.round(newValue))
+                            }
+                        }
+                    }
+
                     Item { Layout.fillHeight: true }
                 }
             }
@@ -557,6 +601,12 @@ Page {
         Rectangle { width: 1; height: Theme.scaled(30); color: "white"; opacity: 0.3 }
         Text {
             text: temperatureInput.value.toFixed(0) + "°C"
+            color: "white"
+            font: Theme.bodyFont
+        }
+        Rectangle { width: 1; height: Theme.scaled(30); color: "white"; opacity: 0.3 }
+        Text {
+            text: (flowRateInput.value / 10).toFixed(1) + " mL/s"
             color: "white"
             font: Theme.bodyFont
         }
@@ -661,7 +711,7 @@ Page {
                     accessibleName: TranslationManager.translate("hotWater.saveVesselChanges", "Save changes to water vessel preset")
                     onClicked: {
                         var preset = Settings.getWaterVesselPreset(editingVesselIndex)
-                        Settings.updateWaterVesselPreset(editingVesselIndex, editVesselNameInput.text, preset.volume, preset.mode || "weight")
+                        Settings.updateWaterVesselPreset(editingVesselIndex, editVesselNameInput.text, preset.volume, preset.mode || "weight", (preset.flowRate !== undefined) ? preset.flowRate : 40)
                         editVesselPopup.close()
                     }
                 }
@@ -758,7 +808,7 @@ Page {
                     accessibleName: TranslationManager.translate("hotWater.addNewVessel", "Add new water vessel with entered name")
                     onClicked: {
                         if (newVesselNameInput.text.length > 0) {
-                            Settings.addWaterVesselPreset(newVesselNameInput.text, 200)
+                            Settings.addWaterVesselPreset(newVesselNameInput.text, 200, "weight", 40)
                             newVesselNameInput.text = ""
                             addVesselDialog.close()
                         }
