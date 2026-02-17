@@ -531,8 +531,10 @@ Page {
 
                 LabeledField {
                     Layout.fillWidth: true
-                    label: TranslationManager.translate("shotmetadata.label.roastdate", "Roast date")
+                    label: TranslationManager.translate("shotmetadata.label.roastdate.format", "Roast date (yyyy-mm-dd)")
                     text: isEditMode ? editRoastDate : Settings.dyeRoastDate
+                    inputHints: Qt.ImhDate
+                    inputMask: "9999-99-99"
                     onTextEdited: function(t) { if (isEditMode) editRoastDate = t; else Settings.dyeRoastDate = t; }
                 }
 
@@ -652,6 +654,7 @@ Page {
 
             Accessible.role: Accessible.Button
             Accessible.name: TranslationManager.translate("beaninfo.button.save", "Save Changes")
+            Accessible.focusable: true
             Accessible.onPressAction: saveArea.clicked(null)
 
             Row {
@@ -767,6 +770,7 @@ Page {
             Accessible.role: Accessible.ComboBox
             Accessible.name: parent.label
             Accessible.description: currentIndex > 0 ? currentText : TranslationManager.translate("shotmetadata.accessible.notset", "Not set")
+            Accessible.focusable: true
 
             onActiveFocusChanged: {
                 if (activeFocus && AccessibilityManager.enabled) {

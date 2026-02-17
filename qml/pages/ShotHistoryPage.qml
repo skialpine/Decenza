@@ -450,6 +450,23 @@ Page {
 
                 property int shotEnjoyment: model.enjoyment || 0
 
+                // Accessibility: row is a button whose primary action opens shot detail
+                Accessible.role: Accessible.Button
+                Accessible.name: {
+                    var parts = []
+                    if (model.profileName) parts.push(model.profileName)
+                    if (model.dateTime) parts.push(model.dateTime)
+                    var bean = (model.beanBrand || "") + (model.beanType ? " " + model.beanType : "")
+                    if (bean) parts.push(bean)
+                    var dose = (model.doseWeight || 0).toFixed(1) + "g"
+                    var yield_ = (model.finalWeight || 0).toFixed(1) + "g"
+                    parts.push(dose + " to " + yield_)
+                    if (shotDelegate.shotEnjoyment > 0) parts.push(shotDelegate.shotEnjoyment + "%")
+                    return parts.join(", ")
+                }
+                Accessible.focusable: true
+                Accessible.onPressAction: openShotDetail(model.id)
+
                 RowLayout {
                     anchors.fill: parent
                     anchors.margins: Theme.spacingMedium
@@ -459,6 +476,10 @@ Page {
                     CheckBox {
                         checked: isSelected(model.id)
                         onClicked: toggleSelection(model.id)
+                        Accessible.role: Accessible.CheckBox
+                        Accessible.name: TranslationManager.translate("shothistory.accessible.compare", "Compare")
+                        Accessible.checked: checked
+                        Accessible.focusable: true
 
                         indicator: Rectangle {
                             implicitWidth: Theme.scaled(24)
@@ -575,6 +596,10 @@ Page {
                         height: Theme.scaled(40)
                         radius: Theme.scaled(20)
                         color: Theme.warningColor
+                        Accessible.role: Accessible.Button
+                        Accessible.name: TranslationManager.translate("shothistory.accessible.load", "Load profile")
+                        Accessible.focusable: true
+                        Accessible.onPressAction: loadArea.clicked(null)
 
                         Text {
                             id: loadButtonText
@@ -586,6 +611,7 @@ Page {
                         }
 
                         MouseArea {
+                            id: loadArea
                             anchors.fill: parent
                             onClicked: {
                                 MainController.loadShotWithMetadata(model.id)
@@ -600,6 +626,10 @@ Page {
                         height: Theme.scaled(40)
                         radius: Theme.scaled(20)
                         color: "#2E7D32"
+                        Accessible.role: Accessible.Button
+                        Accessible.name: TranslationManager.translate("shothistory.accessible.edit", "Edit shot")
+                        Accessible.focusable: true
+                        Accessible.onPressAction: editArea.clicked(null)
 
                         Text {
                             anchors.centerIn: parent
@@ -610,6 +640,7 @@ Page {
                         }
 
                         MouseArea {
+                            id: editArea
                             anchors.fill: parent
                             onClicked: {
                                 pageStack.push(Qt.resolvedUrl("PostShotReviewPage.qml"), { editShotId: model.id })
@@ -623,6 +654,10 @@ Page {
                         height: Theme.scaled(40)
                         radius: Theme.scaled(20)
                         color: Theme.primaryColor
+                        Accessible.role: Accessible.Button
+                        Accessible.name: TranslationManager.translate("shothistory.accessible.details", "View details")
+                        Accessible.focusable: true
+                        Accessible.onPressAction: detailArea.clicked(null)
 
                         Text {
                             anchors.centerIn: parent
@@ -633,6 +668,7 @@ Page {
                         }
 
                         MouseArea {
+                            id: detailArea
                             anchors.fill: parent
                             onClicked: openShotDetail(model.id)
                         }

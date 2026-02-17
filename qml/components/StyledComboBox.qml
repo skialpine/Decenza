@@ -106,4 +106,5 @@ ComboBox {
 
     Accessible.role: Accessible.ComboBox
     Accessible.name: control.displayText
+    Accessible.focusable: true
 }
