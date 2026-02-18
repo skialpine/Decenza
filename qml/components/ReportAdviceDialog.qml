@@ -10,6 +10,7 @@ Dialog {
     modal: true
     padding: 0
     closePolicy: Dialog.NoAutoClose
+    Accessible.name: TranslationManager.translate("aiReport.title", "Report Bad Advice")
 
     property string conversationTranscript: ""
     property string shotDebugLog: ""
@@ -581,6 +582,7 @@ Dialog {
                 AccessibleButton {
                     width: parent.buttonWidth
                     height: parent.buttonHeight
+                    enabled: !CrashReporter.submitting
                     text: TranslationManager.translate("aiReport.retry", "Retry")
                     accessibleName: TranslationManager.translate("aiReport.retryAccessible", "Retry submitting report")
                     onClicked: root.submitReport()

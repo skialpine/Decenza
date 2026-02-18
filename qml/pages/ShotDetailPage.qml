@@ -196,7 +196,8 @@ Page {
                     id: prevShotButton
                     text: TranslationManager.translate("shotdetail.previousshot", "Previous Shot")
                     accessibleName: TranslationManager.translate("shotdetail.accessible.previousshot",
-                        "Previous shot") + " (" + (currentIndex) + " / " + shotIds.length + ")"
+                        "Previous shot") + ", " + TranslationManager.translate("shotdetail.accessible.position",
+                        "Shot %1 of %2").arg(currentIndex + 1).arg(shotIds.length)
                     Layout.fillWidth: true
                     enabled: canGoPrevious()
                     onClicked: navigateToShot(currentIndex - 1)
@@ -215,7 +216,8 @@ Page {
                     id: nextShotButton
                     text: TranslationManager.translate("shotdetail.nextshot", "Next Shot")
                     accessibleName: TranslationManager.translate("shotdetail.accessible.nextshot",
-                        "Next shot") + " (" + (currentIndex + 2) + " / " + shotIds.length + ")"
+                        "Next shot") + ", " + TranslationManager.translate("shotdetail.accessible.position",
+                        "Shot %1 of %2").arg(currentIndex + 1).arg(shotIds.length)
                     Layout.fillWidth: true
                     enabled: canGoNext()
                     onClicked: navigateToShot(currentIndex + 1)
