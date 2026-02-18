@@ -281,6 +281,7 @@ Page {
             fallback: "PREHEATING..."
             color: Theme.textColor
             font: Theme.bodyFont
+            Accessible.ignored: true
         }
     }
 
@@ -304,6 +305,7 @@ Page {
             color: "white"
             font.pixelSize: Theme.scaled(24)
             font.weight: Font.Bold
+            Accessible.ignored: true
         }
 
         AccessibleTapHandler {
@@ -376,12 +378,14 @@ Page {
                     color: Theme.textColor
                     font.pixelSize: Theme.scaled(36)
                     font.weight: Font.Bold
+                    Accessible.ignored: true
                 }
                 Tr {
                     key: "espresso.label.time"
                     fallback: "Time"
                     color: Theme.textSecondaryColor
                     font: Theme.captionFont
+                    Accessible.ignored: true
                 }
             }
 
@@ -408,12 +412,14 @@ Page {
                     color: Theme.pressureColor
                     font.pixelSize: Theme.scaled(28)
                     font.weight: Font.Medium
+                    Accessible.ignored: true
                 }
                 Tr {
                     key: "espresso.unit.bar"
                     fallback: "bar"
                     color: Theme.textSecondaryColor
                     font: Theme.captionFont
+                    Accessible.ignored: true
                 }
             }
 
@@ -430,12 +436,14 @@ Page {
                     color: Theme.flowColor
                     font.pixelSize: Theme.scaled(28)
                     font.weight: Font.Medium
+                    Accessible.ignored: true
                 }
                 Tr {
                     key: "espresso.unit.flowRate"
                     fallback: "mL/s"
                     color: Theme.textSecondaryColor
                     font: Theme.captionFont
+                    Accessible.ignored: true
                 }
             }
 
@@ -452,12 +460,14 @@ Page {
                     color: Theme.temperatureColor
                     font.pixelSize: Theme.scaled(28)
                     font.weight: Font.Medium
+                    Accessible.ignored: true
                 }
                 Tr {
                     key: "espresso.unit.celsius"
                     fallback: "°C"
                     color: Theme.textSecondaryColor
                     font: Theme.captionFont
+                    Accessible.ignored: true
                 }
             }
 
@@ -474,12 +484,14 @@ Page {
                     color: Theme.weightFlowColor
                     font.pixelSize: Theme.scaled(28)
                     font.weight: Font.Medium
+                    Accessible.ignored: true
                 }
                 Tr {
                     key: "espresso.unit.weightFlow"
                     fallback: "g/s"
                     color: Theme.textSecondaryColor
                     font: Theme.captionFont
+                    Accessible.ignored: true
                 }
             }
 
@@ -520,6 +532,7 @@ Page {
                         font.pixelSize: Theme.scaled(28)
                         font.weight: Font.Medium
                         Layout.alignment: Qt.AlignBaseline
+                        Accessible.ignored: true
                     }
                     Text {
                         text: MainController.brewByRatioActive && !weightVolumeColumn.isVolumeMode
@@ -528,6 +541,7 @@ Page {
                         color: Theme.textSecondaryColor
                         font.pixelSize: Theme.scaled(18)
                         Layout.alignment: Qt.AlignBaseline
+                        Accessible.ignored: true
                     }
                 }
 
@@ -578,6 +592,7 @@ Page {
                             color: "white"
                             font.pixelSize: Theme.scaled(11)
                             font.weight: Font.Medium
+                            Accessible.ignored: true
                         }
 
                         TapHandler {

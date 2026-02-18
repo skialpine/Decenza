@@ -186,6 +186,7 @@ Page {
                 visible: editShotData.pressure && editShotData.pressure.length > 0
 
                 HistoryShotGraph {
+                    id: reviewGraph
                     anchors.fill: parent
                     anchors.margins: Theme.spacingSmall
                     anchors.bottomMargin: Theme.spacingSmall + resizeHandle.height
@@ -196,6 +197,14 @@ Page {
                     weightFlowRateData: editShotData.weightFlowRate || []
                     phaseMarkers: editShotData.phases || []
                     maxTime: editShotData.duration || 60
+                }
+
+                // Tap-to-announce overlay (reads out curve values at tapped position)
+                MouseArea {
+                    anchors.fill: reviewGraph
+                    onClicked: function(mouse) {
+                        reviewGraph.announceAtPosition(mouse.x, mouse.y)
+                    }
                 }
 
                 // Resize handle at bottom

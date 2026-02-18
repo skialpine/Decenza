@@ -111,6 +111,11 @@ Page {
 
                     onSwipedLeft: comparisonModel.shiftWindowRight()
                     onSwipedRight: comparisonModel.shiftWindowLeft()
+                    onTapped: function(x, y) {
+                        // Convert page-relative position to graph-relative
+                        var graphPos = mapToItem(comparisonGraph, x, y)
+                        comparisonGraph.announceAtPosition(graphPos.x, graphPos.y)
+                    }
                 }
 
                 // Position indicator (only show if more than 3 shots)
@@ -209,16 +214,23 @@ Page {
                     border.width: 1
                     opacity: showPressure ? 1.0 : 0.5
 
+                    Accessible.role: Accessible.CheckBox
+                    Accessible.name: TranslationManager.translate("comparison.pressure", "Pressure")
+                    Accessible.checked: showPressure
+                    Accessible.focusable: true
+                    Accessible.onPressAction: showPressure = !showPressure
+
                     RowLayout {
                         id: pressureToggleContent
                         anchors.centerIn: parent
                         spacing: Theme.spacingSmall
 
-                        Rectangle { width: Theme.scaled(20); height: 2; color: showPressure ? Theme.textColor : Theme.textSecondaryColor }
+                        Rectangle { width: Theme.scaled(20); height: 2; color: showPressure ? Theme.textColor : Theme.textSecondaryColor; Accessible.ignored: true }
                         Text {
                             text: TranslationManager.translate("comparison.pressure", "Pressure")
                             font: Theme.captionFont
                             color: showPressure ? Theme.textColor : Theme.textSecondaryColor
+                            Accessible.ignored: true
                         }
                     }
 
@@ -238,6 +250,12 @@ Page {
                     border.width: 1
                     opacity: showFlow ? 1.0 : 0.5
 
+                    Accessible.role: Accessible.CheckBox
+                    Accessible.name: TranslationManager.translate("comparison.flow", "Flow")
+                    Accessible.checked: showFlow
+                    Accessible.focusable: true
+                    Accessible.onPressAction: showFlow = !showFlow
+
                     RowLayout {
                         id: flowToggleContent
                         anchors.centerIn: parent
@@ -246,11 +264,13 @@ Page {
                         Rectangle {
                             width: Theme.scaled(20); height: 2; color: showFlow ? Theme.textColor : Theme.textSecondaryColor
                             Rectangle { anchors.fill: parent; color: "transparent"; border.color: showFlow ? Theme.textColor : Theme.textSecondaryColor; border.width: 1 }
+                            Accessible.ignored: true
                         }
                         Text {
                             text: TranslationManager.translate("comparison.flow", "Flow")
                             font: Theme.captionFont
                             color: showFlow ? Theme.textColor : Theme.textSecondaryColor
+                            Accessible.ignored: true
                         }
                     }
 
@@ -270,6 +290,12 @@ Page {
                     border.width: 1
                     opacity: showWeight ? 1.0 : 0.5
 
+                    Accessible.role: Accessible.CheckBox
+                    Accessible.name: TranslationManager.translate("comparison.weight", "Weight")
+                    Accessible.checked: showWeight
+                    Accessible.focusable: true
+                    Accessible.onPressAction: showWeight = !showWeight
+
                     RowLayout {
                         id: weightToggleContent
                         anchors.centerIn: parent
@@ -277,6 +303,7 @@ Page {
 
                         Row {
                             spacing: Theme.scaled(3)
+                            Accessible.ignored: true
                             Repeater {
                                 model: 4
                                 Rectangle { width: 3; height: 2; color: showWeight ? Theme.textColor : Theme.textSecondaryColor }
@@ -286,6 +313,7 @@ Page {
                             text: TranslationManager.translate("comparison.weight", "Weight")
                             font: Theme.captionFont
                             color: showWeight ? Theme.textColor : Theme.textSecondaryColor
+                            Accessible.ignored: true
                         }
                     }
 
@@ -305,16 +333,23 @@ Page {
                     border.width: 1
                     opacity: showWeightFlow ? 1.0 : 0.5
 
+                    Accessible.role: Accessible.CheckBox
+                    Accessible.name: TranslationManager.translate("comparison.weightFlow", "Weight Flow")
+                    Accessible.checked: showWeightFlow
+                    Accessible.focusable: true
+                    Accessible.onPressAction: showWeightFlow = !showWeightFlow
+
                     RowLayout {
                         id: weightFlowToggleContent
                         anchors.centerIn: parent
                         spacing: Theme.spacingSmall
 
-                        Rectangle { width: Theme.scaled(20); height: 2; color: showWeightFlow ? Theme.weightFlowColor : Theme.textSecondaryColor }
+                        Rectangle { width: Theme.scaled(20); height: 2; color: showWeightFlow ? Theme.weightFlowColor : Theme.textSecondaryColor; Accessible.ignored: true }
                         Text {
                             text: TranslationManager.translate("comparison.weightFlow", "Weight Flow")
                             font: Theme.captionFont
                             color: showWeightFlow ? Theme.textColor : Theme.textSecondaryColor
+                            Accessible.ignored: true
                         }
                     }
 

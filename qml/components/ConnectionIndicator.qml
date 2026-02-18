@@ -22,6 +22,7 @@ ColumnLayout {
             visible: machineConnected
             color: Theme.successColor
             font: Theme.valueFont
+            Accessible.ignored: true
         }
 
         Tr {
@@ -31,6 +32,7 @@ ColumnLayout {
             visible: !machineConnected
             color: Theme.errorColor
             font: Theme.valueFont
+            Accessible.ignored: true
         }
     }
 
@@ -49,6 +51,7 @@ ColumnLayout {
             visible: !machineConnected || (machineConnected && !scaleConnected && !isFlowScale)
             color: Theme.textSecondaryColor
             font: Theme.labelFont
+            Accessible.ignored: true
         }
 
         Tr {
@@ -58,6 +61,7 @@ ColumnLayout {
             visible: machineConnected && scaleConnected && !isFlowScale
             color: Theme.textSecondaryColor
             font: Theme.labelFont
+            Accessible.ignored: true
         }
 
         Tr {
@@ -67,6 +71,7 @@ ColumnLayout {
             visible: machineConnected && isFlowScale
             color: Theme.textSecondaryColor
             font: Theme.labelFont
+            Accessible.ignored: true
         }
     }
 }

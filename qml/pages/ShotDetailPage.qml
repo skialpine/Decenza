@@ -144,6 +144,7 @@ Page {
                 transform: Translate { x: graphSwipeArea.swipeOffset * 0.3 }
 
                 HistoryShotGraph {
+                    id: shotGraph
                     anchors.fill: parent
                     anchors.margins: Theme.spacingSmall
                     anchors.bottomMargin: Theme.spacingSmall + resizeHandle.height
@@ -167,6 +168,10 @@ Page {
 
                     onSwipedLeft: navigateToShot(currentIndex + 1)
                     onSwipedRight: navigateToShot(currentIndex - 1)
+                    onTapped: function(x, y) {
+                        var graphPos = mapToItem(shotGraph, x, y)
+                        shotGraph.announceAtPosition(graphPos.x, graphPos.y)
+                    }
                 }
 
                 // Resize handle at bottom

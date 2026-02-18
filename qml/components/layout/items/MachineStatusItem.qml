@@ -12,7 +12,7 @@ Item {
     implicitHeight: isCompact ? compactContent.implicitHeight : fullContent.implicitHeight
 
     Accessible.role: Accessible.StaticText
-    Accessible.name: "Machine status: " + root.statusText
+    Accessible.name: TranslationManager.translate("machineStatus.accessible", "Machine status: %1").arg(root.statusText)
     Accessible.focusable: true
 
     readonly property color statusColor: {
@@ -82,6 +82,7 @@ Item {
                 text: root.statusText
                 color: root.statusColor
                 font: Theme.bodyFont
+                Accessible.ignored: true
             }
         }
 
@@ -109,6 +110,7 @@ Item {
                 text: root.statusText
                 color: root.statusColor
                 font: Theme.valueFont
+                Accessible.ignored: true
             }
 
             Text {
@@ -116,6 +118,7 @@ Item {
                 text: TranslationManager.translate("machineStatus.label", "Machine Status")
                 color: Theme.textSecondaryColor
                 font: Theme.labelFont
+                Accessible.ignored: true
             }
         }
 

@@ -8,6 +8,7 @@ Item {
     // Signals emitted on successful swipe
     signal swipedLeft()   // Swipe left = go to next (newer)
     signal swipedRight()  // Swipe right = go to previous (older)
+    signal tapped(real x, real y)  // Non-swipe tap at position (for accessibility graph readout)
 
     // Whether swiping is allowed in each direction (for edge bounce)
     property bool canSwipeLeft: true
@@ -107,6 +108,11 @@ Item {
             isHorizontalSwipe = false
             // Animate back to center
             resetAnimation.start()
+        }
+
+        onClicked: function(mouse) {
+            // A tap (press+release without swiping) — emit position for graph readout
+            swipeArea.tapped(mouse.x, mouse.y)
         }
 
         onCanceled: {

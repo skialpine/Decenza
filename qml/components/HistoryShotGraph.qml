@@ -65,6 +65,52 @@ ChartView {
     // Qt.callLater deduplicates: N calls before execution → 1 actual invocation.
     function doReload() { loadData(); loadMarkers() }
 
+    // Find the Y value in a LineSeries closest to the given time
+    function findValueAtTime(series, time) {
+        if (series.count === 0) return null
+        var closest = series.at(0)
+        var minDist = Math.abs(closest.x - time)
+        for (var i = 1; i < series.count; i++) {
+            var p = series.at(i)
+            var dist = Math.abs(p.x - time)
+            if (dist < minDist) {
+                closest = p
+                minDist = dist
+            } else if (dist > minDist) {
+                break  // sorted by x
+            }
+        }
+        return minDist < 1.0 ? closest.y : null
+    }
+
+    // Announce curve values at a pixel position (called on tap)
+    function announceAtPosition(pixelX, pixelY) {
+        var dataPoint = chart.mapToValue(Qt.point(pixelX, pixelY), pressureSeries)
+        var time = dataPoint.x
+        if (time < 0 || time > timeAxis.max) return
+
+        var curves = [
+            { name: "Pressure", series: pressureSeries },
+            { name: "Flow", series: flowSeries },
+            { name: "Weight flow", series: weightFlowRateSeries },
+            { name: "Weight", series: weightSeries },
+            { name: "Temp", series: temperatureSeries }
+        ]
+
+        var parts = []
+        for (var i = 0; i < curves.length; i++) {
+            var v = findValueAtTime(curves[i].series, time)
+            if (v !== null) {
+                parts.push(curves[i].name + " " + v.toFixed(1))
+            }
+        }
+
+        if (parts.length === 0) return
+        if (typeof AccessibilityManager !== "undefined") {
+            AccessibilityManager.announce(time.toFixed(1) + ". " + parts.join(". "), true)
+        }
+    }
+
     onPressureDataChanged: Qt.callLater(doReload)
     onFlowDataChanged: Qt.callLater(doReload)
     onTemperatureDataChanged: Qt.callLater(doReload)

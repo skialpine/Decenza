@@ -51,6 +51,7 @@ Item {
                 fallback: DE1Device.connected ? "Online" : "Offline"
                 color: DE1Device.connected ? Theme.successColor : Theme.textSecondaryColor
                 font: Theme.bodyFont
+                Accessible.ignored: true
             }
         }
     }
