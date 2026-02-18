@@ -310,12 +310,18 @@ QString AIManager::getRecentShotContext(const QString& beanBrand, const QString&
     if (!m_shotHistory || (beanBrand.isEmpty() && profileName.isEmpty()))
         return QString();
 
-    // Build filter: match on non-empty fields, last 3 weeks
+    // Look up the current shot's timestamp so we only include older shots
+    qint64 shotTimestamp = m_shotHistory->getShotTimestamp(excludeShotId);
+    if (shotTimestamp <= 0)
+        return QString();
+
+    // Build filter: match on non-empty fields, up to 3 weeks before this shot
     QVariantMap filter;
     if (!beanBrand.isEmpty()) filter["beanBrand"] = beanBrand;
     if (!beanType.isEmpty()) filter["beanType"] = beanType;
     if (!profileName.isEmpty()) filter["profileName"] = profileName;
-    filter["dateFrom"] = QDateTime::currentSecsSinceEpoch() - 21 * 24 * 3600;
+    filter["dateFrom"] = shotTimestamp - 21 * 24 * 3600;
+    filter["dateTo"] = shotTimestamp;  // Only shots before (or at) this shot's time
 
     // Fetch extra to have room after filtering out excludeShotId and mistakes
     QVariantList candidates = m_shotHistory->getShotsFiltered(filter, 0, 6);
@@ -340,7 +346,7 @@ QString AIManager::getRecentShotContext(const QString& beanBrand, const QString&
         qint64 timestamp = shot.value("timestamp").toLongLong();
         QString dateStr = QDateTime::fromSecsSinceEpoch(timestamp).toString("MMM d, HH:mm");
 
-        shotSections.prepend(QString("### Shot #%1 (%2)\n\n%3").arg(id).arg(dateStr).arg(summary));
+        shotSections.prepend(QString("### Shot (%1)\n\n%2").arg(dateStr).arg(summary));
     }
 
     if (shotSections.isEmpty())

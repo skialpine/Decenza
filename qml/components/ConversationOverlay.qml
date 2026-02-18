@@ -11,7 +11,7 @@ import DecenzaDE1
  *       id: conversationOverlay
  *       anchors.fill: parent
  *       pendingShotSummary: myPage.pendingShotSummary
- *       shotId: myPage.shotId
+ *       shotId: myPage.shotId  // DB ID for internal lookups
  *       beverageType: "espresso"
  *       onPendingShotSummaryCleared: myPage.pendingShotSummary = ""
  *   }
@@ -22,6 +22,7 @@ Rectangle {
     // Properties set by the parent page
     property string pendingShotSummary: ""
     property int shotId: 0
+    property string shotLabel: ""  // Human-readable date/time for display (e.g. "Feb 15, 14:30")
     property string beverageType: "espresso"
     property string overlayTitle: TranslationManager.translate("conversation.title", "AI Conversation")
     property bool isMistakeShot: false
@@ -81,6 +82,12 @@ Rectangle {
         overlay.historicalContext = MainController.aiManager.getRecentShotContext(
             overlay.savedBeanBrand, overlay.savedBeanType, overlay.savedProfileName, shotId)
 
+        // Format shot timestamp as human-readable label for AI display
+        var shotTs = shotData.timestamp || 0
+        var shotLabel = shotTs > 0
+            ? new Date(shotTs * 1000).toLocaleString(Qt.locale(), "MMM d, HH:mm")
+            : ""
+
         // Check for mistake shot
         var isMistake = MainController.aiManager.isMistakeShot(shotData)
         if (isMistake) {
@@ -88,10 +95,11 @@ Rectangle {
         } else {
             // Generate shot summary from history shot data, with recipe dedup and change detection
             var raw = MainController.aiManager.generateHistoryShotSummary(shotData)
-            overlay.pendingShotSummary = MainController.aiManager.conversation.processShotForConversation(raw, shotId)
+            overlay.pendingShotSummary = MainController.aiManager.conversation.processShotForConversation(raw, shotLabel)
         }
 
         overlay.shotId = shotId
+        overlay.shotLabel = shotLabel
         overlay.beverageType = bevType
         overlay.isMistakeShot = isMistake
         overlay.shotDebugLog = shotData.debugLog || ""
@@ -419,7 +427,7 @@ Rectangle {
                             var hasShotData = overlay.pendingShotSummary.length > 0
                             if (hasShotData) {
                                 // For new conversations with historical context, prepend previous shots
-                                var shotSection = "## Shot #" + overlay.shotId + "\n\nHere's my latest shot:\n\n" +
+                                var shotSection = "## Shot (" + overlay.shotLabel + ")\n\nHere's my latest shot:\n\n" +
                                                   overlay.pendingShotSummary + "\n\n" + text
                                 if (overlay.historicalContext.length > 0) {
                                     message = overlay.historicalContext + "\n\n" + shotSection

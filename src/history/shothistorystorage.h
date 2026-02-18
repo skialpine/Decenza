@@ -133,6 +133,9 @@ public:
     Q_INVOKABLE QVariantList getShots(int offset = 0, int limit = 50);
     Q_INVOKABLE QVariantList getShotsFiltered(const QVariantMap& filter, int offset = 0, int limit = 50);
 
+    // Get just the timestamp of a shot (lightweight, no time-series)
+    Q_INVOKABLE qint64 getShotTimestamp(qint64 shotId);
+
     // Get full shot record (loads time-series data)
     Q_INVOKABLE QVariantMap getShot(qint64 shotId);
     ShotRecord getShotRecord(qint64 shotId);

@@ -14,7 +14,7 @@ const QRegularExpression AIConversation::s_yieldRe("\\*\\*Yield\\*\\*:\\s*([\\d.
 const QRegularExpression AIConversation::s_durationRe("\\*\\*Duration\\*\\*:\\s*([\\d.]+)s");
 const QRegularExpression AIConversation::s_grinderRe("\\*\\*Grinder\\*\\*:\\s*(.+?)\\n");
 const QRegularExpression AIConversation::s_profileRe("\\*\\*Profile\\*\\*:\\s*(.+?)(?:\\s*\\(by|\\n|$)");
-const QRegularExpression AIConversation::s_shotIdRe("## Shot #(\\d+)");
+const QRegularExpression AIConversation::s_shotLabelRe("## Shot \\(([^)]+)\\)");
 const QRegularExpression AIConversation::s_scoreRe("\\*\\*Score\\*\\*:\\s*(\\d+)");
 const QRegularExpression AIConversation::s_notesRe("\\*\\*Notes\\*\\*:\\s*\"([^\"]+)\"");
 
@@ -269,15 +269,15 @@ QString AIConversation::getConversationText() const
                     }
                 }
 
-                // Format: [Shot #N] or [Coffee #N] depending on beverage type
+                // Format: [Shot date] or [Coffee date] depending on beverage type
                 bool isFilter = content.contains("Beverage type**: filter", Qt::CaseInsensitive) ||
                                content.contains("Beverage type**: pourover", Qt::CaseInsensitive);
 
-                // Extract shot number from "## Shot #N" prefix if present
-                QRegularExpressionMatch shotNumMatch = s_shotIdRe.match(content);
+                // Extract shot label from "## Shot (date)" prefix if present
+                QRegularExpressionMatch shotNumMatch = s_shotLabelRe.match(content);
                 if (shotNumMatch.hasMatch()) {
-                    QString num = shotNumMatch.captured(1);
-                    text += isFilter ? "**[Coffee #" + num + "]**" : "**[Shot #" + num + "]**";
+                    QString label = shotNumMatch.captured(1);
+                    text += isFilter ? "**[Coffee " + label + "]**" : "**[Shot " + label + "]**";
                 } else {
                     text += isFilter ? "**[Coffee Data]**" : "**[Shot Data]**";
                 }
@@ -295,7 +295,7 @@ QString AIConversation::getConversationText() const
     return text;
 }
 
-void AIConversation::addShotContext(const QString& shotSummary, int shotId, const QString& beverageType)
+void AIConversation::addShotContext(const QString& shotSummary, const QString& shotLabel, const QString& beverageType)
 {
     if (m_busy) {
         qWarning() << "AIConversation::addShotContext ignored — already busy";
@@ -309,8 +309,8 @@ void AIConversation::addShotContext(const QString& shotSummary, int shotId, cons
         m_systemPrompt = multiShotSystemPrompt(beverageType);
     }
 
-    // Add the new shot as context with the app's shot ID
-    QString contextMessage = "## Shot #" + QString::number(shotId) +
+    // Add the new shot as context with its date/time label
+    QString contextMessage = "## Shot (" + shotLabel + ")" +
                             "\n\nHere's my latest shot:\n\n" + shotSummary +
                             "\n\nPlease analyze this shot and provide recommendations, considering any previous shots we've discussed.";
     addUserMessage(contextMessage);
@@ -320,14 +320,14 @@ void AIConversation::addShotContext(const QString& shotSummary, int shotId, cons
     qDebug() << "AIConversation: Added new shot context, now have" << m_messages.size() << "messages";
 }
 
-QString AIConversation::processShotForConversation(const QString& shotSummary, int shotId)
+QString AIConversation::processShotForConversation(const QString& shotSummary, const QString& shotLabel)
 {
     QString processed = shotSummary;
 
-    // Find previous shot in conversation (exclude the current shotId to avoid self-comparison)
-    PreviousShotInfo prev = findPreviousShot(shotId);
+    // Find previous shot in conversation (exclude the current shot to avoid self-comparison)
+    PreviousShotInfo prev = findPreviousShot(shotLabel);
     QString prevContent = prev.content;
-    int prevShotId = prev.shotId;
+    QString prevLabel = prev.shotLabel;
 
     if (!prevContent.isEmpty()) {
         // === Recipe dedup: skip recipe if same profile ===
@@ -365,11 +365,11 @@ QString AIConversation::processShotForConversation(const QString& shotSummary, i
 
         // Prepend changes section
         QString changesSection;
-        if (prevShotId >= 0) {
+        if (!prevLabel.isEmpty()) {
             if (!changes.isEmpty()) {
-                changesSection = "**Changes from Shot #" + QString::number(prevShotId) + "**: " + changes.join(", ") + "\n\n";
+                changesSection = "**Changes from Shot (" + prevLabel + ")**: " + changes.join(", ") + "\n\n";
             } else {
-                changesSection = "**No parameter changes from Shot #" + QString::number(prevShotId) + "**\n\n";
+                changesSection = "**No parameter changes from Shot (" + prevLabel + ")**\n\n";
             }
         }
 
@@ -401,22 +401,22 @@ QString AIConversation::extractMetric(const QString& content, const QRegularExpr
     return match.hasMatch() ? match.captured(1).trimmed() : QString();
 }
 
-AIConversation::PreviousShotInfo AIConversation::findPreviousShot(int excludeShotId) const
+AIConversation::PreviousShotInfo AIConversation::findPreviousShot(const QString& excludeLabel) const
 {
     // Walk backwards to find the most recent user message containing shot data,
-    // excluding the shot with the given ID to avoid self-comparison
+    // excluding the shot with the given label to avoid self-comparison
     for (int i = m_messages.size() - 1; i >= 0; i--) {
         QJsonObject msg = m_messages[i].toObject();
         if (msg["role"].toString() == "user") {
             QString content = msg["content"].toString();
             if (content.contains("Shot Summary") || content.contains("Here's my latest shot")) {
-                QRegularExpressionMatch match = s_shotIdRe.match(content);
-                int id = match.hasMatch() ? match.captured(1).toInt() : -1;
+                QRegularExpressionMatch match = s_shotLabelRe.match(content);
+                QString label = match.hasMatch() ? match.captured(1) : QString();
                 // Skip if this is the shot we're excluding
-                if (excludeShotId >= 0 && id == excludeShotId) {
+                if (!excludeLabel.isEmpty() && label == excludeLabel) {
                     continue;
                 }
-                return { content, id };
+                return { content, label };
             }
         }
     }
@@ -600,11 +600,11 @@ QString AIConversation::summarizeShotMessage(const QString& content)
     if (!content.contains("Shot Summary") && !content.contains("Here's my latest shot"))
         return QString();
 
-    // Extract shot number from "## Shot #N" prefix
-    QString shotNum;
-    QRegularExpressionMatch numMatch = s_shotIdRe.match(content);
+    // Extract shot label from "## Shot (date)" prefix
+    QString shotLabel;
+    QRegularExpressionMatch numMatch = s_shotLabelRe.match(content);
     if (numMatch.hasMatch()) {
-        shotNum = numMatch.captured(1);
+        shotLabel = numMatch.captured(1);
     }
 
     // Extract key metrics using shared regex constants
@@ -635,7 +635,7 @@ QString AIConversation::summarizeShotMessage(const QString& content)
 
     // Build compact summary
     QString summary = "- Shot";
-    if (!shotNum.isEmpty()) summary += " #" + shotNum;
+    if (!shotLabel.isEmpty()) summary += " (" + shotLabel + ")";
     summary += ":";
     if (!profile.isEmpty()) summary += " \"" + profile + "\"";
     if (!dose.isEmpty() && !yield.isEmpty()) summary += " " + dose + "g\u2192" + yield + "g";

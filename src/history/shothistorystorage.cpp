@@ -798,6 +798,17 @@ QVariantList ShotHistoryStorage::getShotsFiltered(const QVariantMap& filterMap, 
     return results;
 }
 
+qint64 ShotHistoryStorage::getShotTimestamp(qint64 shotId)
+{
+    if (!m_ready) return 0;
+    QSqlQuery query(m_db);
+    query.prepare("SELECT timestamp FROM shots WHERE id = ?");
+    query.bindValue(0, shotId);
+    if (query.exec() && query.next())
+        return query.value(0).toLongLong();
+    return 0;
+}
+
 QVariantMap ShotHistoryStorage::getShot(qint64 shotId)
 {
     ShotRecord record = getShotRecord(shotId);

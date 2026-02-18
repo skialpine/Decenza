@@ -81,16 +81,17 @@ public:
     /**
      * Add new shot context to existing conversation (for multi-shot dialing)
      * This appends shot data as a new user message without clearing history.
-     * shotId is the app's database shot ID used to label the shot in the conversation.
+     * shotLabel is a human-readable date/time string (e.g. "Feb 15, 14:30") identifying the shot.
      */
-    Q_INVOKABLE void addShotContext(const QString& shotSummary, int shotId, const QString& beverageType = "espresso");
+    Q_INVOKABLE void addShotContext(const QString& shotSummary, const QString& shotLabel, const QString& beverageType = "espresso");
 
     /**
      * Process a shot summary for conversation: deduplicates profile recipe if same
      * profile as previous shot, and prepends a "changes from previous" section.
      * Call this before sending via ask()/followUp() to avoid redundant data.
+     * shotLabel is a human-readable date/time string (e.g. "Feb 15, 14:30") identifying the shot.
      */
-    Q_INVOKABLE QString processShotForConversation(const QString& shotSummary, int shotId);
+    Q_INVOKABLE QString processShotForConversation(const QString& shotSummary, const QString& shotLabel);
 
     /**
      * Get the full system prompt for multi-shot conversations.
@@ -135,14 +136,14 @@ private:
     static QString summarizeAdvice(const QString& response);
     static QString extractMetric(const QString& content, const QRegularExpression& re);
 
-    struct PreviousShotInfo { QString content; int shotId = -1; };
-    PreviousShotInfo findPreviousShot(int excludeShotId = -1) const;
+    struct PreviousShotInfo { QString content; QString shotLabel; };
+    PreviousShotInfo findPreviousShot(const QString& excludeLabel = QString()) const;
 
     static constexpr int MAX_VERBATIM_PAIRS = 2;
 
     // Shared regex constants for shot message parsing
     static const QRegularExpression s_doseRe, s_yieldRe, s_durationRe,
-        s_grinderRe, s_profileRe, s_shotIdRe, s_scoreRe, s_notesRe;
+        s_grinderRe, s_profileRe, s_shotLabelRe, s_scoreRe, s_notesRe;
 
     AIManager* m_aiManager;
     QString m_systemPrompt;
