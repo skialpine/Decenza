@@ -107,6 +107,7 @@ Dialog {
 
             // Crash log preview (collapsible)
             Rectangle {
+                id: crashDetailsPreview
                 Layout.fillWidth: true
                 Layout.leftMargin: Theme.scaled(20)
                 Layout.rightMargin: Theme.scaled(20)
@@ -138,14 +139,23 @@ Dialog {
                         Item { Layout.fillWidth: true }
 
                         Text {
-                            text: parent.parent.parent.detailsExpanded ? TranslationManager.translate("crashReport.hide", "Hide") : TranslationManager.translate("crashReport.show", "Show")
+                            text: crashDetailsPreview.detailsExpanded
+                                  ? TranslationManager.translate("crashReport.hide", "Hide")
+                                  : TranslationManager.translate("crashReport.show", "Show")
                             font: Theme.labelFont
                             color: Theme.primaryColor
+
+                            Accessible.role: Accessible.Button
+                            Accessible.name: crashDetailsPreview.detailsExpanded
+                                ? TranslationManager.translate("crashReport.hide", "Hide")
+                                : TranslationManager.translate("crashReport.show", "Show")
+                            Accessible.focusable: true
+                            Accessible.onPressAction: crashDetailsPreview.detailsExpanded = !crashDetailsPreview.detailsExpanded
 
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: parent.parent.parent.parent.detailsExpanded = !parent.parent.parent.parent.detailsExpanded
+                                onClicked: crashDetailsPreview.detailsExpanded = !crashDetailsPreview.detailsExpanded
                             }
                         }
                     }
@@ -153,7 +163,7 @@ Dialog {
                     ScrollView {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        visible: parent.parent.detailsExpanded
+                        visible: crashDetailsPreview.detailsExpanded
                         clip: true
 
                         TextArea {
@@ -246,6 +256,7 @@ Dialog {
                     height: parent.buttonHeight
                     text: TranslationManager.translate("crashReport.sendReport", "Send Report")
                     accessibleName: TranslationManager.translate("crashReport.sendReportAccessible", "Send crash report")
+                    enabled: !CrashReporter.submitting
                     onClicked: {
                         root.dialogState = "submitting"
                         CrashReporter.submitReport(crashLog, userNotesInput.text, debugLogTail)
@@ -490,6 +501,7 @@ Dialog {
                     height: parent.buttonHeight
                     text: TranslationManager.translate("crashReport.retry", "Retry")
                     accessibleName: TranslationManager.translate("crashReport.retryAccessible", "Retry sending crash report")
+                    enabled: !CrashReporter.submitting
                     onClicked: {
                         root.dialogState = "submitting"
                         CrashReporter.submitReport(crashLog, userNotesInput.text, debugLogTail)

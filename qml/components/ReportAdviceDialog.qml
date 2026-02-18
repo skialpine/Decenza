@@ -36,6 +36,12 @@ Dialog {
     }
 
     function submitReport() {
+        if (CrashReporter.submitting) {
+            root.errorMessage = TranslationManager.translate("aiReport.alreadySubmitting",
+                "Another report is already being submitted. Please wait and try again.")
+            root.dialogState = "error"
+            return
+        }
         root.dialogState = "submitting"
         CrashReporter.submitReport(buildCrashLog(), userNotesInput.text)
     }
@@ -236,7 +242,7 @@ Dialog {
                             color: Theme.textColor
                             wrapMode: TextArea.Wrap
                             background: null
-                            Accessible.role: Accessible.EditableText
+                            Accessible.role: Accessible.StaticText
                             Accessible.name: TranslationManager.translate("aiReport.previewData", "Preview data")
                             Accessible.description: text.substring(0, 200)
                         }

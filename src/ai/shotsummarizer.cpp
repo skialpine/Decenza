@@ -503,7 +503,7 @@ QString ShotSummarizer::buildUserPrompt(const ShotSummary& summary) const
 
         // Skip peak-deviation if it's too close to start or end (within 1s)
         bool showPeak = std::abs(peakDevTime - phase.startTime) > 1.0 &&
-                        std::abs(peakDevTime - (phase.endTime - 0.1)) > 1.0;
+                        std::abs(peakDevTime - phase.endTime) > 1.0;
 
         for (int i = 0; i < 3; i++) {
             if (i == 1 && !showPeak) continue;

@@ -27,9 +27,10 @@ Rectangle {
     property bool isMistakeShot: false
     property string historicalContext: ""
     property string shotDebugLog: ""
-    property string _beanBrand: ""
-    property string _beanType: ""
-    property string _profileName: ""
+    // Saved context for re-fetching shot history after conversation clear
+    property string savedBeanBrand: ""
+    property string savedBeanType: ""
+    property string savedProfileName: ""
 
     // Emitted when the overlay clears pendingShotSummary (parent must handle)
     signal pendingShotSummaryCleared()
@@ -74,11 +75,11 @@ Rectangle {
 
         // Always fetch recent shot history as context (even for existing conversations,
         // since trimHistory() may have reduced prior shots to one-line summaries)
-        overlay._beanBrand = beanBrand || ""
-        overlay._beanType = beanType || ""
-        overlay._profileName = profileName || ""
+        overlay.savedBeanBrand = beanBrand || ""
+        overlay.savedBeanType = beanType || ""
+        overlay.savedProfileName = profileName || ""
         overlay.historicalContext = MainController.aiManager.getRecentShotContext(
-            overlay._beanBrand, overlay._beanType, overlay._profileName, shotId)
+            overlay.savedBeanBrand, overlay.savedBeanType, overlay.savedProfileName, shotId)
 
         // Check for mistake shot
         var isMistake = MainController.aiManager.isMistakeShot(shotData)
@@ -212,7 +213,7 @@ Rectangle {
                                     // Re-fetch historical context so next message includes prior shots
                                     if (overlay.shotId > 0) {
                                         overlay.historicalContext = MainController.aiManager.getRecentShotContext(
-                                            overlay._beanBrand, overlay._beanType, overlay._profileName, overlay.shotId)
+                                            overlay.savedBeanBrand, overlay.savedBeanType, overlay.savedProfileName, overlay.shotId)
                                     }
                                 }
                             }
