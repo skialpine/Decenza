@@ -23,6 +23,7 @@ Page {
             if (currentIndex < 0) currentIndex = 0
         }
         loadShot()
+        graphCard.forceActiveFocus()
     }
 
     function loadShot() {
@@ -52,6 +53,18 @@ Page {
             return "1:" + (shotData.finalWeight / shotData.doseWeight).toFixed(1)
         }
         return "-"
+    }
+
+    function graphAccessibleDescription() {
+        var parts = []
+        if (shotData.profileName)
+            parts.push(shotData.profileName)
+        parts.push((shotData.duration || 0).toFixed(0) + "s")
+        parts.push((shotData.doseWeight || 0).toFixed(1) + "g in")
+        parts.push((shotData.finalWeight || 0).toFixed(1) + "g out")
+        if (shotData.doseWeight > 0)
+            parts.push("ratio " + formatRatio())
+        return TranslationManager.translate("shotdetail.accessible.graph", "Shot graph") + ": " + parts.join(", ")
     }
 
 
@@ -119,6 +132,11 @@ Page {
                 radius: Theme.cardRadius
                 clip: true
 
+                Accessible.role: Accessible.Graphic
+                Accessible.name: graphAccessibleDescription()
+                Accessible.focusable: true
+                focus: true
+
                 // Visual offset during swipe
                 transform: Translate { x: graphSwipeArea.swipeOffset * 0.3 }
 
@@ -131,6 +149,7 @@ Page {
                     weightData: shotData.weight || []
                     phaseMarkers: shotData.phases || []
                     maxTime: shotData.duration || 60
+                    Accessible.ignored: true
                 }
 
                 // Swipe handler overlay
@@ -154,6 +173,7 @@ Page {
                     height: Theme.scaled(24)
                     radius: Theme.scaled(12)
                     color: Qt.rgba(0, 0, 0, 0.5)
+                    Accessible.ignored: true
 
                     Text {
                         id: positionText
@@ -161,7 +181,46 @@ Page {
                         text: (currentIndex + 1) + " / " + shotIds.length
                         font: Theme.captionFont
                         color: "white"
+                        Accessible.ignored: true
                     }
+                }
+            }
+
+            // Accessible navigation buttons for screen readers (hidden visually)
+            RowLayout {
+                visible: shotIds.length > 1
+                Layout.fillWidth: true
+                spacing: Theme.spacingMedium
+
+                AccessibleButton {
+                    id: prevShotButton
+                    text: TranslationManager.translate("shotdetail.previousshot", "Previous Shot")
+                    accessibleName: TranslationManager.translate("shotdetail.accessible.previousshot",
+                        "Previous shot") + ", " + TranslationManager.translate("shotdetail.accessible.position",
+                        "Shot %1 of %2").arg(currentIndex + 1).arg(shotIds.length)
+                    Layout.fillWidth: true
+                    enabled: canGoPrevious()
+                    onClicked: navigateToShot(currentIndex - 1)
+                }
+
+                Text {
+                    text: (currentIndex + 1) + " / " + shotIds.length
+                    font: Theme.labelFont
+                    color: Theme.textSecondaryColor
+                    horizontalAlignment: Text.AlignHCenter
+                    Accessible.name: TranslationManager.translate("shotdetail.accessible.position",
+                        "Shot %1 of %2").arg(currentIndex + 1).arg(shotIds.length)
+                }
+
+                AccessibleButton {
+                    id: nextShotButton
+                    text: TranslationManager.translate("shotdetail.nextshot", "Next Shot")
+                    accessibleName: TranslationManager.translate("shotdetail.accessible.nextshot",
+                        "Next shot") + ", " + TranslationManager.translate("shotdetail.accessible.position",
+                        "Shot %1 of %2").arg(currentIndex + 1).arg(shotIds.length)
+                    Layout.fillWidth: true
+                    enabled: canGoNext()
+                    onClicked: navigateToShot(currentIndex + 1)
                 }
             }
 
@@ -173,46 +232,67 @@ Page {
                 // Duration
                 ColumnLayout {
                     spacing: Theme.scaled(2)
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: TranslationManager.translate("shotdetail.duration", "Duration") + ": " +
+                        (shotData.duration || 0).toFixed(1) + "s"
                     Tr {
                         key: "shotdetail.duration"
                         fallback: "Duration"
                         font: Theme.captionFont
                         color: Theme.textSecondaryColor
+                        Accessible.ignored: true
                     }
                     Text {
                         text: (shotData.duration || 0).toFixed(1) + "s"
                         font: Theme.subtitleFont
                         color: Theme.textColor
+                        Accessible.ignored: true
                     }
                 }
 
                 // Dose
                 ColumnLayout {
                     spacing: Theme.scaled(2)
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: TranslationManager.translate("shotdetail.dose", "Dose") + ": " +
+                        (shotData.doseWeight || 0).toFixed(1) + "g"
                     Tr {
                         key: "shotdetail.dose"
                         fallback: "Dose"
                         font: Theme.captionFont
                         color: Theme.textSecondaryColor
+                        Accessible.ignored: true
                     }
                     Text {
                         text: (shotData.doseWeight || 0).toFixed(1) + "g"
                         font: Theme.subtitleFont
                         color: Theme.dyeDoseColor
+                        Accessible.ignored: true
                     }
                 }
 
                 // Output (with optional target)
                 ColumnLayout {
                     spacing: Theme.scaled(2)
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: {
+                        var label = TranslationManager.translate("shotdetail.output", "Output") + ": " +
+                            (shotData.finalWeight || 0).toFixed(1) + "g"
+                        var y = shotData.yieldOverride
+                        if (y !== undefined && y !== null && y > 0 && Math.abs(y - shotData.finalWeight) > 0.5)
+                            label += " (" + Math.round(y) + "g target)"
+                        return label
+                    }
                     Tr {
                         key: "shotdetail.output"
                         fallback: "Output"
                         font: Theme.captionFont
                         color: Theme.textSecondaryColor
+                        Accessible.ignored: true
                     }
                     Row {
                         spacing: Theme.scaled(4)
+                        Accessible.ignored: true
                         Text {
                             text: (shotData.finalWeight || 0).toFixed(1) + "g"
                             font: Theme.subtitleFont
@@ -238,32 +318,41 @@ Page {
                 // Ratio
                 ColumnLayout {
                     spacing: Theme.scaled(2)
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: TranslationManager.translate("shotdetail.ratio", "Ratio") + ": " + formatRatio()
                     Tr {
                         key: "shotdetail.ratio"
                         fallback: "Ratio"
                         font: Theme.captionFont
                         color: Theme.textSecondaryColor
+                        Accessible.ignored: true
                     }
                     Text {
                         text: formatRatio()
                         font: Theme.subtitleFont
                         color: Theme.textColor
+                        Accessible.ignored: true
                     }
                 }
 
                 // Rating
                 ColumnLayout {
                     spacing: Theme.scaled(2)
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: TranslationManager.translate("shotdetail.rating", "Rating") + ": " +
+                        ((shotData.enjoyment || 0) > 0 ? shotData.enjoyment + "%" : "-")
                     Tr {
                         key: "shotdetail.rating"
                         fallback: "Rating"
                         font: Theme.captionFont
                         color: Theme.textSecondaryColor
+                        Accessible.ignored: true
                     }
                     Text {
                         text: (shotData.enjoyment || 0) > 0 ? shotData.enjoyment + "%" : "-"
                         font: Theme.subtitleFont
                         color: Theme.warningColor
+                        Accessible.ignored: true
                     }
                 }
             }
@@ -274,6 +363,8 @@ Page {
                 Layout.preferredHeight: beanColumn.height + Theme.spacingLarge
                 color: Theme.surfaceColor
                 radius: Theme.cardRadius
+                Accessible.role: Accessible.Grouping
+                Accessible.name: TranslationManager.translate("shotdetail.beaninfo", "Beans")
 
                 ColumnLayout {
                     id: beanColumn
@@ -320,6 +411,8 @@ Page {
                 Layout.preferredHeight: grinderColumn.height + Theme.spacingLarge
                 color: Theme.surfaceColor
                 radius: Theme.cardRadius
+                Accessible.role: Accessible.Grouping
+                Accessible.name: TranslationManager.translate("shotdetail.grinder", "Grinder")
 
                 ColumnLayout {
                     id: grinderColumn
@@ -358,6 +451,8 @@ Page {
                 color: Theme.surfaceColor
                 radius: Theme.cardRadius
                 visible: shotData.drinkTds > 0 || shotData.drinkEy > 0
+                Accessible.role: Accessible.Grouping
+                Accessible.name: TranslationManager.translate("shotdetail.analysis", "Analysis")
 
                 ColumnLayout {
                     id: analysisColumn
@@ -399,6 +494,8 @@ Page {
                 color: Theme.surfaceColor
                 radius: Theme.cardRadius
                 visible: shotData.barista && shotData.barista !== ""
+                Accessible.role: Accessible.Grouping
+                Accessible.name: TranslationManager.translate("shotdetail.barista", "Barista:") + " " + (shotData.barista || "")
 
                 RowLayout {
                     id: baristaRow
@@ -429,6 +526,8 @@ Page {
                 Layout.preferredHeight: notesColumn.height + Theme.spacingLarge
                 color: Theme.surfaceColor
                 radius: Theme.cardRadius
+                Accessible.role: Accessible.Grouping
+                Accessible.name: TranslationManager.translate("shotdetail.notes", "Notes")
 
                 ColumnLayout {
                     id: notesColumn
@@ -497,6 +596,9 @@ Page {
                 color: Theme.surfaceColor
                 radius: Theme.cardRadius
                 visible: shotData.visualizerId
+                Accessible.role: Accessible.StaticText
+                Accessible.name: TranslationManager.translate("shotdetail.uploadedtovisualizer",
+                    "Uploaded to Visualizer") + ": " + (shotData.visualizerId || "")
 
                 RowLayout {
                     anchors.fill: parent
@@ -551,6 +653,10 @@ Page {
                 selectByMouse: true
                 wrapMode: Text.Wrap
                 background: Rectangle { color: "transparent" }
+
+                Accessible.role: Accessible.EditableText
+                Accessible.name: TranslationManager.translate("shotdetail.debuglog", "Debug Log")
+                Accessible.description: text.substring(0, 200)
             }
         }
 
@@ -610,6 +716,7 @@ Page {
             Accessible.name: shotData.visualizerId
                 ? TranslationManager.translate("shotdetail.button.reupload", "Re-Upload to Visualizer")
                 : TranslationManager.translate("shotdetail.button.upload", "Upload to Visualizer")
+            Accessible.focusable: true
             Accessible.onPressAction: uploadButtonArea.clicked(null)
 
             Row {
@@ -622,6 +729,7 @@ Page {
                     font.pixelSize: Theme.scaled(16)
                     color: "white"
                     anchors.verticalCenter: parent.verticalCenter
+                    Accessible.ignored: true
                 }
 
                 Tr {
@@ -634,6 +742,7 @@ Page {
                     color: "white"
                     font: Theme.bodyFont
                     anchors.verticalCenter: parent.verticalCenter
+                    Accessible.ignored: true
                 }
             }
 
@@ -673,6 +782,7 @@ Page {
 
             Accessible.role: Accessible.Button
             Accessible.name: TranslationManager.translate("shotdetail.aiadvice", "AI Advice")
+            Accessible.focusable: true
             Accessible.onPressAction: aiButtonArea.clicked(null)
 
             Row {
@@ -686,6 +796,7 @@ Page {
                     height: Theme.scaled(18)
                     anchors.verticalCenter: parent.verticalCenter
                     visible: status === Image.Ready
+                    Accessible.ignored: true
                 }
 
                 Tr {
@@ -694,6 +805,7 @@ Page {
                     color: "white"
                     font: Theme.bodyFont
                     anchors.verticalCenter: parent.verticalCenter
+                    Accessible.ignored: true
                 }
             }
 
@@ -719,6 +831,7 @@ Page {
 
             Accessible.role: Accessible.Button
             Accessible.name: TranslationManager.translate("shotdetail.emailprompt", "Email Prompt")
+            Accessible.focusable: true
             Accessible.onPressAction: emailButtonArea.clicked(null)
 
             Row {
@@ -733,6 +846,7 @@ Page {
                     anchors.verticalCenter: parent.verticalCenter
                     visible: status === Image.Ready
                     opacity: 0.6
+                    Accessible.ignored: true
                 }
 
                 Tr {
@@ -741,6 +855,7 @@ Page {
                     color: Theme.textColor
                     font: Theme.bodyFont
                     anchors.verticalCenter: parent.verticalCenter
+                    Accessible.ignored: true
                 }
             }
 

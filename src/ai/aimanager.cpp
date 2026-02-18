@@ -17,6 +17,7 @@
 #include <QCryptographicHash>
 #include <QJsonDocument>
 #include <QJsonParseError>
+#include <QRegularExpression>
 #include <cmath>
 
 AIManager::AIManager(Settings* settings, QObject* parent)
@@ -310,15 +311,26 @@ QString AIManager::getRecentShotContext(const QString& beanBrand, const QString&
     if (!m_shotHistory || (beanBrand.isEmpty() && profileName.isEmpty()))
         return QString();
 
-    // Build filter: match on non-empty fields, last 3 weeks
+    // Look up the current shot's timestamp so we only include older shots
+    qint64 shotTimestamp = m_shotHistory->getShotTimestamp(excludeShotId);
+    if (shotTimestamp <= 0)
+        return QString();
+
+    // Build filter: match on non-empty fields, up to 3 weeks before this shot
     QVariantMap filter;
     if (!beanBrand.isEmpty()) filter["beanBrand"] = beanBrand;
     if (!beanType.isEmpty()) filter["beanType"] = beanType;
     if (!profileName.isEmpty()) filter["profileName"] = profileName;
-    filter["dateFrom"] = QDateTime::currentSecsSinceEpoch() - 21 * 24 * 3600;
+    filter["dateFrom"] = shotTimestamp - 21 * 24 * 3600;
+    filter["dateTo"] = shotTimestamp;  // Only shots before (or at) this shot's time
 
     // Fetch extra to have room after filtering out excludeShotId and mistakes
     QVariantList candidates = m_shotHistory->getShotsFiltered(filter, 0, 6);
+
+    qDebug() << "AIManager::getRecentShotContext: excludeShotId=" << excludeShotId
+             << "shotTimestamp=" << QDateTime::fromSecsSinceEpoch(shotTimestamp).toString("yyyy-MM-dd HH:mm")
+             << "filter: bean=" << beanBrand << beanType << "profile=" << profileName
+             << "candidates=" << candidates.size();
 
     QStringList shotSections;
     for (const QVariant& v : candidates) {
@@ -326,8 +338,20 @@ QString AIManager::getRecentShotContext(const QString& beanBrand, const QString&
 
         QVariantMap shot = v.toMap();
         qint64 id = shot.value("id").toLongLong();
-        if (id == excludeShotId) continue;
-        if (isMistakeShot(shot)) continue;
+        qint64 timestamp = shot.value("timestamp").toLongLong();
+        QString shotProfile = shot.value("profileName").toString();
+        QString shotDate = QDateTime::fromSecsSinceEpoch(timestamp).toString("yyyy-MM-dd HH:mm");
+
+        if (id == excludeShotId) {
+            qDebug() << "  Shot id=" << id << "date=" << shotDate << "profile=" << shotProfile << "-> SKIPPED (current shot)";
+            continue;
+        }
+        if (isMistakeShot(shot)) {
+            qDebug() << "  Shot id=" << id << "date=" << shotDate << "profile=" << shotProfile << "-> SKIPPED (mistake)";
+            continue;
+        }
+
+        qDebug() << "  Shot id=" << id << "date=" << shotDate << "profile=" << shotProfile << "-> INCLUDED";
 
         // Load full shot data (with time-series) for rich summary
         QVariantMap fullShot = m_shotHistory->getShot(id);
@@ -336,17 +360,26 @@ QString AIManager::getRecentShotContext(const QString& beanBrand, const QString&
         QString summary = generateHistoryShotSummary(fullShot);
         if (summary.isEmpty()) continue;
 
+        // Strip the profile recipe section from historical summaries — the current
+        // shot already has the full recipe, and stored profile JSONs can differ
+        // between shots even for the same profile name (app updates, edits)
+        static const QRegularExpression recipeRe("## Profile Recipe[^\\n]*\\n(?:(?!## ).+\\n)*\\n?");
+        summary.replace(recipeRe, QString());
+
         // Format date for header
-        qint64 timestamp = shot.value("timestamp").toLongLong();
         QString dateStr = QDateTime::fromSecsSinceEpoch(timestamp).toString("MMM d, HH:mm");
 
-        shotSections.prepend(QString("### Shot #%1 (%2)\n\n%3").arg(id).arg(dateStr).arg(summary));
+        shotSections.prepend(QString("### Shot (%1)\n\n%2").arg(dateStr).arg(summary));
     }
 
     if (shotSections.isEmpty())
         return QString();
 
-    return "## Previous Shots with This Bean & Profile\n\n" + shotSections.join("\n\n");
+    return "## Previous Shots with This Bean & Profile\n\n"
+           "All shots below use the same profile as the current shot. "
+           "Do NOT report profile recipe differences — focus on what the user changed "
+           "(grind, dose, temperature) and how it affected the outcome.\n\n" +
+           shotSections.join("\n\n");
 }
 
 void AIManager::testConnection()
