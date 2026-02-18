@@ -23,6 +23,7 @@ ChartView {
     property var flowData: []
     property var temperatureData: []
     property var weightData: []
+    property var weightFlowRateData: []
     property var phaseMarkers: []
     property double maxTime: 60
 
@@ -32,6 +33,7 @@ ChartView {
         flowSeries.clear()
         temperatureSeries.clear()
         weightSeries.clear()
+        weightFlowRateSeries.clear()
 
         for (var i = 0; i < pressureData.length; i++) {
             pressureSeries.append(pressureData[i].x, pressureData[i].y)
@@ -45,6 +47,9 @@ ChartView {
         for (i = 0; i < weightData.length; i++) {
             weightSeries.append(weightData[i].x, weightData[i].y)
         }
+        for (i = 0; i < weightFlowRateData.length; i++) {
+            weightFlowRateSeries.append(weightFlowRateData[i].x, weightFlowRateData[i].y)
+        }
 
         // Update time axis
         if (pressureData.length > 0) {
@@ -52,9 +57,21 @@ ChartView {
         }
     }
 
-    onPressureDataChanged: { loadData(); loadMarkers() }
-    onPhaseMarkersChanged: loadMarkers()
-    Component.onCompleted: { loadData(); loadMarkers() }
+    // Use Qt.callLater to coalesce reloads when multiple properties change at once.
+    // When parent reassigns shotData, QML re-evaluates each binding (pressureData,
+    // flowData, weightData, etc.) sequentially — not atomically. Without callLater,
+    // the first property change would trigger loadData() while other properties still
+    // hold stale values from the previous shot, causing a mix of old/new data.
+    // Qt.callLater deduplicates: N calls before execution → 1 actual invocation.
+    function doReload() { loadData(); loadMarkers() }
+
+    onPressureDataChanged: Qt.callLater(doReload)
+    onFlowDataChanged: Qt.callLater(doReload)
+    onTemperatureDataChanged: Qt.callLater(doReload)
+    onWeightDataChanged: Qt.callLater(doReload)
+    onWeightFlowRateDataChanged: Qt.callLater(doReload)
+    onPhaseMarkersChanged: Qt.callLater(doReload)
+    Component.onCompleted: doReload()
 
     // Time axis
     ValueAxis {
@@ -156,6 +173,16 @@ ChartView {
         width: Theme.graphLineWidth
         axisX: timeAxis
         axisYRight: weightAxis
+    }
+
+    // Weight flow rate (delta) line - shows g/s from scale
+    LineSeries {
+        id: weightFlowRateSeries
+        name: "Weight Flow"
+        color: Theme.weightFlowColor
+        width: Theme.graphLineWidth
+        axisX: timeAxis
+        axisY: pressureAxis
     }
 
     // Phase marker vertical lines (up to 10 markers)

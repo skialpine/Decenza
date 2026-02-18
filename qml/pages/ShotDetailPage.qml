@@ -123,11 +123,14 @@ Page {
                 }
             }
 
-            // Graph with swipe navigation
+            // Resizable graph with swipe navigation
+            // Persisted graph height (like PostShotReviewPage)
+            property real graphHeight: Settings.value("shotDetail/graphHeight", Theme.scaled(250))
+
             Rectangle {
                 id: graphCard
                 Layout.fillWidth: true
-                Layout.preferredHeight: Theme.scaled(250)
+                Layout.preferredHeight: Math.max(Theme.scaled(100), Math.min(Theme.scaled(400), shotDetailPage.graphHeight))
                 color: Theme.surfaceColor
                 radius: Theme.cardRadius
                 clip: true
@@ -143,10 +146,12 @@ Page {
                 HistoryShotGraph {
                     anchors.fill: parent
                     anchors.margins: Theme.spacingSmall
+                    anchors.bottomMargin: Theme.spacingSmall + resizeHandle.height
                     pressureData: shotData.pressure || []
                     flowData: shotData.flow || []
                     temperatureData: shotData.temperature || []
                     weightData: shotData.weight || []
+                    weightFlowRateData: shotData.weightFlowRate || []
                     phaseMarkers: shotData.phases || []
                     maxTime: shotData.duration || 60
                     Accessible.ignored: true
@@ -156,6 +161,7 @@ Page {
                 SwipeableArea {
                     id: graphSwipeArea
                     anchors.fill: parent
+                    anchors.bottomMargin: resizeHandle.height
                     canSwipeLeft: canGoNext()
                     canSwipeRight: canGoPrevious()
 
@@ -163,42 +169,77 @@ Page {
                     onSwipedRight: navigateToShot(currentIndex - 1)
                 }
 
-                // Position indicator (only show if navigating through multiple shots)
+                // Resize handle at bottom
                 Rectangle {
-                    visible: shotIds.length > 1
+                    id: resizeHandle
                     anchors.bottom: parent.bottom
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.bottomMargin: Theme.spacingSmall
-                    width: positionText.width + Theme.scaled(16)
-                    height: Theme.scaled(24)
-                    radius: Theme.scaled(12)
-                    color: Qt.rgba(0, 0, 0, 0.5)
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: Theme.scaled(16)
+                    color: "transparent"
                     Accessible.ignored: true
 
-                    Text {
-                        id: positionText
+                    Column {
                         anchors.centerIn: parent
-                        text: (currentIndex + 1) + " / " + shotIds.length
-                        font: Theme.captionFont
-                        color: "white"
-                        Accessible.ignored: true
+                        spacing: Theme.scaled(2)
+
+                        Repeater {
+                            model: 3
+                            Rectangle {
+                                width: Theme.scaled(30)
+                                height: 1
+                                color: Theme.textSecondaryColor
+                                opacity: resizeMouseArea.containsMouse || resizeMouseArea.pressed ? 0.8 : 0.4
+                            }
+                        }
+                    }
+
+                    MouseArea {
+                        id: resizeMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.SizeVerCursor
+                        preventStealing: true
+
+                        property real startY: 0
+                        property real startHeight: 0
+
+                        onPressed: function(mouse) {
+                            startY = mouse.y + resizeHandle.mapToItem(shotDetailPage, 0, 0).y
+                            startHeight = graphCard.Layout.preferredHeight
+                        }
+
+                        onPositionChanged: function(mouse) {
+                            if (pressed) {
+                                var currentY = mouse.y + resizeHandle.mapToItem(shotDetailPage, 0, 0).y
+                                var delta = currentY - startY
+                                var newHeight = startHeight + delta
+                                newHeight = Math.max(Theme.scaled(100), Math.min(Theme.scaled(400), newHeight))
+                                shotDetailPage.graphHeight = newHeight
+                            }
+                        }
+
+                        onReleased: {
+                            Settings.setValue("shotDetail/graphHeight", shotDetailPage.graphHeight)
+                        }
                     }
                 }
             }
 
-            // Accessible navigation buttons for screen readers (hidden visually)
+            // Shot navigation buttons (list is newest-first, so lower index = newer)
             RowLayout {
                 visible: shotIds.length > 1
                 Layout.fillWidth: true
                 spacing: Theme.spacingMedium
 
                 AccessibleButton {
-                    id: prevShotButton
-                    text: TranslationManager.translate("shotdetail.previousshot", "Previous Shot")
-                    accessibleName: TranslationManager.translate("shotdetail.accessible.previousshot",
-                        "Previous shot") + ", " + TranslationManager.translate("shotdetail.accessible.position",
+                    id: newerShotButton
+                    text: TranslationManager.translate("shotdetail.newershot", "Newer Shot")
+                    accessibleName: TranslationManager.translate("shotdetail.accessible.newershot",
+                        "Newer shot") + ", " + TranslationManager.translate("shotdetail.accessible.position",
                         "Shot %1 of %2").arg(currentIndex + 1).arg(shotIds.length)
                     Layout.fillWidth: true
+                    Layout.preferredWidth: 10  // Equal base for both buttons
                     enabled: canGoPrevious()
                     onClicked: navigateToShot(currentIndex - 1)
                 }
@@ -213,12 +254,13 @@ Page {
                 }
 
                 AccessibleButton {
-                    id: nextShotButton
-                    text: TranslationManager.translate("shotdetail.nextshot", "Next Shot")
-                    accessibleName: TranslationManager.translate("shotdetail.accessible.nextshot",
-                        "Next shot") + ", " + TranslationManager.translate("shotdetail.accessible.position",
+                    id: olderShotButton
+                    text: TranslationManager.translate("shotdetail.oldershot", "Older Shot")
+                    accessibleName: TranslationManager.translate("shotdetail.accessible.oldershot",
+                        "Older shot") + ", " + TranslationManager.translate("shotdetail.accessible.position",
                         "Shot %1 of %2").arg(currentIndex + 1).arg(shotIds.length)
                     Layout.fillWidth: true
+                    Layout.preferredWidth: 10  // Equal base for both buttons
                     enabled: canGoNext()
                     onClicked: navigateToShot(currentIndex + 1)
                 }
