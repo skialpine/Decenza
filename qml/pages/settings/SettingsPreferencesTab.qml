@@ -309,15 +309,15 @@ KeyboardAwareContainer {
                                 onToggled: {
                                     // Save to persistent Settings — takes effect on next launch
                                     Settings.simulationMode = checked
-                                    restartRequiredText.visible = true
                                 }
                             }
                         }
 
-                        Text {
+                        Tr {
                             id: restartRequiredText
-                            visible: false
-                            text: "Restart required for this change to take effect"
+                            visible: Settings.simulationMode !== DE1Device.simulationMode
+                            key: "settings.preferences.restartRequired"
+                            fallback: "Restart required for this change to take effect"
                             color: Theme.warningColor
                             font.pixelSize: Theme.scaled(12)
                             Layout.leftMargin: Theme.scaled(15)
