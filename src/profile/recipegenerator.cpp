@@ -284,7 +284,7 @@ QList<ProfileFrame> RecipeGenerator::generateAFlowFrames(const RecipeParams& rec
         fill.volume = 100.0;
         fill.exitIf = true;
         fill.exitType = "pressure_over";
-        fill.exitPressureOver = recipe.fillExitPressure;
+        fill.exitPressureOver = recipe.fillPressure;  // de1app A-Flow template uses fill pressure (3.0)
         fill.exitPressureUnder = 0.0;
         fill.exitFlowOver = 6.0;
         fill.exitFlowUnder = 0.0;
