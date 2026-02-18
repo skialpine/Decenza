@@ -466,6 +466,7 @@ set(QML_FILES
     qml/components/UnsavedChangesDialog.qml
     qml/components/SwipeableArea.qml
     qml/components/CrashReportDialog.qml
+    qml/components/ReportAdviceDialog.qml
 
     qml/components/layout/LayoutItemDelegate.qml
     qml/components/layout/LayoutBarZone.qml
