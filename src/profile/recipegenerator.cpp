@@ -264,8 +264,8 @@ ProfileFrame RecipeGenerator::createDeclineFrame(const RecipeParams& recipe) {
 }
 
 // === A-Flow Frame Generation ===
-// Matches de1app's update_A-Flow proc. All 6 frames built inline (not shared with D-Flow).
-// Fill → Infuse → Pressure Up → Pressure Decline → Flow Start → Flow Extraction
+// Matches de1app's update_A-Flow proc. All 9 frames built inline (not shared with D-Flow).
+// Pre Fill → Fill → Infuse → 2nd Fill → Pause → Pressure Up → Pressure Decline → Flow Start → Flow Extraction
 //
 // Key differences from D-Flow:
 // - Fill: flow pump with pressure limiter (8.0 bar), range 0.6

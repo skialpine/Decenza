@@ -366,6 +366,7 @@ Page {
                                     font: Theme.captionFont
                                     color: Theme.textSecondaryColor
                                     Layout.fillWidth: true
+                                    Accessible.ignored: true
                                 }
                                 StyledSwitch {
                                     checked: val(recipe.rampDownEnabled, false)
@@ -399,6 +400,7 @@ Page {
                                     font: Theme.captionFont
                                     color: Theme.textSecondaryColor
                                     Layout.fillWidth: true
+                                    Accessible.ignored: true
                                 }
                                 StyledSwitch {
                                     checked: val(recipe.flowExtractionUp, true)
@@ -416,6 +418,7 @@ Page {
                                     font: Theme.captionFont
                                     color: Theme.textSecondaryColor
                                     Layout.fillWidth: true
+                                    Accessible.ignored: true
                                 }
                                 StyledSwitch {
                                     checked: val(recipe.secondFillEnabled, false)

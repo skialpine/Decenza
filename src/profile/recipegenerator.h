@@ -17,8 +17,8 @@ class Profile;
  *   Always 3 core frames matching de1app's update_D-Flow.
  *
  * A-Flow (Janek, forked from D-Flow):
- *   Fill -> [Infuse] -> Pressure Up -> Pressure Decline -> Flow Start -> Flow Extraction
- *   Hybrid pressure-then-flow extraction. Own frame creation (not shared with D-Flow).
+ *   Pre Fill -> Fill -> [Infuse] -> [2nd Fill] -> [Pause] -> Pressure Up -> Pressure Decline -> Flow Start -> Flow Extraction
+ *   Hybrid pressure-then-flow extraction. All 9 frames built inline (not shared with D-Flow).
  *
  * Pressure (settings_2a):
  *   Preinfusion -> [Forced Rise] -> Hold -> Decline
