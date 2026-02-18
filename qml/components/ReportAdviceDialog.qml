@@ -11,28 +11,55 @@ Dialog {
     padding: 0
     closePolicy: Dialog.NoAutoClose
 
-    property string crashLog: ""
-    property string debugLogTail: ""
-
-    signal dismissed()
-    signal reported()
+    property string conversationTranscript: ""
+    property string shotDebugLog: ""
+    property string providerName: ""
+    property string modelName: ""
+    property string systemPrompt: ""
+    property string contextLabel: ""
 
     // State management
     property string dialogState: "prompt"  // prompt, submitting, success, error
     property string issueUrl: ""
     property string errorMessage: ""
 
+    // Format the AI report as crash_log for the existing crash-report endpoint
+    function buildCrashLog() {
+        var body = "[AI Report] Bad advice from " + root.providerName + " / " + root.modelName
+        if (root.contextLabel.length > 0)
+            body += "\nContext: " + root.contextLabel
+        body += "\n\n--- System Prompt ---\n" + root.systemPrompt
+        body += "\n\n--- Conversation Transcript ---\n" + root.conversationTranscript
+        if (root.shotDebugLog.length > 0)
+            body += "\n\n--- Shot Debug Log ---\n" + root.shotDebugLog
+        return body
+    }
+
+    function submitReport() {
+        root.dialogState = "submitting"
+        CrashReporter.submitReport(buildCrashLog(), userNotesInput.text)
+    }
+
+    onOpened: {
+        dialogState = "prompt"
+        issueUrl = ""
+        errorMessage = ""
+        userNotesInput.text = ""
+    }
+
     Connections {
         target: CrashReporter
         function onSubmitted(url) {
-            if (root.dialogState !== "submitting") return
-            root.issueUrl = url
-            root.dialogState = "success"
+            if (root.dialogState === "submitting") {
+                root.issueUrl = url
+                root.dialogState = "success"
+            }
         }
         function onFailed(error) {
-            if (root.dialogState !== "submitting") return
-            root.errorMessage = error
-            root.dialogState = "error"
+            if (root.dialogState === "submitting") {
+                root.errorMessage = error
+                root.dialogState = "error"
+            }
         }
     }
 
@@ -68,19 +95,20 @@ Dialog {
                         width: Theme.scaled(32)
                         height: Theme.scaled(32)
                         radius: Theme.scaled(16)
-                        color: Theme.errorColor
+                        color: Theme.warningColor
+                        Accessible.ignored: true
 
                         Text {
                             anchors.centerIn: parent
-                            text: "!"
-                            font.pixelSize: Theme.scaled(20)
-                            font.bold: true
+                            text: "\u26A0"
+                            font.pixelSize: Theme.scaled(18)
                             color: "white"
+                            Accessible.ignored: true
                         }
                     }
 
                     Text {
-                        text: TranslationManager.translate("crashReport.appCrashed", "App Crashed")
+                        text: TranslationManager.translate("aiReport.title", "Report Bad Advice")
                         font: Theme.titleFont
                         color: Theme.textColor
                     }
@@ -97,25 +125,60 @@ Dialog {
 
             // Message
             Text {
-                text: TranslationManager.translate("crashReport.message", "The app crashed during the last session.\nWould you like to send a crash report to help us fix this issue?")
+                text: TranslationManager.translate("aiReport.message",
+                    "This will send the following to help improve the AI advisor:")
                 font: Theme.bodyFont
                 color: Theme.textColor
                 wrapMode: Text.Wrap
                 Layout.fillWidth: true
-                Layout.margins: Theme.scaled(20)
+                Layout.leftMargin: Theme.scaled(20)
+                Layout.rightMargin: Theme.scaled(20)
+                Layout.topMargin: Theme.scaled(12)
             }
 
-            // Crash log preview (collapsible)
+            // Bullet list of what's included
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin: Theme.scaled(32)
+                Layout.rightMargin: Theme.scaled(20)
+                Layout.topMargin: Theme.scaled(6)
+                spacing: Theme.scaled(2)
+
+                Text {
+                    text: "\u2022 " + TranslationManager.translate("aiReport.bullet.transcript", "AI conversation transcript")
+                    font: Theme.labelFont
+                    color: Theme.textSecondaryColor
+                }
+                Text {
+                    text: "\u2022 " + TranslationManager.translate("aiReport.bullet.systemprompt", "System prompt (AI instructions)")
+                    font: Theme.labelFont
+                    color: Theme.textSecondaryColor
+                }
+                Text {
+                    text: "\u2022 " + TranslationManager.translate("aiReport.bullet.debuglog", "Shot debug log (machine data from the shot)")
+                    font: Theme.labelFont
+                    color: Theme.textSecondaryColor
+                }
+                Text {
+                    text: "\u2022 " + TranslationManager.translate("aiReport.bullet.device", "App version and device info")
+                    font: Theme.labelFont
+                    color: Theme.textSecondaryColor
+                }
+            }
+
+            // Transcript preview (collapsible)
             Rectangle {
+                id: transcriptPreview
                 Layout.fillWidth: true
                 Layout.leftMargin: Theme.scaled(20)
                 Layout.rightMargin: Theme.scaled(20)
-                Layout.preferredHeight: detailsExpanded ? Theme.scaled(150) : Theme.scaled(36)
+                Layout.topMargin: Theme.scaled(12)
+                Layout.preferredHeight: previewExpanded ? Theme.scaled(150) : Theme.scaled(36)
                 color: Theme.backgroundColor
                 radius: Theme.scaled(4)
                 clip: true
 
-                property bool detailsExpanded: false
+                property bool previewExpanded: false
 
                 Behavior on Layout.preferredHeight {
                     NumberAnimation { duration: 200 }
@@ -130,7 +193,7 @@ Dialog {
                         Layout.fillWidth: true
 
                         Text {
-                            text: TranslationManager.translate("crashReport.crashDetails", "Crash Details")
+                            text: TranslationManager.translate("aiReport.previewData", "Preview data")
                             font: Theme.labelFont
                             color: Theme.textSecondaryColor
                         }
@@ -138,14 +201,23 @@ Dialog {
                         Item { Layout.fillWidth: true }
 
                         Text {
-                            text: parent.parent.parent.detailsExpanded ? TranslationManager.translate("crashReport.hide", "Hide") : TranslationManager.translate("crashReport.show", "Show")
+                            text: transcriptPreview.previewExpanded
+                                  ? TranslationManager.translate("aiReport.hide", "Hide")
+                                  : TranslationManager.translate("aiReport.show", "Show")
                             font: Theme.labelFont
                             color: Theme.primaryColor
+
+                            Accessible.role: Accessible.Button
+                            Accessible.name: transcriptPreview.previewExpanded
+                                ? TranslationManager.translate("aiReport.hide", "Hide")
+                                : TranslationManager.translate("aiReport.show", "Show")
+                            Accessible.focusable: true
+                            Accessible.onPressAction: transcriptPreview.previewExpanded = !transcriptPreview.previewExpanded
 
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: parent.parent.parent.parent.detailsExpanded = !parent.parent.parent.parent.detailsExpanded
+                                onClicked: transcriptPreview.previewExpanded = !transcriptPreview.previewExpanded
                             }
                         }
                     }
@@ -153,25 +225,28 @@ Dialog {
                     ScrollView {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        visible: parent.parent.detailsExpanded
+                        visible: transcriptPreview.previewExpanded
                         clip: true
 
                         TextArea {
                             readOnly: true
-                            text: crashLog
+                            text: root.conversationTranscript
                             font.family: "monospace"
                             font.pixelSize: Theme.scaled(10)
                             color: Theme.textColor
                             wrapMode: TextArea.Wrap
                             background: null
+                            Accessible.role: Accessible.EditableText
+                            Accessible.name: TranslationManager.translate("aiReport.previewData", "Preview data")
+                            Accessible.description: text.substring(0, 200)
                         }
                     }
                 }
             }
 
-            // User notes input
+            // User notes input (required)
             Text {
-                text: TranslationManager.translate("crashReport.whatWereYouDoing", "What were you doing? (optional)")
+                text: TranslationManager.translate("aiReport.whatWasWrong", "What was wrong with the advice?")
                 font: Theme.labelFont
                 color: Theme.textSecondaryColor
                 Layout.leftMargin: Theme.scaled(20)
@@ -195,15 +270,26 @@ Dialog {
                     anchors.margins: Theme.scaled(8)
                     font: Theme.bodyFont
                     color: Theme.textColor
-                    placeholderText: TranslationManager.translate("crashReport.placeholder", "e.g., 'Steaming milk after a shot'")
+                    placeholderText: TranslationManager.translate("aiReport.placeholder",
+                        "e.g., 'It suggested a finer grind but my shot was already choking'")
                     placeholderTextColor: Qt.rgba(Theme.textSecondaryColor.r, Theme.textSecondaryColor.g, Theme.textSecondaryColor.b, 0.5)
                     wrapMode: TextArea.Wrap
                     background: null
                     Accessible.role: Accessible.EditableText
-                    Accessible.name: TranslationManager.translate("crashReport.userNotes", "What were you doing?")
+                    Accessible.name: TranslationManager.translate("aiReport.whatWasWrong", "What was wrong with the advice?")
                     Accessible.description: text
                     Accessible.focusable: true
                 }
+            }
+
+            // Validation hint
+            Text {
+                visible: userNotesInput.text.trim().length === 0
+                text: TranslationManager.translate("aiReport.notesRequired", "Please describe the issue to submit")
+                font: Theme.labelFont
+                color: Theme.textSecondaryColor
+                Layout.leftMargin: Theme.scaled(20)
+                Layout.topMargin: Theme.scaled(4)
             }
 
             // Buttons
@@ -219,12 +305,9 @@ Dialog {
                 AccessibleButton {
                     width: parent.buttonWidth
                     height: parent.buttonHeight
-                    text: TranslationManager.translate("crashReport.dismiss", "Dismiss")
-                    accessibleName: TranslationManager.translate("crashReport.dismissAccessible", "Dismiss crash report")
-                    onClicked: {
-                        root.close()
-                        root.dismissed()
-                    }
+                    text: TranslationManager.translate("aiReport.cancel", "Cancel")
+                    accessibleName: TranslationManager.translate("aiReport.cancelAccessible", "Cancel report")
+                    onClicked: root.close()
                     background: Rectangle {
                         implicitHeight: Theme.scaled(60)
                         radius: Theme.buttonRadius
@@ -244,12 +327,11 @@ Dialog {
                 AccessibleButton {
                     width: parent.buttonWidth
                     height: parent.buttonHeight
-                    text: TranslationManager.translate("crashReport.sendReport", "Send Report")
-                    accessibleName: TranslationManager.translate("crashReport.sendReportAccessible", "Send crash report")
-                    onClicked: {
-                        root.dialogState = "submitting"
-                        CrashReporter.submitReport(crashLog, userNotesInput.text, debugLogTail)
-                    }
+                    enabled: userNotesInput.text.trim().length > 0
+                    text: TranslationManager.translate("aiReport.submit", "Submit")
+                    accessibleName: TranslationManager.translate("aiReport.submitAccessible", "Submit AI advice report")
+                    opacity: enabled ? 1.0 : 0.5
+                    onClicked: root.submitReport()
                     background: Rectangle {
                         implicitHeight: Theme.scaled(60)
                         radius: Theme.buttonRadius
@@ -280,7 +362,7 @@ Dialog {
 
             Text {
                 Layout.alignment: Qt.AlignHCenter
-                text: TranslationManager.translate("crashReport.submitting", "Submitting crash report...")
+                text: TranslationManager.translate("aiReport.submitting", "Submitting report...")
                 font: Theme.bodyFont
                 color: Theme.textColor
             }
@@ -309,17 +391,19 @@ Dialog {
                         height: Theme.scaled(32)
                         radius: Theme.scaled(16)
                         color: Theme.primaryColor
+                        Accessible.ignored: true
 
                         Text {
                             anchors.centerIn: parent
                             text: "\u2713"
                             font.pixelSize: Theme.scaled(20)
                             color: "white"
+                            Accessible.ignored: true
                         }
                     }
 
                     Text {
-                        text: TranslationManager.translate("crashReport.reportSubmitted", "Report Submitted")
+                        text: TranslationManager.translate("aiReport.reportSubmitted", "Report Submitted")
                         font: Theme.titleFont
                         color: Theme.textColor
                     }
@@ -335,7 +419,8 @@ Dialog {
             }
 
             Text {
-                text: TranslationManager.translate("crashReport.thankYou", "Thank you! Your crash report has been submitted and will help us improve the app.")
+                text: TranslationManager.translate("aiReport.thankYou",
+                    "Thank you! Your report will help us improve the AI advisor.")
                 font: Theme.bodyFont
                 color: Theme.textColor
                 wrapMode: Text.Wrap
@@ -344,17 +429,22 @@ Dialog {
             }
 
             Text {
-                visible: issueUrl !== ""
-                text: TranslationManager.translate("crashReport.viewOnGithub", "View issue on GitHub")
+                visible: root.issueUrl !== ""
+                text: TranslationManager.translate("aiReport.viewOnGithub", "View issue on GitHub")
                 font: Theme.bodyFont
                 color: Theme.primaryColor
                 Layout.leftMargin: Theme.scaled(20)
                 Layout.bottomMargin: Theme.scaled(10)
 
+                Accessible.role: Accessible.Link
+                Accessible.name: TranslationManager.translate("aiReport.viewOnGithub", "View issue on GitHub")
+                Accessible.focusable: true
+                Accessible.onPressAction: Qt.openUrlExternally(root.issueUrl)
+
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: Qt.openUrlExternally(issueUrl)
+                    onClicked: Qt.openUrlExternally(root.issueUrl)
                 }
             }
 
@@ -368,12 +458,9 @@ Dialog {
                     anchors.right: parent.right
                     width: Theme.scaled(120)
                     height: parent.height
-                    text: TranslationManager.translate("crashReport.ok", "OK")
-                    accessibleName: TranslationManager.translate("crashReport.closeDialog", "Close dialog")
-                    onClicked: {
-                        root.close()
-                        root.reported()
-                    }
+                    text: TranslationManager.translate("aiReport.ok", "OK")
+                    accessibleName: TranslationManager.translate("aiReport.closeDialog", "Close dialog")
+                    onClicked: root.close()
                     background: Rectangle {
                         implicitHeight: Theme.scaled(60)
                         radius: Theme.buttonRadius
@@ -413,6 +500,7 @@ Dialog {
                         height: Theme.scaled(32)
                         radius: Theme.scaled(16)
                         color: Theme.errorColor
+                        Accessible.ignored: true
 
                         Text {
                             anchors.centerIn: parent
@@ -420,11 +508,12 @@ Dialog {
                             font.pixelSize: Theme.scaled(16)
                             font.bold: true
                             color: "white"
+                            Accessible.ignored: true
                         }
                     }
 
                     Text {
-                        text: TranslationManager.translate("crashReport.submissionFailed", "Submission Failed")
+                        text: TranslationManager.translate("aiReport.submissionFailed", "Submission Failed")
                         font: Theme.titleFont
                         color: Theme.textColor
                     }
@@ -440,7 +529,8 @@ Dialog {
             }
 
             Text {
-                text: TranslationManager.translate("crashReport.failedToSubmit", "Failed to submit crash report:\n%1").arg(errorMessage)
+                text: TranslationManager.translate("aiReport.failedToSubmit",
+                    "Failed to submit report:\n%1").arg(root.errorMessage)
                 font: Theme.bodyFont
                 color: Theme.textColor
                 wrapMode: Text.Wrap
@@ -463,12 +553,9 @@ Dialog {
                 AccessibleButton {
                     width: parent.buttonWidth
                     height: parent.buttonHeight
-                    text: TranslationManager.translate("crashReport.dismiss", "Dismiss")
-                    accessibleName: TranslationManager.translate("crashReport.dismissAccessible", "Dismiss crash report")
-                    onClicked: {
-                        root.close()
-                        root.dismissed()
-                    }
+                    text: TranslationManager.translate("aiReport.dismiss", "Dismiss")
+                    accessibleName: TranslationManager.translate("aiReport.dismissAccessible", "Dismiss report")
+                    onClicked: root.close()
                     background: Rectangle {
                         implicitHeight: Theme.scaled(60)
                         radius: Theme.buttonRadius
@@ -488,12 +575,9 @@ Dialog {
                 AccessibleButton {
                     width: parent.buttonWidth
                     height: parent.buttonHeight
-                    text: TranslationManager.translate("crashReport.retry", "Retry")
-                    accessibleName: TranslationManager.translate("crashReport.retryAccessible", "Retry sending crash report")
-                    onClicked: {
-                        root.dialogState = "submitting"
-                        CrashReporter.submitReport(crashLog, userNotesInput.text, debugLogTail)
-                    }
+                    text: TranslationManager.translate("aiReport.retry", "Retry")
+                    accessibleName: TranslationManager.translate("aiReport.retryAccessible", "Retry submitting report")
+                    onClicked: root.submitReport()
                     background: Rectangle {
                         implicitHeight: Theme.scaled(60)
                         radius: Theme.buttonRadius

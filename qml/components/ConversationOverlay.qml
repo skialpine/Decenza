@@ -26,6 +26,10 @@ Rectangle {
     property string overlayTitle: TranslationManager.translate("conversation.title", "AI Conversation")
     property bool isMistakeShot: false
     property string historicalContext: ""
+    property string shotDebugLog: ""
+    property string _beanBrand: ""
+    property string _beanType: ""
+    property string _profileName: ""
 
     // Emitted when the overlay clears pendingShotSummary (parent must handle)
     signal pendingShotSummaryCleared()
@@ -68,13 +72,13 @@ Rectangle {
             profileName || ""
         )
 
-        // For new conversations, include recent shot history as context
-        if (!MainController.aiManager.conversation.hasHistory) {
-            overlay.historicalContext = MainController.aiManager.getRecentShotContext(
-                beanBrand || "", beanType || "", profileName || "", shotId)
-        } else {
-            overlay.historicalContext = ""
-        }
+        // Always fetch recent shot history as context (even for existing conversations,
+        // since trimHistory() may have reduced prior shots to one-line summaries)
+        overlay._beanBrand = beanBrand || ""
+        overlay._beanType = beanType || ""
+        overlay._profileName = profileName || ""
+        overlay.historicalContext = MainController.aiManager.getRecentShotContext(
+            overlay._beanBrand, overlay._beanType, overlay._profileName, shotId)
 
         // Check for mistake shot
         var isMistake = MainController.aiManager.isMistakeShot(shotData)
@@ -89,6 +93,7 @@ Rectangle {
         overlay.shotId = shotId
         overlay.beverageType = bevType
         overlay.isMistakeShot = isMistake
+        overlay.shotDebugLog = shotData.debugLog || ""
         overlay.open()
     }
 
@@ -132,6 +137,50 @@ Rectangle {
 
                     Item { Layout.fillWidth: true }
 
+                    // Report bad advice button
+                    Rectangle {
+                        visible: MainController.aiManager && MainController.aiManager.conversation &&
+                                 MainController.aiManager.conversation.messageCount >= 2
+                        width: reportText.width + Theme.scaled(16)
+                        height: Theme.scaled(32)
+                        radius: Theme.scaled(4)
+                        color: Theme.warningColor
+                        opacity: 0.8
+
+                        Accessible.role: Accessible.Button
+                        Accessible.name: TranslationManager.translate("conversation.report.accessible", "Report bad AI advice")
+                        Accessible.focusable: true
+                        Accessible.onPressAction: reportArea.clicked(null)
+
+                        Text {
+                            id: reportText
+                            anchors.centerIn: parent
+                            text: TranslationManager.translate("conversation.report", "Report")
+                            font.pixelSize: Theme.scaled(12)
+                            color: "white"
+                            Accessible.ignored: true
+                        }
+
+                        MouseArea {
+                            id: reportArea
+                            anchors.fill: parent
+                            onClicked: {
+                                reportAdviceDialog.conversationTranscript =
+                                    MainController.aiManager.conversation.getConversationText()
+                                reportAdviceDialog.systemPrompt =
+                                    MainController.aiManager.conversation.getSystemPrompt()
+                                reportAdviceDialog.contextLabel =
+                                    MainController.aiManager.conversation.contextLabel || ""
+                                reportAdviceDialog.shotDebugLog = overlay.shotDebugLog
+                                reportAdviceDialog.providerName =
+                                    MainController.aiManager.selectedProvider || ""
+                                reportAdviceDialog.modelName =
+                                    MainController.aiManager.currentModelName || ""
+                                reportAdviceDialog.open()
+                            }
+                        }
+                    }
+
                     // Clear conversation button
                     Rectangle {
                         width: clearText.width + Theme.scaled(16)
@@ -140,19 +189,31 @@ Rectangle {
                         color: Theme.errorColor
                         opacity: 0.8
 
+                        Accessible.role: Accessible.Button
+                        Accessible.name: TranslationManager.translate("conversation.clear.accessible", "Clear conversation")
+                        Accessible.focusable: true
+                        Accessible.onPressAction: clearArea.clicked(null)
+
                         Text {
                             id: clearText
                             anchors.centerIn: parent
                             text: TranslationManager.translate("conversation.clear", "Clear")
                             font.pixelSize: Theme.scaled(12)
                             color: "white"
+                            Accessible.ignored: true
                         }
 
                         MouseArea {
+                            id: clearArea
                             anchors.fill: parent
                             onClicked: {
                                 if (MainController.aiManager) {
                                     MainController.aiManager.clearCurrentConversation()
+                                    // Re-fetch historical context so next message includes prior shots
+                                    if (overlay.shotId > 0) {
+                                        overlay.historicalContext = MainController.aiManager.getRecentShotContext(
+                                            overlay._beanBrand, overlay._beanType, overlay._profileName, overlay.shotId)
+                                    }
                                 }
                             }
                         }
@@ -314,7 +375,13 @@ Rectangle {
                             font.pixelSize: Theme.scaled(12)
                             color: Theme.textSecondaryColor
 
+                            Accessible.role: Accessible.Button
+                            Accessible.name: TranslationManager.translate("conversation.dismissshot.accessible", "Remove shot data")
+                            Accessible.focusable: true
+                            Accessible.onPressAction: dismissShotArea.clicked(null)
+
                             MouseArea {
+                                id: dismissShotArea
                                 anchors.fill: parent
                                 anchors.margins: -Theme.scaled(4)
                                 onClicked: overlay.pendingShotSummaryCleared()
@@ -353,7 +420,7 @@ Rectangle {
                                 // For new conversations with historical context, prepend previous shots
                                 var shotSection = "## Shot #" + overlay.shotId + "\n\nHere's my latest shot:\n\n" +
                                                   overlay.pendingShotSummary + "\n\n" + text
-                                if (overlay.historicalContext.length > 0 && !conversation.hasHistory) {
+                                if (overlay.historicalContext.length > 0) {
                                     message = overlay.historicalContext + "\n\n" + shotSection
                                     overlay.historicalContext = ""
                                 } else {
@@ -388,14 +455,21 @@ Rectangle {
                         border.color: Theme.borderColor
                         border.width: conversationInput.text.length > 0 ? 0 : 1
 
+                        Accessible.role: Accessible.Button
+                        Accessible.name: TranslationManager.translate("conversation.send.accessible", "Send message")
+                        Accessible.focusable: true
+                        Accessible.onPressAction: sendArea.clicked(null)
+
                         Text {
                             anchors.centerIn: parent
                             text: TranslationManager.translate("conversation.send", "Send")
                             font: Theme.bodyFont
                             color: conversationInput.text.length > 0 ? "white" : Theme.textSecondaryColor
+                            Accessible.ignored: true
                         }
 
                         MouseArea {
+                            id: sendArea
                             anchors.fill: parent
                             enabled: conversationInput.text.length > 0 &&
                                      MainController.aiManager && MainController.aiManager.conversation &&
@@ -443,6 +517,11 @@ Rectangle {
                 conversationFlickable.contentY = Math.max(0, conversationFlickable.contentHeight - conversationFlickable.height)
             })
         }
+    }
+
+    // Report bad advice dialog
+    ReportAdviceDialog {
+        id: reportAdviceDialog
     }
 
     // Unsupported beverage type dialog (used by openWithShot)

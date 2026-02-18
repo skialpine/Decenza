@@ -378,6 +378,12 @@ ShotSummary ShotSummarizer::summarizeFromHistory(const QVariantMap& shotData) co
         phase.avgTemperature = calculateAverage(summary.tempCurve, 0, summary.totalDuration);
         phase.tempStability = calculateStdDev(summary.tempCurve, 0, summary.totalDuration);
 
+        if (!summary.weightCurve.isEmpty()) {
+            double startWeight = findValueAtTime(summary.weightCurve, 0);
+            double endWeight = findValueAtTime(summary.weightCurve, summary.totalDuration);
+            phase.weightGained = endWeight - startWeight;
+        }
+
         summary.phases.append(phase);
     }
 

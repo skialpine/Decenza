@@ -74,6 +74,11 @@ public:
     Q_INVOKABLE QString getConversationText() const;
 
     /**
+     * Get the system prompt used for this conversation (for AI report)
+     */
+    Q_INVOKABLE QString getSystemPrompt() const { return m_systemPrompt; }
+
+    /**
      * Add new shot context to existing conversation (for multi-shot dialing)
      * This appends shot data as a new user message without clearing history.
      * shotId is the app's database shot ID used to label the shot in the conversation.

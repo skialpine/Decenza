@@ -80,6 +80,13 @@ KeyboardAwareContainer {
                                 }
                                 border.width: 1
 
+                                Accessible.role: Accessible.Button
+                                Accessible.name: modelData.name + (isSelected
+                                    ? " (" + TranslationManager.translate("settings.ai.selected", "selected") + ")"
+                                    : "")
+                                Accessible.focusable: true
+                                Accessible.onPressAction: providerArea.clicked(null)
+
                                 Column {
                                     anchors.centerIn: parent
                                     spacing: Theme.scaled(2)
@@ -90,16 +97,19 @@ KeyboardAwareContainer {
                                         font.pixelSize: Theme.scaled(13)
                                         font.bold: isSelected
                                         color: isSelected ? "white" : Theme.textColor
+                                        Accessible.ignored: true
                                     }
                                     Text {
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         text: MainController.aiManager ? MainController.aiManager.modelDisplayName(modelData.id) : ""
                                         font.pixelSize: Theme.scaled(11)
                                         color: isSelected ? Qt.rgba(1,1,1,0.8) : Theme.textSecondaryColor
+                                        Accessible.ignored: true
                                     }
                                 }
 
                                 MouseArea {
+                                    id: providerArea
                                     anchors.fill: parent
                                     onClicked: Settings.aiProvider = modelData.id
                                 }
@@ -253,6 +263,7 @@ KeyboardAwareContainer {
                             model: MainController.aiManager ? MainController.aiManager.ollamaModels : []
                             currentIndex: model ? model.indexOf(Settings.ollamaModel) : -1
                             onCurrentTextChanged: if (currentText) Settings.ollamaModel = currentText
+                            Accessible.name: TranslationManager.translate("settings.ai.ollamaModel", "Ollama model")
                         }
 
                         AccessibleButton {

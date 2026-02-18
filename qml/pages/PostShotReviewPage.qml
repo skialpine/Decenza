@@ -205,6 +205,7 @@ Page {
                     anchors.right: parent.right
                     height: Theme.scaled(16)
                     color: "transparent"
+                    Accessible.ignored: true
 
                     // Visual indicator (three lines)
                     Column {
@@ -355,6 +356,7 @@ Page {
                         text: TranslationManager.translate("postshotreview.label.preset", "Preset")
                         color: Theme.textColor
                         font.pixelSize: Theme.scaled(11)
+                        Accessible.ignored: true
                     }
 
                     Rectangle {
@@ -397,6 +399,7 @@ Page {
                         text: TranslationManager.translate("postshotreview.label.shotdate", "Shot date")
                         color: Theme.textColor
                         font.pixelSize: Theme.scaled(11)
+                        Accessible.ignored: true
                     }
 
                     Rectangle {
@@ -441,6 +444,7 @@ Page {
                         fallback: "Measurements"
                         color: Theme.textColor
                         font.pixelSize: Theme.scaled(11)
+                        Accessible.ignored: true
                     }
 
                     RowLayout {
@@ -460,6 +464,7 @@ Page {
                                 fallback: "Dose"
                                 color: Theme.textSecondaryColor
                                 font.pixelSize: Theme.scaled(10)
+                                Accessible.ignored: true
                             }
                             ValueInput {
                                 id: doseInput
@@ -490,6 +495,7 @@ Page {
                                 fallback: "Out"
                                 color: Theme.textSecondaryColor
                                 font.pixelSize: Theme.scaled(10)
+                                Accessible.ignored: true
                             }
                             ValueInput {
                                 id: outInput
@@ -520,6 +526,7 @@ Page {
                                 fallback: "TDS"
                                 color: Theme.textSecondaryColor
                                 font.pixelSize: Theme.scaled(10)
+                                Accessible.ignored: true
                             }
                             ValueInput {
                                 id: tdsInput
@@ -550,6 +557,7 @@ Page {
                                 fallback: "EY"
                                 color: Theme.textSecondaryColor
                                 font.pixelSize: Theme.scaled(10)
+                                Accessible.ignored: true
                             }
                             ValueInput {
                                 id: eyInput
@@ -587,6 +595,7 @@ Page {
                         fallback: "Rating"
                         color: Theme.textColor
                         font.pixelSize: Theme.scaled(11)
+                        Accessible.ignored: true
                     }
 
                     Rectangle {
@@ -628,6 +637,7 @@ Page {
                         fallback: "Notes"
                         color: Theme.textColor
                         font.pixelSize: Theme.scaled(11)
+                        Accessible.ignored: true
                     }
 
                     TextArea {
@@ -655,6 +665,7 @@ Page {
                         Accessible.role: Accessible.EditableText
                         Accessible.name: TranslationManager.translate("postshotreview.label.notes", "Notes")
                         Accessible.description: text.length > 0 ? text : TranslationManager.translate("postshotreview.accessible.empty", "Empty")
+                        Accessible.focusable: true
 
                         onActiveFocusChanged: {
                             if (activeFocus) {
@@ -703,6 +714,7 @@ Page {
 
             Accessible.role: Accessible.Button
             Accessible.name: TranslationManager.translate("postshotreview.button.save", "Save Changes")
+            Accessible.focusable: true
             Accessible.onPressAction: saveArea.clicked(null)
 
             Row {
@@ -716,6 +728,7 @@ Page {
                     font.bold: true
                     color: "white"
                     anchors.verticalCenter: parent.verticalCenter
+                    Accessible.ignored: true
                 }
 
                 Tr {
@@ -724,6 +737,7 @@ Page {
                     color: "white"
                     font: Theme.bodyFont
                     anchors.verticalCenter: parent.verticalCenter
+                    Accessible.ignored: true
                 }
             }
 
@@ -747,6 +761,7 @@ Page {
             Accessible.name: editShotData.visualizerId
                 ? TranslationManager.translate("postshotreview.button.reupload", "Re-Upload to Visualizer")
                 : TranslationManager.translate("postshotreview.button.upload", "Upload to Visualizer")
+            Accessible.focusable: true
             Accessible.onPressAction: uploadArea.clicked(null)
 
             Row {
@@ -759,6 +774,7 @@ Page {
                     font.pixelSize: Theme.scaled(16)
                     color: "white"
                     anchors.verticalCenter: parent.verticalCenter
+                    Accessible.ignored: true
                 }
 
                 Tr {
@@ -771,6 +787,7 @@ Page {
                     color: "white"
                     font: Theme.bodyFont
                     anchors.verticalCenter: parent.verticalCenter
+                    Accessible.ignored: true
                 }
             }
 
@@ -836,6 +853,7 @@ Page {
 
             Accessible.role: Accessible.Button
             Accessible.name: TranslationManager.translate("postshotreview.accessible.getaiadvice", "Get AI Advice")
+            Accessible.focusable: true
             Accessible.onPressAction: aiAdviceArea.clicked(null)
 
             Row {
@@ -849,6 +867,7 @@ Page {
                     height: Theme.scaled(18)
                     anchors.verticalCenter: parent.verticalCenter
                     visible: status === Image.Ready
+                    Accessible.ignored: true
                 }
 
                 Tr {
@@ -860,6 +879,7 @@ Page {
                            ? "white" : Theme.textColor
                     font: Theme.bodyFont
                     anchors.verticalCenter: parent.verticalCenter
+                    Accessible.ignored: true
                 }
             }
 
@@ -884,6 +904,7 @@ Page {
 
             Accessible.role: Accessible.Button
             Accessible.name: TranslationManager.translate("postshotreview.accessible.emailprompt", "Email AI prompt to yourself")
+            Accessible.focusable: true
             Accessible.onPressAction: emailPromptArea.clicked(null)
 
             Row {
@@ -898,6 +919,7 @@ Page {
                     anchors.verticalCenter: parent.verticalCenter
                     visible: status === Image.Ready
                     opacity: 0.6
+                    Accessible.ignored: true
                 }
 
                 Tr {
@@ -906,6 +928,7 @@ Page {
                     color: Theme.textColor
                     font: Theme.bodyFont
                     anchors.verticalCenter: parent.verticalCenter
+                    Accessible.ignored: true
                 }
             }
 
@@ -942,6 +965,7 @@ Page {
             text: parent.label
             color: Theme.textColor
             font.pixelSize: Theme.scaled(11)
+            Accessible.ignored: true
         }
 
         StyledTextField {
@@ -986,6 +1010,7 @@ Page {
             text: parent.label
             color: Theme.textColor
             font.pixelSize: Theme.scaled(11)
+            Accessible.ignored: true
         }
 
         StyledComboBox {

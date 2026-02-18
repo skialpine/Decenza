@@ -223,7 +223,7 @@ Page {
 
             AccessibleButton {
                 text: "Copy"
-                accessibleName: "Copy recommendation to clipboard"
+                accessibleName: TranslationManager.translate("dialingassistant.accessible.copy", "Copy recommendation to clipboard")
                 Layout.fillWidth: true
                 onClicked: {
                     // Copy edited text to clipboard
@@ -252,7 +252,7 @@ Page {
 
             AccessibleButton {
                 text: "Done"
-                accessibleName: "Close recommendation"
+                accessibleName: TranslationManager.translate("dialingassistant.accessible.done", "Close recommendation")
                 Layout.fillWidth: true
                 onClicked: pageStack.pop()
                 background: Rectangle {
