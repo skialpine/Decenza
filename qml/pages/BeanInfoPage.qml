@@ -18,6 +18,16 @@ Page {
     property bool keyboardVisible: Qt.inputMethod.visible
     property Item focusedField: null
 
+    // Snapshot of DYE values at page open (for Cancel/undo in non-edit mode)
+    property string _snapBrand
+    property string _snapType
+    property string _snapRoastDate
+    property string _snapRoastLevel
+    property string _snapGrinderModel
+    property string _snapGrinderSetting
+    property string _snapBarista
+    property int _snapSelectedPreset: -1
+
     // Preset dialog properties
     property int editPresetIndex: -1
     property string editPresetName: ""
@@ -27,11 +37,30 @@ Page {
 
     Component.onCompleted: {
         root.currentPageTitle = TranslationManager.translate("beaninfo.title", "Beans")
+
+        // Snapshot current DYE values BEFORE auto-match so Cancel restores the true pre-page state
+        if (!isEditMode) {
+            _snapBrand = Settings.dyeBeanBrand
+            _snapType = Settings.dyeBeanType
+            _snapRoastDate = Settings.dyeRoastDate
+            _snapRoastLevel = Settings.dyeRoastLevel
+            _snapGrinderModel = Settings.dyeGrinderModel
+            _snapGrinderSetting = Settings.dyeGrinderSetting
+            _snapBarista = Settings.dyeBarista
+            _snapSelectedPreset = Settings.selectedBeanPreset
+        }
+
         if (editShotId > 0) {
             loadShotForEditing()
         } else if (Settings.selectedBeanPreset === -1 && hasGuestBeanData()) {
-            // Show prompt to save guest bean as preset
-            guestBeanDialog.open()
+            // Check if current bean data matches an existing preset
+            var matchIndex = Settings.findBeanPresetByContent(Settings.dyeBeanBrand, Settings.dyeBeanType)
+            if (matchIndex >= 0) {
+                // Auto-select the matching preset instead of showing the dialog
+                Settings.selectedBeanPreset = matchIndex
+            } else {
+                guestBeanDialog.open()
+            }
         }
     }
 
@@ -356,6 +385,12 @@ Page {
                                                      (beanDelegate.beanIndex === Settings.selectedBeanPreset ?
                                                       ", " + TranslationManager.translate("accessibility.selected", "selected") : "")
                                     Accessible.focusable: true
+                                    Accessible.onPressAction: {
+                                        var s = beanPresetsRow.settings
+                                        var targetIndex = beanDelegate.beanIndex
+                                        s.selectedBeanPreset = targetIndex
+                                        s.applyBeanPreset(targetIndex)
+                                    }
 
                                     Drag.active: beanDragArea.drag.active
                                     Drag.source: beanDelegate
@@ -633,24 +668,59 @@ Page {
     // Bottom bar
     BottomBar {
         barColor: "transparent"
+        showBackButton: isEditMode  // Edit mode keeps back button; non-edit uses Done/Cancel
 
         onBackClicked: {
-            // Remove focus first to ensure any text field changes are committed
-            shotMetadataPage.forceActiveFocus()
-
-            // Save current values to the selected preset (if any)
-            if (!isEditMode && Settings.selectedBeanPreset >= 0) {
-                var preset = Settings.getBeanPreset(Settings.selectedBeanPreset)
-                Settings.updateBeanPreset(Settings.selectedBeanPreset,
-                    preset.name || "",
-                    Settings.dyeBeanBrand,
-                    Settings.dyeBeanType,
-                    Settings.dyeRoastDate,
-                    Settings.dyeRoastLevel,
-                    Settings.dyeGrinderModel,
-                    Settings.dyeGrinderSetting)
-            }
+            // Edit mode only — back navigates without saving
             root.goBack()
+        }
+
+        // Cancel button — visible in non-edit mode
+        AccessibleButton {
+            visible: !isEditMode
+            text: TranslationManager.translate("common.cancel", "Cancel")
+            accessibleName: TranslationManager.translate("beaninfo.button.cancel.accessible", "Cancel changes and go back")
+            onClicked: {
+                shotMetadataPage.forceActiveFocus()
+
+                // Restore snapshot values (discard all edits)
+                Settings.dyeBeanBrand = _snapBrand
+                Settings.dyeBeanType = _snapType
+                Settings.dyeRoastDate = _snapRoastDate
+                Settings.dyeRoastLevel = _snapRoastLevel
+                Settings.dyeGrinderModel = _snapGrinderModel
+                Settings.dyeGrinderSetting = _snapGrinderSetting
+                Settings.dyeBarista = _snapBarista
+                Settings.selectedBeanPreset = _snapSelectedPreset
+                root.goBack()
+            }
+        }
+
+        // Done button — visible in non-edit mode
+        AccessibleButton {
+            visible: !isEditMode
+            primary: true
+            text: TranslationManager.translate("common.done", "Done")
+            accessibleName: TranslationManager.translate("beaninfo.button.done.accessible", "Save changes and go back")
+            onClicked: {
+                shotMetadataPage.forceActiveFocus()
+
+                // Save current values to the selected preset (if any)
+                if (Settings.selectedBeanPreset >= 0) {
+                    var preset = Settings.getBeanPreset(Settings.selectedBeanPreset)
+                    if (preset && preset.name !== undefined) {
+                        Settings.updateBeanPreset(Settings.selectedBeanPreset,
+                            preset.name || "",
+                            Settings.dyeBeanBrand,
+                            Settings.dyeBeanType,
+                            Settings.dyeRoastDate,
+                            Settings.dyeRoastLevel,
+                            Settings.dyeGrinderModel,
+                            Settings.dyeGrinderSetting)
+                    }
+                }
+                root.goBack()
+            }
         }
 
         // Save button - visible in edit mode only
@@ -780,11 +850,10 @@ Page {
             model: parent.model
             currentIndex: Math.max(0, model.indexOf(parent.currentValue))
             font.pixelSize: Theme.scaled(18)
+            accessibleLabel: parent.label
+            emptyItemText: TranslationManager.translate("shotmetadata.option.none", "(None)")
 
-            Accessible.role: Accessible.ComboBox
-            Accessible.name: parent.label
             Accessible.description: currentIndex > 0 ? currentText : TranslationManager.translate("shotmetadata.accessible.notset", "Not set")
-            Accessible.focusable: true
 
             onActiveFocusChanged: {
                 if (activeFocus && AccessibilityManager.enabled) {
@@ -817,43 +886,7 @@ Page {
                 font.pixelSize: Theme.scaled(10)
             }
 
-            delegate: ItemDelegate {
-                width: combo.width
-                height: Theme.scaled(40)
-                contentItem: Text {
-                    text: modelData || TranslationManager.translate("shotmetadata.option.none", "(None)")
-                    color: Theme.textColor
-                    font.pixelSize: Theme.scaled(18)
-                    verticalAlignment: Text.AlignVCenter
-                    leftPadding: Theme.scaled(12)
-                }
-                background: Rectangle {
-                    color: highlighted ? Theme.primaryColor : Theme.surfaceColor
-                }
-                highlighted: combo.highlightedIndex === index
-
-                Accessible.role: Accessible.ListItem
-                Accessible.name: modelData || TranslationManager.translate("shotmetadata.accessible.none", "None")
-            }
-
-            popup: Popup {
-                y: combo.height
-                width: combo.width
-                implicitHeight: Math.min(contentItem.implicitHeight, Theme.scaled(250))
-                padding: 1
-                contentItem: ListView {
-                    clip: true
-                    implicitHeight: contentHeight
-                    model: combo.popup.visible ? combo.delegateModel : null
-                }
-                background: Rectangle {
-                    color: Theme.surfaceColor
-                    border.color: Theme.borderColor
-                    radius: Theme.scaled(4)
-                }
-            }
-
-            onCurrentTextChanged: parent.valueChanged(currentText)
+            onActivated: function(index) { parent.valueChanged(currentText) }
         }
     }
 
