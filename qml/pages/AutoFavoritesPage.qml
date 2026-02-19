@@ -393,8 +393,7 @@ Page {
                 StyledComboBox {
                     id: groupByCombo
                     Layout.fillWidth: true
-                    Accessible.name: TranslationManager.translate("autofavorites.groupby", "Group by") +
-                        ": " + displayText
+                    accessibleLabel: TranslationManager.translate("autofavorites.groupby", "Group by")
                     model: [
                         TranslationManager.translate("autofavorites.groupby.bean", "Bean only"),
                         TranslationManager.translate("autofavorites.groupby.profile", "Profile only"),

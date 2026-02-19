@@ -441,6 +441,7 @@ Item {
                     StyledComboBox {
                         id: typeComboBox
                         Layout.preferredWidth: Theme.scaled(220)
+                        accessibleLabel: TranslationManager.translate("settings.screensaver.type", "Screensaver type")
                         model: [
                             TranslationManager.translate("settings.screensaver.type.disabled", "Turn Screen Off"),
                             TranslationManager.translate("settings.screensaver.type.videos", "Videos & Images"),
@@ -634,6 +635,7 @@ Item {
                         StyledComboBox {
                             id: shotMapShapeCombo
                             width: Theme.scaled(100)
+                            accessibleLabel: TranslationManager.translate("settings.screensaver.shotmap.shape", "Shape")
                             model: [
                                 TranslationManager.translate("settings.screensaver.shotmap.flat", "Flat"),
                                 TranslationManager.translate("settings.screensaver.shotmap.globe", "Globe")
@@ -659,6 +661,7 @@ Item {
                         StyledComboBox {
                             id: shotMapTextureCombo
                             width: Theme.scaled(110)
+                            accessibleLabel: TranslationManager.translate("settings.screensaver.shotmap.texture", "Texture")
                             model: [
                                 TranslationManager.translate("settings.screensaver.shotmap.dark", "Dark"),
                                 TranslationManager.translate("settings.screensaver.shotmap.bright", "Bright"),

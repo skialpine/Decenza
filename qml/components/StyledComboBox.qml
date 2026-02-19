@@ -63,7 +63,7 @@ ComboBox {
     Accessible.role: Accessible.ComboBox
     Accessible.name: control.accessibleLabel || control.displayText
     Accessible.focusable: true
-    Accessible.onPressAction: selectionDialog.open()
+    Accessible.onPressAction: if (!selectionDialog.visible) selectionDialog.open()
 
     // Close dialog when ComboBox becomes invisible (page popped, tab switched)
     onVisibleChanged: if (!visible) selectionDialog.close()
@@ -82,7 +82,7 @@ ComboBox {
         Accessible.ignored: true
 
         onClicked: {
-            selectionDialog.open()
+            if (!selectionDialog.visible) selectionDialog.open()
         }
     }
 

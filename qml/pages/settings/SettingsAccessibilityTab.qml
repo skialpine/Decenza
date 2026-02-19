@@ -252,6 +252,7 @@ Item {
                     StyledComboBox {
                         id: modeComboBox
                         Layout.preferredWidth: Theme.scaled(180)
+                        accessibleLabel: TranslationManager.translate("settings.accessibility.announcementMode", "Announcement mode")
                         enabled: AccessibilityManager.enabled && AccessibilityManager.extractionAnnouncementsEnabled
                         model: [
                             TranslationManager.translate("settings.accessibility.modeBoth", "Time + Milestones"),
