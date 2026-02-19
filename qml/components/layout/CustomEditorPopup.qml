@@ -44,6 +44,7 @@ Popup {
 
     onClosed: {
         showEmojiPicker = false
+        actionPickerPopup.close()
     }
 
     // Detect malformed HTML (tags inside attribute values) and strip to plain text
@@ -1129,6 +1130,17 @@ Popup {
         id: actionPickerPopup
         property string gesture: "click"
 
+        // Snapshot of actions, refreshed each time the dialog opens
+        property var actionItems: []
+
+        onAboutToShow: {
+            var items = [{ id: "", label: "None" }]
+            var filtered = popup.getFilteredActions()
+            for (var i = 0; i < filtered.length; i++)
+                items.push(filtered[i])
+            actionItems = items
+        }
+
         parent: Overlay.overlay
         anchors.centerIn: parent
         modal: true
@@ -1193,13 +1205,7 @@ Popup {
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
 
-                    model: {
-                        var items = [{ id: "", label: "None" }]
-                        var filtered = popup.getFilteredActions()
-                        for (var i = 0; i < filtered.length; i++)
-                            items.push(filtered[i])
-                        return items
-                    }
+                    model: actionPickerPopup.actionItems
 
                     delegate: Rectangle {
                         id: apOptionDelegate
@@ -1220,7 +1226,7 @@ Popup {
                             : (apDelegateMa.pressed ? Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.1) : "transparent")
 
                         Accessible.role: Accessible.Button
-                        Accessible.name: modelData.label + (isSelected ? ". Selected" : "")
+                        Accessible.name: modelData.label + (isSelected ? ". " + TranslationManager.translate("combobox.selected", "Selected") : "")
                         Accessible.focusable: true
                         Accessible.onPressAction: apDelegateMa.clicked(null)
 

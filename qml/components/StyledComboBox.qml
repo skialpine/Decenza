@@ -69,9 +69,9 @@ ComboBox {
     onVisibleChanged: if (!visible) selectionDialog.close()
 
     // Keyboard support: open dialog with Space/Enter (native popup is suppressed)
-    Keys.onSpacePressed: selectionDialog.open()
-    Keys.onReturnPressed: selectionDialog.open()
-    Keys.onEnterPressed: selectionDialog.open()
+    Keys.onSpacePressed: if (!selectionDialog.visible) selectionDialog.open()
+    Keys.onReturnPressed: if (!selectionDialog.visible) selectionDialog.open()
+    Keys.onEnterPressed: if (!selectionDialog.visible) selectionDialog.open()
 
     // Intercept all taps to open our Dialog instead of the native Popup
     MouseArea {

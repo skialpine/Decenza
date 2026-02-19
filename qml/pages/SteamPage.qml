@@ -144,7 +144,7 @@ Page {
                         border.width: 1
 
                         Accessible.role: Accessible.Button
-                        Accessible.name: modelData.name + (index === Settings.selectedSteamPitcher ? ", selected" : "")
+                        Accessible.name: modelData.name + (index === Settings.selectedSteamPitcher ? ", " + TranslationManager.translate("accessibility.selected", "selected") : "")
                         Accessible.focusable: true
                         Accessible.onPressAction: livePitcherMa.clicked(null)
 
@@ -523,7 +523,15 @@ Page {
                                                      (pitcherDelegate.pitcherIndex === Settings.selectedSteamPitcher ?
                                                       ", " + TranslationManager.translate("accessibility.selected", "selected") : "")
                                     Accessible.focusable: true
-                                    Accessible.onPressAction: dragArea.released(null)
+                                    Accessible.onPressAction: {
+                                        Settings.selectedSteamPitcher = pitcherDelegate.pitcherIndex
+                                        var flow = modelData.flow !== undefined ? modelData.flow : 150
+                                        durationSlider.value = modelData.duration
+                                        flowSlider.value = flow
+                                        Settings.steamTimeout = modelData.duration
+                                        Settings.steamFlow = flow
+                                        MainController.startSteamHeating()
+                                    }
 
                                     Drag.active: dragArea.drag.active
                                     Drag.source: pitcherDelegate
