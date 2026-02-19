@@ -143,15 +143,22 @@ Page {
                         border.color: index === Settings.selectedSteamPitcher ? Theme.primaryColor : Theme.textSecondaryColor
                         border.width: 1
 
+                        Accessible.role: Accessible.Button
+                        Accessible.name: modelData.name + (index === Settings.selectedSteamPitcher ? ", " + TranslationManager.translate("accessibility.selected", "selected") : "")
+                        Accessible.focusable: true
+                        Accessible.onPressAction: livePitcherMa.clicked(null)
+
                         Text {
                             id: livePitcherText
                             anchors.centerIn: parent
                             text: modelData.name
                             color: index === Settings.selectedSteamPitcher ? "white" : Theme.textColor
                             font: Theme.bodyFont
+                            Accessible.ignored: true
                         }
 
                         MouseArea {
+                            id: livePitcherMa
                             anchors.fill: parent
                             onClicked: {
                                 Settings.selectedSteamPitcher = index
@@ -188,11 +195,17 @@ Page {
                         border.color: "white"
                         border.width: 1
 
+                        Accessible.role: Accessible.Button
+                        Accessible.name: TranslationManager.translate("steam.decreaseTime", "Decrease steam time by 5 seconds")
+                        Accessible.focusable: true
+                        Accessible.onPressAction: decreaseMouseArea.clicked(null)
+
                         Text {
                             anchors.centerIn: parent
                             text: "-5s"
                             color: Theme.textColor
                             font: Theme.bodyFont
+                            Accessible.ignored: true
                         }
 
                         MouseArea {
@@ -234,11 +247,17 @@ Page {
                         border.color: "white"
                         border.width: 1
 
+                        Accessible.role: Accessible.Button
+                        Accessible.name: TranslationManager.translate("steam.increaseTime", "Increase steam time by 5 seconds")
+                        Accessible.focusable: true
+                        Accessible.onPressAction: increaseMouseArea.clicked(null)
+
                         Text {
                             anchors.centerIn: parent
                             text: "+5s"
                             color: Theme.textColor
                             font: Theme.bodyFont
+                            Accessible.ignored: true
                         }
 
                         MouseArea {
@@ -504,6 +523,15 @@ Page {
                                                      (pitcherDelegate.pitcherIndex === Settings.selectedSteamPitcher ?
                                                       ", " + TranslationManager.translate("accessibility.selected", "selected") : "")
                                     Accessible.focusable: true
+                                    Accessible.onPressAction: {
+                                        Settings.selectedSteamPitcher = pitcherDelegate.pitcherIndex
+                                        var flow = modelData.flow !== undefined ? modelData.flow : 150
+                                        durationSlider.value = modelData.duration
+                                        flowSlider.value = flow
+                                        Settings.steamTimeout = modelData.duration
+                                        Settings.steamFlow = flow
+                                        MainController.startSteamHeating()
+                                    }
 
                                     Drag.active: dragArea.drag.active
                                     Drag.source: pitcherDelegate
@@ -522,6 +550,7 @@ Page {
                                         text: modelData.name
                                         color: pitcherDelegate.pitcherIndex === Settings.selectedSteamPitcher ? "white" : Theme.textColor
                                         font: Theme.bodyFont
+                                        Accessible.ignored: true
                                     }
 
                                     MouseArea {

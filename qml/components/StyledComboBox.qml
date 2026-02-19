@@ -63,15 +63,15 @@ ComboBox {
     Accessible.role: Accessible.ComboBox
     Accessible.name: control.accessibleLabel || control.displayText
     Accessible.focusable: true
-    Accessible.onPressAction: selectionDialog.open()
+    Accessible.onPressAction: if (!selectionDialog.visible) selectionDialog.open()
 
     // Close dialog when ComboBox becomes invisible (page popped, tab switched)
     onVisibleChanged: if (!visible) selectionDialog.close()
 
     // Keyboard support: open dialog with Space/Enter (native popup is suppressed)
-    Keys.onSpacePressed: selectionDialog.open()
-    Keys.onReturnPressed: selectionDialog.open()
-    Keys.onEnterPressed: selectionDialog.open()
+    Keys.onSpacePressed: if (!selectionDialog.visible) selectionDialog.open()
+    Keys.onReturnPressed: if (!selectionDialog.visible) selectionDialog.open()
+    Keys.onEnterPressed: if (!selectionDialog.visible) selectionDialog.open()
 
     // Intercept all taps to open our Dialog instead of the native Popup
     MouseArea {
@@ -82,7 +82,7 @@ ComboBox {
         Accessible.ignored: true
 
         onClicked: {
-            selectionDialog.open()
+            if (!selectionDialog.visible) selectionDialog.open()
         }
     }
 
