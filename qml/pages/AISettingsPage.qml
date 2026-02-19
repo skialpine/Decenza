@@ -197,6 +197,7 @@ Page {
                     StyledComboBox {
                         id: ollamaModelCombo
                         Layout.fillWidth: true
+                        accessibleLabel: TranslationManager.translate("aisettings.label.model", "Model")
                         model: MainController.aiManager ? MainController.aiManager.ollamaModels : []
                         currentIndex: model.indexOf(Settings.ollamaModel)
                         onCurrentTextChanged: if (currentText) Settings.ollamaModel = currentText

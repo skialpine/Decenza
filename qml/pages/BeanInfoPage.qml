@@ -646,6 +646,11 @@ Page {
         color: Theme.primaryColor
         z: 100
 
+        Accessible.role: Accessible.Button
+        Accessible.name: TranslationManager.translate("shotmetadata.button.hidekeyboard", "Hide keyboard")
+        Accessible.focusable: true
+        Accessible.onPressAction: hideKeyboardMa.clicked(null)
+
         Tr {
             id: hideKeyboardText
             anchors.centerIn: parent
@@ -654,9 +659,11 @@ Page {
             color: "white"
             font.pixelSize: Theme.scaled(13)
             font.bold: true
+            Accessible.ignored: true
         }
 
         MouseArea {
+            id: hideKeyboardMa
             anchors.fill: parent
             onClicked: {
                 focusedField = null

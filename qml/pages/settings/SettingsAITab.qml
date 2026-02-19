@@ -263,7 +263,7 @@ KeyboardAwareContainer {
                             model: MainController.aiManager ? MainController.aiManager.ollamaModels : []
                             currentIndex: model ? model.indexOf(Settings.ollamaModel) : -1
                             onCurrentTextChanged: if (currentText) Settings.ollamaModel = currentText
-                            Accessible.name: TranslationManager.translate("settings.ai.ollamaModel", "Ollama model")
+                            accessibleLabel: TranslationManager.translate("settings.ai.ollamaModel", "Ollama model")
                         }
 
                         AccessibleButton {

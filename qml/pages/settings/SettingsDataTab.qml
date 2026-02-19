@@ -183,6 +183,7 @@ KeyboardAwareContainer {
                     StyledComboBox {
                         id: backupTimeCombo
                         Layout.fillWidth: true
+                        accessibleLabel: TranslationManager.translate("settings.data.backuptime", "Backup time")
                         model: {
                             var times = [TranslationManager.translate("settings.data.backupoff", "Off")];
                             for (var hour = 0; hour < 24; hour++) {
@@ -315,6 +316,7 @@ KeyboardAwareContainer {
                 StyledComboBox {
                     id: restoreBackupCombo
                     Layout.fillWidth: true
+                    accessibleLabel: TranslationManager.translate("settings.data.restorefrombackup", "Restore backup")
                     enabled: MainController.backupManager && availableBackups.length > 0
                     model: availableBackups.length > 0 ? availableBackups : [TranslationManager.translate("settings.data.nobackups", "No backups available")]
                     currentIndex: 0
@@ -450,6 +452,17 @@ KeyboardAwareContainer {
                         border.color: Theme.borderColor
                         visible: MainController.dataMigration.discoveredDevices.length === 1
 
+                        Accessible.role: Accessible.Button
+                        Accessible.name: {
+                            if (MainController.dataMigration.discoveredDevices.length > 0) {
+                                var dev = MainController.dataMigration.discoveredDevices[0]
+                                return (dev.deviceName || "Unknown Device") + ", " + dev.ipAddress
+                            }
+                            return ""
+                        }
+                        Accessible.focusable: true
+                        Accessible.onPressAction: singleDeviceMouseArea.clicked(null)
+
                         RowLayout {
                             id: singleDeviceRow
                             anchors.left: parent.left
@@ -468,6 +481,7 @@ KeyboardAwareContainer {
                                     color: Theme.textColor
                                     font.pixelSize: Theme.scaled(13)
                                     font.bold: true
+                                    Accessible.ignored: true
                                 }
 
                                 Text {
@@ -476,6 +490,7 @@ KeyboardAwareContainer {
                                            MainController.dataMigration.discoveredDevices[0].appVersion) : ""
                                     color: Theme.textSecondaryColor
                                     font.pixelSize: Theme.scaled(11)
+                                    Accessible.ignored: true
                                 }
                             }
 
@@ -484,6 +499,7 @@ KeyboardAwareContainer {
                                       MainController.dataMigration.discoveredDevices[0].ipAddress : ""
                                 color: Theme.textSecondaryColor
                                 font.pixelSize: Theme.scaled(11)
+                                Accessible.ignored: true
                             }
                         }
 

@@ -151,7 +151,8 @@ Button {
             id: singleTapTimer
             interval: 250
             onTriggered: {
-                control.clicked()
+                if (control.enabled)
+                    control.clicked()
             }
         }
 

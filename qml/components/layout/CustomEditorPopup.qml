@@ -1124,38 +1124,39 @@ Popup {
         }
     }
 
-    // === Action picker popup (deferred via Loader) ===
-    Popup {
+    // === Action picker dialog (modal Dialog for TalkBack focus trapping) ===
+    Dialog {
         id: actionPickerPopup
         property string gesture: "click"
 
         parent: Overlay.overlay
+        anchors.centerIn: parent
         modal: true
-        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-        padding: Theme.spacingSmall
-
-        x: Math.round((parent.width - width) / 2)
-        y: Math.round((parent.height - height) / 2)
-        width: Theme.scaled(200)
-        height: Theme.scaled(350)
+        width: Math.min(parent ? parent.width - Theme.scaled(40) : Theme.scaled(200), Theme.scaled(300))
+        height: Math.min(apDialogContent.implicitHeight + Theme.scaled(16), parent ? parent.height - Theme.scaled(80) : Theme.scaled(400))
+        padding: 0
+        topPadding: 0
+        bottomPadding: 0
 
         background: Rectangle {
             color: Theme.surfaceColor
-            radius: Theme.cardRadius
+            radius: Theme.scaled(12)
             border.color: Theme.borderColor
             border.width: 1
         }
 
-        onOpened: apLoader.active = true
-        onClosed: apLoader.active = false
+        contentItem: Column {
+            id: apDialogContent
+            spacing: 0
+            width: parent ? parent.width : actionPickerPopup.width
 
-        contentItem: Loader {
-            id: apLoader
-            active: false
-            sourceComponent: ColumnLayout {
-                spacing: Theme.scaled(2)
+            // Header
+            Item {
+                width: parent.width
+                height: Theme.scaled(48)
 
                 Text {
+                    anchors.centerIn: parent
                     text: {
                         switch (actionPickerPopup.gesture) {
                             case "click": return "Click Action"
@@ -1164,16 +1165,31 @@ Popup {
                             default: return "Action"
                         }
                     }
+                    font.pixelSize: Theme.scaled(18)
+                    font.family: Theme.bodyFont.family
+                    font.bold: true
                     color: Theme.textColor
-                    font: Theme.labelFont
-                    Layout.alignment: Qt.AlignHCenter
+                    Accessible.ignored: true
                 }
 
-                Rectangle { Layout.fillWidth: true; height: 1; color: Theme.borderColor }
+                Rectangle {
+                    anchors.bottom: parent.bottom
+                    width: parent.width
+                    height: 1
+                    color: Theme.borderColor
+                }
+            }
+
+            // Scrollable list of actions
+            Item {
+                width: parent.width
+                implicitHeight: apDialogList.implicitHeight
+                height: implicitHeight
 
                 ListView {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
+                    id: apDialogList
+                    anchors.fill: parent
+                    implicitHeight: Math.min(count * Theme.scaled(48), Theme.scaled(300))
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
 
@@ -1186,9 +1202,9 @@ Popup {
                     }
 
                     delegate: Rectangle {
-                        width: ListView.view.width
-                        height: Theme.scaled(28)
-                        radius: Theme.scaled(4)
+                        id: apOptionDelegate
+                        width: apDialogList.width
+                        height: Theme.scaled(48)
 
                         property bool isSelected: {
                             switch (actionPickerPopup.gesture) {
@@ -1199,16 +1215,53 @@ Popup {
                             }
                         }
 
-                        color: isSelected ? Theme.primaryColor
-                            : (apDelegateMa.pressed ? Qt.darker(Theme.backgroundColor, 1.3) : "transparent")
+                        color: isSelected
+                            ? Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.15)
+                            : (apDelegateMa.pressed ? Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.1) : "transparent")
 
-                        Text {
-                            anchors.left: parent.left
-                            anchors.leftMargin: Theme.scaled(8)
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: modelData.label
-                            color: parent.isSelected ? "white" : Theme.textColor
-                            font: Theme.captionFont
+                        Accessible.role: Accessible.Button
+                        Accessible.name: modelData.label + (isSelected ? ". Selected" : "")
+                        Accessible.focusable: true
+                        Accessible.onPressAction: apDelegateMa.clicked(null)
+
+                        Row {
+                            anchors.fill: parent
+                            anchors.leftMargin: Theme.scaled(16)
+                            anchors.rightMargin: Theme.scaled(16)
+                            spacing: Theme.scaled(8)
+                            Accessible.ignored: true
+
+                            Text {
+                                text: apOptionDelegate.isSelected ? "\u2713" : ""
+                                font.pixelSize: Theme.scaled(16)
+                                font.family: Theme.bodyFont.family
+                                color: Theme.primaryColor
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Theme.scaled(24)
+                                horizontalAlignment: Text.AlignHCenter
+                                Accessible.ignored: true
+                            }
+
+                            Text {
+                                text: modelData.label
+                                font.pixelSize: Theme.scaled(16)
+                                font.family: Theme.bodyFont.family
+                                color: Theme.textColor
+                                verticalAlignment: Text.AlignVCenter
+                                anchors.verticalCenter: parent.verticalCenter
+                                elide: Text.ElideRight
+                                width: apDialogList.width - Theme.scaled(56)
+                                Accessible.ignored: true
+                            }
+                        }
+
+                        // Bottom separator
+                        Rectangle {
+                            anchors.bottom: parent.bottom
+                            width: parent.width
+                            height: 1
+                            color: Theme.borderColor
+                            opacity: 0.3
                         }
 
                         MouseArea {
@@ -1224,6 +1277,40 @@ Popup {
                             }
                         }
                     }
+                }
+            }
+
+            // Separator
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Theme.borderColor
+            }
+
+            // Cancel button
+            Rectangle {
+                width: parent.width
+                height: Theme.scaled(48)
+                color: apCancelArea.pressed ? Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.1) : "transparent"
+
+                Accessible.role: Accessible.Button
+                Accessible.name: TranslationManager.translate("combobox.cancel", "Cancel")
+                Accessible.focusable: true
+                Accessible.onPressAction: apCancelArea.clicked(null)
+
+                Text {
+                    anchors.centerIn: parent
+                    text: TranslationManager.translate("combobox.cancel", "Cancel")
+                    font.pixelSize: Theme.scaled(16)
+                    font.family: Theme.bodyFont.family
+                    color: Theme.textSecondaryColor
+                    Accessible.ignored: true
+                }
+
+                MouseArea {
+                    id: apCancelArea
+                    anchors.fill: parent
+                    onClicked: actionPickerPopup.close()
                 }
             }
         }

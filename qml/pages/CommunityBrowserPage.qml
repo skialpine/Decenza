@@ -42,6 +42,7 @@ Item {
             StyledComboBox {
                 id: typeFilter
                 Layout.preferredWidth: Theme.scaled(120)
+                accessibleLabel: TranslationManager.translate("community.filter.type", "Type filter")
                 model: ["All Types", "Items", "Zones", "Layouts"]
                 onCurrentIndexChanged: {
                     var types = ["", "item", "zone", "layout"]
@@ -54,6 +55,7 @@ Item {
             StyledComboBox {
                 id: variableFilter
                 Layout.fillWidth: true
+                accessibleLabel: TranslationManager.translate("community.filter.variable", "Variable filter")
                 model: ["Any Variable", "Group Head Temp", "Steam Temp", "Pressure",
                         "Flow Rate", "Weight", "Water Level", "Shot Time",
                         "Profile", "Machine State", "Time", "Date",
@@ -72,6 +74,7 @@ Item {
             StyledComboBox {
                 id: actionFilter
                 Layout.fillWidth: true
+                accessibleLabel: TranslationManager.translate("community.filter.action", "Action filter")
                 model: ["Any Action",
                         "Go to Settings", "Go to History", "Go to Profiles",
                         "Go to Profile Editor", "Go to Recipes", "Go to Descaling",
@@ -104,6 +107,7 @@ Item {
             StyledComboBox {
                 id: sortFilter
                 Layout.preferredWidth: Theme.scaled(120)
+                accessibleLabel: TranslationManager.translate("community.filter.sort", "Sort order")
                 model: ["Newest", "Most Popular"]
                 onCurrentIndexChanged: {
                     var sorts = ["newest", "popular"]

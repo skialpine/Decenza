@@ -97,6 +97,10 @@ Button {
         enabled: root.enabled
         cursorShape: Qt.PointingHandCursor
 
+        onPressed: function(mouse) {
+            mouse.accepted = true
+        }
+
         onClicked: {
             var accessibilityMode = typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled
 

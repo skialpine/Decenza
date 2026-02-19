@@ -64,6 +64,7 @@ Page {
                             verticalAlignment: Text.AlignVCenter
                             leftPadding: Theme.scaled(12)
                             rightPadding: Theme.scaled(30)
+                            Accessible.ignored: true
                         }
 
                         indicator: Text {
@@ -72,6 +73,7 @@ Page {
                             text: "\u25BC"
                             color: Theme.textSecondaryColor
                             font.pixelSize: Theme.scaled(10)
+                            Accessible.ignored: true
                         }
 
                         accessibleLabel: TranslationManager.translate("profileselector.filter.label", "Profile filter")

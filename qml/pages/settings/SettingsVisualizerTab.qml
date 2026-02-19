@@ -60,29 +60,16 @@ KeyboardAwareContainer {
                         font.pixelSize: Theme.scaled(12)
                     }
 
-                    TextField {
+                    StyledTextField {
                         id: usernameField
                         Layout.fillWidth: true
                         text: Settings.visualizerUsername
-                        font: Theme.bodyFont
-                        color: Theme.textColor
-                        placeholderTextColor: Theme.textSecondaryColor
+                        placeholder: TranslationManager.translate("settings.visualizer.username", "Username / Email")
                         inputMethodHints: Qt.ImhEmailCharactersOnly | Qt.ImhNoAutoUppercase
-                        leftPadding: Theme.scaled(12)
-                        rightPadding: Theme.scaled(12)
-                        topPadding: Theme.scaled(12)
-                        bottomPadding: Theme.scaled(12)
-                        background: Rectangle {
-                            color: Theme.backgroundColor
-                            radius: Theme.scaled(4)
-                            border.color: usernameField.activeFocus ? Theme.primaryColor : Theme.textSecondaryColor
-                            border.width: 1
-                        }
                         onTextChanged: Settings.visualizerUsername = text
                         // Enter jumps to password field
-                        onAccepted: passwordField.forceActiveFocus()
-                        Keys.onReturnPressed: passwordField.forceActiveFocus()
-                        Keys.onEnterPressed: passwordField.forceActiveFocus()
+                        Keys.onReturnPressed: function(event) { passwordField.forceActiveFocus() }
+                        Keys.onEnterPressed: function(event) { passwordField.forceActiveFocus() }
                     }
                 }
 
@@ -98,33 +85,14 @@ KeyboardAwareContainer {
                         font.pixelSize: Theme.scaled(12)
                     }
 
-                    TextField {
+                    StyledTextField {
                         id: passwordField
                         Layout.fillWidth: true
                         text: Settings.visualizerPassword
                         echoMode: TextInput.Password
-                        font: Theme.bodyFont
-                        color: Theme.textColor
-                        placeholderTextColor: Theme.textSecondaryColor
+                        placeholder: TranslationManager.translate("settings.visualizer.password", "Password")
                         inputMethodHints: Qt.ImhNoAutoUppercase
-                        leftPadding: Theme.scaled(12)
-                        rightPadding: Theme.scaled(12)
-                        topPadding: Theme.scaled(12)
-                        bottomPadding: Theme.scaled(12)
-                        background: Rectangle {
-                            color: Theme.backgroundColor
-                            radius: Theme.scaled(4)
-                            border.color: passwordField.activeFocus ? Theme.primaryColor : Theme.textSecondaryColor
-                            border.width: 1
-                        }
                         onTextChanged: Settings.visualizerPassword = text
-                        // Enter dismisses keyboard
-                        onAccepted: {
-                            passwordField.focus = false
-                            Qt.inputMethod.hide()
-                        }
-                        Keys.onReturnPressed: { passwordField.focus = false; Qt.inputMethod.hide() }
-                        Keys.onEnterPressed: { passwordField.focus = false; Qt.inputMethod.hide() }
                     }
                 }
 

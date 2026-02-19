@@ -69,6 +69,7 @@ Item {
                         StyledComboBox {
                             id: resolutionCombo
                             Layout.preferredWidth: Theme.scaled(200)
+                            accessibleLabel: TranslationManager.translate("settings.debug.windowResolution", "Window resolution")
                             model: resolutionSection.resolutions
                             textRole: "name"
                             displayText: Window.window ? (Window.window.width + " x " + Window.window.height) : "Select..."
