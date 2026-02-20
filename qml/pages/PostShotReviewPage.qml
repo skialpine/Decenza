@@ -187,6 +187,8 @@ Page {
             width: parent.width
             spacing: Theme.scaled(6)
 
+            GraphInspectBar { graph: reviewGraph }
+
             // Resizable Graph (visible when we have shot data)
             Rectangle {
                 id: graphCard
@@ -195,6 +197,9 @@ Page {
                 color: Theme.surfaceColor
                 radius: Theme.cardRadius
                 visible: editShotData.pressure && editShotData.pressure.length > 0
+                Accessible.role: Accessible.Graphic
+                Accessible.name: "Shot graph. Tap to inspect values"
+                Accessible.focusable: true
 
                 HistoryShotGraph {
                     id: reviewGraph
@@ -210,11 +215,20 @@ Page {
                     maxTime: editShotData.duration || 60
                 }
 
-                // Tap-to-announce overlay (reads out curve values at tapped position)
+                // Tap/drag-to-inspect overlay (shows crosshair, values shown above graph)
                 MouseArea {
                     anchors.fill: reviewGraph
                     onClicked: function(mouse) {
-                        reviewGraph.announceAtPosition(mouse.x, mouse.y)
+                        if (mouse.x > reviewGraph.plotArea.x + reviewGraph.plotArea.width) {
+                            reviewGraph.toggleRightAxis()
+                        } else {
+                            reviewGraph.inspectAtPosition(mouse.x, mouse.y)
+                        }
+                    }
+                    onPositionChanged: function(mouse) {
+                        if (pressed) {
+                            reviewGraph.inspectAtPosition(mouse.x, mouse.y)
+                        }
                     }
                 }
 
@@ -276,6 +290,11 @@ Page {
                         }
                     }
                 }
+            }
+
+            GraphLegend {
+                graph: reviewGraph
+                visible: editShotData.pressure && editShotData.pressure.length > 0
             }
 
             // 3-column grid for all fields

@@ -2531,6 +2531,11 @@ void MainController::onShotEnded() {
         shotYieldOverride = finalWeight;
     }
 
+    // Smooth weight flow rate before saving (centered moving average over 7 points ≈ 1.4s at 5Hz).
+    // The raw LSLR data from recording has staircase artifacts from 0.1g scale quantization;
+    // this post-processing matches de1app's smoothing level for storage and visualizer export.
+    m_shotDataModel->smoothWeightFlowRate();
+
     // Always save shot to local history
     qDebug() << "[metadata] Saving shot - shotHistory:" << (m_shotHistory ? "exists" : "null")
              << "isReady:" << (m_shotHistory ? m_shotHistory->isReady() : false);

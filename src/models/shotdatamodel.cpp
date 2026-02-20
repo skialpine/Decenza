@@ -366,6 +366,27 @@ void ShotDataModel::markStopAt(double time) {
     emit weightAtStopChanged();
 }
 
+void ShotDataModel::smoothWeightFlowRate(int window) {
+    int n = m_weightFlowRatePoints.size();
+    if (n < 3) return;
+
+    // Centered moving average: each point averages with `window` neighbors on each side.
+    // With window=3 and ~5Hz data, this spans ~1.4s on top of the 1s LSLR recording window,
+    // matching de1app's effective smoothing. X values (timestamps) are preserved.
+    QVector<QPointF> smoothed;
+    smoothed.reserve(n);
+    for (int i = 0; i < n; i++) {
+        int lo = qMax(0, i - window);
+        int hi = qMin(n - 1, i + window);
+        double sum = 0;
+        for (int j = lo; j <= hi; j++) {
+            sum += m_weightFlowRatePoints[j].y();
+        }
+        smoothed.append(QPointF(m_weightFlowRatePoints[i].x(), sum / (hi - lo + 1)));
+    }
+    m_weightFlowRatePoints = smoothed;
+}
+
 void ShotDataModel::addPhaseMarker(double time, const QString& label, int frameNumber, bool isFlowMode, const QString& transitionReason) {
     m_pendingMarkers.append({time, label});
 

@@ -340,6 +340,70 @@ bool ShotHistoryStorage::runMigrations()
         currentVersion = 6;
     }
 
+    // Migration 7: Smooth weight flow rate data in all existing shots
+    // The raw LSLR data has staircase artifacts from 0.1g scale quantization.
+    // Apply the same centered moving average (window=3, 7-point) used for new shots.
+    if (currentVersion < 7) {
+        qDebug() << "ShotHistoryStorage: Running migration to version 7 (smooth weight flow rate)";
+
+        m_db.transaction();
+
+        QSqlQuery readQuery(m_db);
+        readQuery.prepare("SELECT id, sample_data FROM shots WHERE sample_data IS NOT NULL");
+        readQuery.exec();
+
+        QSqlQuery updateQuery(m_db);
+        updateQuery.prepare("UPDATE shots SET sample_data = ? WHERE id = ?");
+
+        int smoothedCount = 0;
+        while (readQuery.next()) {
+            qint64 id = readQuery.value(0).toLongLong();
+            QByteArray blob = readQuery.value(1).toByteArray();
+
+            QByteArray json = qUncompress(blob);
+            if (json.isEmpty()) continue;
+
+            QJsonDocument doc = QJsonDocument::fromJson(json);
+            QJsonObject root = doc.object();
+
+            if (!root.contains("weightFlowRate")) continue;
+
+            QJsonObject wfrObj = root["weightFlowRate"].toObject();
+            QJsonArray timeArr = wfrObj["t"].toArray();
+            QJsonArray valueArr = wfrObj["v"].toArray();
+            int n = qMin(timeArr.size(), valueArr.size());
+            if (n < 3) continue;
+
+            // Centered moving average with window=3 (7-point)
+            QJsonArray smoothedArr;
+            for (int i = 0; i < n; i++) {
+                int lo = qMax(0, i - 3);
+                int hi = qMin(n - 1, i + 3);
+                double sum = 0;
+                for (int j = lo; j <= hi; j++) {
+                    sum += valueArr[j].toDouble();
+                }
+                smoothedArr.append(sum / (hi - lo + 1));
+            }
+
+            wfrObj["v"] = smoothedArr;
+            root["weightFlowRate"] = wfrObj;
+            QByteArray newJson = QJsonDocument(root).toJson(QJsonDocument::Compact);
+            QByteArray newBlob = qCompress(newJson, 9);
+
+            updateQuery.bindValue(0, newBlob);
+            updateQuery.bindValue(1, id);
+            updateQuery.exec();
+            smoothedCount++;
+        }
+
+        qDebug() << "ShotHistoryStorage: Smoothed weight flow rate for" << smoothedCount << "shots";
+        query.exec("UPDATE schema_version SET version = 7");
+        currentVersion = 7;
+
+        m_db.commit();
+    }
+
     m_schemaVersion = currentVersion;
     return true;
 }

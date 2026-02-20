@@ -125,6 +125,8 @@ Page {
                 }
             }
 
+            GraphInspectBar { graph: shotGraph }
+
             // Resizable graph with swipe navigation
             Rectangle {
                 id: graphCard
@@ -165,11 +167,19 @@ Page {
                     canSwipeLeft: canGoNext()
                     canSwipeRight: canGoPrevious()
 
-                    onSwipedLeft: navigateToShot(currentIndex + 1)
-                    onSwipedRight: navigateToShot(currentIndex - 1)
+                    onSwipedLeft: { shotGraph.dismissInspect(); navigateToShot(currentIndex + 1) }
+                    onSwipedRight: { shotGraph.dismissInspect(); navigateToShot(currentIndex - 1) }
                     onTapped: function(x, y) {
                         var graphPos = mapToItem(shotGraph, x, y)
-                        shotGraph.announceAtPosition(graphPos.x, graphPos.y)
+                        if (graphPos.x > shotGraph.plotArea.x + shotGraph.plotArea.width) {
+                            shotGraph.toggleRightAxis()
+                        } else {
+                            shotGraph.inspectAtPosition(graphPos.x, graphPos.y)
+                        }
+                    }
+                    onMoved: function(x, y) {
+                        var graphPos = mapToItem(shotGraph, x, y)
+                        shotGraph.inspectAtPosition(graphPos.x, graphPos.y)
                     }
                 }
 
@@ -229,6 +239,8 @@ Page {
                     }
                 }
             }
+
+            GraphLegend { graph: shotGraph }
 
             // Shot navigation buttons (list is newest-first, so lower index = newer)
             RowLayout {
