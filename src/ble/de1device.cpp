@@ -1169,6 +1169,8 @@ void DE1Device::sendInitialSettings() {
         writeMMR(DE1::MMR::ESPRESSO_WARMUP_TIMEOUT, m_settings->heaterWarmupTimeout());
         writeMMR(DE1::MMR::HOT_WATER_FLOW_RATE, m_settings->hotWaterFlowRate());
         writeMMR(DE1::MMR::STEAM_TWO_TAP_STOP, m_settings->steamTwoTapStop() ? 1 : 0);
+        writeMMR(DE1::MMR::STEAM_HIGHFLOW_START, 70);   // de1app default, no UI
+        writeMMR(DE1::MMR::TANK_TEMP_THRESHOLD, 0);     // de1app default (off), no UI
     } else {
         // Fallback defaults if Settings not yet wired (matches de1app defaults)
         writeMMR(DE1::MMR::PHASE1_FLOW_RATE, 20);
@@ -1177,6 +1179,8 @@ void DE1Device::sendInitialSettings() {
         writeMMR(DE1::MMR::ESPRESSO_WARMUP_TIMEOUT, 10);
         writeMMR(DE1::MMR::HOT_WATER_FLOW_RATE, 10);
         writeMMR(DE1::MMR::STEAM_TWO_TAP_STOP, 1);
+        writeMMR(DE1::MMR::STEAM_HIGHFLOW_START, 70);
+        writeMMR(DE1::MMR::TANK_TEMP_THRESHOLD, 0);
     }
 
     // Send a basic profile header (5 bytes)
