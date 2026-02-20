@@ -432,6 +432,15 @@ void ShotTimingController::onSettlingComplete()
         return;
     }
 
+    // Extra cup-removal guard at completion time. Handles slow/multi-step cup
+    // removal paths that may not trigger single-sample bypass checks.
+    if (m_settlingPeakWeight > 20.0 && m_weight < m_settlingPeakWeight - 20.0) {
+        qWarning() << "[SAW] Possible cup removal detected at settling complete"
+                   << "(weight=" << m_weight << "peak=" << m_settlingPeakWeight
+                   << "), skipping learning";
+        return;
+    }
+
     // Validate drip is in reasonable range (0 to 15 grams)
     if (drip > 15.0) {
         qWarning() << "[SAW] Drip out of range (" << drip << "g), skipping learning";
