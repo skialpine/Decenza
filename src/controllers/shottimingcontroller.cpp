@@ -189,6 +189,7 @@ void ShotTimingController::onWeightSample(double weight, double flowRate)
                        << "peak:" << m_settlingPeakWeight << ") - skipping learning";
             // Cup removal corrupts weight data — bypass learning entirely
             // but still emit signals so the shot is saved
+            m_sawTriggeredThisShot = false;  // Prevent stale SAW state on next operation
             m_settlingTimer.stop();
             m_displayTimer.stop();
             emit sawSettlingChanged();
@@ -415,7 +416,10 @@ void ShotTimingController::onSettlingComplete()
 
     // Calculate how much weight came after we sent the stop command
     double drip = m_weight - m_weightAtStop;
-    if (drip < 0) drip = 0;  // Weight can't decrease
+    if (drip < 0) {
+        qWarning() << "[SAW] Negative drip (" << drip << "g), clamping to 0";
+        drip = 0;  // Weight can't decrease
+    }
 
     double overshoot = m_weight - m_targetWeightAtStop;
 
