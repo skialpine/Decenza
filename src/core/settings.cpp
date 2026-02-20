@@ -2135,14 +2135,20 @@ void Settings::setAutoFavoritesMaxItems(int maxItems) {
     }
 }
 
-bool Settings::resetBleOnWake() const {
+bool Settings::bleHealthRefreshEnabled() const {
+    // Migration path: keep honoring legacy key if new key is not yet present.
+    if (m_settings.contains("ble/healthRefreshEnabled")) {
+        return m_settings.value("ble/healthRefreshEnabled", false).toBool();
+    }
     return m_settings.value("ble/resetOnWake", false).toBool();
 }
 
-void Settings::setResetBleOnWake(bool enabled) {
-    if (resetBleOnWake() != enabled) {
+void Settings::setBleHealthRefreshEnabled(bool enabled) {
+    if (bleHealthRefreshEnabled() != enabled) {
+        m_settings.setValue("ble/healthRefreshEnabled", enabled);
+        // Keep legacy key in sync for downgrade compatibility.
         m_settings.setValue("ble/resetOnWake", enabled);
-        emit resetBleOnWakeChanged();
+        emit bleHealthRefreshEnabledChanged();
     }
 }
 
