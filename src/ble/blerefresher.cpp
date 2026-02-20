@@ -17,6 +17,17 @@ BleRefresher::BleRefresher(DE1Device* de1, BLEManager* bleManager,
     m_periodicTimer.setSingleShot(true);
     connect(&m_periodicTimer, &QTimer::timeout, this, &BleRefresher::scheduleRefresh);
 
+    connect(m_settings, &Settings::bleHealthRefreshEnabledChanged, this, [this]() {
+        if (!m_settings->bleHealthRefreshEnabled()) {
+            m_periodicTimer.stop();
+            m_refreshPending = false;
+            qDebug() << "[BleRefresher] BLE health refresh disabled";
+        } else if (m_periodicIntervalMs > 0 && !m_periodicTimer.isActive()) {
+            m_periodicTimer.start(m_periodicIntervalMs);
+            qDebug() << "[BleRefresher] BLE health refresh enabled";
+        }
+    });
+
     // Detect wake from sleep: when phase leaves Sleep, schedule a refresh.
     // The 60-minute debounce prevents treating the initial Disconnected→Sleep→Idle
     // transition (normal first connect) as a wake-from-sleep event.
@@ -26,11 +37,11 @@ BleRefresher::BleRefresher(DE1Device* de1, BLEManager* bleManager,
             m_sleeping = true;
         } else if (m_sleeping) {
             m_sleeping = false;
-            if (m_settings->resetBleOnWake()) {
+            if (m_settings->bleHealthRefreshEnabled()) {
                 qDebug() << "[BleRefresher] Wake from sleep detected, scheduling BLE refresh";
                 scheduleRefresh();
             } else {
-                qDebug() << "[BleRefresher] Wake from sleep detected, BLE refresh disabled by setting";
+                qDebug() << "[BleRefresher] Wake from sleep detected, BLE health refresh disabled by setting";
             }
         }
     });
@@ -40,13 +51,37 @@ BleRefresher::BleRefresher(DE1Device* de1, BLEManager* bleManager,
 
 void BleRefresher::startPeriodicRefresh(int intervalHours) {
     m_periodicIntervalMs = intervalHours * 3600 * 1000;
+    if (!m_settings->bleHealthRefreshEnabled()) {
+        qDebug() << "[BleRefresher] Periodic refresh disabled by setting";
+        return;
+    }
     m_periodicTimer.start(m_periodicIntervalMs);
     qDebug() << "[BleRefresher] Periodic refresh started, interval:" << intervalHours << "hours";
 }
 
 void BleRefresher::scheduleRefresh() {
+    if (!m_settings->bleHealthRefreshEnabled()) {
+        qDebug() << "[BleRefresher] BLE health refresh disabled by setting";
+        return;
+    }
+
+    auto rearmPeriodicCheck = [this]() {
+        if (m_periodicIntervalMs > 0 && !m_periodicTimer.isActive()) {
+            m_periodicTimer.start(m_periodicIntervalMs);
+        }
+    };
+
     if (m_refreshInProgress) {
         qDebug() << "[BleRefresher] Refresh already in progress, skipping";
+        rearmPeriodicCheck();
+        return;
+    }
+
+    // Periodic refresh should never run while machine is sleeping. Reconnecting BLE
+    // during sleep can wake some DE1 setups unintentionally.
+    if (m_machineState->phase() == MachineState::Phase::Sleep) {
+        qDebug() << "[BleRefresher] Machine sleeping, skipping periodic BLE refresh";
+        rearmPeriodicCheck();
         return;
     }
 
@@ -54,6 +89,7 @@ void BleRefresher::scheduleRefresh() {
     if (m_lastRefresh.elapsed() < MIN_REFRESH_INTERVAL_MS) {
         qDebug() << "[BleRefresher] Last refresh was" << m_lastRefresh.elapsed() / 1000
                  << "s ago, skipping (debounce)";
+        rearmPeriodicCheck();
         return;
     }
 

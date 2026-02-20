@@ -259,8 +259,8 @@ int main(int argc, char *argv[])
     });
     autoWakeManager.start();
 
-    // BLE health refresh - cycles BLE connections on wake from sleep (and every 5 hours)
-    // to prevent Android Bluetooth stack degradation over long uptimes
+    // BLE health refresh (settings-controlled) - cycles BLE connections on wake from
+    // sleep and every 5 hours to prevent long-uptime Android Bluetooth degradation.
     BleRefresher bleRefresher(&de1Device, &bleManager, &machineState, &settings);
     bleRefresher.startPeriodicRefresh(5);
 
