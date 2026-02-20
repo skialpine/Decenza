@@ -9,6 +9,7 @@ Item {
     signal swipedLeft()   // Swipe left = go to next (newer)
     signal swipedRight()  // Swipe right = go to previous (older)
     signal tapped(real x, real y)  // Non-swipe tap at position (for accessibility graph readout)
+    signal moved(real x, real y)   // Drag position (for inspect scrub, emitted when not horizontal swiping)
 
     // Whether swiping is allowed in each direction (for edge bounce)
     property bool canSwipeLeft: true
@@ -64,11 +65,6 @@ Item {
             if (!directionDecided && (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10)) {
                 directionDecided = true
                 isHorizontalSwipe = Math.abs(deltaX) > Math.abs(deltaY)
-                if (!isHorizontalSwipe) {
-                    // Vertical scroll - stop tracking, let parent handle
-                    tracking = false
-                    return
-                }
             }
 
             if (isHorizontalSwipe) {
@@ -83,6 +79,11 @@ Item {
                     // Normal swipe
                     swipeOffset = deltaX
                 }
+            } else if (directionDecided) {
+                // Not a horizontal swipe - emit for drag-to-inspect.
+                // preventStealing is false here, so parent ScrollView/Flickable
+                // can still steal the gesture for scrolling.
+                swipeArea.moved(mouse.x, mouse.y)
             }
         }
 

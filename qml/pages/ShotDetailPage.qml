@@ -50,6 +50,11 @@ Page {
         return shotIds.length > 0 && currentIndex > 0
     }
 
+    function saveGraphSetting(key, value) {
+        shotGraph[key] = value
+        Settings.setValue("graph/" + key, value)
+    }
+
     function formatRatio() {
         if (shotData.doseWeight > 0) {
             return "1:" + (shotData.finalWeight / shotData.doseWeight).toFixed(1)
@@ -125,6 +130,60 @@ Page {
                 }
             }
 
+            // Inspect values bar (visible when tapping on graph)
+            // TTS handled by announceAtPosition() — visual only for sighted users
+            Flow {
+                Layout.fillWidth: true
+                opacity: shotGraph.inspecting ? 1 : 0
+                spacing: Theme.spacingMedium
+
+                Text {
+                    text: shotGraph.inspectTime.toFixed(1) + "s"
+                    font.family: Theme.captionFont.family
+                    font.pixelSize: Theme.captionFont.pixelSize
+                    font.bold: true
+                    color: Theme.textColor
+                    Accessible.ignored: true
+                }
+
+                Repeater {
+                    model: {
+                        var items = []
+                        var vals = shotGraph.inspectValues
+                        var keys = ["pressure", "flow", "temperature", "weight", "weightFlow"]
+                        for (var i = 0; i < keys.length; i++) {
+                            if (vals[keys[i]]) items.push(vals[keys[i]])
+                        }
+                        return items
+                    }
+
+                    delegate: Row {
+                        required property var modelData
+                        spacing: Theme.scaled(4)
+                        Rectangle {
+                            width: Theme.scaled(8); height: Theme.scaled(8); radius: Theme.scaled(4)
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: {
+                                switch (modelData.name) {
+                                    case "Pressure": return Theme.pressureColor
+                                    case "Flow": return Theme.flowColor
+                                    case "Temp": return Theme.temperatureColor
+                                    case "Weight": return Theme.weightColor
+                                    case "Weight flow": return Theme.weightFlowColor
+                                    default: return Theme.textColor
+                                }
+                            }
+                        }
+                        Text {
+                            text: modelData.value.toFixed(1) + " " + modelData.unit
+                            font: Theme.captionFont
+                            color: Theme.textColor
+                            Accessible.ignored: true
+                        }
+                    }
+                }
+            }
+
             // Resizable graph with swipe navigation
             Rectangle {
                 id: graphCard
@@ -165,11 +224,19 @@ Page {
                     canSwipeLeft: canGoNext()
                     canSwipeRight: canGoPrevious()
 
-                    onSwipedLeft: navigateToShot(currentIndex + 1)
-                    onSwipedRight: navigateToShot(currentIndex - 1)
+                    onSwipedLeft: { shotGraph.dismissInspect(); navigateToShot(currentIndex + 1) }
+                    onSwipedRight: { shotGraph.dismissInspect(); navigateToShot(currentIndex - 1) }
                     onTapped: function(x, y) {
                         var graphPos = mapToItem(shotGraph, x, y)
-                        shotGraph.announceAtPosition(graphPos.x, graphPos.y)
+                        if (graphPos.x > shotGraph.plotArea.x + shotGraph.plotArea.width) {
+                            shotGraph.toggleRightAxis()
+                        } else {
+                            shotGraph.inspectAtPosition(graphPos.x, graphPos.y)
+                        }
+                    }
+                    onMoved: function(x, y) {
+                        var graphPos = mapToItem(shotGraph, x, y)
+                        shotGraph.inspectAtPosition(graphPos.x, graphPos.y)
                     }
                 }
 
@@ -225,6 +292,60 @@ Page {
 
                         onReleased: {
                             Settings.setValue("shotDetail/graphHeight", shotDetailPage.graphHeight)
+                        }
+                    }
+                }
+            }
+
+            // Graph legend (tap to toggle curve visibility)
+            Flow {
+                Layout.fillWidth: true
+                spacing: Theme.spacingSmall
+
+                Repeater {
+                    model: [
+                        { label: "Pressure", sColor: Theme.pressureColor, key: "showPressure" },
+                        { label: "Flow", sColor: Theme.flowColor, key: "showFlow" },
+                        { label: "Temp", sColor: Theme.temperatureColor, key: "showTemperature" },
+                        { label: "Weight", sColor: Theme.weightColor, key: "showWeight" },
+                        { label: "Wt flow", sColor: Theme.weightFlowColor, key: "showWeightFlow" }
+                    ]
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: legendItemRow.width + Theme.spacingSmall * 2
+                        height: legendItemRow.height + Theme.scaled(6)
+                        radius: Theme.scaled(4)
+                        color: "transparent"
+                        opacity: shotGraph[modelData.key] ? 1.0 : 0.4
+
+                        Accessible.role: Accessible.CheckBox
+                        Accessible.name: modelData.label
+                        Accessible.checked: shotGraph[modelData.key]
+                        Accessible.focusable: true
+                        Accessible.onPressAction: legendItemArea.clicked(null)
+
+                        Row {
+                            id: legendItemRow
+                            anchors.centerIn: parent
+                            spacing: Theme.scaled(4)
+                            Rectangle {
+                                width: Theme.scaled(10); height: Theme.scaled(10); radius: Theme.scaled(5)
+                                color: modelData.sColor; anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Text {
+                                text: modelData.label; font: Theme.captionFont
+                                color: Theme.textSecondaryColor
+                                Accessible.ignored: true
+                            }
+                        }
+
+                        MouseArea {
+                            id: legendItemArea
+                            anchors.fill: parent
+                            onClicked: {
+                                shotDetailPage.saveGraphSetting(modelData.key, !shotGraph[modelData.key])
+                            }
                         }
                     }
                 }

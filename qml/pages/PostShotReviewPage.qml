@@ -91,6 +91,11 @@ Page {
         editBeverageType !== (editShotData.beverageType || "espresso")
     )
 
+    function saveGraphSetting(key, value) {
+        reviewGraph[key] = value
+        Settings.setValue("graph/" + key, value)
+    }
+
     // Save edited shot back to history
     function saveEditedShot() {
         if (editShotId <= 0) return
@@ -187,6 +192,60 @@ Page {
             width: parent.width
             spacing: Theme.scaled(6)
 
+            // Inspect values bar (visible when tapping on graph)
+            // TTS handled by announceAtPosition() — visual only for sighted users
+            Flow {
+                Layout.fillWidth: true
+                opacity: reviewGraph.inspecting ? 1 : 0
+                spacing: Theme.spacingMedium
+
+                Text {
+                    text: reviewGraph.inspectTime.toFixed(1) + "s"
+                    font.family: Theme.captionFont.family
+                    font.pixelSize: Theme.captionFont.pixelSize
+                    font.bold: true
+                    color: Theme.textColor
+                    Accessible.ignored: true
+                }
+
+                Repeater {
+                    model: {
+                        var items = []
+                        var vals = reviewGraph.inspectValues
+                        var keys = ["pressure", "flow", "temperature", "weight", "weightFlow"]
+                        for (var i = 0; i < keys.length; i++) {
+                            if (vals[keys[i]]) items.push(vals[keys[i]])
+                        }
+                        return items
+                    }
+
+                    delegate: Row {
+                        required property var modelData
+                        spacing: Theme.scaled(4)
+                        Rectangle {
+                            width: Theme.scaled(8); height: Theme.scaled(8); radius: Theme.scaled(4)
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: {
+                                switch (modelData.name) {
+                                    case "Pressure": return Theme.pressureColor
+                                    case "Flow": return Theme.flowColor
+                                    case "Temp": return Theme.temperatureColor
+                                    case "Weight": return Theme.weightColor
+                                    case "Weight flow": return Theme.weightFlowColor
+                                    default: return Theme.textColor
+                                }
+                            }
+                        }
+                        Text {
+                            text: modelData.value.toFixed(1) + " " + modelData.unit
+                            font: Theme.captionFont
+                            color: Theme.textColor
+                            Accessible.ignored: true
+                        }
+                    }
+                }
+            }
+
             // Resizable Graph (visible when we have shot data)
             Rectangle {
                 id: graphCard
@@ -195,6 +254,9 @@ Page {
                 color: Theme.surfaceColor
                 radius: Theme.cardRadius
                 visible: editShotData.pressure && editShotData.pressure.length > 0
+                Accessible.role: Accessible.Graphic
+                Accessible.name: "Shot graph. Tap to inspect values"
+                Accessible.focusable: true
 
                 HistoryShotGraph {
                     id: reviewGraph
@@ -210,11 +272,20 @@ Page {
                     maxTime: editShotData.duration || 60
                 }
 
-                // Tap-to-announce overlay (reads out curve values at tapped position)
+                // Tap/drag-to-inspect overlay (shows crosshair, values shown above graph)
                 MouseArea {
                     anchors.fill: reviewGraph
                     onClicked: function(mouse) {
-                        reviewGraph.announceAtPosition(mouse.x, mouse.y)
+                        if (mouse.x > reviewGraph.plotArea.x + reviewGraph.plotArea.width) {
+                            reviewGraph.toggleRightAxis()
+                        } else {
+                            reviewGraph.inspectAtPosition(mouse.x, mouse.y)
+                        }
+                    }
+                    onPositionChanged: function(mouse) {
+                        if (pressed) {
+                            reviewGraph.inspectAtPosition(mouse.x, mouse.y)
+                        }
                     }
                 }
 
@@ -273,6 +344,61 @@ Page {
                         onReleased: {
                             // Save the height
                             Settings.setValue("postShotReview/graphHeight", postShotReviewPage.graphHeight)
+                        }
+                    }
+                }
+            }
+
+            // Graph legend (tap to toggle curve visibility)
+            Flow {
+                Layout.fillWidth: true
+                visible: editShotData.pressure && editShotData.pressure.length > 0
+                spacing: Theme.spacingSmall
+
+                Repeater {
+                    model: [
+                        { label: "Pressure", sColor: Theme.pressureColor, key: "showPressure" },
+                        { label: "Flow", sColor: Theme.flowColor, key: "showFlow" },
+                        { label: "Temp", sColor: Theme.temperatureColor, key: "showTemperature" },
+                        { label: "Weight", sColor: Theme.weightColor, key: "showWeight" },
+                        { label: "Wt flow", sColor: Theme.weightFlowColor, key: "showWeightFlow" }
+                    ]
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: legendItemRow.width + Theme.spacingSmall * 2
+                        height: legendItemRow.height + Theme.scaled(6)
+                        radius: Theme.scaled(4)
+                        color: "transparent"
+                        opacity: reviewGraph[modelData.key] ? 1.0 : 0.4
+
+                        Accessible.role: Accessible.CheckBox
+                        Accessible.name: modelData.label
+                        Accessible.checked: reviewGraph[modelData.key]
+                        Accessible.focusable: true
+                        Accessible.onPressAction: legendItemArea.clicked(null)
+
+                        Row {
+                            id: legendItemRow
+                            anchors.centerIn: parent
+                            spacing: Theme.scaled(4)
+                            Rectangle {
+                                width: Theme.scaled(10); height: Theme.scaled(10); radius: Theme.scaled(5)
+                                color: modelData.sColor; anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Text {
+                                text: modelData.label; font: Theme.captionFont
+                                color: Theme.textSecondaryColor
+                                Accessible.ignored: true
+                            }
+                        }
+
+                        MouseArea {
+                            id: legendItemArea
+                            anchors.fill: parent
+                            onClicked: {
+                                postShotReviewPage.saveGraphSetting(modelData.key, !reviewGraph[modelData.key])
+                            }
                         }
                     }
                 }

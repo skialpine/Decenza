@@ -13,10 +13,31 @@ ChartView {
     property bool showLabels: true
     property bool showPhaseLabels: true
 
+    // Persisted visibility toggles (tappable legend)
+    property bool showPressure: Settings.value("graph/showPressure", true)
+    property bool showFlow: Settings.value("graph/showFlow", true)
+    property bool showTemperature: Settings.value("graph/showTemperature", true)
+    property bool showWeight: Settings.value("graph/showWeight", true)
+    property bool showWeightFlow: Settings.value("graph/showWeightFlow", true)
+
+    // Which right-side axis labels to display (tap axis to swap)
+    property bool showWeightAxis: Settings.value("graph/showWeightAxis", true)
+
+    function toggleRightAxis() {
+        showWeightAxis = !showWeightAxis
+        Settings.setValue("graph/showWeightAxis", showWeightAxis)
+    }
+
+    // Inspect state (crosshair + tooltip)
+    property bool inspecting: false
+    property real inspectTime: 0
+    property real inspectPixelX: 0
+    property var inspectValues: ({})
+
     margins.top: 0
     margins.bottom: 0
     margins.left: 0
-    margins.right: 0
+    margins.right: chart.showLabels ? Theme.scaled(35) : 0
 
     // Data to display (set from parent)
     property var pressureData: []
@@ -63,7 +84,44 @@ ChartView {
     // the first property change would trigger loadData() while other properties still
     // hold stale values from the previous shot, causing a mix of old/new data.
     // Qt.callLater deduplicates: N calls before execution → 1 actual invocation.
-    function doReload() { loadData(); loadMarkers() }
+    function doReload() { dismissInspect(); loadData(); loadMarkers() }
+
+    // Inspect at a pixel position: show crosshair + tooltip, announce for TTS
+    function inspectAtPosition(pixelX, pixelY) {
+        var dataPoint = chart.mapToValue(Qt.point(pixelX, pixelY), pressureSeries)
+        var time = dataPoint.x
+        if (time < 0 || time > timeAxis.max) return
+
+        inspectTime = time
+        // Calculate pixel X from time (clamped to plot area)
+        inspectPixelX = chart.plotArea.x + (time / timeAxis.max) * chart.plotArea.width
+
+        var vals = {}
+        var curves = [
+            { key: "pressure", name: "Pressure", series: pressureSeries, unit: "bar", show: showPressure },
+            { key: "flow", name: "Flow", series: flowSeries, unit: "mL/s", show: showFlow },
+            { key: "temperature", name: "Temp", series: temperatureSeries, unit: "\u00B0C", show: showTemperature },
+            { key: "weight", name: "Weight", series: weightSeries, unit: "g", show: showWeight },
+            { key: "weightFlow", name: "Weight flow", series: weightFlowRateSeries, unit: "g/s", show: showWeightFlow }
+        ]
+
+        for (var i = 0; i < curves.length; i++) {
+            if (!curves[i].show) continue
+            var v = findValueAtTime(curves[i].series, time)
+            if (v !== null) {
+                vals[curves[i].key] = { name: curves[i].name, value: v, unit: curves[i].unit }
+            }
+        }
+
+        inspectValues = vals
+        inspecting = true
+        announceAtPosition(pixelX, pixelY)
+    }
+
+    // Dismiss the inspect crosshair/tooltip
+    function dismissInspect() {
+        inspecting = false
+    }
 
     // Find the Y value in a LineSeries closest to the given time
     function findValueAtTime(series, time) {
@@ -90,15 +148,16 @@ ChartView {
         if (time < 0 || time > timeAxis.max) return
 
         var curves = [
-            { name: "Pressure", series: pressureSeries },
-            { name: "Flow", series: flowSeries },
-            { name: "Weight flow", series: weightFlowRateSeries },
-            { name: "Weight", series: weightSeries },
-            { name: "Temp", series: temperatureSeries }
+            { name: "Pressure", series: pressureSeries, show: showPressure },
+            { name: "Flow", series: flowSeries, show: showFlow },
+            { name: "Weight flow", series: weightFlowRateSeries, show: showWeightFlow },
+            { name: "Weight", series: weightSeries, show: showWeight },
+            { name: "Temp", series: temperatureSeries, show: showTemperature }
         ]
 
         var parts = []
         for (var i = 0; i < curves.length; i++) {
+            if (!curves[i].show) continue
             var v = findValueAtTime(curves[i].series, time)
             if (v !== null) {
                 parts.push(curves[i].name + " " + v.toFixed(1))
@@ -131,11 +190,37 @@ ChartView {
         gridLineColor: Qt.rgba(255, 255, 255, 0.1)
     }
 
+    // Dynamic max for pressure/flow axis based on all data (ignores visibility
+    // toggles so the graph doesn't jump when toggling curves on/off)
+    property double pressureAxisMax: {
+        var maxVal = 0
+        for (var i = 0; i < pressureData.length; i++) {
+            if (pressureData[i].y > maxVal) maxVal = pressureData[i].y
+        }
+        for (var i = 0; i < flowData.length; i++) {
+            if (flowData[i].y > maxVal) maxVal = flowData[i].y
+        }
+        for (var i = 0; i < weightFlowRateData.length; i++) {
+            if (weightFlowRateData[i].y > maxVal) maxVal = weightFlowRateData[i].y
+        }
+        if (maxVal < 0.1) return 12  // fallback when no data
+        // Round up to nice tick-friendly value
+        var padded = maxVal * 1.15
+        if (padded <= 2) return 2
+        if (padded <= 4) return 4
+        if (padded <= 5) return 5
+        if (padded <= 6) return 6
+        if (padded <= 8) return 8
+        if (padded <= 10) return 10
+        if (padded <= 12) return 12
+        return Math.ceil(padded / 5) * 5
+    }
+
     // Pressure/Flow axis (left Y)
     ValueAxis {
         id: pressureAxis
         min: 0
-        max: 12
+        max: pressureAxisMax
         tickCount: 5
         labelFormat: "%.0f"
         labelsVisible: chart.showLabels
@@ -145,21 +230,7 @@ ChartView {
         titleBrush: Theme.textSecondaryColor
     }
 
-    // Temperature axis (right Y) - hidden to make room for weight
-    ValueAxis {
-        id: tempAxis
-        min: 80
-        max: 100
-        tickCount: 5
-        labelFormat: "%.0f"
-        labelsColor: Theme.temperatureColor
-        gridLineColor: "transparent"
-        titleText: chart.showLabels ? "°C" : ""
-        titleBrush: Theme.temperatureColor
-        visible: false
-    }
-
-    // Weight axis (right Y) - scaled to max weight in data + 10%
+    // Two hidden right axes — used only for correct series mapping (no labels)
     property double maxWeight: {
         var max = 0
         for (var i = 0; i < weightData.length; i++) {
@@ -169,16 +240,17 @@ ChartView {
     }
 
     ValueAxis {
+        id: tempAxis
+        visible: false
+        min: 40
+        max: 100
+    }
+
+    ValueAxis {
         id: weightAxis
+        visible: false
         min: 0
         max: maxWeight
-        tickCount: 5
-        labelFormat: "%.0f"
-        labelsVisible: chart.showLabels
-        labelsColor: Theme.weightColor
-        gridLineColor: "transparent"
-        titleText: chart.showLabels ? "g" : ""
-        titleBrush: Theme.weightColor
     }
 
     // Pressure line
@@ -189,6 +261,7 @@ ChartView {
         width: Theme.graphLineWidth
         axisX: timeAxis
         axisY: pressureAxis
+        visible: chart.showPressure
     }
 
     // Flow line
@@ -199,6 +272,7 @@ ChartView {
         width: Theme.graphLineWidth
         axisX: timeAxis
         axisY: pressureAxis
+        visible: chart.showFlow
     }
 
     // Temperature line
@@ -209,6 +283,7 @@ ChartView {
         width: Theme.graphLineWidth
         axisX: timeAxis
         axisYRight: tempAxis
+        visible: chart.showTemperature
     }
 
     // Weight line
@@ -219,6 +294,7 @@ ChartView {
         width: Theme.graphLineWidth
         axisX: timeAxis
         axisYRight: weightAxis
+        visible: chart.showWeight
     }
 
     // Weight flow rate (delta) line - shows g/s from scale
@@ -229,6 +305,7 @@ ChartView {
         width: Theme.graphLineWidth
         axisX: timeAxis
         axisY: pressureAxis
+        visible: chart.showWeightFlow
     }
 
     // Phase marker vertical lines (up to 10 markers)
@@ -258,7 +335,7 @@ ChartView {
             var t = marker.time
             if (marker.label === "Start" || marker.label === "End") continue
             _markerLines[m].append(t, 0)
-            _markerLines[m].append(t, 12)
+            _markerLines[m].append(t, 100)  // large value; clipped to axis range
         }
     }
 
@@ -312,4 +389,67 @@ ChartView {
             }
         }
     }
+
+    // Crosshair vertical line
+    Rectangle {
+        id: crosshairLine
+        visible: chart.inspecting
+        x: chart.inspectPixelX - width / 2
+        y: chart.plotArea.y
+        width: Theme.scaled(1)
+        height: chart.plotArea.height
+        color: Theme.textColor
+        opacity: 0.6
+        Accessible.ignored: true
+    }
+
+    // Manual right-axis labels (fixed position — no layout shift when swapping)
+    Item {
+        id: rightAxisLabels
+        visible: chart.showLabels
+        x: chart.plotArea.x + chart.plotArea.width + Theme.scaled(4)
+        y: chart.plotArea.y
+        width: chart.width - x
+        height: chart.plotArea.height
+
+        Accessible.role: Accessible.Button
+        Accessible.name: chart.showWeightAxis ? "Right axis: Weight. Tap to show Temperature"
+                                              : "Right axis: Temperature. Tap to show Weight"
+        Accessible.focusable: true
+        Accessible.onPressAction: chart.toggleRightAxis()
+
+        property color labelColor: chart.showWeightAxis ? Theme.weightColor : Theme.temperatureColor
+
+        // Tick labels
+        Repeater {
+            model: 5
+            Text {
+                required property int index
+                property real value: {
+                    var axisMin = chart.showWeightAxis ? weightAxis.min : tempAxis.min
+                    var axisMax = chart.showWeightAxis ? weightAxis.max : tempAxis.max
+                    return axisMax - index * (axisMax - axisMin) / 4
+                }
+                text: value.toFixed(0)
+                x: 0
+                y: index / 4 * rightAxisLabels.height - height / 2
+                font: Theme.captionFont
+                color: rightAxisLabels.labelColor
+                Accessible.ignored: true
+            }
+        }
+
+        // Axis title (rotated, centered vertically — mirrors the left axis title)
+        Text {
+            text: chart.showWeightAxis ? "g" : "°C"
+            font: Theme.captionFont
+            color: rightAxisLabels.labelColor
+            rotation: 90
+            transformOrigin: Item.Center
+            x: Theme.scaled(24)
+            y: rightAxisLabels.height / 2 - height / 2
+            Accessible.ignored: true
+        }
+    }
+
 }
