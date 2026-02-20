@@ -1335,6 +1335,75 @@ void Settings::resetThemeToDefault() {
     emit colorGroupsChanged();
 }
 
+// Font size customization
+QVariantMap Settings::customFontSizes() const {
+    QByteArray data = m_settings.value("theme/customFontSizes").toByteArray();
+    if (data.isEmpty()) {
+        return QVariantMap();
+    }
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    return doc.object().toVariantMap();
+}
+
+void Settings::setCustomFontSizes(const QVariantMap& sizes) {
+    QJsonObject obj = QJsonObject::fromVariantMap(sizes);
+    m_settings.setValue("theme/customFontSizes", QJsonDocument(obj).toJson());
+    emit customFontSizesChanged();
+}
+
+void Settings::setFontSize(const QString& fontName, int size) {
+    QVariantMap sizes = customFontSizes();
+    sizes[fontName] = size;
+    setCustomFontSizes(sizes);
+}
+
+int Settings::getFontSize(const QString& fontName) const {
+    QVariantMap sizes = customFontSizes();
+    return sizes.value(fontName, 0).toInt();
+}
+
+void Settings::resetFontSizesToDefault() {
+    m_settings.remove("theme/customFontSizes");
+    emit customFontSizesChanged();
+}
+
+void Settings::setCurrentPageColors(const QStringList& colors) {
+    if (m_currentPageColors != colors) {
+        m_currentPageColors = colors;
+        emit currentPageColorsChanged();
+    }
+}
+
+void Settings::flashThemeColor(const QString& colorName) {
+    // Stop any existing flash
+    if (m_flashTimer) {
+        m_flashTimer->stop();
+        m_flashTimer->deleteLater();
+        m_flashTimer = nullptr;
+    }
+
+    m_flashColorName = colorName;
+    m_flashPhase = 1;
+    emit flashColorNameChanged();
+    emit flashPhaseChanged();
+
+    m_flashTimer = new QTimer(this);
+    m_flashTimer->setInterval(130);
+    connect(m_flashTimer, &QTimer::timeout, this, [this]() {
+        m_flashPhase++;
+        if (m_flashPhase > 6) {
+            m_flashTimer->stop();
+            m_flashTimer->deleteLater();
+            m_flashTimer = nullptr;
+            m_flashColorName.clear();
+            m_flashPhase = 0;
+            emit flashColorNameChanged();
+        }
+        emit flashPhaseChanged();
+    });
+    m_flashTimer->start();
+}
+
 QVariantList Settings::getPresetThemes() const {
     QVariantList themes;
 
@@ -1603,6 +1672,41 @@ QVariantMap Settings::generatePalette(double baseHue, double baseSat, double bas
     palette["pressureGoalColor"] = hslColor(triadic1 + goldenAngle * 0, 55.0, 75.0);
     palette["flowGoalColor"] = hslColor(triadic2 + goldenAngle * 1, 55.0, 75.0);
     palette["temperatureGoalColor"] = hslColor(complementary + goldenAngle * 2, 55.0, 75.0);
+
+    // Weight flow - lighter variant of weight color (same relationship as goal colors)
+    palette["weightFlowColor"] = hslColor(splitComp1 + goldenAngle * 3, 55.0, 70.0);
+
+    // Highlight color - analogous to warning for attention-drawing
+    palette["highlightColor"] = palette["warningColor"];
+
+    // DYE measurement colors - spread using golden angle from split-complementary
+    palette["dyeDoseColor"] = hslColor(splitComp2 + goldenAngle * 0, 50.0, 40.0);
+    palette["dyeOutputColor"] = hslColor(splitComp2 + goldenAngle * 1, 65.0, 50.0);
+    palette["dyeTdsColor"] = hslColor(splitComp2 + goldenAngle * 2, 75.0, 55.0);
+    palette["dyeEyColor"] = hslColor(splitComp2 + goldenAngle * 3, 55.0, 45.0);
+
+    // Button states
+    palette["buttonDisabled"] = hslColor(baseHue, 10.0, 35.0);
+
+    // UI indicator colors - derived from status colors
+    palette["stopMarkerColor"] = hslColor(fmod(360.0 + baseHue * 0.1, 360.0), 70.0, 65.0);  // Error-ish but lighter
+    palette["modifiedIndicatorColor"] = hslColor(50.0 + (baseHue * 0.1), 85.0, 55.0);  // Yellow-ish
+    palette["simulationIndicatorColor"] = hslColor(25.0 + (baseHue * 0.1), 85.0, 50.0);  // Orange-ish
+    palette["warningButtonColor"] = palette["warningColor"];
+    palette["successButtonColor"] = hslColor(140.0 + (baseHue * 0.1), 70.0, 35.0);  // Darker success
+
+    // Frame markers - semi-transparent overlay, adapts to background brightness
+    palette["frameMarkerColor"] = (bgLight > 40.0) ? "#66000000" : "#66ffffff";
+
+    // Row alternate backgrounds - very dark/light variants of background
+    double rowLight = qBound(3.0, bgLight - 5.0, 15.0);
+    palette["rowAlternateColor"] = hslColor(complementary, 20.0, rowLight);
+    palette["rowAlternateLightColor"] = hslColor(complementary, 15.0, rowLight + 5.0);
+
+    // Source badge colors - 3 distinct hues spread across the wheel
+    palette["sourceBadgeBlueColor"] = hslColor(baseHue + 210.0, 65.0, 55.0);   // Cool tone
+    palette["sourceBadgeGreenColor"] = hslColor(baseHue + 90.0, 65.0, 55.0);   // Green-ish
+    palette["sourceBadgeOrangeColor"] = hslColor(baseHue + 330.0, 65.0, 55.0); // Warm tone
 
     // Derived colors
     palette["focusColor"] = palette["primaryColor"];

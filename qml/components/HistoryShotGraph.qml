@@ -232,16 +232,16 @@ ChartView {
     }
 
     // Phase marker vertical lines (up to 10 markers)
-    LineSeries { id: markerLine1; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: markerLine2; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: markerLine3; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: markerLine4; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: markerLine5; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: markerLine6; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: markerLine7; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: markerLine8; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: markerLine9; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: markerLine10; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: markerLine1; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: markerLine2; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: markerLine3; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: markerLine4; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: markerLine5; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: markerLine6; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: markerLine7; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: markerLine8; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: markerLine9; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: markerLine10; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
 
     property var _markerLines: [markerLine1, markerLine2, markerLine3, markerLine4, markerLine5,
                                 markerLine6, markerLine7, markerLine8, markerLine9, markerLine10]
@@ -296,7 +296,7 @@ ChartView {
                 }
                 font.pixelSize: Theme.scaled(14)
                 font.bold: isEnd
-                color: isEnd ? "#FF6B6B" : Qt.rgba(255, 255, 255, 0.8)
+                color: isEnd ? Theme.stopMarkerColor : Qt.rgba(255, 255, 255, 0.8)
                 rotation: -90
                 transformOrigin: Item.TopLeft
                 x: Theme.scaled(3)

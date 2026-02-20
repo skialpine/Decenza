@@ -113,23 +113,23 @@ ChartView {
     LineSeries {
         id: stopMarker
         name: ""
-        color: "#FF6B6B"  // Red-ish color for stop
+        color: Theme.stopMarkerColor
         width: Theme.scaled(2)
         style: Qt.DashDotLine
         axisX: timeAxis
         axisY: pressureAxis
     }
 
-    LineSeries { id: frameMarker1; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: frameMarker2; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: frameMarker3; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: frameMarker4; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: frameMarker5; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: frameMarker6; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: frameMarker7; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: frameMarker8; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: frameMarker9; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
-    LineSeries { id: frameMarker10; name: ""; color: Qt.rgba(255,255,255,0.4); width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: frameMarker1; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: frameMarker2; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: frameMarker3; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: frameMarker4; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: frameMarker5; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: frameMarker6; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: frameMarker7; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: frameMarker8; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: frameMarker9; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
+    LineSeries { id: frameMarker10; name: ""; color: Theme.frameMarkerColor; width: Theme.scaled(1); style: Qt.DotLine; axisX: timeAxis; axisY: pressureAxis }
 
     // === GOAL LINES (dashed) - Multiple segments for clean breaks ===
 
@@ -254,7 +254,7 @@ ChartView {
                 }
                 font.pixelSize: Theme.scaled(18)
                 font.bold: isStart || isEnd
-                color: isStart ? Theme.accentColor : (isEnd ? "#FF6B6B" : Qt.rgba(255, 255, 255, 0.8))
+                color: isStart ? Theme.accentColor : (isEnd ? Theme.stopMarkerColor : Qt.rgba(255, 255, 255, 0.8))
                 rotation: -90
                 transformOrigin: Item.TopLeft
                 x: Theme.scaled(4)

@@ -65,6 +65,14 @@ void ShotServer::setSettings(Settings* settings)
     if (m_settings) {
         connect(m_settings, &Settings::layoutConfigurationChanged,
                 this, &ShotServer::onLayoutChanged);
+        connect(m_settings, &Settings::customThemeColorsChanged,
+                this, &ShotServer::onThemeChanged);
+        connect(m_settings, &Settings::customFontSizesChanged,
+                this, &ShotServer::onThemeChanged);
+        connect(m_settings, &Settings::activeThemeNameChanged,
+                this, &ShotServer::onThemeChanged);
+        connect(m_settings, &Settings::currentPageColorsChanged,
+                this, &ShotServer::onThemeChanged);
     }
 }
 
@@ -83,6 +91,24 @@ void ShotServer::onLayoutChanged()
     }
     for (QTcpSocket* s : dead) {
         m_sseLayoutClients.remove(s);
+    }
+}
+
+void ShotServer::onThemeChanged()
+{
+    // Notify all SSE clients that the theme has changed
+    QByteArray event = "event: theme-changed\ndata: {}\n\n";
+    QList<QTcpSocket*> dead;
+    for (QTcpSocket* client : m_sseThemeClients) {
+        if (client->state() != QAbstractSocket::ConnectedState) {
+            dead.append(client);
+            continue;
+        }
+        client->write(event);
+        client->flush();
+    }
+    for (QTcpSocket* s : dead) {
+        m_sseThemeClients.remove(s);
     }
 }
 
@@ -146,6 +172,7 @@ void ShotServer::stop()
     if (m_server) {
         m_cleanupTimer->stop();
         m_sseLayoutClients.clear();
+        m_sseThemeClients.clear();
         m_server->close();
         delete m_server;
         m_server = nullptr;
@@ -172,6 +199,7 @@ void ShotServer::onReadyRead()
 
     // SSE clients keep connections open — ignore further data from them
     if (m_sseLayoutClients.contains(socket)) return;
+    if (m_sseThemeClients.contains(socket)) return;
 
     try {
         PendingRequest& pending = m_pendingRequests[socket];
@@ -358,6 +386,7 @@ void ShotServer::onDisconnected()
     QTcpSocket* socket = qobject_cast<QTcpSocket*>(sender());
     if (socket) {
         m_sseLayoutClients.remove(socket);
+        m_sseThemeClients.remove(socket);
         cleanupPendingRequest(socket);
         m_pendingRequests.remove(socket);
         socket->deleteLater();
@@ -875,6 +904,27 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
         tempFile.close();
 
         handleBackupRestore(socket, tempPath, headers);
+    }
+    // Theme editor
+    else if (path == "/theme") {
+        sendHtml(socket, generateThemePage());
+    }
+    // SSE endpoint for theme change notifications
+    else if (path == "/api/theme/subscribe" && method == "GET") {
+        QByteArray sseHeaders = "HTTP/1.1 200 OK\r\n"
+                             "Content-Type: text/event-stream\r\n"
+                             "Cache-Control: no-cache\r\n"
+                             "Connection: keep-alive\r\n"
+                             "Access-Control-Allow-Origin: *\r\n\r\n";
+        socket->write(sseHeaders);
+        socket->flush();
+        m_sseThemeClients.insert(socket);
+    }
+    // Theme API endpoints
+    else if (path == "/api/theme" || path.startsWith("/api/theme/")) {
+        qsizetype headerEndPos = request.indexOf("\r\n\r\n");
+        QByteArray body = (headerEndPos >= 0) ? request.mid(headerEndPos + 4) : QByteArray();
+        handleThemeApi(socket, method, path, body);
     }
     // Layout editor
     else if (path == "/layout") {

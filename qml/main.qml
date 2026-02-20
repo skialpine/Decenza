@@ -825,7 +825,15 @@ ApplicationWindow {
         function onCurrentItemChanged() {
             updateCurrentPageScale()
             announceCurrentPage()
+            pageColorTimer.restart()  // Detect colors after page settles
         }
+    }
+
+    // Delay color detection slightly so page content is fully loaded
+    Timer {
+        id: pageColorTimer
+        interval: 300
+        onTriggered: updatePageColors()
     }
 
     // Announce page name for accessibility when page changes
@@ -874,6 +882,56 @@ ApplicationWindow {
         console.log("Scale config: enabled =", Theme.configurePageScaleEnabled,
                     "page =", Theme.currentPageObjectName,
                     "scale =", Theme.pageScaleMultiplier)
+    }
+
+    // Detect which Theme colors are used on the current page
+    // Walks the QML item tree and matches resolved color values against Theme properties
+    function updatePageColors() {
+        var page = pageStack.currentItem
+        if (!page) {
+            Settings.currentPageColors = []
+            return
+        }
+
+        // Collect all unique color hex values from visible items
+        var foundColors = {}
+        function walkItem(item) {
+            if (!item || !item.visible) return
+            // Check 'color' property (Rectangle, Text, etc.)
+            if (item.color !== undefined) {
+                var c = ("" + item.color).substring(0, 7).toLowerCase()
+                if (c.charAt(0) === "#") foundColors[c] = true
+            }
+            for (var i = 0; i < item.children.length; i++) {
+                walkItem(item.children[i])
+            }
+        }
+        walkItem(page)
+
+        // Match against all Theme color properties
+        var themeColorNames = [
+            "backgroundColor", "surfaceColor", "primaryColor", "secondaryColor",
+            "textColor", "textSecondaryColor", "accentColor", "successColor",
+            "warningColor", "highlightColor", "errorColor", "borderColor",
+            "pressureColor", "pressureGoalColor", "flowColor", "flowGoalColor",
+            "temperatureColor", "temperatureGoalColor", "weightColor", "weightFlowColor",
+            "dyeDoseColor", "dyeOutputColor", "dyeTdsColor", "dyeEyColor",
+            "buttonDisabled", "stopMarkerColor", "frameMarkerColor",
+            "modifiedIndicatorColor", "simulationIndicatorColor",
+            "warningButtonColor", "successButtonColor",
+            "rowAlternateColor", "rowAlternateLightColor",
+            "sourceBadgeBlueColor", "sourceBadgeGreenColor", "sourceBadgeOrangeColor"
+        ]
+
+        var matched = []
+        for (var j = 0; j < themeColorNames.length; j++) {
+            var name = themeColorNames[j]
+            var themeVal = ("" + Theme[name]).substring(0, 7).toLowerCase()
+            if (foundColors[themeVal]) {
+                matched.push(name)
+            }
+        }
+        Settings.currentPageColors = matched
     }
 
     // Initialize page scale after pageStack is ready

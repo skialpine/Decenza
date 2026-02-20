@@ -167,9 +167,9 @@ FocusScope {
                     opacity: 0.25
                     gradient: Gradient {
                         orientation: Gradient.Horizontal
-                        GradientStop { position: 0.0; color: "#ff4444" }
-                        GradientStop { position: 0.5; color: "#ffaa00" }
-                        GradientStop { position: 1.0; color: "#00cc6d" }
+                        GradientStop { position: 0.0; color: Theme.errorColor }
+                        GradientStop { position: 0.5; color: Theme.warningColor }
+                        GradientStop { position: 1.0; color: Theme.successColor }
                     }
                 }
 
@@ -186,9 +186,9 @@ FocusScope {
                         radius: height / 2
                         gradient: Gradient {
                             orientation: Gradient.Horizontal
-                            GradientStop { position: 0.0; color: "#ff4444" }
-                            GradientStop { position: 0.5; color: "#ffaa00" }
-                            GradientStop { position: 1.0; color: "#00cc6d" }
+                            GradientStop { position: 0.0; color: Theme.errorColor }
+                            GradientStop { position: 0.5; color: Theme.warningColor }
+                            GradientStop { position: 1.0; color: Theme.successColor }
                         }
                     }
                 }

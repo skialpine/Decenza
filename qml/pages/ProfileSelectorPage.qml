@@ -202,7 +202,7 @@ Page {
                     delegate: Rectangle {
                         id: profileDelegate
                         width: allProfilesList.width
-                        height: Theme.scaled(60)
+                        height: Math.max(Theme.scaled(60), profileContentRow.implicitHeight + Theme.scaled(10) * 2)
                         radius: Theme.scaled(6)
 
                         // ProfileSource enum: 0=BuiltIn, 1=Downloaded, 2=UserCreated
@@ -227,9 +227,9 @@ Page {
                         property bool isCurrentProfile: modelData.name === MainController.currentProfile
 
                         // Source-based colors
-                        property color sourceColor: isBuiltIn ? "#4a90d9" :      // Blue for Decent
-                                                    isDownloaded ? "#4ad94a" :   // Green for Downloaded
-                                                    "#d9a04a"                     // Orange for User
+                        property color sourceColor: isBuiltIn ? Theme.sourceBadgeBlueColor :      // Blue for Decent
+                                                    isDownloaded ? Theme.sourceBadgeGreenColor :   // Green for Downloaded
+                                                    Theme.sourceBadgeOrangeColor                     // Orange for User
 
                         // Row background with source tint
                         color: {
@@ -237,11 +237,12 @@ Page {
                                 return Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.25)
                             }
                             // Subtle source color tint
-                            var baseColor = index % 2 === 0 ? "#1a1a1a" : "#222222"
+                            var baseColor = index % 2 === 0 ? Theme.rowAlternateColor : Theme.rowAlternateLightColor
                             return Qt.tint(baseColor, Qt.rgba(sourceColor.r, sourceColor.g, sourceColor.b, 0.15))
                         }
 
                         RowLayout {
+                            id: profileContentRow
                             anchors.fill: parent
                             anchors.margins: Theme.scaled(10)
                             spacing: Theme.scaled(10)
@@ -608,7 +609,7 @@ Page {
                     delegate: Item {
                         id: favoriteDelegate
                         width: favoritesList.width
-                        height: Theme.scaled(60)
+                        height: Math.max(Theme.scaled(60), favContentRow.implicitHeight + Theme.scaled(10) * 2)
 
                         property int favoriteIndex: index
 
@@ -622,6 +623,7 @@ Page {
                             border.width: 1
 
                             RowLayout {
+                                id: favContentRow
                                 anchors.fill: parent
                                 anchors.margins: Theme.scaled(10)
                                 spacing: Theme.scaled(8)

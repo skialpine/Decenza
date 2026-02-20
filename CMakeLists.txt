@@ -198,6 +198,7 @@ set(SOURCES
     src/network/shotserver_upload.cpp
     src/network/shotserver_backup.cpp
     src/network/shotserver_layout.cpp
+    src/network/shotserver_theme.cpp
     src/network/shotserver_settings.cpp
     src/network/mqttclient.cpp
     src/network/webdebuglogger.cpp

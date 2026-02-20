@@ -6,6 +6,7 @@
 #include <QVariantList>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QTimer>
 
 class Settings : public QObject {
     Q_OBJECT
@@ -84,6 +85,14 @@ class Settings : public QObject {
     Q_PROPERTY(QVariantList colorGroups READ colorGroups WRITE setColorGroups NOTIFY colorGroupsChanged)
     Q_PROPERTY(QString activeThemeName READ activeThemeName WRITE setActiveThemeName NOTIFY activeThemeNameChanged)
     Q_PROPERTY(double screenBrightness READ screenBrightness WRITE setScreenBrightness NOTIFY screenBrightnessChanged)
+    Q_PROPERTY(QVariantMap customFontSizes READ customFontSizes WRITE setCustomFontSizes NOTIFY customFontSizesChanged)
+
+    // Theme flash (in-memory only, for identifying colors on device)
+    Q_PROPERTY(QString flashColorName READ flashColorName NOTIFY flashColorNameChanged)
+    Q_PROPERTY(int flashPhase READ flashPhase NOTIFY flashPhaseChanged)
+
+    // Colors detected on the current page (set from QML tree walker)
+    Q_PROPERTY(QStringList currentPageColors READ currentPageColors WRITE setCurrentPageColors NOTIFY currentPageColorsChanged)
 
     // Visualizer settings
     Q_PROPERTY(QString visualizerUsername READ visualizerUsername WRITE setVisualizerUsername NOTIFY visualizerUsernameChanged)
@@ -390,6 +399,22 @@ public:
     Q_INVOKABLE bool loadThemeFromFile(const QString& filePath);
     Q_INVOKABLE QVariantMap generatePalette(double hue, double saturation, double lightness) const;
 
+    // Font size customization
+    QVariantMap customFontSizes() const;
+    void setCustomFontSizes(const QVariantMap& sizes);
+    Q_INVOKABLE void setFontSize(const QString& fontName, int size);
+    Q_INVOKABLE int getFontSize(const QString& fontName) const;
+    Q_INVOKABLE void resetFontSizesToDefault();
+
+    // Theme flash - temporarily flash a color red/black to identify it on device
+    QString flashColorName() const { return m_flashColorName; }
+    int flashPhase() const { return m_flashPhase; }
+    Q_INVOKABLE void flashThemeColor(const QString& colorName);
+
+    // Page color detection
+    QStringList currentPageColors() const { return m_currentPageColors; }
+    void setCurrentPageColors(const QStringList& colors);
+
     double screenBrightness() const;
     void setScreenBrightness(double brightness);
 
@@ -676,6 +701,10 @@ signals:
     void customThemeColorsChanged();
     void colorGroupsChanged();
     void activeThemeNameChanged();
+    void customFontSizesChanged();
+    void flashColorNameChanged();
+    void flashPhaseChanged();
+    void currentPageColorsChanged();
     void screenBrightnessChanged();
     void visualizerUsernameChanged();
     void visualizerPasswordChanged();
@@ -764,6 +793,10 @@ private:
     bool isSawConverged(const QString& scaleType) const;
 
     QSettings m_settings;
+    QString m_flashColorName;
+    int m_flashPhase = 0;
+    QTimer* m_flashTimer = nullptr;
+    QStringList m_currentPageColors;
     mutable QJsonObject m_layoutCache;
     mutable QString m_layoutJsonCache;
     mutable bool m_layoutCacheValid = false;

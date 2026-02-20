@@ -62,7 +62,7 @@ Item {
                     delegate: Item {
                         id: langDelegate
                         width: languageList.width
-                        height: Theme.scaled(44)
+                        height: Math.max(Theme.scaled(44), langContentRow.implicitHeight + Theme.scaled(8) * 2)
 
                         property bool highlighted: modelData === TranslationManager.currentLanguage
                         property string langCode: modelData
@@ -89,6 +89,7 @@ Item {
                         }
 
                         RowLayout {
+                            id: langContentRow
                             anchors.fill: parent
                             anchors.leftMargin: Theme.scaled(8)
                             anchors.rightMargin: Theme.scaled(8)
@@ -102,7 +103,7 @@ Item {
                                 font.bold: langDelegate.highlighted
                                 color: {
                                     var version = TranslationManager.translationVersion  // Force re-evaluation
-                                    if (TranslationManager.isRemoteLanguage(langDelegate.langCode)) return "#2196F3"
+                                    if (TranslationManager.isRemoteLanguage(langDelegate.langCode)) return Theme.sourceBadgeBlueColor
                                     return Theme.successColor
                                 }
                                 elide: Text.ElideRight

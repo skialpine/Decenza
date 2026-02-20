@@ -737,7 +737,7 @@ Page {
             Layout.preferredWidth: saveButtonContent.width + 40
             Layout.preferredHeight: Theme.scaled(44)
             radius: Theme.scaled(8)
-            color: saveArea.pressed ? Qt.darker("#2E7D32", 1.2) : "#2E7D32"  // Dark green
+            color: saveArea.pressed ? Qt.darker(Theme.successButtonColor, 1.2) : Theme.successButtonColor  // Dark green
 
             Accessible.role: Accessible.Button
             Accessible.name: TranslationManager.translate("beaninfo.button.save", "Save Changes")

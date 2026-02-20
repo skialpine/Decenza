@@ -445,7 +445,7 @@ Page {
             delegate: Rectangle {
                 id: shotDelegate
                 width: shotListView.width
-                height: Theme.scaled(90)
+                height: Math.max(Theme.scaled(90), shotContentRow.implicitHeight + Theme.spacingMedium * 2)
                 radius: Theme.cardRadius
                 color: isSelected(model.id) ? Qt.darker(Theme.surfaceColor, 1.2) : Theme.surfaceColor
                 border.color: isSelected(model.id) ? Theme.primaryColor : "transparent"
@@ -474,6 +474,7 @@ Page {
                 Accessible.onPressAction: openShotDetail(model.id)
 
                 RowLayout {
+                    id: shotContentRow
                     anchors.fill: parent
                     anchors.margins: Theme.spacingMedium
                     spacing: Theme.spacingMedium

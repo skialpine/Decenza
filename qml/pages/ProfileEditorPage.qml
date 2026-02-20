@@ -739,7 +739,7 @@ Page {
         Tr {
             key: "profileeditor.status.modified"
             fallback: "\u2022 Modified"
-            color: "#FFCC00"
+            color: Theme.modifiedIndicatorColor
             font: Theme.bodyFont
             visible: profileModified
         }

@@ -37,7 +37,7 @@ Item {
 
             Text {
                 text: root.pageTitle
-                color: DE1Device.simulationMode ? "#E65100" : Theme.textColor
+                color: DE1Device.simulationMode ? Theme.simulationIndicatorColor : Theme.textColor
                 font.pixelSize: Theme.scaled(20)
                 font.bold: true
                 elide: Text.ElideRight
@@ -68,7 +68,7 @@ Item {
             Text {
                 Layout.alignment: Qt.AlignHCenter
                 text: root.pageTitle
-                color: DE1Device.simulationMode ? "#E65100" : Theme.textColor
+                color: DE1Device.simulationMode ? Theme.simulationIndicatorColor : Theme.textColor
                 font: Theme.valueFont
             }
 

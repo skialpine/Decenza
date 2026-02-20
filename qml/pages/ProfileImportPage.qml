@@ -181,9 +181,9 @@ Page {
                 delegate: Rectangle {
                     id: profileDelegate
                     width: profileList.width
-                    height: Theme.scaled(56)
+                    height: Math.max(Theme.scaled(56), importContentRow.implicitHeight + Theme.scaled(10) * 2)
                     radius: Theme.scaled(6)
-                    color: index % 2 === 0 ? "#1a1a1a" : "#222222"
+                    color: index % 2 === 0 ? Theme.rowAlternateColor : Theme.rowAlternateLightColor
 
                     property var profileData: modelData
                     property string status: profileData.status || "new"
@@ -202,6 +202,7 @@ Page {
                     }
 
                     RowLayout {
+                        id: importContentRow
                         anchors.fill: parent
                         anchors.margins: Theme.scaled(10)
                         spacing: Theme.scaled(10)
@@ -216,7 +217,7 @@ Page {
                             font.pixelSize: Theme.scaled(18)
                             color: profileDelegate.isNew ? Theme.primaryColor :
                                    profileDelegate.isIdentical ? Theme.successColor :
-                                   "#FFA500"  // Orange for different
+                                   Theme.warningButtonColor  // Orange for different
                             horizontalAlignment: Text.AlignHCenter
                         }
 
@@ -225,7 +226,7 @@ Page {
                             Layout.preferredWidth: Theme.scaled(40)
                             Layout.preferredHeight: Theme.scaled(20)
                             radius: Theme.scaled(4)
-                            color: profileData.format === "TCL" ? "#4a90d9" : "#4ad94a"
+                            color: profileData.format === "TCL" ? Theme.sourceBadgeBlueColor : Theme.sourceBadgeGreenColor
 
                             Text {
                                 anchors.centerIn: parent

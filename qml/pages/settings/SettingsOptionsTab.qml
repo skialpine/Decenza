@@ -334,7 +334,7 @@ KeyboardAwareContainer {
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        color: "#1a1a2e"
+                        color: Theme.backgroundColor
                         radius: Theme.cardRadius
                         clip: true
 

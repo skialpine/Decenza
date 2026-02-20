@@ -7,6 +7,7 @@
 #include <QHash>
 #include <QSet>
 #include <QFile>
+#include <QJsonObject>
 #include <QTimer>
 #include <QElapsedTimer>
 
@@ -83,6 +84,7 @@ private slots:
     void cleanupStaleConnections();
     void onDiscoveryDatagram();
     void onLayoutChanged();
+    void onThemeChanged();
 
 private:
     void handleRequest(QTcpSocket* socket, const QByteArray& request);
@@ -129,6 +131,11 @@ private:
     QString generateLayoutPage() const;
     void handleLayoutApi(QTcpSocket* socket, const QString& method, const QString& path, const QByteArray& body);
 
+    // Theme editor web UI
+    QString generateThemePage() const;
+    void handleThemeApi(QTcpSocket* socket, const QString& method, const QString& path, const QByteArray& body);
+    QJsonObject buildThemeJson() const;
+
     // Settings web UI
     QString generateSettingsPage() const;
     void handleGetSettings(QTcpSocket* socket);
@@ -151,6 +158,7 @@ private:
     int m_activeMediaUploads = 0;
     QHash<QTcpSocket*, PendingRequest> m_pendingRequests;
     QSet<QTcpSocket*> m_sseLayoutClients;  // SSE connections for layout change notifications
+    QSet<QTcpSocket*> m_sseThemeClients;   // SSE connections for theme change notifications
 
     // Limits to prevent resource exhaustion
     static constexpr qint64 MAX_HEADER_SIZE = 64 * 1024;           // 64 KB for headers

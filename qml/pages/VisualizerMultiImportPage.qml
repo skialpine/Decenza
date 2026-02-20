@@ -42,9 +42,9 @@ Page {
 
     // Source badge colors (matching ProfileSelectorPage)
     function sourceColor(source) {
-        if (source === "B") return "#4a90d9"  // Blue for Built-in/Decent
-        if (source === "D") return "#4ad94a"  // Green for Downloaded/Visualizer
-        return "#d9a04a"  // Orange for User
+        if (source === "B") return Theme.sourceBadgeBlueColor  // Blue for Built-in/Decent
+        if (source === "D") return Theme.sourceBadgeGreenColor  // Green for Downloaded/Visualizer
+        return Theme.sourceBadgeOrangeColor  // Orange for User
     }
 
     function sourceLetter(source) {
@@ -380,7 +380,7 @@ Page {
                             delegate: Rectangle {
                                 id: shotDelegate
                                 width: shotList.width
-                                height: Theme.scaled(60)
+                                height: Math.max(Theme.scaled(60), vizContentRow.implicitHeight + Theme.spacingSmall * 2)
                                 color: selectedShot === modelData ? Theme.primaryColor.darker(1.5) :
                                        (index % 2 === 0 ? "transparent" : Theme.backgroundColor)
 
@@ -388,6 +388,7 @@ Page {
                                 property bool isImported: selectionVersion >= 0 && importedIds[modelData.id] === true
 
                                 RowLayout {
+                                    id: vizContentRow
                                     anchors.fill: parent
                                     anchors.margins: Theme.spacingSmall
                                     spacing: Theme.spacingSmall
@@ -696,7 +697,7 @@ Page {
                                     width: Theme.scaled(24)
                                     height: Theme.scaled(24)
                                     radius: Theme.scaled(12)
-                                    color: "#4a90d9"
+                                    color: Theme.sourceBadgeBlueColor
                                     Text {
                                         anchors.centerIn: parent
                                         text: "D"
@@ -719,7 +720,7 @@ Page {
                                     width: Theme.scaled(24)
                                     height: Theme.scaled(24)
                                     radius: Theme.scaled(12)
-                                    color: "#4ad94a"
+                                    color: Theme.sourceBadgeGreenColor
                                     Text {
                                         anchors.centerIn: parent
                                         text: "V"

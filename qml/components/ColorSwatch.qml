@@ -7,7 +7,7 @@ Rectangle {
 
     property string colorName: "primaryColor"
     property string displayName: "Primary"
-    property color colorValue: "#4e85f4"
+    property color colorValue: Theme.primaryColor
     property bool selected: false
 
     signal clicked()

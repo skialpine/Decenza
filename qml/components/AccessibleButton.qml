@@ -50,7 +50,7 @@ Button {
                 return root.down ? Qt.darker(Theme.errorColor, 1.1) : Theme.errorColor
             }
             if (root.warning) {
-                return root.down ? Qt.darker("#FFA500", 1.1) : "#FFA500"
+                return root.down ? Qt.darker(Theme.warningButtonColor, 1.1) : Theme.warningButtonColor
             }
             if (root.primary) {
                 return root.down ? Qt.darker(Theme.primaryColor, 1.1) : Theme.primaryColor
