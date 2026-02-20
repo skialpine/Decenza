@@ -17,15 +17,6 @@ BleRefresher::BleRefresher(DE1Device* de1, BLEManager* bleManager,
     m_periodicTimer.setSingleShot(true);
     connect(&m_periodicTimer, &QTimer::timeout, this, &BleRefresher::scheduleRefresh);
 
-    m_refreshTimeout.setSingleShot(true);
-    connect(&m_refreshTimeout, &QTimer::timeout, this, [this]() {
-        qWarning() << "[BleRefresher] Refresh timed out after" << REFRESH_TIMEOUT_MS / 1000
-                   << "s — DE1 failed to reconnect, clearing overlay";
-        // Ensure scanning continues so the app can reconnect in the background
-        m_bleManager->startScan();
-        onRefreshComplete();
-    });
-
     // Detect wake from sleep: when phase leaves Sleep, schedule a refresh.
     // The 60-minute debounce prevents treating the initial Disconnected→Sleep→Idle
     // transition (normal first connect) as a wake-from-sleep event.
@@ -143,7 +134,24 @@ void BleRefresher::executeRefresh() {
         }
     }, Qt::QueuedConnection);
 
-    m_refreshTimeout.start(REFRESH_TIMEOUT_MS);
+    // Detect scan completion without reconnection — event-based replacement
+    // for a timeout timer. BLEManager's scan has a built-in 15s timeout.
+    QObject::disconnect(m_scanConn);
+    m_scanConn = connect(m_bleManager, &BLEManager::scanningChanged, this, [this]() {
+        if (!m_bleManager->scanning() && m_refreshInProgress && !m_de1->isConnected()) {
+            qWarning() << "[BleRefresher] Scan finished without DE1 reconnecting, clearing overlay";
+            QObject::disconnect(m_scanConn);
+            QObject::disconnect(m_de1ConnConn);
+
+            if (m_scaleWasConnected) {
+                m_bleManager->tryDirectConnectToScale();
+            }
+
+            m_bleManager->startScan();
+            onRefreshComplete();
+        }
+    });
+
     qDebug() << "[BleRefresher] Disconnecting DE1...";
     m_de1->disconnect();
 }
@@ -153,7 +161,6 @@ void BleRefresher::onRefreshComplete() {
         return;  // Already completed (timeout + queued reconnect race)
     }
 
-    m_refreshTimeout.stop();
     m_refreshInProgress = false;
     emit refreshingChanged();
     m_refreshPending = false;
@@ -162,6 +169,7 @@ void BleRefresher::onRefreshComplete() {
     // Cleanup any lingering connections
     QObject::disconnect(m_phaseConn);
     QObject::disconnect(m_de1ConnConn);
+    QObject::disconnect(m_scanConn);
 
     // Reset periodic timer
     if (m_periodicIntervalMs > 0) {
