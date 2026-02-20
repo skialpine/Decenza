@@ -74,7 +74,7 @@ QString UpdateChecker::currentVersion() const
 
 int UpdateChecker::currentVersionCode() const
 {
-    return VERSION_CODE;
+    return versionCode();
 }
 
 void UpdateChecker::checkForUpdates()

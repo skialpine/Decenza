@@ -1194,16 +1194,7 @@ QString ShotServer::generateShotDetailPage(qint64 shotId) const
                 <h1>%1</h1>
                 <div class="subtitle">%2</div>
             </div>
-            <div class="menu-wrapper">
-                <button class="menu-btn" onclick="toggleMenu()" aria-label="Menu">&#9776;</button>
-                <div class="menu-dropdown" id="menuDropdown">
-                    <a href="#" class="menu-item" id="powerToggle" onclick="togglePower(); return false;">&#9889; Loading...</a>
-                    <a href="/" class="menu-item">&#127866; Shot History</a>
-                    <a href="/remote" class="menu-item">&#128421; Remote Control</a>
-                    <a href="/upload/media" class="menu-item">&#127912; Upload Screensaver Media</a>
-                    <a href="/debug" class="menu-item">&#128736; Debug &amp; Dev Tools</a>
-                </div>
-            </div>
+)HTML" + generateMenuHtml() + R"HTML(
         </div>
     </header>
     <main class="container">
@@ -1965,16 +1956,7 @@ QString ShotServer::generateComparisonPage(const QList<qint64>& shotIds) const
         <div class="header-content">
             <a href="/" class="back-btn">&#8592;</a>
             <h1>Compare %1 Shots</h1>
-            <div class="menu-wrapper">
-                <button class="menu-btn" onclick="toggleMenu()" aria-label="Menu">&#9776;</button>
-                <div class="menu-dropdown" id="menuDropdown">
-                    <a href="#" class="menu-item" id="powerToggle" onclick="togglePower(); return false;">&#9889; Loading...</a>
-                    <a href="/" class="menu-item">&#127866; Shot History</a>
-                    <a href="/remote" class="menu-item">&#128421; Remote Control</a>
-                    <a href="/upload/media" class="menu-item">&#127912; Upload Screensaver Media</a>
-                    <a href="/debug" class="menu-item">&#128736; Debug &amp; Dev Tools</a>
-                </div>
-            </div>
+)HTML" + generateMenuHtml() + R"HTML(
         </div>
     </header>
     <main class="container">

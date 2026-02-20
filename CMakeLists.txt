@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 # Version code - always increments for Android (separate from display version)
 set(VERSION_CODE_FILE "${CMAKE_SOURCE_DIR}/versioncode.txt")
 set(VERSION_HEADER "${CMAKE_BINARY_DIR}/version.h")
+set(VERSION_CODE_CPP "${CMAKE_BINARY_DIR}/version_code.cpp")
 
 # Read version code at configure time
 file(READ "${VERSION_CODE_FILE}" CURRENT_VERSION_CODE)
@@ -13,10 +14,17 @@ string(STRIP "${CURRENT_VERSION_CODE}" CURRENT_VERSION_CODE)
 # Build will increment, so compute next version code for Android
 math(EXPR NEXT_VERSION_CODE "${CURRENT_VERSION_CODE} + 1")
 
-# Configure version.h from template
+# Configure version.h from template (stable values: VERSION_STRING, VERSION_MAJOR, etc.)
 configure_file(
     "${CMAKE_SOURCE_DIR}/src/version.h.in"
     "${VERSION_HEADER}"
+    @ONLY
+)
+
+# Generate initial version_code.cpp (updated every build by IncrementVersionCode.cmake)
+configure_file(
+    "${CMAKE_SOURCE_DIR}/src/version_code.cpp.in"
+    "${VERSION_CODE_CPP}"
     @ONLY
 )
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -527,15 +535,19 @@ qt_add_qml_module(Decenza_DE1
     NO_GENERATE_EXTRA_QMLDIRS
 )
 
-# Increment version code on every build
+# Increment version code on every build.
+# BYPRODUCTS tells Ninja that this target produces version_code.cpp, so dependents
+# (the compilation of version_code.cpp into an object file) are scheduled after this
+# target and properly detect the file change. This fixes the stale build number issue
+# where Ninja's pre-computed dirty state missed header-only changes.
 add_custom_target(increment_version_code ALL
     COMMAND ${CMAKE_COMMAND}
         -DVERSION_CODE_FILE=${VERSION_CODE_FILE}
         -DMANIFEST_FILE=${CMAKE_SOURCE_DIR}/android/AndroidManifest.xml
         -DVERSION_STRING=${PROJECT_VERSION}
         -DCMAKE_SOURCE_DIR=${CMAKE_SOURCE_DIR}
-        -DVERSION_HEADER=${VERSION_HEADER}
-        -DVERSION_TEMPLATE=${CMAKE_SOURCE_DIR}/src/version.h.in
+        -DVERSION_CODE_CPP=${VERSION_CODE_CPP}
+        -DVERSION_CODE_CPP_TEMPLATE=${CMAKE_SOURCE_DIR}/src/version_code.cpp.in
         -DPROJECT_VERSION=${PROJECT_VERSION}
         -DPROJECT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
         -DPROJECT_VERSION_MINOR=${PROJECT_VERSION_MINOR}
@@ -543,9 +555,14 @@ add_custom_target(increment_version_code ALL
         -DISS_TEMPLATE=${CMAKE_SOURCE_DIR}/installer/version.iss.in
         -DISS_OUTPUT=${CMAKE_SOURCE_DIR}/installer/version.iss
         -P ${CMAKE_SOURCE_DIR}/cmake/IncrementVersionCode.cmake
+    BYPRODUCTS ${VERSION_CODE_CPP}
     COMMENT "Incrementing version code..."
 )
 add_dependencies(Decenza_DE1 increment_version_code)
+
+# Add generated version_code.cpp to the build (recompiled every build, triggers relink)
+target_sources(Decenza_DE1 PRIVATE ${VERSION_CODE_CPP})
+set_source_files_properties(${VERSION_CODE_CPP} PROPERTIES GENERATED TRUE)
 
 # Force QML resource rebuild when source files change
 # NOTE: Disabled - defeats QML caching which slows page loads

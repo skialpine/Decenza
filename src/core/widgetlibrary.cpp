@@ -10,6 +10,7 @@
 #include <QUuid>
 #include <QDateTime>
 #include <QRegularExpression>
+#include <QPainter>
 #include <QDebug>
 
 WidgetLibrary::WidgetLibrary(Settings* settings, QObject* parent)
@@ -150,6 +151,134 @@ QString WidgetLibrary::addCurrentLayout(bool includeTheme)
         emit entryAdded(entryId);
     }
     return entryId;
+}
+
+// --- Theme entries ---
+
+QString WidgetLibrary::addCurrentTheme(const QString& name)
+{
+    QJsonObject themeObj;
+
+    // Colors
+    QVariantMap colors = m_settings->customThemeColors();
+    QJsonObject colorsJson = QJsonObject::fromVariantMap(colors);
+    themeObj["colors"] = colorsJson;
+
+    // Font sizes
+    QVariantMap fonts = m_settings->customFontSizes();
+    if (!fonts.isEmpty()) {
+        themeObj["fonts"] = QJsonObject::fromVariantMap(fonts);
+    }
+
+    // Theme name
+    QString themeName = name.isEmpty() ? m_settings->activeThemeName() : name;
+    themeObj["name"] = themeName;
+
+    QJsonObject data;
+    data["theme"] = themeObj;
+
+    QJsonObject envelope = buildEnvelope("theme", data);
+
+    // Extract theme-specific tags
+    QStringList tags = extractTagsFromTheme(themeObj);
+    envelope["tags"] = QJsonArray::fromStringList(tags);
+
+    QString entryId = saveEntryFile(envelope);
+    if (!entryId.isEmpty()) {
+        generateThemeThumbnail(entryId);
+        emit entryAdded(entryId);
+    }
+    return entryId;
+}
+
+bool WidgetLibrary::applyThemeEntry(const QString& entryId)
+{
+    QJsonObject entry = readEntryFile(entryId);
+    if (entry.isEmpty() || entry["type"].toString() != "theme") {
+        qWarning() << "WidgetLibrary: Invalid theme entry:" << entryId;
+        return false;
+    }
+
+    QJsonObject data = entry["data"].toObject();
+    QJsonObject themeObj = data["theme"].toObject();
+
+    // Apply colors
+    QJsonObject colorsJson = themeObj["colors"].toObject();
+    if (!colorsJson.isEmpty()) {
+        m_settings->setCustomThemeColors(colorsJson.toVariantMap());
+    }
+
+    // Apply font sizes
+    QJsonObject fontsJson = themeObj["fonts"].toObject();
+    if (!fontsJson.isEmpty()) {
+        m_settings->setCustomFontSizes(fontsJson.toVariantMap());
+    }
+
+    // Apply theme name
+    QString themeName = themeObj["name"].toString();
+    if (!themeName.isEmpty()) {
+        m_settings->setActiveThemeName(themeName);
+    }
+
+    qDebug() << "WidgetLibrary: Applied theme" << entryId << "name:" << themeName;
+    return true;
+}
+
+void WidgetLibrary::generateThemeThumbnail(const QString& entryId)
+{
+    QJsonObject entry = readEntryFile(entryId);
+    QJsonObject data = entry["data"].toObject();
+    QJsonObject themeObj = data["theme"].toObject();
+    QJsonObject colors = themeObj["colors"].toObject();
+
+    // Key colors to show in the thumbnail grid (3 rows x 4 cols)
+    static const QStringList keyColors = {
+        "backgroundColor", "surfaceColor", "primaryColor", "accentColor",
+        "textColor", "successColor", "warningColor", "errorColor",
+        "pressureColor", "flowColor", "temperatureColor", "weightColor"
+    };
+
+    // Default fallbacks
+    static const QMap<QString, QString> defaults = {
+        {"backgroundColor", "#1a1a2e"}, {"surfaceColor", "#303048"},
+        {"primaryColor", "#4e85f4"}, {"accentColor", "#e94560"},
+        {"textColor", "#ffffff"}, {"successColor", "#00cc6d"},
+        {"warningColor", "#ffaa00"}, {"errorColor", "#ff4444"},
+        {"pressureColor", "#18c37e"}, {"flowColor", "#4e85f4"},
+        {"temperatureColor", "#e73249"}, {"weightColor", "#a2693d"}
+    };
+
+    // Full thumbnail (300x200)
+    QImage full(300, 200, QImage::Format_ARGB32);
+    full.fill(Qt::transparent);
+    {
+        QPainter p(&full);
+        p.setRenderHint(QPainter::Antialiasing);
+        int cols = 4, rows = 3;
+        int sw = 300 / cols, sh = 200 / rows;
+        for (int i = 0; i < keyColors.size(); i++) {
+            QString val = colors[keyColors[i]].toString();
+            if (val.isEmpty()) val = defaults.value(keyColors[i], "#333333");
+            p.fillRect((i % cols) * sw, (i / cols) * sh, sw, sh, QColor(val));
+        }
+    }
+    saveThumbnail(entryId, full);
+
+    // Compact thumbnail (128x100)
+    QImage compact(128, 100, QImage::Format_ARGB32);
+    compact.fill(Qt::transparent);
+    {
+        QPainter p(&compact);
+        p.setRenderHint(QPainter::Antialiasing);
+        int cols = 4, rows = 3;
+        int sw = 128 / cols, sh = 100 / rows;
+        for (int i = 0; i < keyColors.size(); i++) {
+            QString val = colors[keyColors[i]].toString();
+            if (val.isEmpty()) val = defaults.value(keyColors[i], "#333333");
+            p.fillRect((i % cols) * sw, (i / cols) * sh, sw, sh, QColor(val));
+        }
+    }
+    saveThumbnailCompact(entryId, compact);
 }
 
 // --- Manage entries ---
@@ -423,7 +552,14 @@ QString WidgetLibrary::importEntry(const QByteArray& json)
     }
     entry["importedAt"] = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
 
-    return saveEntryFile(entry);
+    QString entryId = saveEntryFile(entry);
+
+    // Generate thumbnail for imported theme entries (community downloads)
+    if (!entryId.isEmpty() && entry["type"].toString() == "theme") {
+        generateThemeThumbnail(entryId);
+    }
+
+    return entryId;
 }
 
 QByteArray WidgetLibrary::exportEntry(const QString& entryId) const
@@ -515,6 +651,8 @@ QStringList WidgetLibrary::extractTags(const QVariantMap& entryData) const
                 tags.append(extractTagsFromItem(val.toObject()));
             }
         }
+    } else if (type == "theme") {
+        tags = extractTagsFromTheme(dataPayload["theme"].toObject());
     }
 
     tags.removeDuplicates();
@@ -547,6 +685,47 @@ QStringList WidgetLibrary::extractTagsFromItem(const QJsonObject& item) const
         QString action = item[field].toString();
         if (!action.isEmpty()) {
             tags.append("action:" + action);  // e.g., "action:navigate:settings"
+        }
+    }
+
+    return tags;
+}
+
+QStringList WidgetLibrary::extractTagsFromTheme(const QJsonObject& themeObj) const
+{
+    QStringList tags;
+    tags.append("type:theme");
+
+    QJsonObject colors = themeObj["colors"].toObject();
+    QString bgColor = colors["backgroundColor"].toString();
+
+    // Determine brightness: dark vs light theme
+    if (!bgColor.isEmpty()) {
+        QColor bg(bgColor);
+        // Perceived brightness: (R*299 + G*587 + B*114) / 1000
+        int brightness = (bg.red() * 299 + bg.green() * 587 + bg.blue() * 114) / 1000;
+        tags.append(brightness < 128 ? "scheme:dark" : "scheme:light");
+    }
+
+    // Dominant hue family from primary color
+    QString primaryColor = colors["primaryColor"].toString();
+    if (!primaryColor.isEmpty()) {
+        QColor pc(primaryColor);
+        int hue = pc.hsvHue();
+        if (hue < 0) {
+            tags.append("hue:neutral");
+        } else if (hue < 30 || hue >= 330) {
+            tags.append("hue:red");
+        } else if (hue < 90) {
+            tags.append("hue:yellow");
+        } else if (hue < 150) {
+            tags.append("hue:green");
+        } else if (hue < 210) {
+            tags.append("hue:cyan");
+        } else if (hue < 270) {
+            tags.append("hue:blue");
+        } else {
+            tags.append("hue:purple");
         }
     }
 

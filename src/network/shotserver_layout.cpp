@@ -483,6 +483,10 @@ void ShotServer::handleLayoutApi(QTcpSocket* socket, const QString& method, cons
             if (!m_pendingLibrarySocket) return;
             QJsonObject resp;
             resp["error"] = error;
+            // Include the server's existing ID so clients can delete-and-reupload
+            if (error == "Already shared") {
+                resp["existingId"] = m_librarySharing->lastExistingId();
+            }
             sendJson(m_pendingLibrarySocket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
             m_pendingLibrarySocket = nullptr;
             disconnect(*successConn);

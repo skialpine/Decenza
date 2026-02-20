@@ -23,7 +23,10 @@ dependencies {
 
 android {
     namespace = androidPackageName
-    compileSdkVersion androidCompileSdkVersion
+    // androidCompileSdkVersion (from Qt) is 34, but androidx.core:core:1.16.0
+    // requires compileSdk 35+. This only affects compilation, NOT device compatibility
+    // (minSdk still controls which devices can install the app).
+    compileSdkVersion 35
     buildToolsVersion androidBuildToolsVersion
     ndkVersion = androidNdkVersion
 

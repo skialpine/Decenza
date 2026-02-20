@@ -44,6 +44,7 @@ public:
     bool isBrowsing() const { return m_browsing; }
     bool isDownloading() const { return m_downloading; }
     QString lastError() const { return m_lastError; }
+    QString lastExistingId() const { return m_lastExistingId; }
     QVariantList communityEntries() const { return m_communityEntries; }
     QVariantList featuredEntries() const { return m_featuredEntries; }
     int totalCommunityResults() const { return m_totalCommunityResults; }
@@ -159,4 +160,5 @@ private:
     // Pending operation IDs
     QString m_pendingDownloadId;
     QString m_pendingDeleteId;
+    QString m_lastExistingId;  // Server ID from 409 "Already shared" response
 };

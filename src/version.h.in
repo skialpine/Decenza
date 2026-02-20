@@ -7,4 +7,6 @@
 #define VERSION_PATCH @PROJECT_VERSION_PATCH@
 
 #define VERSION_STRING "@PROJECT_VERSION@"
-#define VERSION_CODE @NEXT_VERSION_CODE@
+
+// Build number — defined in generated version_code.cpp, updated every build
+int versionCode();

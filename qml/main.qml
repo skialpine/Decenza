@@ -2727,6 +2727,10 @@ ApplicationWindow {
         var data = WidgetLibrary.getEntryData(entryId)
         if (!data || !data.type) return
 
+        // Theme entries generate their own color-grid thumbnail in C++;
+        // skip QML screenshot capture which would overwrite it
+        if (data.type === "theme") return
+
         libThumbFull.entryData = data
         libThumbCompact.entryData = data
         libThumbContainer.z = -1

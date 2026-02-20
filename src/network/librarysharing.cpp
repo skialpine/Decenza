@@ -162,6 +162,7 @@ void LibrarySharing::handleUploadFinished(QNetworkReply* reply, const QString& l
             m_library->renameEntry(localEntryId, existingId);
         }
 
+        m_lastExistingId = existingId;
         setLastError("Already shared");
         emit uploadFailed("Already shared");
         return;

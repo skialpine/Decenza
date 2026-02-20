@@ -1,5 +1,6 @@
 #include "shotserver.h"
 #include "../core/settings.h"
+#include "../core/widgetlibrary.h"
 #include "webtemplates/theme_page.h"
 
 #include <QJsonDocument>
@@ -228,6 +229,140 @@ void ShotServer::handleThemeApi(QTcpSocket* socket, const QString& method,
         m_settings->deleteUserTheme(name);
         QJsonDocument doc(buildThemeJson());
         sendJson(socket, doc.toJson(QJsonDocument::Compact));
+        return;
+    }
+
+    // --- Theme Library endpoints (local save/browse/apply) ---
+
+    // POST /api/theme/library/save - save current theme to local library
+    if (path == "/api/theme/library/save" && method == "POST") {
+        if (!m_widgetLibrary) {
+            sendJson(socket, R"({"error":"Widget library not available"})");
+            return;
+        }
+        QJsonObject obj = QJsonDocument::fromJson(body).object();
+        QString name = obj["name"].toString();
+        if (name.isEmpty()) name = m_settings->activeThemeName();
+        QString entryId = m_widgetLibrary->addCurrentTheme(name);
+        if (entryId.isEmpty()) {
+            sendJson(socket, R"({"error":"Failed to save theme"})");
+            return;
+        }
+        QJsonObject resp;
+        resp["success"] = true;
+        resp["entryId"] = entryId;
+        sendJson(socket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+        return;
+    }
+
+    // GET /api/theme/library/list - list local theme entries
+    if (path == "/api/theme/library/list" && method == "GET") {
+        if (!m_widgetLibrary) {
+            sendJson(socket, R"({"error":"Widget library not available"})");
+            return;
+        }
+        QVariantList themes = m_widgetLibrary->entriesByType("theme");
+        QJsonArray arr;
+        for (const QVariant& v : themes) {
+            QVariantMap entry = v.toMap();
+            QJsonObject obj;
+            QString id = entry["id"].toString();
+            obj["id"] = id;
+            obj["type"] = entry["type"].toString();
+            obj["createdAt"] = entry["createdAt"].toString();
+            // Extract theme name from data.theme.name
+            QVariantMap data = entry["data"].toMap();
+            QVariantMap themeData = data["theme"].toMap();
+            obj["name"] = themeData["name"].toString();
+            // Tags (stored as QVariantList in index)
+            QVariantList tagList = entry["tags"].toList();
+            QJsonArray tagsArr;
+            for (const QVariant& tag : tagList)
+                tagsArr.append(tag.toString());
+            obj["tags"] = tagsArr;
+            obj["hasThumbnail"] = m_widgetLibrary->hasThumbnail(id);
+            arr.append(obj);
+        }
+        QJsonObject resp;
+        resp["success"] = true;
+        resp["entries"] = arr;
+        sendJson(socket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+        return;
+    }
+
+    // POST /api/theme/library/apply - apply a theme from local library
+    if (path == "/api/theme/library/apply" && method == "POST") {
+        if (!m_widgetLibrary) {
+            sendJson(socket, R"({"error":"Widget library not available"})");
+            return;
+        }
+        QJsonObject obj = QJsonDocument::fromJson(body).object();
+        QString entryId = obj["entryId"].toString();
+        if (entryId.isEmpty()) {
+            sendResponse(socket, 400, "application/json", R"({"error":"Missing entryId"})");
+            return;
+        }
+        bool ok = m_widgetLibrary->applyThemeEntry(entryId);
+        if (!ok) {
+            sendJson(socket, R"({"error":"Failed to apply theme"})");
+            return;
+        }
+        // Return updated theme state so the editor can refresh
+        QJsonDocument doc(buildThemeJson());
+        sendJson(socket, doc.toJson(QJsonDocument::Compact));
+        return;
+    }
+
+    // DELETE /api/theme/library/{id} - remove a theme from local library
+    if (path.startsWith("/api/theme/library/") && method == "DELETE") {
+        if (!m_widgetLibrary) {
+            sendJson(socket, R"({"error":"Widget library not available"})");
+            return;
+        }
+        QString entryId = path.mid(19); // after "/api/theme/library/"
+        if (entryId.isEmpty()) {
+            sendResponse(socket, 400, "application/json", R"({"error":"Missing entry ID"})");
+            return;
+        }
+        bool ok = m_widgetLibrary->removeEntry(entryId);
+        QJsonObject resp;
+        resp["success"] = ok;
+        sendJson(socket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+        return;
+    }
+
+    // GET /api/theme/library/{id}/thumbnail - serve theme thumbnail
+    if (path.startsWith("/api/theme/library/") && path.endsWith("/thumbnail") && method == "GET") {
+        if (!m_widgetLibrary) {
+            sendResponse(socket, 404, "text/plain", "Not available");
+            return;
+        }
+        // Extract ID: "/api/theme/library/{id}/thumbnail"
+        QString sub = path.mid(19); // after "/api/theme/library/"
+        QString entryId = sub.left(sub.length() - 10); // remove "/thumbnail"
+        if (m_widgetLibrary->hasThumbnail(entryId)) {
+            sendFile(socket, m_widgetLibrary->thumbnailPath(entryId), "image/png");
+        } else {
+            sendResponse(socket, 404, "text/plain", "No thumbnail");
+        }
+        return;
+    }
+
+    // GET /api/theme/library/{id}/data - get full theme entry data
+    if (path.startsWith("/api/theme/library/") && path.endsWith("/data") && method == "GET") {
+        if (!m_widgetLibrary) {
+            sendJson(socket, R"({"error":"Widget library not available"})");
+            return;
+        }
+        QString sub = path.mid(19); // after "/api/theme/library/"
+        QString entryId = sub.left(sub.length() - 5); // remove "/data"
+        QVariantMap data = m_widgetLibrary->getEntryData(entryId);
+        if (data.isEmpty()) {
+            sendResponse(socket, 404, "application/json", R"({"error":"Entry not found"})");
+            return;
+        }
+        QJsonObject resp = QJsonObject::fromVariantMap(data);
+        sendJson(socket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
         return;
     }
 

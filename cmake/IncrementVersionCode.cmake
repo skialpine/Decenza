@@ -8,10 +8,13 @@ math(EXPR VERSION_CODE "${VERSION_CODE} + 1")
 # Write back
 file(WRITE "${VERSION_CODE_FILE}" "${VERSION_CODE}\n")
 
-# Regenerate version.h so VERSION_CODE stays in sync with manifest
-if(DEFINED VERSION_HEADER AND DEFINED VERSION_TEMPLATE)
+# Generate version_code.cpp so the build number is compiled into the binary.
+# This is a .cpp file (not a header) so Ninja/MSBuild properly detect the change
+# and recompile it every build. Using BYPRODUCTS in CMakeLists.txt ensures the
+# build system knows this target produces the file.
+if(DEFINED VERSION_CODE_CPP AND DEFINED VERSION_CODE_CPP_TEMPLATE)
     set(NEXT_VERSION_CODE ${VERSION_CODE})
-    configure_file("${VERSION_TEMPLATE}" "${VERSION_HEADER}" @ONLY)
+    configure_file("${VERSION_CODE_CPP_TEMPLATE}" "${VERSION_CODE_CPP}" @ONLY)
 endif()
 
 # Update AndroidManifest.xml

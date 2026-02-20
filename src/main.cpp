@@ -482,7 +482,7 @@ int main(int argc, char *argv[])
     context->setContextProperty("PreviousCrashLog", previousCrashLog);
     context->setContextProperty("PreviousDebugLogTail", previousDebugLogTail);
     context->setContextProperty("AppVersion", VERSION_STRING);
-    context->setContextProperty("AppVersionCode", VERSION_CODE);
+    context->setContextProperty("AppVersionCode", versionCode());
 #ifdef QT_DEBUG
     context->setContextProperty("IsDebugBuild", true);
 #else

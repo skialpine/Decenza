@@ -43,9 +43,9 @@ Item {
                 id: typeFilter
                 Layout.preferredWidth: Theme.scaled(120)
                 accessibleLabel: TranslationManager.translate("community.filter.type", "Type filter")
-                model: ["All Types", "Items", "Zones", "Layouts"]
+                model: ["All Types", "Items", "Zones", "Layouts", "Themes"]
                 onCurrentIndexChanged: {
-                    var types = ["", "item", "zone", "layout"]
+                    var types = ["", "item", "zone", "layout", "theme"]
                     filterType = types[currentIndex]
                     refreshResults()
                 }
