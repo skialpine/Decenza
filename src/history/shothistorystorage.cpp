@@ -346,6 +346,8 @@ bool ShotHistoryStorage::runMigrations()
     if (currentVersion < 7) {
         qDebug() << "ShotHistoryStorage: Running migration to version 7 (smooth weight flow rate)";
 
+        m_db.transaction();
+
         QSqlQuery readQuery(m_db);
         readQuery.prepare("SELECT id, sample_data FROM shots WHERE sample_data IS NOT NULL");
         readQuery.exec();
@@ -398,6 +400,8 @@ bool ShotHistoryStorage::runMigrations()
         qDebug() << "ShotHistoryStorage: Smoothed weight flow rate for" << smoothedCount << "shots";
         query.exec("UPDATE schema_version SET version = 7");
         currentVersion = 7;
+
+        m_db.commit();
     }
 
     m_schemaVersion = currentVersion;
