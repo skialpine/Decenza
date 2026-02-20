@@ -319,7 +319,7 @@ Page {
                     }
 
                     ColumnLayout {
-                        width: parent.width
+                        width: editorScrollView.width - Theme.scaled(14)
                         spacing: Theme.scaled(14)
 
                         // === Profile Temperature ===

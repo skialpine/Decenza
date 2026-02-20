@@ -593,7 +593,7 @@ Page {
                     Layout.preferredWidth: Theme.scaled(160); valueColor: Theme.temperatureColor
                     accessibleName: TranslationManager.translate("profileEditor.preheatTankAccessible", "Preheat water tank temperature")
                     from: 0; to: 45; stepSize: 1
-                    value: profile ? (profile.tank_desired_water_temperature || 0) : 0
+                    value: { stepVersion; return profile ? (profile.tank_desired_water_temperature || 0) : 0 }
                     onValueModified: function(newValue) {
                         if (profile) {
                             profile.tank_desired_water_temperature = Math.round(newValue)
@@ -612,7 +612,7 @@ Page {
                     Layout.preferredWidth: Theme.scaled(160)
                     accessibleName: TranslationManager.translate("profileEditor.preinfusionEndsAccessible", "Preinfusion ends after step")
                     from: 0; to: profile ? profile.steps.length : 0; stepSize: 1
-                    value: profile ? (profile.preinfuse_frame_count || 0) : 0
+                    value: { stepVersion; return profile ? (profile.preinfuse_frame_count || 0) : 0 }
                     onValueModified: function(newValue) {
                         if (profile) {
                             profile.preinfuse_frame_count = Math.round(newValue)
@@ -631,7 +631,7 @@ Page {
                     Layout.preferredWidth: Theme.scaled(160); valueColor: Theme.flowColor
                     accessibleName: TranslationManager.translate("profileEditor.afterPreinfusionStopAccessible", "After preinfusion, stop the shot at volume")
                     from: 0; to: 500; stepSize: 1
-                    value: profile ? (profile.target_volume || 0) : 0
+                    value: { stepVersion; return profile ? (profile.target_volume || 0) : 0 }
                     onValueModified: function(newValue) {
                         if (profile) {
                             profile.target_volume = Math.round(newValue)
@@ -654,7 +654,7 @@ Page {
                     Layout.preferredWidth: Theme.scaled(160); valueColor: Theme.weightColor
                     accessibleName: TranslationManager.translate("profileEditor.stopAtWeightAccessible", "Stop at weight")
                     from: 0; to: 100; stepSize: 0.5
-                    value: profile ? (profile.target_weight || 0) : 0
+                    value: { stepVersion; return profile ? (profile.target_weight || 0) : 0 }
                     onValueModified: function(newValue) {
                         if (profile) {
                             profile.target_weight = Math.round(newValue * 2) / 2
@@ -677,7 +677,7 @@ Page {
                     Layout.preferredWidth: Theme.scaled(160); valueColor: Theme.flowColor
                     accessibleName: TranslationManager.translate("profileEditor.limitFlowRangeAccessible", "Limit flow range for pressure steps")
                     from: 0; to: 8; stepSize: 0.1
-                    value: profile ? (profile.maximum_flow_range_advanced || 0.6) : 0.6
+                    value: { stepVersion; return profile ? (profile.maximum_flow_range_advanced || 0.6) : 0.6 }
                     onValueModified: function(newValue) {
                         if (profile) {
                             var newRange = Math.round(newValue * 10) / 10
@@ -698,7 +698,7 @@ Page {
                     Layout.preferredWidth: Theme.scaled(160); valueColor: Theme.pressureColor
                     accessibleName: TranslationManager.translate("profileEditor.limitPressureRangeAccessible", "Limit pressure range for flow steps")
                     from: 0; to: 8; stepSize: 0.1
-                    value: profile ? (profile.maximum_pressure_range_advanced || 0.6) : 0.6
+                    value: { stepVersion; return profile ? (profile.maximum_pressure_range_advanced || 0.6) : 0.6 }
                     onValueModified: function(newValue) {
                         if (profile) {
                             var newRange = Math.round(newValue * 10) / 10
@@ -972,7 +972,7 @@ Page {
                    profile.steps[selectedStepIndex] : null
 
             ColumnLayout {
-                width: stepEditorScroll.width - Theme.scaled(10)
+                width: stepEditorScroll.width - Theme.scaled(24)
                 spacing: Theme.scaled(4)
 
                 // Frame name
@@ -1063,24 +1063,24 @@ Page {
                     }
                 }
 
-                // Pressure goal (only visible when pump=pressure)
+                // Pressure/Flow goal (switches based on pump mode)
                 ValueInput {
-                    Layout.fillWidth: true; valueColor: Theme.pressureColor
-                    visible: step && step.pump === "pressure"
-                    accessibleName: "Pressure goal"
-                    from: 0; to: 12; stepSize: 0.1
-                    value: { var v = stepVersion; return step ? step.pressure : 0 }
-                    onValueModified: function(newValue) { if (profile && selectedStepIndex >= 0) { profile.steps[selectedStepIndex].pressure = Math.round(newValue * 10) / 10; uploadProfile() } }
-                }
-
-                // Flow goal (only visible when pump=flow)
-                ValueInput {
-                    Layout.fillWidth: true; valueColor: Theme.flowColor
-                    visible: step && step.pump === "flow"
-                    accessibleName: "Flow goal"
-                    from: 0; to: 8; stepSize: 0.1
-                    value: { var v = stepVersion; return step ? step.flow : 0 }
-                    onValueModified: function(newValue) { if (profile && selectedStepIndex >= 0) { profile.steps[selectedStepIndex].flow = Math.round(newValue * 10) / 10; uploadProfile() } }
+                    Layout.fillWidth: true
+                    valueColor: step && step.pump === "flow" ? Theme.flowColor : Theme.pressureColor
+                    accessibleName: step && step.pump === "flow" ? "Flow goal" : "Pressure goal"
+                    from: 0; to: step && step.pump === "flow" ? 8 : 12; stepSize: 0.1
+                    value: { var v = stepVersion; return step ? (step.pump === "flow" ? step.flow : step.pressure) : 0 }
+                    onValueModified: function(newValue) {
+                        if (profile && selectedStepIndex >= 0) {
+                            var val = Math.round(newValue * 10) / 10
+                            if (profile.steps[selectedStepIndex].pump === "flow") {
+                                profile.steps[selectedStepIndex].flow = val
+                            } else {
+                                profile.steps[selectedStepIndex].pressure = val
+                            }
+                            uploadProfile()
+                        }
+                    }
                 }
 
                 // Transition toggle
