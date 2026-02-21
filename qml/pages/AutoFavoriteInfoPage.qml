@@ -131,7 +131,7 @@ Page {
             }
 
             // Graph inspect bar
-            GraphInspectBar { graph: shotGraph }
+            GraphInspectBar { graph: shotGraph; visible: shotId > 0 }
 
             // Shot graph (most recent shot)
             Rectangle {
@@ -141,10 +141,12 @@ Page {
                 color: Theme.surfaceColor
                 radius: Theme.cardRadius
                 clip: true
+                visible: shotId > 0
 
                 Accessible.role: Accessible.Graphic
                 Accessible.name: TranslationManager.translate("autofavoriteinfo.graph", "Most recent shot graph")
                 Accessible.focusable: true
+                Accessible.onPressAction: graphTapArea.clicked(null)
 
                 HistoryShotGraph {
                     id: shotGraph
@@ -191,7 +193,10 @@ Page {
                     anchors.right: parent.right
                     height: Theme.scaled(16)
                     color: "transparent"
-                    Accessible.ignored: true
+                    Accessible.role: Accessible.Slider
+                    Accessible.name: TranslationManager.translate("autofavoriteinfo.resizegraph", "Resize graph")
+                    Accessible.focusable: true
+                    Accessible.onPressAction: resizeMouseArea.clicked(null)
 
                     Column {
                         anchors.centerIn: parent
@@ -238,7 +243,7 @@ Page {
             }
 
             // Graph legend
-            GraphLegend { graph: shotGraph }
+            GraphLegend { graph: shotGraph; visible: shotId > 0 }
 
             // Metrics row: Avg Duration, Avg Dose, Avg Yield, Avg Rating
             RowLayout {
@@ -353,6 +358,7 @@ Page {
                         fallback: "Analysis"
                         font: Theme.subtitleFont
                         color: Theme.textColor
+                        Accessible.ignored: true
                     }
 
                     RowLayout {
@@ -361,15 +367,15 @@ Page {
                         ColumnLayout {
                             visible: (groupDetails.avgTds || 0) > 0
                             spacing: Theme.scaled(2)
-                            Tr { key: "autofavoriteinfo.avgtds"; fallback: "Avg TDS"; font: Theme.captionFont; color: Theme.textSecondaryColor }
-                            Text { text: (groupDetails.avgTds || 0).toFixed(2) + "%"; font: Theme.bodyFont; color: Theme.dyeTdsColor }
+                            Tr { key: "autofavoriteinfo.avgtds"; fallback: "Avg TDS"; font: Theme.captionFont; color: Theme.textSecondaryColor; Accessible.ignored: true }
+                            Text { text: (groupDetails.avgTds || 0).toFixed(2) + "%"; font: Theme.bodyFont; color: Theme.dyeTdsColor; Accessible.ignored: true }
                         }
 
                         ColumnLayout {
                             visible: (groupDetails.avgEy || 0) > 0
                             spacing: Theme.scaled(2)
-                            Tr { key: "autofavoriteinfo.avgey"; fallback: "Avg EY"; font: Theme.captionFont; color: Theme.textSecondaryColor }
-                            Text { text: (groupDetails.avgEy || 0).toFixed(1) + "%"; font: Theme.bodyFont; color: Theme.dyeEyColor }
+                            Tr { key: "autofavoriteinfo.avgey"; fallback: "Avg EY"; font: Theme.captionFont; color: Theme.textSecondaryColor; Accessible.ignored: true }
+                            Text { text: (groupDetails.avgEy || 0).toFixed(1) + "%"; font: Theme.bodyFont; color: Theme.dyeEyColor; Accessible.ignored: true }
                         }
                     }
                 }
@@ -438,6 +444,7 @@ Page {
                         fallback: "Beans"
                         font: Theme.subtitleFont
                         color: Theme.textColor
+                        Accessible.ignored: true
                     }
 
                     GridLayout {
@@ -446,17 +453,17 @@ Page {
                         rowSpacing: Theme.spacingSmall
                         Layout.fillWidth: true
 
-                        Tr { key: "shotdetail.roaster"; fallback: "Roaster:"; font: Theme.labelFont; color: Theme.textSecondaryColor; visible: beanBrand !== "" }
-                        Text { text: beanBrand; font: Theme.labelFont; color: Theme.textColor; visible: beanBrand !== "" }
+                        Tr { key: "shotdetail.roaster"; fallback: "Roaster:"; font: Theme.labelFont; color: Theme.textSecondaryColor; visible: beanBrand !== ""; Accessible.ignored: true }
+                        Text { text: beanBrand; font: Theme.labelFont; color: Theme.textColor; visible: beanBrand !== ""; Accessible.ignored: true }
 
-                        Tr { key: "shotdetail.coffee"; fallback: "Coffee:"; font: Theme.labelFont; color: Theme.textSecondaryColor; visible: beanType !== "" }
-                        Text { text: beanType; font: Theme.labelFont; color: Theme.textColor; visible: beanType !== "" }
+                        Tr { key: "shotdetail.coffee"; fallback: "Coffee:"; font: Theme.labelFont; color: Theme.textSecondaryColor; visible: beanType !== ""; Accessible.ignored: true }
+                        Text { text: beanType; font: Theme.labelFont; color: Theme.textColor; visible: beanType !== ""; Accessible.ignored: true }
 
-                        Tr { key: "shotdetail.roastdate"; fallback: "Roast Date:"; font: Theme.labelFont; color: Theme.textSecondaryColor; visible: _hasRoastDate }
-                        Text { text: shotData.roastDate || ""; font: Theme.labelFont; color: Theme.textColor; visible: _hasRoastDate }
+                        Tr { key: "shotdetail.roastdate"; fallback: "Roast Date:"; font: Theme.labelFont; color: Theme.textSecondaryColor; visible: _hasRoastDate; Accessible.ignored: true }
+                        Text { text: shotData.roastDate || ""; font: Theme.labelFont; color: Theme.textColor; visible: _hasRoastDate; Accessible.ignored: true }
 
-                        Tr { key: "shotdetail.roastlevel"; fallback: "Roast Level:"; font: Theme.labelFont; color: Theme.textSecondaryColor; visible: _hasRoastLevel }
-                        Text { text: shotData.roastLevel || ""; font: Theme.labelFont; color: Theme.textColor; visible: _hasRoastLevel }
+                        Tr { key: "shotdetail.roastlevel"; fallback: "Roast Level:"; font: Theme.labelFont; color: Theme.textSecondaryColor; visible: _hasRoastLevel; Accessible.ignored: true }
+                        Text { text: shotData.roastLevel || ""; font: Theme.labelFont; color: Theme.textColor; visible: _hasRoastLevel; Accessible.ignored: true }
                     }
                 }
             }

@@ -350,14 +350,16 @@ Page {
         }
     }
 
-    // Settings popup
-    Popup {
+    // Settings dialog
+    Dialog {
         id: settingsPopup
         parent: Overlay.overlay
         anchors.centerIn: parent
         width: Math.min(parent.width * 0.85, Theme.scaled(320))
         modal: true
         padding: Theme.scaled(20)
+        title: TranslationManager.translate("autofavorites.settings", "Auto-Favorites Settings")
+        header: Item {} // Hide default Dialog header, we use our own
 
         onOpened: {
             if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
