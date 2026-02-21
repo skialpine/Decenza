@@ -570,9 +570,10 @@ double MachineState::scaleFlowRate() const {
 
 void MachineState::recordWeightSample() {
     if (!m_scale) return;
-    // Accumulate during extraction and the Ending phase (espresso still drips
-    // through the puck after the pump stops).  Stop once we leave Ending so
-    // Idle-phase scale noise doesn't pollute the LSLR buffer.
+    // Accumulate during EspressoPreheating (so a brief BLE phase glitch doesn't
+    // wipe the LSLR buffer mid-extraction), extraction, and the Ending phase
+    // (espresso still drips after the pump stops).  Stop once we leave Ending
+    // so Idle-phase scale noise doesn't pollute the LSLR buffer.
     if (m_phase != Phase::EspressoPreheating && m_phase != Phase::Preinfusion && m_phase != Phase::Pouring && m_phase != Phase::Ending) {
         m_weightSamples.clear();
         return;

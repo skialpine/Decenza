@@ -2964,7 +2964,7 @@ void Settings::addSawLearningPoint(double drip, double flowRate, const QString& 
     // Outlier rejection: when converged, skip learning points that deviate too far
     if (isSawConverged(scaleType)) {
         double expectedDrip = getExpectedDrip(flowRate);
-        double threshold = qMax(3.0, expectedDrip * 0.6);  // Tighter: 60% of expected or 3g floor
+        double threshold = qMax(3.0, expectedDrip);  // Reject if deviation exceeds expected drip (or 3g floor)
         if (qAbs(drip - expectedDrip) > threshold) {
             qDebug() << "[SAW] Outlier rejected: drip=" << drip
                      << "g expected=" << expectedDrip
