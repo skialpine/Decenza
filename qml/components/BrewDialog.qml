@@ -121,11 +121,10 @@ Dialog {
         // Announce dialog for accessibility
         if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
             var announcement = TranslationManager.translate("brewDialog.dialogAnnouncement", "Brew Settings dialog. Profile: ") + MainController.currentProfileName
-            if (Settings.dyeBeanBrand.length > 0 || Settings.dyeBeanType.length > 0) {
-                announcement += ". " + TranslationManager.translate("brewDialog.roasterCoffeeLabel", "Roaster: ")
-                if (Settings.dyeBeanBrand.length > 0) announcement += Settings.dyeBeanBrand
-                if (Settings.dyeBeanType.length > 0) announcement += " " + Settings.dyeBeanType
-            }
+            if (Settings.dyeBeanBrand.length > 0)
+                announcement += ". " + TranslationManager.translate("brewDialog.roasterAnnouncementLabel", "Roaster: ") + Settings.dyeBeanBrand
+            if (Settings.dyeBeanType.length > 0)
+                announcement += ". " + TranslationManager.translate("brewDialog.coffeeAnnouncementLabel", "Coffee: ") + Settings.dyeBeanType
             AccessibilityManager.announce(announcement)
         }
 
