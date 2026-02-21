@@ -37,7 +37,9 @@ void ShotHistoryStorage::close()
     if (m_db.isOpen()) {
         m_db.close();
     }
-    QSqlDatabase::removeDatabase(DB_CONNECTION_NAME);
+    if (QSqlDatabase::contains(DB_CONNECTION_NAME)) {
+        QSqlDatabase::removeDatabase(DB_CONNECTION_NAME);
+    }
 }
 
 bool ShotHistoryStorage::initialize(const QString& dbPath)

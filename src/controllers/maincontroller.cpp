@@ -2831,15 +2831,20 @@ void MainController::factoryResetAndQuit()
 {
     qWarning() << "MainController::factoryResetAndQuit() - Starting factory reset";
 
-    // 1. Close the shot database so files can be deleted
+    // 1. Stop the web server so it can't serve during wipe
+    if (m_shotServer) {
+        m_shotServer->stop();
+    }
+
+    // 2. Close the shot database so files can be deleted
     if (m_shotHistory) {
         m_shotHistory->close();
     }
 
-    // 2. Wipe all data
+    // 3. Wipe all data
     m_settings->factoryReset();
 
-    // 3. Platform-specific exit
+    // 4. Platform-specific exit
 #ifdef Q_OS_ANDROID
     // Launch system uninstall dialog
     QJniObject::callStaticMethod<void>(
@@ -2848,7 +2853,7 @@ void MainController::factoryResetAndQuit()
         "()V");
 #endif
 
-    // 4. Quit the app
+    // 5. Quit the app
     QCoreApplication::quit();
 }
 
