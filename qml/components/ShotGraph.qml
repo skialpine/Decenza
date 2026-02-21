@@ -28,7 +28,7 @@ ChartView {
         // Register fast renderers (QSGGeometryNode, pre-allocated VBO - no rebuilds)
         ShotDataModel.registerFastSeries(
             pressureRenderer, flowRenderer, temperatureRenderer,
-            weightRenderer, weightFlowRenderer
+            weightRenderer, weightFlowRenderer, resistanceRenderer
         )
     }
 
@@ -209,6 +209,17 @@ ChartView {
     }
 
     FastLineRenderer {
+        id: resistanceRenderer
+        x: chart.plotArea.x; y: chart.plotArea.y
+        width: chart.plotArea.width; height: chart.plotArea.height
+        color: Theme.resistanceColor
+        lineWidth: Theme.scaled(2)
+        minX: timeAxis.min; maxX: timeAxis.max
+        minY: pressureAxis.min; maxY: pressureAxis.max
+        visible: Settings.value("graph/showResistance", false)
+    }
+
+    FastLineRenderer {
         id: weightRenderer
         x: chart.plotArea.x; y: chart.plotArea.y
         width: chart.plotArea.width; height: chart.plotArea.height
@@ -367,6 +378,12 @@ ChartView {
                 spacing: Theme.spacingSmall
                 Rectangle { width: Theme.scaled(16); height: Theme.scaled(2); radius: Theme.scaled(1); color: Theme.weightFlowColor; anchors.verticalCenter: parent.verticalCenter }
                 Text { text: "Weight flow"; color: Theme.textSecondaryColor; font: Theme.captionFont }
+            }
+            Row {
+                visible: resistanceRenderer.visible
+                spacing: Theme.spacingSmall
+                Rectangle { width: Theme.scaled(16); height: Theme.scaled(2); radius: Theme.scaled(1); color: Theme.resistanceColor; anchors.verticalCenter: parent.verticalCenter }
+                Text { text: "Resistance"; color: Theme.textSecondaryColor; font: Theme.captionFont }
             }
 
             // Solid/dashed indicator

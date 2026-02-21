@@ -154,6 +154,7 @@ Page {
                     temperatureData: shotData.temperature || []
                     weightData: shotData.weight || []
                     weightFlowRateData: shotData.weightFlowRate || []
+                    resistanceData: shotData.resistance || []
                     phaseMarkers: shotData.phases || []
                     maxTime: shotData.duration || 60
                     Accessible.ignored: true
