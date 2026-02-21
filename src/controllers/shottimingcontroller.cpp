@@ -254,7 +254,12 @@ void ShotTimingController::onWeightSample(double weight, double flowRate, double
         }
         // Rolling average path: tolerates oscillations
         else if (m_settlingWindowCount >= kSettlingWindowSize) {
-            if (avgDrift < kSettlingAvgThreshold) {
+            // Sanity guard: drip only adds weight, so the settled average must be
+            // at least the weight when SAW triggered.  If it's below, the scale is
+            // still recovering from pump-vibration artifacts — don't declare stable.
+            bool avgBelowStop = (m_weightAtStop > 0 && avg < m_weightAtStop - 0.5);
+
+            if (avgDrift < kSettlingAvgThreshold && !avgBelowStop) {
                 // Average is stable - check how long
                 if (m_settlingAvgStableSince == 0)
                     m_settlingAvgStableSince = now;
@@ -268,7 +273,11 @@ void ShotTimingController::onWeightSample(double weight, double flowRate, double
                     onSettlingComplete();
                 }
             } else {
-                // Average still drifting - reset
+                // Average still drifting or below stop weight - reset
+                if (avgBelowStop && m_settlingAvgStableSince > 0)
+                    qDebug() << "[SAW] Avg" << QString::number(avg, 'f', 1)
+                             << "g below stop weight" << QString::number(m_weightAtStop, 'f', 1)
+                             << "g - not settling yet";
                 m_settlingAvgStableSince = 0;
             }
             m_lastSettlingAvg = avg;
@@ -454,7 +463,7 @@ void ShotTimingController::checkPerFrameWeight(int frameNumber)
 
 void ShotTimingController::startSettlingTimer()
 {
-    qDebug() << "[SAW] Starting settling (max 15s, or avg stable for" << kSettlingStableMs << "ms) - current weight:" << m_weight;
+    qDebug() << "[SAW] Starting settling (max 10s, or avg stable for" << kSettlingStableMs << "ms) - current weight:" << m_weight;
     m_lastStableWeight = m_weight;
     m_settlingPeakWeight = m_weight;
     m_lastWeightChangeTime = QDateTime::currentMSecsSinceEpoch();
@@ -465,7 +474,7 @@ void ShotTimingController::startSettlingTimer()
     m_lastSettlingAvg = 0.0;
     m_settlingAvgStableSince = 0;
 
-    m_settlingTimer.setInterval(15000);  // 15 second max timeout
+    m_settlingTimer.setInterval(10000);  // 10 second max timeout
     m_settlingTimer.start();
     emit sawSettlingChanged();
 }
