@@ -30,7 +30,7 @@ void FlowScale::tare() {
 }
 
 void FlowScale::addFlowSample(double flowRate, double deltaTime) {
-    // Skip integration if FlowScale is disabled
+    // Skip integration if FlowScale is disabled (only applies when FlowScale is the active scale)
     if (m_settings && !m_settings->useFlowScale())
         return;
 

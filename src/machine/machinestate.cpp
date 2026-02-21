@@ -287,17 +287,18 @@ void MachineState::updatePhase() {
                 bool startingExtraction = (oldPhase == Phase::EspressoPreheating);
 
                 if (startingExtraction) {
-                    // Extraction starting - reset and start scale timer (like de1app)
+                    // Extraction starting from preheating - properly start the shot timer
+                    startShotTimer();
+
+                    // Reset and start scale timer (like de1app)
                     if (m_scale) {
                         m_scale->resetTimer();
                         m_scale->startTimer();
                         qDebug() << "=== SCALE TIMER: Reset + Started (espresso extraction began) ===";
                     }
-                }
-
-                // Glitch recovery: restart timer without resetting state
-                // This preserves stop-at-weight triggers and cumulative tracking
-                if (!m_shotTimer->isActive()) {
+                } else if (!m_shotTimer->isActive()) {
+                    // Actual glitch recovery: restart timer without resetting state
+                    // This preserves stop-at-weight triggers and cumulative tracking
                     qDebug() << "=== TIMER RESTART: recovering from mid-espresso phase glitch ===";
                     // If m_shotStartTime is invalid (0 or in the future), reset it
                     qint64 now = QDateTime::currentMSecsSinceEpoch();

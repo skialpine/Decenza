@@ -2875,7 +2875,9 @@ void MainController::onShotSampleReceived(const ShotSample& sample) {
             // Shadow: feed FlowScale in parallel when a physical scale is active.
             // When FlowScale IS the active scale, MachineState already feeds it,
             // so only feed here when using a physical scale (to avoid double-counting).
-            if (m_flowScale && m_bleManager && m_bleManager->scaleDevice() &&
+            // Only runs when useFlowScale is enabled (virtual scale preference).
+            if (m_flowScale && m_settings && m_settings->useFlowScale() &&
+                m_bleManager && m_bleManager->scaleDevice() &&
                 m_bleManager->scaleDevice()->isConnected()) {
                 m_flowScale->addFlowSample(sample.groupFlow, deltaTime);
             }
@@ -3028,8 +3030,9 @@ void MainController::onScaleWeightChanged(double weight) {
     }
 
     // FlowScale comparison logging: log both physical scale and FlowScale estimated weight
-    // during espresso extraction to validate puck absorption model
-    if (m_flowScale && m_extractionStarted) {
+    // during espresso extraction to validate puck absorption model.
+    // Only logs when useFlowScale is enabled to avoid confusing 0.0g entries.
+    if (m_flowScale && m_extractionStarted && m_settings && m_settings->useFlowScale()) {
         MachineState::Phase phase = m_machineState->phase();
         if (phase == MachineState::Phase::Preinfusion ||
             phase == MachineState::Phase::Pouring ||
