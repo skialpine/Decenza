@@ -1594,7 +1594,7 @@ ApplicationWindow {
         completionMessage = message
         completionType = type
         completionOverlay.opacity = 1  // Instant (Behavior disabled when opacity is 0)
-        completionTimer.start()
+        completionTimer.restart()
     }
 
     // Save current page info before navigating to operation pages (steam/flush/water)
@@ -2029,6 +2029,21 @@ ApplicationWindow {
 
             // Update previous phase tracking
             root.previousPhase = phase
+
+            // Cancel any pending completion overlay when a new operation starts
+            // (e.g., second GHC flush within 3s of first flush ending)
+            if (phase === MachineStateType.Phase.Flushing ||
+                phase === MachineStateType.Phase.Steaming ||
+                phase === MachineStateType.Phase.HotWater ||
+                phase === MachineStateType.Phase.EspressoPreheating ||
+                phase === MachineStateType.Phase.Preinfusion ||
+                phase === MachineStateType.Phase.Pouring) {
+                if (completionTimer.running) {
+                    console.log("Cancelling pending completion - new operation started (phase=" + phase + ")")
+                    completionTimer.stop()
+                    completionOverlay.opacity = 0
+                }
+            }
 
             // Navigate to active operation pages (skip during page transition)
             if (phase === MachineStateType.Phase.EspressoPreheating ||
