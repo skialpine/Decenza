@@ -1313,7 +1313,8 @@ static const QMap<QString, QStringList>& knownEffectParams() {
             "scanlineIntensity", "scanlineSize", "noiseIntensity", "bloomStrength",
             "aberration", "jitterAmount", "vignetteStrength", "tintStrength",
             "flickerAmount", "glitchRate", "glowStart", "noiseSize",
-            "reflectionStrength"
+            "reflectionStrength",
+            "colorGain", "colorContrast", "colorSaturation", "hueShift"
         }}
         // Future: {"vhs", {"trackingError", "colorBleed", ...}}
     };

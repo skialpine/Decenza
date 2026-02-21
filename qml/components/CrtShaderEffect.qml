@@ -25,6 +25,11 @@ ShaderEffect {
     property real glowStart:         _p.glowStart         !== undefined ? _p.glowStart         : 0.0
     property real noiseSize:         _p.noiseSize         !== undefined ? _p.noiseSize         : 3.5
     property real reflectionStrength: _p.reflectionStrength !== undefined ? _p.reflectionStrength : 0.22
+    // Color grading (applied last)
+    property real colorGain:       _p.colorGain       !== undefined ? _p.colorGain       : 1.0
+    property real colorContrast:   _p.colorContrast   !== undefined ? _p.colorContrast   : 1.0
+    property real colorSaturation: _p.colorSaturation !== undefined ? _p.colorSaturation : 1.0
+    property real hueShift:        _p.hueShift        !== undefined ? _p.hueShift        : 0.0
 
     NumberAnimation on time {
         from: 0

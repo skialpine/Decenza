@@ -27,7 +27,12 @@ var shaderParamDefs = [
     { name: 'tintStrength',      label: 'Phosphor Tint',      min: 0, max: 1,    step: 0.01,  def: 1    },
     { name: 'flickerAmount',     label: 'Flicker',            min: 0, max: 0.2,  step: 0.005, def: 0.05 },
     { name: 'glitchRate',        label: 'Glitch Lines',       min: 0, max: 1,    step: 0.05,  def: 1    },
-    { name: 'reflectionStrength',label: 'Glass Reflection',   min: 0, max: 0.3,  step: 0.01,  def: 0.22 }
+    { name: 'reflectionStrength',label: 'Glass Reflection',   min: 0, max: 0.3,  step: 0.01,  def: 0.22 },
+    // Color grading
+    { name: 'colorGain',        label: 'Gain',               min: 0.5, max: 3,   step: 0.05,  def: 1    },
+    { name: 'colorContrast',    label: 'Contrast',           min: 0.5, max: 3,   step: 0.05,  def: 1    },
+    { name: 'colorSaturation',  label: 'Saturation',         min: 0, max: 3,     step: 0.05,  def: 1    },
+    { name: 'hueShift',         label: 'Hue Shift',          min: 0, max: 360,   step: 1,     def: 0    }
 ];
 
 function setDeviceShader(shaderId) {

@@ -23,6 +23,11 @@ layout(std140, binding = 0) uniform buf {
     float glowStart;          // 0-1,    threshold for overexposure bloom-to-white
     float noiseSize;          // 1-10,   noise detail (1=coarse ~16px, 10=fine ~1.6px)
     float reflectionStrength; // 0-0.3,  CRT glass reflection highlight
+    // Color grading (applied last, after all CRT effects)
+    float colorGain;          // 0.5-3,  brightness multiplier
+    float colorContrast;      // 0.5-3,  contrast around mid-gray
+    float colorSaturation;    // 0-3,    saturation (0=grayscale, 1=normal, 3=vivid)
+    float hueShift;           // 0-360,  hue rotation in degrees
 };
 
 layout(binding = 1) uniform sampler2D source;
@@ -151,6 +156,30 @@ void main() {
             color = mix(color + vec3(0.0, 0.06, 0.02), color, gBand);
         }
     }
+
+    // ── Color grading: gain, contrast, saturation, hue shift ──
+    // Gain: brightness multiplier
+    color *= colorGain;
+
+    // Contrast: scale around 0.5 mid-gray
+    color = (color - 0.5) * colorContrast + 0.5;
+
+    // Saturation: lerp between luminance and color
+    float satLum = dot(color, vec3(0.299, 0.587, 0.114));
+    color = mix(vec3(satLum), color, colorSaturation);
+
+    // Hue shift: rotate color around the luminance axis (1,1,1)/sqrt(3)
+    // using Rodrigues' rotation formula — fast, no RGB→HSV round-trip
+    if (hueShift > 0.5) {
+        float hueRad = hueShift * 6.28318 / 360.0;
+        float cosH = cos(hueRad);
+        float sinH = sin(hueRad);
+        vec3 k = vec3(0.57735);  // (1,1,1) normalized
+        float kDot = dot(k, color);
+        color = color * cosH + cross(k, color) * sinH + k * kDot * (1.0 - cosH);
+    }
+
+    color = clamp(color, 0.0, 1.0);
 
     fragColor = vec4(color, 1.0) * qt_Opacity;
 }
