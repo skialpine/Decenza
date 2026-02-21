@@ -539,4 +539,24 @@ public class StorageHelper {
             }
         }
     }
+
+    /**
+     * Request the system to uninstall this app.
+     * Shows the native Android uninstall confirmation dialog.
+     */
+    public static void requestUninstall() {
+        if (sActivity == null) {
+            Log.e(TAG, "Activity not initialized, cannot request uninstall");
+            return;
+        }
+
+        try {
+            Intent intent = new Intent(Intent.ACTION_DELETE);
+            intent.setData(Uri.parse("package:" + sActivity.getPackageName()));
+            sActivity.startActivity(intent);
+            Log.i(TAG, "Launched uninstall dialog");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to launch uninstall dialog: " + e.getMessage());
+        }
+    }
 }
