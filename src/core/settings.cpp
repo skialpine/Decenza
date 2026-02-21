@@ -1276,6 +1276,43 @@ void Settings::setActiveThemeName(const QString& name) {
     }
 }
 
+QString Settings::activeShader() const {
+    return m_settings.value("theme/activeShader", "").toString();
+}
+
+void Settings::setActiveShader(const QString& shader) {
+    if (activeShader() != shader) {
+        m_settings.setValue("theme/activeShader", shader);
+        emit activeShaderChanged();
+    }
+}
+
+QVariantMap Settings::shaderParams() const {
+    // Use full key paths to stay const-correct (beginGroup/childKeys are non-const)
+    static const QStringList paramNames = {
+        "scanlineIntensity", "scanlineSize", "noiseIntensity", "bloomStrength",
+        "aberration", "jitterAmount", "vignetteStrength", "tintStrength",
+        "flickerAmount", "glitchRate", "glowStart", "noiseSize",
+        "reflectionStrength"
+    };
+    QVariantMap params;
+    for (const QString& name : paramNames) {
+        const QString key = "shader/" + name;
+        if (m_settings.contains(key))
+            params[name] = m_settings.value(key).toDouble();
+    }
+    return params;
+}
+
+void Settings::setShaderParam(const QString& name, double value) {
+    QString key = "shader/" + name;
+    double current = m_settings.value(key, -99999.0).toDouble();
+    if (qAbs(current - value) > 0.0001) {
+        m_settings.setValue(key, value);
+        emit shaderParamsChanged();
+    }
+}
+
 double Settings::screenBrightness() const {
     return m_settings.value("theme/screenBrightness", 1.0).toDouble();
 }
@@ -3200,4 +3237,94 @@ QVariant Settings::value(const QString& key, const QVariant& defaultValue) const
 void Settings::setValue(const QString& key, const QVariant& value) {
     m_settings.setValue(key, value);
     emit valueChanged(key);
+}
+
+void Settings::factoryReset()
+{
+    qWarning() << "Settings::factoryReset() - WIPING ALL DATA";
+
+    // 1. Clear primary QSettings (favorites, presets, theme, all preferences)
+    m_settings.clear();
+    m_settings.sync();
+
+    // 2. Clear secondary QSettings store (used by AI, location, profilestorage)
+    QSettings defaultSettings;
+    defaultSettings.clear();
+    defaultSettings.sync();
+
+    // 3. Delete all data directories under AppDataLocation
+    QString appDataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QStringList dataDirs = {
+        "profiles",
+        "library",
+        "skins",
+        "translations",
+        "screensaver_videos"
+    };
+
+    for (const QString& subdir : dataDirs) {
+        QDir dir(appDataDir + "/" + subdir);
+        if (dir.exists()) {
+            qWarning() << "  Removing:" << dir.absolutePath();
+            if (!dir.removeRecursively())
+                qWarning() << "  WARNING: Failed to completely remove" << dir.absolutePath();
+        }
+    }
+
+    // 4. Delete shot database files
+    QStringList dbFiles = {"shots.db", "shots.db-wal", "shots.db-shm"};
+    for (const QString& dbFile : dbFiles) {
+        QString path = appDataDir + "/" + dbFile;
+        if (QFile::exists(path)) {
+            qWarning() << "  Removing:" << path;
+            if (!QFile::remove(path))
+                qWarning() << "  WARNING: Failed to remove" << path;
+        }
+    }
+
+    // 5. Delete log files in AppDataLocation
+    QStringList logFiles = {"debug.log", "crash.log", "steam_debug.log"};
+    for (const QString& logFile : logFiles) {
+        QString path = appDataDir + "/" + logFile;
+        if (QFile::exists(path)) {
+            if (!QFile::remove(path))
+                qWarning() << "  WARNING: Failed to remove" << path;
+        }
+    }
+
+    // 6. Delete public Documents directories
+    QString docsDir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    QStringList publicDirs = {"Decenza", "Decenza Backups", "ai_logs"};
+    for (const QString& pubDir : publicDirs) {
+        QDir dir(docsDir + "/" + pubDir);
+        if (dir.exists()) {
+            qWarning() << "  Removing:" << dir.absolutePath();
+            if (!dir.removeRecursively())
+                qWarning() << "  WARNING: Failed to completely remove" << dir.absolutePath();
+        }
+    }
+
+    // 7. Delete visualizer debug files in Documents
+    QStringList debugFiles = {
+        docsDir + "/last_upload.json",
+        docsDir + "/last_upload_debug.txt",
+        docsDir + "/last_upload_response.txt"
+    };
+    for (const QString& debugFile : debugFiles) {
+        if (QFile::exists(debugFile)) {
+            if (!QFile::remove(debugFile))
+                qWarning() << "  WARNING: Failed to remove" << debugFile;
+        }
+    }
+
+    // 8. Clear cache directory
+    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    QDir cache(cacheDir);
+    if (cache.exists()) {
+        qWarning() << "  Clearing cache:" << cache.absolutePath();
+        if (!cache.removeRecursively())
+            qWarning() << "  WARNING: Failed to completely clear cache";
+    }
+
+    qWarning() << "Settings::factoryReset() - COMPLETE";
 }
