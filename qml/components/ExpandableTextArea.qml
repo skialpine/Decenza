@@ -27,14 +27,26 @@ Rectangle {
     Layout.preferredHeight: inlineHeight
 
     // URL detection: convert plain text to StyledText with clickable links
+    function escapeHtml(text) {
+        return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    }
+
     function formatTextWithLinks(plainText) {
         if (!plainText) return ""
-        var escaped = plainText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-        escaped = escaped.replace(/\n/g, "<br>")
-        var urlRegex = /https?:\/\/[^\s<>&"')\]]+/g
-        return escaped.replace(urlRegex, function(url) {
-            return '<a href="' + url + '" style="color:' + Theme.primaryColor + '">' + url + '</a>'
-        })
+        // Run regex on original text before HTML escaping so URLs with & are not truncated
+        var urlRegex = /https?:\/\/[^\s<>"']+/g
+        var lastIndex = 0
+        var result = ""
+        var match
+        while ((match = urlRegex.exec(plainText)) !== null) {
+            result += escapeHtml(plainText.substring(lastIndex, match.index))
+            var url = match[0].replace(/[.,;:!?\])}]+$/, '')  // trim trailing punctuation
+            result += '<a href="' + url + '" style="color:' + Theme.primaryColor + '">' + escapeHtml(url) + '</a>'
+            lastIndex = match.index + url.length
+            urlRegex.lastIndex = lastIndex
+        }
+        result += escapeHtml(plainText.substring(lastIndex))
+        return result.replace(/\n/g, "<br>")
     }
 
     // Display mode: read-only Text with clickable URLs (visible when not focused and has text)
@@ -127,10 +139,6 @@ Rectangle {
                 }
             }
 
-            onEditingFinished: {
-                root.editingFinished()
-            }
-
             onActiveFocusChanged: {
                 if (!activeFocus) {
                     root.editingFinished()
@@ -161,7 +169,7 @@ Rectangle {
         z: 10
 
         Accessible.role: Accessible.Button
-        Accessible.name: "Expand editor"
+        Accessible.name: root.readOnly ? "View full text" : "Expand editor"
         Accessible.focusable: true
         Accessible.onPressAction: expandArea.clicked(null)
 

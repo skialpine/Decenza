@@ -227,10 +227,11 @@ void ShotDataModel::addSample(double time, double pressure, double flow, double 
     m_temperaturePoints.append(QPointF(time, temperature));
     m_temperatureMixPoints.append(QPointF(time, mixTemp));
 
-    // Resistance: pressure / flow (DSx2 formula)
+    // Resistance: pressure / flow (DSx2 formula), clamped to avoid spikes
+    // during phase transitions when flow is near zero
     double resistance = 0.0;
-    if (flow > 0.0) {
-        resistance = pressure / flow;
+    if (flow > 0.05) {
+        resistance = qMin(pressure / flow, 15.0);
     }
     m_resistancePoints.append(QPointF(time, resistance));
 

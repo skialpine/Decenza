@@ -212,11 +212,8 @@ ChartView {
         for (var i = 0; i < weightFlowRateData.length; i++) {
             if (weightFlowRateData[i].y > maxVal) maxVal = weightFlowRateData[i].y
         }
-        if (showResistance) {
-            for (var i = 0; i < resistanceData.length; i++) {
-                if (resistanceData[i].y > maxVal) maxVal = resistanceData[i].y
-            }
-        }
+        // Resistance excluded from axis scaling — values are clamped at source
+        // and clip at the axis boundary, matching the live graph behavior
         if (maxVal < 0.1) return 12  // fallback when no data
         // Round up to nice tick-friendly value
         var padded = maxVal * 1.15
