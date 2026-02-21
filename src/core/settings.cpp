@@ -2947,9 +2947,9 @@ double Settings::getExpectedDrip(double currentFlowRate) const {
 
     double expectedDrip = weightedDripSum / totalWeight;
 
-    // Clamp to reasonable range (0.5 to 15 grams)
+    // Clamp to reasonable range (0.5 to 20 grams)
     if (expectedDrip < 0.5) expectedDrip = 0.5;
-    if (expectedDrip > 15.0) expectedDrip = 15.0;
+    if (expectedDrip > 20.0) expectedDrip = 20.0;
 
     return expectedDrip;
 }
@@ -2964,7 +2964,7 @@ void Settings::addSawLearningPoint(double drip, double flowRate, const QString& 
     // Outlier rejection: when converged, skip learning points that deviate too far
     if (isSawConverged(scaleType)) {
         double expectedDrip = getExpectedDrip(flowRate);
-        double threshold = qMax(2.0, expectedDrip * 0.6);  // Tighter: 60% of expected or 2g floor
+        double threshold = qMax(3.0, expectedDrip * 0.6);  // Tighter: 60% of expected or 3g floor
         if (qAbs(drip - expectedDrip) > threshold) {
             qDebug() << "[SAW] Outlier rejected: drip=" << drip
                      << "g expected=" << expectedDrip
