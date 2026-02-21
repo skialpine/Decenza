@@ -121,11 +121,10 @@ Dialog {
         // Announce dialog for accessibility
         if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled) {
             var announcement = TranslationManager.translate("brewDialog.dialogAnnouncement", "Brew Settings dialog. Profile: ") + MainController.currentProfileName
-            if (Settings.dyeBeanBrand.length > 0 || Settings.dyeBeanType.length > 0) {
-                announcement += ". " + TranslationManager.translate("brewDialog.beansLabel", "Beans: ")
-                if (Settings.dyeBeanBrand.length > 0) announcement += Settings.dyeBeanBrand
-                if (Settings.dyeBeanType.length > 0) announcement += " " + Settings.dyeBeanType
-            }
+            if (Settings.dyeBeanBrand.length > 0)
+                announcement += ". " + TranslationManager.translate("brewDialog.roasterAnnouncementLabel", "Roaster: ") + Settings.dyeBeanBrand
+            if (Settings.dyeBeanType.length > 0)
+                announcement += ". " + TranslationManager.translate("brewDialog.coffeeAnnouncementLabel", "Coffee: ") + Settings.dyeBeanType
             AccessibilityManager.announce(announcement)
         }
 
@@ -158,9 +157,16 @@ Dialog {
     }
 
     contentItem: Item {
-        implicitHeight: mainColumn.implicitHeight * root.dialogScale
+        implicitHeight: Math.min(mainColumn.implicitHeight * root.dialogScale,
+                                 root.parent ? root.parent.height * 0.9 : mainColumn.implicitHeight * root.dialogScale)
         implicitWidth: Theme.scaled(520) * root.dialogScale
-        clip: true
+
+        Flickable {
+            anchors.fill: parent
+            contentHeight: mainColumn.implicitHeight * root.dialogScale
+            contentWidth: parent.width
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
 
         ColumnLayout {
             id: mainColumn
@@ -207,7 +213,7 @@ Dialog {
                 font: Theme.bodyFont
                 color: Theme.textSecondaryColor
                 Layout.alignment: Qt.AlignVCenter
-                Layout.preferredWidth: Theme.scaled(55)
+                Layout.preferredWidth: Theme.scaled(75)
                 Accessible.ignored: true
             }
 
@@ -228,7 +234,7 @@ Dialog {
             }
         }
 
-        // Bean info
+        // Roaster
         RowLayout {
             Layout.fillWidth: true
             Layout.leftMargin: Theme.scaled(20)
@@ -236,39 +242,47 @@ Dialog {
             spacing: Theme.scaled(4)
 
             Text {
-                text: TranslationManager.translate("brewDialog.beansLabel2", "Beans:")
+                text: TranslationManager.translate("brewDialog.roasterLabel", "Roaster:")
                 font: Theme.bodyFont
                 color: Theme.textSecondaryColor
                 Layout.alignment: Qt.AlignVCenter
-                Layout.preferredWidth: Theme.scaled(55)
+                Layout.preferredWidth: Theme.scaled(75)
                 Accessible.ignored: true
             }
 
             SuggestionField {
                 id: beanBrandInput
                 Layout.fillWidth: true
-                Layout.preferredWidth: Theme.scaled(130)
                 label: ""
-                accessibleName: TranslationManager.translate("brewDialog.beanBrand", "Bean brand")
+                accessibleName: TranslationManager.translate("brewDialog.roaster", "Roaster")
                 text: root.beanBrand
                 suggestions: root.getBeanBrandSuggestions()
                 onTextEdited: function(t) { root.beanBrand = t }
             }
+        }
+
+        // Coffee
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: Theme.scaled(20)
+            Layout.rightMargin: Theme.scaled(20)
+            Layout.topMargin: Theme.scaled(4)
+            spacing: Theme.scaled(4)
 
             Text {
-                text: "-"
+                text: TranslationManager.translate("brewDialog.coffeeLabel", "Coffee:")
                 font: Theme.bodyFont
                 color: Theme.textSecondaryColor
                 Layout.alignment: Qt.AlignVCenter
+                Layout.preferredWidth: Theme.scaled(75)
                 Accessible.ignored: true
             }
 
             SuggestionField {
                 id: beanTypeInput
                 Layout.fillWidth: true
-                Layout.preferredWidth: Theme.scaled(130)
                 label: ""
-                accessibleName: TranslationManager.translate("brewDialog.beanType", "Bean type")
+                accessibleName: TranslationManager.translate("brewDialog.coffee", "Coffee")
                 text: root.beanType
                 suggestions: root.getBeanTypeSuggestions()
                 onTextEdited: function(t) { root.beanType = t }
@@ -333,7 +347,7 @@ Dialog {
                         font: Theme.bodyFont
                         color: Theme.textSecondaryColor
                         Layout.alignment: Qt.AlignVCenter
-                        Layout.preferredWidth: Theme.scaled(55)
+                        Layout.preferredWidth: Theme.scaled(75)
                         Accessible.ignored: true  // Label for sighted users; input has accessibleName
                     }
 
@@ -388,7 +402,7 @@ Dialog {
                     font.italic: true
                     color: Theme.textSecondaryColor
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.leftMargin: Theme.scaled(55) + Theme.scaled(8)
+                    Layout.leftMargin: Theme.scaled(75) + Theme.scaled(8)
                     Accessible.role: Accessible.StaticText
                     Accessible.name: TranslationManager.translate("brewDialog.profileDefaultTemp", "Profile default temperature: %1 degrees").arg(root.profileTemperature.toFixed(1))
                 }
@@ -404,7 +418,7 @@ Dialog {
                     font: Theme.bodyFont
                     color: Theme.textSecondaryColor
                     Layout.alignment: Qt.AlignVCenter
-                    Layout.preferredWidth: Theme.scaled(55)
+                    Layout.preferredWidth: Theme.scaled(75)
                     Accessible.ignored: true  // Label for sighted users; input has accessibleName
                 }
 
@@ -457,7 +471,7 @@ Dialog {
                 font.italic: true
                 color: Theme.textSecondaryColor
                 Layout.alignment: Qt.AlignHCenter
-                Layout.leftMargin: Theme.scaled(55) + Theme.scaled(8)
+                Layout.leftMargin: Theme.scaled(75) + Theme.scaled(8)
                 Accessible.role: Accessible.StaticText
                 Accessible.name: TranslationManager.translate("brewDialog.profileRecommendedDose", "Profile recommended dose: %1 grams").arg(MainController.profileRecommendedDose.toFixed(1))
             }
@@ -471,7 +485,7 @@ Dialog {
                     text: TranslationManager.translate("brewDialog.ratioLabel", "Ratio: 1:")
                     font: Theme.bodyFont
                     color: Theme.textSecondaryColor
-                    Layout.preferredWidth: Theme.scaled(55)
+                    Layout.preferredWidth: Theme.scaled(75)
                     Accessible.ignored: true  // Label for sighted users; input has accessibleName
                 }
 
@@ -507,7 +521,7 @@ Dialog {
                         font: Theme.bodyFont
                         color: Theme.textSecondaryColor
                         Layout.alignment: Qt.AlignVCenter
-                        Layout.preferredWidth: Theme.scaled(55)
+                        Layout.preferredWidth: Theme.scaled(75)
                         Accessible.ignored: true  // Label for sighted users; input has accessibleName
                     }
 
@@ -564,13 +578,13 @@ Dialog {
                     font.italic: true
                     color: Theme.textSecondaryColor
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.leftMargin: Theme.scaled(55) + Theme.scaled(8)
+                    Layout.leftMargin: Theme.scaled(75) + Theme.scaled(8)
                     Accessible.role: Accessible.StaticText
                     Accessible.name: qsTr("Profile default yield: %1 grams").arg(root.profileTargetWeight.toFixed(0))
                 }
             }
 
-            // Grinder and setting input (only shown when Beans feature is enabled)
+            // Grinder and setting input
             RowLayout {
                 Layout.fillWidth: true
                 spacing: Theme.scaled(4)
@@ -580,7 +594,7 @@ Dialog {
                     font: Theme.bodyFont
                     color: Theme.textSecondaryColor
                     Layout.alignment: Qt.AlignVCenter
-                    Layout.preferredWidth: Theme.scaled(65)
+                    Layout.preferredWidth: Theme.scaled(75)
                     Accessible.ignored: true  // Label for sighted users; inputs have accessibleName
                 }
 
@@ -724,5 +738,6 @@ Dialog {
             }
         }
         } // ColumnLayout (mainColumn)
+        } // Flickable
     } // Item (contentItem)
 }
