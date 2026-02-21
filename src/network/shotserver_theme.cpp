@@ -19,6 +19,9 @@ QJsonObject ShotServer::buildThemeJson() const
     // Active theme name
     result["activeThemeName"] = m_settings->activeThemeName();
 
+    // Screen effect (structured: active + per-effect params)
+    result["screenEffect"] = m_settings->screenEffectJson();
+
     // All colors
     QJsonObject colors;
     QVariantMap themeColors = m_settings->customThemeColors();
@@ -124,6 +127,45 @@ void ShotServer::handleThemeApi(QTcpSocket* socket, const QString& method,
     if (path == "/api/theme" && method == "GET") {
         QJsonDocument doc(buildThemeJson());
         sendJson(socket, doc.toJson(QJsonDocument::Compact));
+        return;
+    }
+
+    // GET /api/theme/shader - get active shader
+    if (path == "/api/theme/shader" && method == "GET") {
+        QJsonObject resp;
+        resp["shader"] = m_settings->activeShader();
+        sendJson(socket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+        return;
+    }
+
+    // POST /api/theme/shader - set active shader (empty string = none)
+    if (path == "/api/theme/shader" && method == "POST") {
+        QJsonObject obj = QJsonDocument::fromJson(body).object();
+        QString shader = obj["shader"].toString();
+        m_settings->setActiveShader(shader);
+        QJsonObject resp;
+        resp["ok"] = true;
+        resp["shader"] = shader;
+        sendJson(socket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+        return;
+    }
+
+    // GET /api/theme/shader/params - get all shader parameters
+    if (path == "/api/theme/shader/params" && method == "GET") {
+        QJsonObject resp = QJsonObject::fromVariantMap(m_settings->shaderParams());
+        sendJson(socket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
+        return;
+    }
+
+    // POST /api/theme/shader/params - set one or more shader parameters
+    if (path == "/api/theme/shader/params" && method == "POST") {
+        QJsonObject obj = QJsonDocument::fromJson(body).object();
+        for (auto it = obj.begin(); it != obj.end(); ++it) {
+            m_settings->setShaderParam(it.key(), it.value().toDouble());
+        }
+        QJsonObject resp;
+        resp["ok"] = true;
+        sendJson(socket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
         return;
     }
 

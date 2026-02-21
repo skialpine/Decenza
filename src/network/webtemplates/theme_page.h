@@ -8,6 +8,8 @@
 #include "theme_css.h"
 #include "theme_html.h"
 #include "theme_js.h"
+#include "shader_css.h"
+#include "shader_js.h"
 
 inline QString generateThemePageHtml(const QString& deviceId = QString())
 {
@@ -25,6 +27,7 @@ inline QString generateThemePageHtml(const QString& deviceId = QString())
     html += WEB_CSS_MENU;
     html += WEB_CSS_THEME_EDITOR;
     html += WEB_CSS_THEME_ACTIONS;
+    html += WEB_CSS_SHADERS;
 
     html += R"HTML(
 </style>
@@ -65,6 +68,7 @@ inline QString generateThemePageHtml(const QString& deviceId = QString())
     html += WEB_JS_MENU;
     html += WEB_JS_THEME_EDITOR;
     html += WEB_JS_THEME_LIBRARY;
+    html += WEB_JS_SHADERS;
 
     html += R"HTML(
 </script>

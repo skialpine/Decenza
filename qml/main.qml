@@ -711,6 +711,10 @@ ApplicationWindow {
         anchors.fill: parent
         initialItem: idlePage
 
+        // CRT shader: render to FBO and process through GPU shader
+        layer.enabled: Settings.activeShader === "crt"
+        layer.effect: CrtShaderEffect {}
+
         // Default: instant transitions (no animation)
         pushEnter: Transition {}
         pushExit: Transition {}
@@ -822,6 +826,17 @@ ApplicationWindow {
         Component {
             id: profileInfoPage
             ProfileInfoPage {}
+        }
+
+        // Status bar (inside pageStack so it's included in the CRT shader FBO)
+        StatusBar {
+            id: statusBar
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: Theme.statusBarHeight
+            z: 600
+            visible: !screensaverActive
         }
     }
 
@@ -1639,6 +1654,13 @@ ApplicationWindow {
         }
     }
 
+    // CRT / Pip-Boy shader overlay (renders above all content including status bar)
+    CrtOverlay {
+        id: crtOverlay
+        anchors.fill: parent
+        z: 950  // Above statusBar (600), below touch capture (1000)
+    }
+
     // Espresso stop reason overlay (shown on top of any page)
     property string stopReason: ""  // "manual", "weight", "machine", ""
     property bool stopOverlayVisible: false
@@ -1950,17 +1972,6 @@ ApplicationWindow {
         id: scanDelayTimer
         interval: 1000  // Give direct connect time, then ensure scan is running
         onTriggered: BLEManager.startScan()
-    }
-
-    // Status bar overlay (hidden during screensaver)
-    StatusBar {
-        id: statusBar
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: Theme.statusBarHeight
-        z: 600  // Above completionOverlay (500)
-        visible: !screensaverActive
     }
 
     // Track previous phase to detect operation starts

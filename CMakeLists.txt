@@ -53,6 +53,14 @@ find_package(Qt6 REQUIRED COMPONENTS
     Positioning
 )
 
+# Optional: ShaderTools (for GPU CRT/Pip-Boy shader effect)
+find_package(Qt6 QUIET COMPONENTS ShaderTools)
+if(Qt6ShaderTools_FOUND)
+    message(STATUS "Qt6ShaderTools found - GPU shader effects enabled")
+else()
+    message(STATUS "Qt6ShaderTools not found - GPU shader effects disabled (Canvas fallback)")
+endif()
+
 # Optional: Quick3D (only used for screensavers)
 if(ENABLE_QUICK3D)
     find_package(Qt6 QUIET COMPONENTS Quick3D)
@@ -477,6 +485,8 @@ set(QML_FILES
     qml/components/UnsavedChangesDialog.qml
     qml/components/SwipeableArea.qml
     qml/components/CrashReportDialog.qml
+    qml/components/CrtOverlay.qml
+    qml/components/CrtShaderEffect.qml
     qml/components/ReportAdviceDialog.qml
 
     qml/components/layout/LayoutItemDelegate.qml
@@ -536,6 +546,16 @@ qt_add_qml_module(Decenza_DE1
     QML_FILES ${QML_FILES}
     NO_GENERATE_EXTRA_QMLDIRS
 )
+
+# Compile CRT shader for GPU effect (requires ShaderTools)
+if(Qt6ShaderTools_FOUND)
+    qt_add_shaders(Decenza_DE1 "crt_shaders"
+        BATCHABLE
+        PREFIX "/"
+        FILES
+            shaders/crt.frag
+    )
+endif()
 
 # Increment version code on every build.
 # BYPRODUCTS tells Ninja that this target produces version_code.cpp, so dependents

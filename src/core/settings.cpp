@@ -113,6 +113,25 @@ Settings::Settings(QObject* parent)
         m_settings.setValue("bean/presets", QJsonDocument(emptyPresets).toJson());
     }
 
+    // Migrate flat shader/* keys to shader/crt/* (one-time, v1.5.x → v1.6)
+    if (m_settings.contains("shader/scanlineIntensity") && !m_settings.contains("shader/migrated")) {
+        static const QStringList crtParams = {
+            "scanlineIntensity", "scanlineSize", "noiseIntensity", "bloomStrength",
+            "aberration", "jitterAmount", "vignetteStrength", "tintStrength",
+            "flickerAmount", "glitchRate", "glowStart", "noiseSize",
+            "reflectionStrength"
+        };
+        for (const QString& name : crtParams) {
+            const QString oldKey = "shader/" + name;
+            if (m_settings.contains(oldKey)) {
+                m_settings.setValue("shader/crt/" + name, m_settings.value(oldKey));
+                m_settings.remove(oldKey);
+            }
+        }
+        m_settings.setValue("shader/migrated", true);
+        qDebug() << "Settings: Migrated flat shader params to shader/crt/ namespace";
+    }
+
     // Load brew parameter overrides (persistent)
     m_hasTemperatureOverride = m_settings.value("brew/hasTemperatureOverride", false).toBool();
     if (m_hasTemperatureOverride) {
@@ -1287,29 +1306,81 @@ void Settings::setActiveShader(const QString& shader) {
     }
 }
 
-QVariantMap Settings::shaderParams() const {
-    // Use full key paths to stay const-correct (beginGroup/childKeys are non-const)
-    static const QStringList paramNames = {
-        "scanlineIntensity", "scanlineSize", "noiseIntensity", "bloomStrength",
-        "aberration", "jitterAmount", "vignetteStrength", "tintStrength",
-        "flickerAmount", "glitchRate", "glowStart", "noiseSize",
-        "reflectionStrength"
+// Known parameter names per effect (for const-correct enumeration)
+static const QMap<QString, QStringList>& knownEffectParams() {
+    static const QMap<QString, QStringList> params = {
+        {"crt", {
+            "scanlineIntensity", "scanlineSize", "noiseIntensity", "bloomStrength",
+            "aberration", "jitterAmount", "vignetteStrength", "tintStrength",
+            "flickerAmount", "glitchRate", "glowStart", "noiseSize",
+            "reflectionStrength"
+        }}
+        // Future: {"vhs", {"trackingError", "colorBleed", ...}}
     };
+    return params;
+}
+
+QVariantMap Settings::shaderParams() const {
+    return effectParams(activeShader());
+}
+
+void Settings::setShaderParam(const QString& name, double value) {
+    setEffectParam(activeShader(), name, value);
+}
+
+QVariantMap Settings::effectParams(const QString& effectId) const {
+    if (effectId.isEmpty()) return {};
+    const auto& allParams = knownEffectParams();
+    if (!allParams.contains(effectId)) return {};
+
     QVariantMap params;
-    for (const QString& name : paramNames) {
-        const QString key = "shader/" + name;
+    for (const QString& name : allParams[effectId]) {
+        const QString key = "shader/" + effectId + "/" + name;
         if (m_settings.contains(key))
             params[name] = m_settings.value(key).toDouble();
     }
     return params;
 }
 
-void Settings::setShaderParam(const QString& name, double value) {
-    QString key = "shader/" + name;
+void Settings::setEffectParam(const QString& effectId, const QString& name, double value) {
+    if (effectId.isEmpty()) return;
+    const QString key = "shader/" + effectId + "/" + name;
     double current = m_settings.value(key, -99999.0).toDouble();
     if (qAbs(current - value) > 0.0001) {
         m_settings.setValue(key, value);
         emit shaderParamsChanged();
+    }
+}
+
+QJsonObject Settings::screenEffectJson() const {
+    QJsonObject result;
+    result["active"] = activeShader();
+
+    QJsonObject effects;
+    const auto& allParams = knownEffectParams();
+    for (auto it = allParams.begin(); it != allParams.end(); ++it) {
+        QVariantMap params = effectParams(it.key());
+        if (!params.isEmpty()) {
+            effects[it.key()] = QJsonObject::fromVariantMap(params);
+        }
+    }
+    result["effects"] = effects;
+    return result;
+}
+
+void Settings::applyScreenEffect(const QJsonObject& screenEffect) {
+    // Set active effect (empty = none)
+    QString active = screenEffect["active"].toString();
+    setActiveShader(active);
+
+    // Restore per-effect params
+    QJsonObject effects = screenEffect["effects"].toObject();
+    for (auto it = effects.begin(); it != effects.end(); ++it) {
+        QString effectId = it.key();
+        QJsonObject params = it.value().toObject();
+        for (auto pit = params.begin(); pit != params.end(); ++pit) {
+            setEffectParam(effectId, pit.key(), pit.value().toDouble());
+        }
     }
 }
 
@@ -1493,6 +1564,7 @@ void Settings::applyPresetTheme(const QString& name) {
         palette["weightColor"] = "#a2693d";
 
         setCustomThemeColors(palette);
+        setActiveShader("");  // Default theme has no screen effect
         setActiveThemeName(name);
         return;
     }
@@ -1510,6 +1582,11 @@ void Settings::applyPresetTheme(const QString& name) {
                 palette[key] = colors[key].toString();
             }
             setCustomThemeColors(palette);
+            // Restore screen effect (or disable for old presets without it)
+            if (obj.contains("screenEffect"))
+                applyScreenEffect(obj["screenEffect"].toObject());
+            else
+                setActiveShader("");
             setActiveThemeName(name);
             return;
         }
@@ -1537,6 +1614,7 @@ void Settings::saveCurrentTheme(const QString& name) {
     QJsonObject newTheme;
     newTheme["name"] = name;
     newTheme["colors"] = QJsonObject::fromVariantMap(customThemeColors());
+    newTheme["screenEffect"] = screenEffectJson();
     userThemes.append(newTheme);
 
     // Save to settings

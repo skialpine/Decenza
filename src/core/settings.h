@@ -392,11 +392,15 @@ public:
     QString activeThemeName() const;
     void setActiveThemeName(const QString& name);
 
-    // Screen shaders (empty string = none, "crt" = CRT/Pip-Boy)
+    // Screen effects (empty string = none, "crt" = CRT/Pip-Boy, extensible for future effects)
     QString activeShader() const;
     void setActiveShader(const QString& shader);
-    QVariantMap shaderParams() const;
-    Q_INVOKABLE void setShaderParam(const QString& name, double value);
+    QVariantMap shaderParams() const;  // Returns active effect's params
+    Q_INVOKABLE void setShaderParam(const QString& name, double value);  // Sets on active effect
+    Q_INVOKABLE QVariantMap effectParams(const QString& effectId) const;  // Get any effect's params
+    Q_INVOKABLE void setEffectParam(const QString& effectId, const QString& name, double value);
+    QJsonObject screenEffectJson() const;       // Build screenEffect block for theme saving
+    void applyScreenEffect(const QJsonObject& screenEffect);  // Restore from theme JSON
 
     Q_INVOKABLE void setThemeColor(const QString& colorName, const QString& colorValue);
     Q_INVOKABLE QString getThemeColor(const QString& colorName) const;
