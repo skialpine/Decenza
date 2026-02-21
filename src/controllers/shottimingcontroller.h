@@ -138,10 +138,10 @@ private:
 
     // Rolling average for settling stability detection
     // Tolerates oscillations by checking if the average weight has stopped drifting
-    static constexpr int kSettlingWindowSize = 6;    // ~1.5s of samples at ~4Hz
-    static constexpr double kSettlingAvgThreshold = 0.3; // Max avg drift to declare stable (g)
-    static constexpr int kSettlingStableMs = 1000;   // How long avg must be stable (ms)
-    double m_settlingWindow[kSettlingWindowSize] = {};
+    static constexpr int SETTLING_WINDOW_SIZE = 6;    // ~1.5s of samples at ~4Hz
+    static constexpr double SETTLING_AVG_THRESHOLD = 0.3; // Max avg drift to declare stable (g)
+    static constexpr int SETTLING_STABLE_MS = 1000;   // How long avg must be stable (ms)
+    double m_settlingWindow[SETTLING_WINDOW_SIZE] = {};
     int m_settlingWindowCount = 0;
     int m_settlingWindowIndex = 0;
     double m_lastSettlingAvg = 0.0;

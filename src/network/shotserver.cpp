@@ -601,7 +601,7 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
     else if (path == "/api/shots/delete" && method == "POST") {
         int bodyStart = request.indexOf("\r\n\r\n");
         if (bodyStart == -1) {
-            sendJson(socket, R"({"error":"Invalid request"})");
+            sendResponse(socket, 400, "application/json", R"({"error":"Invalid request"})");
             return;
         }
         QByteArray body = request.mid(bodyStart + 4);

@@ -1503,6 +1503,7 @@ ApplicationWindow {
     // Completion overlay
     property string completionMessage: ""
     property string completionType: ""  // "steam", "hotwater", "flush"
+    property bool completionPending: false
 
     // Translatable completion messages
     Tr { id: trSteamComplete; key: "main.completion.steam"; fallback: "Steam Complete"; visible: false }
@@ -1572,6 +1573,7 @@ ApplicationWindow {
         id: completionTimer
         interval: 3000
         onTriggered: {
+            completionPending = false
             completionOverlay.opacity = 0
 
             // Return to saved page if set, otherwise go to idlePage
@@ -1593,6 +1595,7 @@ ApplicationWindow {
     function showCompletion(message, type) {
         completionMessage = message
         completionType = type
+        completionPending = true
         completionOverlay.opacity = 1  // Instant (Behavior disabled when opacity is 0)
         completionTimer.restart()
     }
@@ -2038,8 +2041,9 @@ ApplicationWindow {
                 phase === MachineStateType.Phase.EspressoPreheating ||
                 phase === MachineStateType.Phase.Preinfusion ||
                 phase === MachineStateType.Phase.Pouring) {
-                if (completionTimer.running) {
+                if (completionPending) {
                     console.log("Cancelling pending completion - new operation started (phase=" + phase + ")")
+                    completionPending = false
                     completionTimer.stop()
                     completionOverlay.opacity = 0
                 }

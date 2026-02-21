@@ -934,10 +934,12 @@ QString ShotServer::generateShotDetailPage(qint64 shotId) const
     // Escape for embedding in JavaScript string literals (inside double quotes)
     auto jsEscape = [](const QString& s) -> QString {
         QString r = s;
+        r.replace(QLatin1String("%"), QLatin1String("%%"));    // Must be first: prevent %1-%99 arg placeholders
         r.replace(QLatin1String("\\"), QLatin1String("\\\\"));
         r.replace(QLatin1String("\""), QLatin1String("\\\""));
         r.replace(QLatin1String("\n"), QLatin1String("\\n"));
         r.replace(QLatin1String("\r"), QLatin1String(""));
+        r.replace(QLatin1String("<"), QLatin1String("\\u003c")); // Prevent script tag breakout
         return r;
     };
 
@@ -1502,7 +1504,6 @@ QString ShotServer::generateShotDetailPage(qint64 shotId) const
 
             // Build edit form for metrics bar using DOM
             // Note: shotData values are server-escaped and trusted (from our own database)
-            metricsBar.innerHTML = '';
             var metricsHtml =
                 '<div class="metric-card"><input type="number" class="edit-input" id="editDose" step="0.1" value="' + shotData.doseWeight + '" oninput="autoCalcEY()"><div class="label">Dose (g)</div></div>' +
                 '<div class="metric-card"><input type="number" class="edit-input" id="editYield" step="0.1" value="' + shotData.finalWeight + '" oninput="autoCalcEY()"><div class="label">Yield (g)</div></div>' +

@@ -14,7 +14,7 @@ ShotTimingController::ShotTimingController(DE1Device* device, QObject* parent)
     connect(&m_displayTimer, &QTimer::timeout, this, &ShotTimingController::updateDisplayTimer);
 
     // SAW learning settling timer - waits for weight to stabilize after shot ends
-    // Interval set by startSettlingTimer() when settling begins (currently 15s max)
+    // Interval set by startSettlingTimer() when settling begins (currently 10s max)
     m_settlingTimer.setSingleShot(true);
     connect(&m_settlingTimer, &QTimer::timeout, this, &ShotTimingController::onSettlingComplete);
 }
@@ -218,8 +218,8 @@ void ShotTimingController::onWeightSample(double weight, double flowRate, double
         // Rolling average stability detection
         // Add sample to circular buffer
         m_settlingWindow[m_settlingWindowIndex] = weight;
-        m_settlingWindowIndex = (m_settlingWindowIndex + 1) % kSettlingWindowSize;
-        if (m_settlingWindowCount < kSettlingWindowSize)
+        m_settlingWindowIndex = (m_settlingWindowIndex + 1) % SETTLING_WINDOW_SIZE;
+        if (m_settlingWindowCount < SETTLING_WINDOW_SIZE)
             m_settlingWindowCount++;
 
         qint64 now = QDateTime::currentMSecsSinceEpoch();
@@ -253,19 +253,19 @@ void ShotTimingController::onWeightSample(double weight, double flowRate, double
             onSettlingComplete();
         }
         // Rolling average path: tolerates oscillations
-        else if (m_settlingWindowCount >= kSettlingWindowSize) {
+        else if (m_settlingWindowCount >= SETTLING_WINDOW_SIZE) {
             // Sanity guard: drip only adds weight, so the settled average must be
             // at least the weight when SAW triggered.  If it's below, the scale is
             // still recovering from pump-vibration artifacts — don't declare stable.
             bool avgBelowStop = (m_weightAtStop > 0 && avg < m_weightAtStop - 0.5);
 
-            if (avgDrift < kSettlingAvgThreshold && !avgBelowStop) {
+            if (avgDrift < SETTLING_AVG_THRESHOLD && !avgBelowStop) {
                 // Average is stable - check how long
                 if (m_settlingAvgStableSince == 0)
                     m_settlingAvgStableSince = now;
 
                 qint64 avgStableMs = now - m_settlingAvgStableSince;
-                if (avgStableMs >= kSettlingStableMs) {
+                if (avgStableMs >= SETTLING_STABLE_MS) {
                     qDebug() << "[SAW] Weight settled by avg at" << QString::number(avg, 'f', 1)
                              << "g (avg stable for" << avgStableMs << "ms, current:" << weight << "g)";
                     m_weight = avg;  // Use the average as final weight
@@ -346,7 +346,7 @@ void ShotTimingController::updateDisplayTimer()
         // Rolling average path: check if avg has been stable long enough
         else if (m_settlingAvgStableSince > 0) {
             qint64 avgStableMs = now - m_settlingAvgStableSince;
-            if (avgStableMs >= kSettlingStableMs) {
+            if (avgStableMs >= SETTLING_STABLE_MS) {
                 double avg = 0;
                 for (int i = 0; i < m_settlingWindowCount; i++)
                     avg += m_settlingWindow[i];
@@ -463,7 +463,7 @@ void ShotTimingController::checkPerFrameWeight(int frameNumber)
 
 void ShotTimingController::startSettlingTimer()
 {
-    qDebug() << "[SAW] Starting settling (max 10s, or avg stable for" << kSettlingStableMs << "ms) - current weight:" << m_weight;
+    qDebug() << "[SAW] Starting settling (max 10s, or avg stable for" << SETTLING_STABLE_MS << "ms) - current weight:" << m_weight;
     m_lastStableWeight = m_weight;
     m_settlingPeakWeight = m_weight;
     m_lastWeightChangeTime = QDateTime::currentMSecsSinceEpoch();
@@ -471,7 +471,7 @@ void ShotTimingController::startSettlingTimer()
     // Initialize rolling average window
     m_settlingWindowCount = 0;
     m_settlingWindowIndex = 0;
-    m_lastSettlingAvg = 0.0;
+    m_lastSettlingAvg = m_weight;
     m_settlingAvgStableSince = 0;
 
     m_settlingTimer.setInterval(10000);  // 10 second max timeout
