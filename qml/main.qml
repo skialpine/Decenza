@@ -1503,6 +1503,7 @@ ApplicationWindow {
     // Completion overlay
     property string completionMessage: ""
     property string completionType: ""  // "steam", "hotwater", "flush"
+    property bool completionPending: false
 
     // Translatable completion messages
     Tr { id: trSteamComplete; key: "main.completion.steam"; fallback: "Steam Complete"; visible: false }
@@ -1572,6 +1573,7 @@ ApplicationWindow {
         id: completionTimer
         interval: 3000
         onTriggered: {
+            completionPending = false
             completionOverlay.opacity = 0
 
             // Return to saved page if set, otherwise go to idlePage
@@ -1593,8 +1595,9 @@ ApplicationWindow {
     function showCompletion(message, type) {
         completionMessage = message
         completionType = type
+        completionPending = true
         completionOverlay.opacity = 1  // Instant (Behavior disabled when opacity is 0)
-        completionTimer.start()
+        completionTimer.restart()
     }
 
     // Save current page info before navigating to operation pages (steam/flush/water)
@@ -2029,6 +2032,22 @@ ApplicationWindow {
 
             // Update previous phase tracking
             root.previousPhase = phase
+
+            // Cancel any pending completion overlay when a new operation starts
+            // (e.g., second GHC flush within 3s of first flush ending)
+            if (phase === MachineStateType.Phase.Flushing ||
+                phase === MachineStateType.Phase.Steaming ||
+                phase === MachineStateType.Phase.HotWater ||
+                phase === MachineStateType.Phase.EspressoPreheating ||
+                phase === MachineStateType.Phase.Preinfusion ||
+                phase === MachineStateType.Phase.Pouring) {
+                if (completionPending) {
+                    console.log("Cancelling pending completion - new operation started (phase=" + phase + ")")
+                    completionPending = false
+                    completionTimer.stop()
+                    completionOverlay.opacity = 0
+                }
+            }
 
             // Navigate to active operation pages (skip during page transition)
             if (phase === MachineStateType.Phase.EspressoPreheating ||
