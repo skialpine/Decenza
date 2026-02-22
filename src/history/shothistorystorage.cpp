@@ -668,8 +668,8 @@ ShotFilter ShotHistoryStorage::parseFilterMap(const QVariantMap& filterMap)
     filter.grinderModel = filterMap.value("grinderModel").toString();
     filter.grinderSetting = filterMap.value("grinderSetting").toString();
     filter.roastLevel = filterMap.value("roastLevel").toString();
-    filter.minEnjoyment = filterMap.value("minEnjoyment", 0).toInt();
-    filter.maxEnjoyment = filterMap.value("maxEnjoyment", 100).toInt();
+    filter.minEnjoyment = filterMap.value("minEnjoyment", -1).toInt();
+    filter.maxEnjoyment = filterMap.value("maxEnjoyment", -1).toInt();
     filter.minDose = filterMap.value("minDose", -1).toDouble();
     filter.maxDose = filterMap.value("maxDose", -1).toDouble();
     filter.minYield = filterMap.value("minYield", -1).toDouble();
@@ -715,11 +715,11 @@ QString ShotHistoryStorage::buildFilterQuery(const ShotFilter& filter, QVariantL
         conditions << "roast_level = ?";
         bindValues << filter.roastLevel;
     }
-    if (filter.minEnjoyment > 0) {
+    if (filter.minEnjoyment >= 0) {
         conditions << "enjoyment >= ?";
         bindValues << filter.minEnjoyment;
     }
-    if (filter.maxEnjoyment < 100) {
+    if (filter.maxEnjoyment >= 0) {
         conditions << "enjoyment <= ?";
         bindValues << filter.maxEnjoyment;
     }

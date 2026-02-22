@@ -82,22 +82,22 @@ Page {
             // Syntax: keyword:N (exact), keyword:N-M (range), keyword:N+ (min only)
             var keywords = [
                 { pattern: /\brating:(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)\b/g, minKey: "minEnjoyment", maxKey: "maxEnjoyment" },
-                { pattern: /\brating:(\d+(?:\.\d+)?)\+\b/g, minKey: "minEnjoyment", maxKey: null },
+                { pattern: /\brating:(\d+(?:\.\d+)?)\+(?=\s|$)/g, minKey: "minEnjoyment", maxKey: null },
                 { pattern: /\brating:(\d+(?:\.\d+)?)\b/g, minKey: "minEnjoyment", maxKey: "maxEnjoyment", exact: true },
                 { pattern: /\bdose:(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)\b/g, minKey: "minDose", maxKey: "maxDose" },
-                { pattern: /\bdose:(\d+(?:\.\d+)?)\+\b/g, minKey: "minDose", maxKey: null },
+                { pattern: /\bdose:(\d+(?:\.\d+)?)\+(?=\s|$)/g, minKey: "minDose", maxKey: null },
                 { pattern: /\bdose:(\d+(?:\.\d+)?)\b/g, minKey: "minDose", maxKey: "maxDose", exact: true },
                 { pattern: /\byield:(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)\b/g, minKey: "minYield", maxKey: "maxYield" },
-                { pattern: /\byield:(\d+(?:\.\d+)?)\+\b/g, minKey: "minYield", maxKey: null },
+                { pattern: /\byield:(\d+(?:\.\d+)?)\+(?=\s|$)/g, minKey: "minYield", maxKey: null },
                 { pattern: /\byield:(\d+(?:\.\d+)?)\b/g, minKey: "minYield", maxKey: "maxYield", exact: true },
                 { pattern: /\btime:(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)\b/g, minKey: "minDuration", maxKey: "maxDuration" },
-                { pattern: /\btime:(\d+(?:\.\d+)?)\+\b/g, minKey: "minDuration", maxKey: null },
+                { pattern: /\btime:(\d+(?:\.\d+)?)\+(?=\s|$)/g, minKey: "minDuration", maxKey: null },
                 { pattern: /\btime:(\d+(?:\.\d+)?)\b/g, minKey: "minDuration", maxKey: "maxDuration", exact: true },
                 { pattern: /\btds:(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)\b/g, minKey: "minTds", maxKey: "maxTds" },
-                { pattern: /\btds:(\d+(?:\.\d+)?)\+\b/g, minKey: "minTds", maxKey: null },
+                { pattern: /\btds:(\d+(?:\.\d+)?)\+(?=\s|$)/g, minKey: "minTds", maxKey: null },
                 { pattern: /\btds:(\d+(?:\.\d+)?)\b/g, minKey: "minTds", maxKey: "maxTds", exact: true },
                 { pattern: /\bey:(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)\b/g, minKey: "minEy", maxKey: "maxEy" },
-                { pattern: /\bey:(\d+(?:\.\d+)?)\+\b/g, minKey: "minEy", maxKey: null },
+                { pattern: /\bey:(\d+(?:\.\d+)?)\+(?=\s|$)/g, minKey: "minEy", maxKey: null },
                 { pattern: /\bey:(\d+(?:\.\d+)?)\b/g, minKey: "minEy", maxKey: "maxEy", exact: true }
             ]
 
@@ -121,6 +121,9 @@ Page {
                     searchText = searchText.replace(match[0], "")
                 }
             }
+
+            // Strip any remaining keyword tokens (e.g. duplicate dose:18 dose:20)
+            searchText = searchText.replace(/\b(rating|dose|yield|time|tds|ey):\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?|\+)?/g, "")
 
             // Pass remaining text (after stripping keywords) as FTS search
             searchText = searchText.trim().replace(/\s+/g, " ")
@@ -296,6 +299,7 @@ Page {
                 text: TranslationManager.translate("shothistory.save", "Save")
                 accessibleName: TranslationManager.translate("shothistory.saveSearch", "Save current search")
                 enabled: searchField.text.trim().length > 0
+                         && Settings.savedSearches.indexOf(searchField.text.trim()) === -1
                 onClicked: Settings.addSavedSearch(searchField.text.trim())
             }
 
@@ -784,8 +788,10 @@ Page {
                 spacing: Theme.scaled(2)
 
                 delegate: Rectangle {
+                    readonly property bool _accessibilityMode: typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled
+
                     width: savedSearchesList.width
-                    height: Theme.scaled(44)
+                    height: Theme.scaled(44) + (_accessibilityMode ? Theme.scaled(40) : 0)
                     radius: Theme.scaled(6)
                     color: delegateTapArea.pressed ? Qt.darker(Theme.surfaceColor, 1.1) : "transparent"
 
@@ -794,49 +800,70 @@ Page {
                     Accessible.focusable: true
                     Accessible.onPressAction: delegateTapArea.clicked(null)
 
-                    RowLayout {
+                    ColumnLayout {
                         anchors.fill: parent
-                        anchors.leftMargin: Theme.scaled(10)
-                        anchors.rightMargin: Theme.scaled(4)
-                        spacing: Theme.spacingSmall
+                        spacing: 0
 
-                        Text {
-                            text: modelData
-                            font: Theme.bodyFont
-                            color: Theme.textColor
+                        RowLayout {
                             Layout.fillWidth: true
-                            elide: Text.ElideRight
-                            Accessible.ignored: true
-                        }
-
-                        // Delete button
-                        Rectangle {
-                            width: Theme.scaled(28)
-                            height: Theme.scaled(28)
-                            radius: Theme.scaled(14)
-                            color: deleteArea.pressed ? Qt.darker(Theme.errorColor, 1.2) : Theme.errorColor
-                            Accessible.role: Accessible.Button
-                            Accessible.name: TranslationManager.translate("shothistory.deleteSavedSearch", "Delete search: %1").arg(modelData)
-                            Accessible.focusable: true
-                            Accessible.onPressAction: deleteArea.clicked(null)
+                            Layout.preferredHeight: Theme.scaled(44)
+                            Layout.leftMargin: Theme.scaled(10)
+                            Layout.rightMargin: Theme.scaled(4)
+                            spacing: Theme.spacingSmall
 
                             Text {
-                                anchors.centerIn: parent
-                                text: "\u2715"
-                                font.pixelSize: Theme.scaled(14)
-                                font.bold: true
-                                color: "white"
+                                text: modelData
+                                font: Theme.bodyFont
+                                color: Theme.textColor
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
                                 Accessible.ignored: true
                             }
 
-                            MouseArea {
-                                id: deleteArea
-                                anchors.fill: parent
-                                onClicked: {
-                                    Settings.removeSavedSearch(modelData)
-                                    if (Settings.savedSearches.length === 0) {
-                                        savedSearchesDialog.close()
+                            // Inline delete button (hidden in accessibility mode)
+                            Rectangle {
+                                visible: !_accessibilityMode
+                                width: Theme.scaled(28)
+                                height: Theme.scaled(28)
+                                radius: Theme.scaled(14)
+                                color: deleteArea.pressed ? Qt.darker(Theme.errorColor, 1.2) : Theme.errorColor
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "\u2715"
+                                    font.pixelSize: Theme.scaled(14)
+                                    font.bold: true
+                                    color: "white"
+                                    Accessible.ignored: true
+                                }
+
+                                MouseArea {
+                                    id: deleteArea
+                                    anchors.fill: parent
+                                    onClicked: {
+                                        Settings.removeSavedSearch(modelData)
+                                        if (Settings.savedSearches.length === 0) {
+                                            savedSearchesDialog.close()
+                                        }
                                     }
+                                }
+                            }
+                        }
+
+                        // Separate delete button row for accessibility mode (outside row bounds)
+                        AccessibleButton {
+                            visible: _accessibilityMode
+                            text: TranslationManager.translate("shothistory.delete", "Delete")
+                            accessibleName: TranslationManager.translate("shothistory.deleteSavedSearch", "Delete search: %1").arg(modelData)
+                            destructive: true
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: Theme.scaled(36)
+                            Layout.leftMargin: Theme.scaled(10)
+                            Layout.rightMargin: Theme.scaled(4)
+                            onClicked: {
+                                Settings.removeSavedSearch(modelData)
+                                if (Settings.savedSearches.length === 0) {
+                                    savedSearchesDialog.close()
                                 }
                             }
                         }

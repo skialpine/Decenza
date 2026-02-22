@@ -90,8 +90,8 @@ struct ShotFilter {
     QString grinderModel;
     QString grinderSetting;
     QString roastLevel;
-    int minEnjoyment = 0;
-    int maxEnjoyment = 100;
+    int minEnjoyment = -1;
+    int maxEnjoyment = -1;
     double minDose = -1;
     double maxDose = -1;
     double minYield = -1;
