@@ -476,6 +476,9 @@ set(QML_FILES
     qml/components/ComparisonGraph.qml
     qml/components/HistoryShotGraph.qml
     qml/components/GraphInspectBar.qml
+    qml/components/ComparisonInspectBar.qml
+    qml/components/ComparisonDataTable.qml
+    qml/components/ComparisonShotTable.qml
     qml/components/GraphLegend.qml
     qml/components/StyledSwitch.qml
     qml/components/StyledComboBox.qml
