@@ -3455,6 +3455,9 @@ void Settings::factoryReset()
     m_settings.clear();
     m_settings.sync();
 
+    // Invalidate in-memory caches so getters re-read from (now-empty) QSettings
+    m_dyeCacheInitialized = false;
+
     // 2. Clear secondary QSettings store (used by AI, location, profilestorage)
     QSettings defaultSettings;
     defaultSettings.clear();

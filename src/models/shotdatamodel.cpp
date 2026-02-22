@@ -193,6 +193,7 @@ void ShotDataModel::clear() {
     m_currentPressureGoalSegment = 0;
     m_currentFlowGoalSegment = 0;
     m_dirty = false;
+    m_rawTimeDirty = false;
 
     emit cleared();
     emit phaseMarkersChanged();

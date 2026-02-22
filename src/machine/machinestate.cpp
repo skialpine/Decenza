@@ -259,6 +259,8 @@ void MachineState::updatePhase() {
                 m_pourVolume = 0.0;
                 m_cumulativeVolume = 0.0;
                 m_lastEmittedCumulativeVolumeMl = -1;
+                m_lastEmittedPreinfusionVolumeMl = -1;
+                m_lastEmittedPourVolumeMl = -1;
 
                 // CRITICAL: Clear any pending BLE commands to prevent stale profile uploads
                 // from executing during active operations. This fixes a bug where queued
@@ -494,11 +496,19 @@ void MachineState::onFlowSample(double flowRate, double deltaTime) {
         // Split volume by phase: preinfusion vs pouring (matches de1app behavior)
         if (m_phase == Phase::Preinfusion) {
             m_preinfusionVolume += volumeDelta;
-            emit preinfusionVolumeChanged();
+            int roundedMl = static_cast<int>(m_preinfusionVolume);
+            if (roundedMl != m_lastEmittedPreinfusionVolumeMl) {
+                m_lastEmittedPreinfusionVolumeMl = roundedMl;
+                emit preinfusionVolumeChanged();
+            }
         } else {
             // Pouring, HotWater, and all other flowing states count as pour volume
             m_pourVolume += volumeDelta;
-            emit pourVolumeChanged();
+            int roundedMl = static_cast<int>(m_pourVolume);
+            if (roundedMl != m_lastEmittedPourVolumeMl) {
+                m_lastEmittedPourVolumeMl = roundedMl;
+                emit pourVolumeChanged();
+            }
         }
         m_cumulativeVolume = m_preinfusionVolume + m_pourVolume;
         // Only emit when rounded ml changes (avoids ~206 samples/shot of QML binding churn at 5Hz)
