@@ -20,6 +20,7 @@
 
 
 
+#include "core/asynclogger.h"
 #include "core/settings.h"
 #include "core/translationmanager.h"
 #include "core/batterymanager.h"
@@ -36,6 +37,7 @@
 #include "ble/scales/scalefactory.h"
 #include "ble/scales/flowscale.h"
 #include "machine/machinestate.h"
+#include "machine/weightprocessor.h"
 #include "models/shotdatamodel.h"
 #include "controllers/maincontroller.h"
 #include "controllers/shottimingcontroller.h"
@@ -65,7 +67,14 @@ using namespace Qt::StringLiterals;
 
 int main(int argc, char *argv[])
 {
-    // Install crash handler first - catches SIGSEGV, SIGABRT, etc.
+    // Install async logger FIRST — sits at bottom of handler chain.
+    // All handlers above (CrashHandler, WebDebugLogger, ShotDebugLogger) do
+    // fast in-memory work, then call through to AsyncLogger which does
+    // non-blocking I/O on a background thread. This eliminates synchronous
+    // logcat writes (~500μs each on Android) from the main thread.
+    AsyncLogger::install();
+
+    // Install crash handler - catches SIGSEGV, SIGABRT, etc.
     CrashHandler::install();
 
     // Include wall clock in all log messages on all platforms
@@ -160,26 +169,9 @@ int main(int argc, char *argv[])
     QObject::connect(&shotDataModel, &ShotDataModel::flushed,
                      &timingController, &ShotTimingController::shotTimeChanged);
 
-    // Connect stop-at-weight signal to DE1 (urgent: bypasses command queue for lowest latency)
-    QObject::connect(&timingController, &ShotTimingController::stopAtWeightReached,
-                     &de1Device, &DE1Device::stopOperationUrgent);
-
-    // Forward SAW signal to MachineState so QML shows "Target weight reached"
-    QObject::connect(&timingController, &ShotTimingController::stopAtWeightReached,
-                     &machineState, &MachineState::targetWeightReached);
-
-    // Mark stop time on graph when SAW triggers
-    QObject::connect(&timingController, &ShotTimingController::stopAtWeightReached,
-                     [&timingController, &shotDataModel]() {
-                         shotDataModel.markStopAt(timingController.shotTime());
-                     });
-
-    // Connect per-frame weight exit to DE1
-    QObject::connect(&timingController, &ShotTimingController::perFrameWeightReached,
-                     [&de1Device](int frameNumber) {
-                         de1Device.skipToNextFrame();
-                         Q_UNUSED(frameNumber);
-                     });
+    // SAW stop, per-frame weight exit, and graph markings are now handled by
+    // WeightProcessor signals (stopNow, skipFrame) wired below.
+    // ShotTimingController::stopAtWeightReached and perFrameWeightReached are no longer emitted.
 
     // Connect SAW learning signal to settings persistence
     QObject::connect(&timingController, &ShotTimingController::sawLearningComplete,
@@ -204,6 +196,120 @@ int main(int argc, char *argv[])
                      &mainController, &MainController::onShotEnded);
 
     checkpoint("ShotTimingController wiring");
+
+    // Weight processor on dedicated worker thread — isolates LSLR + SOW decisions
+    // from main thread stalls (GC pauses, remaining synchronous I/O).
+    WeightProcessor weightProcessor;
+    QThread weightThread;
+    weightThread.setObjectName(QStringLiteral("WeightProcessor"));
+    weightProcessor.moveToThread(&weightThread);
+    weightThread.start();
+
+    // Scale → WeightProcessor (main → worker, auto QueuedConnection)
+    // Initially connected to FlowScale; reconnected when physical scale is found
+    QObject::connect(&flowScale, &ScaleDevice::weightChanged,
+                     &weightProcessor, &WeightProcessor::processWeight);
+
+    // WeightProcessor → DE1Device: stop-at-weight (worker → main, bypasses command queue)
+    QObject::connect(&weightProcessor, &WeightProcessor::stopNow,
+                     &de1Device, &DE1Device::stopOperationUrgent);
+
+    // WeightProcessor → MachineState: forward SAW trigger for QML "Target reached" display
+    QObject::connect(&weightProcessor, &WeightProcessor::stopNow,
+                     &machineState, &MachineState::targetWeightReached);
+
+    // WeightProcessor → ShotDataModel: mark stop time on graph.
+    // Using &shotDataModel as context ensures lambda runs on the main thread.
+    QObject::connect(&weightProcessor, &WeightProcessor::stopNow,
+                     &shotDataModel, [&timingController, &shotDataModel]() {
+                         shotDataModel.markStopAt(timingController.shotTime());
+                     });
+
+    // WeightProcessor → DE1Device: per-frame weight exit.
+    // Using &de1Device as context ensures BLE write happens on the main thread.
+    QObject::connect(&weightProcessor, &WeightProcessor::skipFrame,
+                     &de1Device, [&de1Device](int) { de1Device.skipToNextFrame(); });
+
+    // WeightProcessor → ShotTimingController: SAW learning context
+    QObject::connect(&weightProcessor, &WeightProcessor::sawTriggered,
+                     &timingController, &ShotTimingController::onSawTriggered);
+
+    // WeightProcessor → ShotTimingController: record weight exits for transition tracking
+    QObject::connect(&weightProcessor, &WeightProcessor::skipFrame,
+                     &timingController, &ShotTimingController::recordWeightExit);
+
+    // WeightProcessor → ShotTimingController: flow rates for graph and settling
+    QObject::connect(&weightProcessor, &WeightProcessor::flowRatesReady,
+                     &timingController, &ShotTimingController::onWeightSample);
+
+    // WeightProcessor → MachineState: cached flow rate for QML property.
+    // Using &machineState as context ensures lambda runs on the main thread.
+    QObject::connect(&weightProcessor, &WeightProcessor::flowRatesReady,
+                     &machineState, [&machineState](double, double flowRate, double flowRateShort) {
+                         machineState.updateCachedFlowRates(flowRate, flowRateShort);
+                     });
+
+    // Forward frame number updates from shot samples to worker thread.
+    // With &weightProcessor as context, Qt auto-uses QueuedConnection (cross-thread).
+    QObject::connect(&timingController, &ShotTimingController::sampleReady,
+                     &weightProcessor, [&weightProcessor](double, double, double, double,
+                         double, double, double, int frameNumber, bool) {
+                         weightProcessor.setCurrentFrame(frameNumber);
+                     });
+
+    // Tare complete → WeightProcessor (so it knows when to start checking weights)
+    QObject::connect(&timingController, &ShotTimingController::tareCompleteChanged,
+                     [&weightProcessor, &timingController]() {
+                         if (timingController.isTareComplete()) {
+                             QMetaObject::invokeMethod(&weightProcessor, [&weightProcessor]() {
+                                 weightProcessor.setTareComplete(true);
+                             }, Qt::QueuedConnection);
+                         }
+                     });
+
+    // Shot lifecycle → WeightProcessor: configure at shot start, stop at shot end
+    QObject::connect(&machineState, &MachineState::espressoCycleStarted,
+                     [&weightProcessor, &machineState, &settings, &mainController]() {
+                         // Build snapshot of learning data and configuration
+                         double targetWeight = machineState.targetWeight();
+                         QString scaleType = settings.scaleType();
+                         bool converged = settings.isSawConverged(scaleType);
+                         int maxEntries = converged ? 12 : 8;
+                         auto entries = settings.sawLearningEntries(scaleType, maxEntries);
+                         QVector<double> drips, flows;
+                         drips.reserve(entries.size());
+                         flows.reserve(entries.size());
+                         for (const auto& e : entries) {
+                             drips.append(e.first);
+                             flows.append(e.second);
+                         }
+
+                         // Build frame exit weights from current profile
+                         QVector<double> frameExitWeights;
+                         const Profile& profile = mainController.currentProfile();
+                         {
+                             const auto& steps = profile.steps();
+                             frameExitWeights.reserve(steps.size());
+                             for (const auto& step : steps) {
+                                 frameExitWeights.append(step.exitWeight);
+                             }
+                         }
+
+                         QMetaObject::invokeMethod(&weightProcessor,
+                             [&weightProcessor, targetWeight, frameExitWeights, drips, flows, converged]() {
+                                 weightProcessor.configure(targetWeight, frameExitWeights, drips, flows, converged);
+                                 weightProcessor.startExtraction();
+                             }, Qt::QueuedConnection);
+                     });
+
+    QObject::connect(&machineState, &MachineState::shotEnded,
+                     [&weightProcessor]() {
+                         QMetaObject::invokeMethod(&weightProcessor, [&weightProcessor]() {
+                             weightProcessor.stopExtraction();
+                         }, Qt::QueuedConnection);
+                     });
+
+    checkpoint("WeightProcessor wiring");
 
     // Create and wire AI Manager
     AIManager aiManager(&settings);
@@ -310,7 +416,7 @@ int main(int argc, char *argv[])
 
     // Connect to any supported scale when discovered
     QObject::connect(&bleManager, &BLEManager::scaleDiscovered,
-                     [&physicalScale, &flowScale, &machineState, &mainController, &engine, &bleManager, &settings, &timingController, &de1Device](const QBluetoothDeviceInfo& device, const QString& type) {
+                     [&physicalScale, &flowScale, &machineState, &mainController, &engine, &bleManager, &settings, &timingController, &de1Device, &weightProcessor](const QBluetoothDeviceInfo& device, const QString& type) {
         // Don't connect if we already have a connected scale
         if (physicalScale && physicalScale->isConnected()) {
             return;
@@ -329,6 +435,9 @@ int main(int argc, char *argv[])
                 // IMPORTANT: Clear all references before deleting the scale to prevent dangling pointers
                 machineState.setScale(&flowScale);  // Switch to FlowScale first
                 timingController.setScale(&flowScale);
+                // Reconnect FlowScale to WeightProcessor temporarily
+                QObject::connect(&flowScale, &ScaleDevice::weightChanged,
+                                 &weightProcessor, &WeightProcessor::processWeight);
                 bleManager.setScaleDevice(nullptr);  // Clear BLEManager's reference
                 physicalScale.reset();  // Now safe to delete old scale
             } else {
@@ -361,25 +470,34 @@ int main(int argc, char *argv[])
         // Connect scale to BLEManager for auto-scan control
         bleManager.setScaleDevice(physicalScale.get());
 
-        // Disconnect FlowScale from graph (in case fallback was active)
+        // Disconnect FlowScale from graph and weight processor
         QObject::disconnect(&flowScale, &ScaleDevice::weightChanged,
                             &mainController, &MainController::onScaleWeightChanged);
+        QObject::disconnect(&flowScale, &ScaleDevice::weightChanged,
+                            &weightProcessor, &WeightProcessor::processWeight);
 
-        // Connect physical scale weight updates to MainController for graph data
+        // Connect physical scale weight updates to MainController and WeightProcessor
         QObject::connect(physicalScale.get(), &ScaleDevice::weightChanged,
                          &mainController, &MainController::onScaleWeightChanged);
+        QObject::connect(physicalScale.get(), &ScaleDevice::weightChanged,
+                         &weightProcessor, &WeightProcessor::processWeight);
 
         // When physical scale connects/disconnects, switch between physical and FlowScale
         QObject::connect(physicalScale.get(), &ScaleDevice::connectedChanged,
-                         [&physicalScale, &flowScale, &machineState, &engine, &bleManager, &mainController, &timingController]() {
+                         [&physicalScale, &flowScale, &machineState, &engine, &bleManager, &mainController, &timingController, &weightProcessor]() {
             if (physicalScale && physicalScale->isConnected()) {
                 // Scale connected - use physical scale
                 machineState.setScale(physicalScale.get());
                 timingController.setScale(physicalScale.get());
                 engine.rootContext()->setContextProperty("ScaleDevice", physicalScale.get());
-                // Disconnect FlowScale from graph to prevent duplicate data
+                // Disconnect FlowScale from graph and weight processor
                 QObject::disconnect(&flowScale, &ScaleDevice::weightChanged,
                                     &mainController, &MainController::onScaleWeightChanged);
+                QObject::disconnect(&flowScale, &ScaleDevice::weightChanged,
+                                    &weightProcessor, &WeightProcessor::processWeight);
+                // Connect physical scale to weight processor
+                QObject::connect(physicalScale.get(), &ScaleDevice::weightChanged,
+                                 &weightProcessor, &WeightProcessor::processWeight);
                 // Notify MQTT
                 if (mainController.mqttClient()) {
                     mainController.mqttClient()->onScaleConnectedChanged(true);
@@ -390,9 +508,14 @@ int main(int argc, char *argv[])
                 machineState.setScale(&flowScale);
                 timingController.setScale(&flowScale);
                 engine.rootContext()->setContextProperty("ScaleDevice", &flowScale);
-                // Reconnect FlowScale to graph
+                // Disconnect physical scale from weight processor
+                QObject::disconnect(physicalScale.get(), &ScaleDevice::weightChanged,
+                                    &weightProcessor, &WeightProcessor::processWeight);
+                // Reconnect FlowScale to graph and weight processor
                 QObject::connect(&flowScale, &ScaleDevice::weightChanged,
                                  &mainController, &MainController::onScaleWeightChanged);
+                QObject::connect(&flowScale, &ScaleDevice::weightChanged,
+                                 &weightProcessor, &WeightProcessor::processWeight);
                 // Notify MQTT
                 if (mainController.mqttClient()) {
                     mainController.mqttClient()->onScaleConnectedChanged(false);
@@ -412,16 +535,18 @@ int main(int argc, char *argv[])
 
     // Handle disconnect request when starting a new scan
     QObject::connect(&bleManager, &BLEManager::disconnectScaleRequested,
-                     [&physicalScale, &flowScale, &machineState, &engine, &mainController, &bleManager, &timingController]() {
+                     [&physicalScale, &flowScale, &machineState, &engine, &mainController, &bleManager, &timingController, &weightProcessor]() {
         if (physicalScale) {
             qDebug() << "Disconnecting scale before scan";
             // Switch to FlowScale first
             machineState.setScale(&flowScale);
             timingController.setScale(&flowScale);
             engine.rootContext()->setContextProperty("ScaleDevice", &flowScale);
-            // Reconnect FlowScale to graph (physical scale is being destroyed)
+            // Reconnect FlowScale to graph and weight processor (physical scale is being destroyed)
             QObject::connect(&flowScale, &ScaleDevice::weightChanged,
                              &mainController, &MainController::onScaleWeightChanged);
+            QObject::connect(&flowScale, &ScaleDevice::weightChanged,
+                             &weightProcessor, &WeightProcessor::processWeight);
             // Notify MQTT that scale is disconnected
             if (mainController.mqttClient()) {
                 mainController.mqttClient()->onScaleConnectedChanged(false);
@@ -769,8 +894,13 @@ int main(int argc, char *argv[])
     });
 
     // Cleanup on exit
-    QObject::connect(&app, &QCoreApplication::aboutToQuit, [&accessibilityManager, &batteryManager, &de1Device, &physicalScale, &engine]() {
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, [&accessibilityManager, &batteryManager, &de1Device, &physicalScale, &engine, &weightThread]() {
         qDebug() << "Application exiting - shutting down devices";
+
+        // Stop weight processor thread first (before BLE shutdown).
+        // Any pending SOW commands are no longer needed since we're exiting.
+        weightThread.quit();
+        weightThread.wait(1000);
 
         bool needBleWait = false;
 
@@ -820,6 +950,10 @@ int main(int argc, char *argv[])
     // Disable crash handler before cleanup - crashes during C++ runtime destruction
     // are not actionable and shouldn't prompt users to submit bug reports
     CrashHandler::uninstall();
+
+    // Drain remaining log messages and restore default handler.
+    // Must be after CrashHandler (reverse of installation order).
+    AsyncLogger::uninstall();
 
     return result;
 }

@@ -64,10 +64,17 @@ public:
     // Transition reason tracking
     bool wasWeightExit(int frameNumber) const { return m_weightExitFrames.contains(frameNumber); }
 
-    // Data ingestion (called by MainController)
+    // Data ingestion
     void onShotSample(const ShotSample& sample, double pressureGoal, double flowGoal,
                       double tempGoal, int frameNumber, bool isFlowMode);
+    // Called by WeightProcessor (via QueuedConnection from worker thread)
     void onWeightSample(double weight, double flowRate, double flowRateShort = 0);
+
+    // Called by WeightProcessor when SAW triggers (captures state for learning)
+    void onSawTriggered(double weightAtStop, double flowRateAtStop, double targetWeight);
+
+    // Called by WeightProcessor when per-frame weight exit fires (for transition tracking)
+    void recordWeightExit(int frameNumber);
 
     // Tare control
     void tare();
@@ -102,8 +109,6 @@ private slots:
 
 private:
     void startSettlingTimer();
-    void checkStopAtWeight();
-    void checkPerFrameWeight(int frameNumber);
 
     DE1Device* m_device = nullptr;
     QPointer<ScaleDevice> m_scale;

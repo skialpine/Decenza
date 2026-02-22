@@ -83,7 +83,9 @@ public:
     double scaleWeight() const;
     double scaleFlowRate() const;
     double smoothedScaleFlowRate() const;
-    double smoothedScaleFlowRateShort() const;  // 500ms LSLR window for SOW decisions
+
+    // Called by WeightProcessor (via signal) to update cached flow rate
+    void updateCachedFlowRates(double flowRate, double flowRateShort);
 
     // Called by MainController when shot samples arrive
     void onFlowSample(double flowRate, double deltaTime);
@@ -148,14 +150,9 @@ private:
     bool m_tareCompleted = false;
     bool m_waitingForTare = false;  // True after tare sent, waiting for scale to report ~0g
 
-    // Weight flow rate: computed as slope of weight over a 1-second window
-    // (avoids differentiating noisy scale data — differentiation amplifies BLE timing jitter)
-    struct WeightSample {
-        qint64 timestamp;
-        double weight;
-    };
-    QList<WeightSample> m_weightSamples;
-    void recordWeightSample();
+    // Cached flow rates from WeightProcessor (updated via signal from worker thread)
+    double m_cachedFlowRate = 0.0;
+    double m_cachedFlowRateShort = 0.0;
 
     // Auto-tare on cup removal detection
     double m_lastIdleWeight = 0.0;

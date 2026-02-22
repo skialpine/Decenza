@@ -694,6 +694,12 @@ public:
     Q_INVOKABLE QVariant value(const QString& key, const QVariant& defaultValue = QVariant()) const;
     Q_INVOKABLE void setValue(const QString& key, const QVariant& value);
 
+    // SAW convergence detection helper
+    bool isSawConverged(const QString& scaleType) const;
+    // Returns SAW learning entries filtered by scale type (most recent first).
+    // Used by WeightProcessor to snapshot learning data at shot start.
+    QList<QPair<double, double>> sawLearningEntries(const QString& scaleType, int maxEntries) const;
+
 signals:
     void machineAddressChanged();
     void scaleAddressChanged();
@@ -826,8 +832,6 @@ private:
     void saveLayoutObject(const QJsonObject& layout);
     QString generateItemId(const QString& type) const;
 
-    // SAW convergence detection helper
-    bool isSawConverged(const QString& scaleType) const;
     void ensureSawCacheLoaded() const;
 
     QSettings m_settings;

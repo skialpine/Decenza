@@ -3021,13 +3021,9 @@ void MainController::onScaleWeightChanged(double weight) {
         return;
     }
 
-    // Forward to timing controller FIRST (handles stop-at-weight on the critical path)
-    // SOW check must run before any debug logging to minimize latency.
-    // Pass both 1s LSLR (for graph) and 500ms LSLR (for SOW decisions).
-    if (m_timingController) {
-        m_timingController->onWeightSample(weight, m_machineState->smoothedScaleFlowRate(),
-                                           m_machineState->smoothedScaleFlowRateShort());
-    }
+    // Weight processing (LSLR, SOW, per-frame exits) is now handled by WeightProcessor
+    // on a dedicated worker thread. It receives weight samples directly from the scale
+    // and feeds ShotTimingController via flowRatesReady signal.
 
     // FlowScale comparison logging: log both physical scale and FlowScale estimated weight
     // during espresso extraction to validate puck absorption model.

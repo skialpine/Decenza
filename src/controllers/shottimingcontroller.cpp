@@ -299,12 +299,9 @@ void ShotTimingController::onWeightSample(double weight, double flowRate, double
 
     emit weightChanged();
 
-    // Weight is cached here, emitted to graph in onShotSample for perfect timestamp sync
-    // Check stop conditions
-    checkStopAtWeight();
-
-    // Check per-frame weight exit (uses m_currentFrameNumber from onShotSample)
-    checkPerFrameWeight(m_currentFrameNumber);
+    // Weight is cached here, emitted to graph in onShotSample for perfect timestamp sync.
+    // SOW and per-frame weight checks are now handled by WeightProcessor on a dedicated
+    // worker thread, eliminating main-thread congestion from the critical stop path.
 }
 
 void ShotTimingController::tare()
@@ -360,105 +357,24 @@ void ShotTimingController::updateDisplayTimer()
     }
 }
 
-void ShotTimingController::checkStopAtWeight()
+void ShotTimingController::onSawTriggered(double weightAtStop, double flowRateAtStop, double targetWeight)
 {
-    if (m_stopAtWeightTriggered) return;
-    if (m_tareState != TareState::Complete) return;
-
-    // Sanity check: if we're very early in extraction and weight is unreasonably high,
-    // assume tare hasn't completed yet (race condition when preheating is skipped).
-    // Real coffee can't drip 50g in 3 seconds.
-    if (m_extractionStarted && m_displayTimeBase > 0) {
-        double extractionTime = (QDateTime::currentMSecsSinceEpoch() - m_displayTimeBase) / 1000.0;
-        if (extractionTime < 3.0 && m_weight > 50.0) {
-            qDebug() << "[SAW] Sanity check: weight" << m_weight << "g at" << extractionTime
-                     << "s - likely untared cup, skipping SAW check";
-            return;
-        }
-    }
-
-    // Determine target based on current state
-    double target = 0;
-    DE1::State state = m_device ? m_device->state() : DE1::State::Sleep;
-
-    if (state == DE1::State::HotWater && m_settings) {
-        target = m_settings->waterVolume();  // ml ≈ g for water
-    } else {
-        target = m_targetWeight;  // Espresso target
-    }
-
-    if (target <= 0) return;
-
-    double stopThreshold;
-    if (state == DE1::State::HotWater) {
-        // Hot water: use fixed 5g offset (predictable, avoids scale-dependent issues)
-        stopThreshold = target - 5.0;
-    } else {
-        // Espresso: predict drip based on current flow and learning history
-        // Use the short-window (500ms) LSLR for less stale flow near end-of-shot
-        double flowRate = m_flowRateShort;
-        if (flowRate > 12.0) flowRate = 12.0;  // Cap at reasonable max
-        // If short-window LSLR has no valid data (buffer empty/recovering from phase glitch),
-        // skip this SOW check. The next weight sample with valid flow will trigger normally.
-        if (flowRate < 0.5) return;
-        double expectedDrip = m_settings ? m_settings->getExpectedDrip(flowRate) : (flowRate * 1.5);
-        stopThreshold = target - expectedDrip;
-
-        // Debug: log the expected drip (once per shot when it changes significantly)
-        static double lastLoggedDrip = -1;
-        if (qAbs(expectedDrip - lastLoggedDrip) > 0.5) {
-            qDebug() << "[SAW] Expected drip:" << expectedDrip << "g at flow" << flowRate
-                     << "ml/s (short LSLR, 1s=" << m_flowRate << ")";
-            lastLoggedDrip = expectedDrip;
-        }
-    }
-
-    if (m_weight >= stopThreshold) {
-        m_stopAtWeightTriggered = true;
-
-        // Capture state for SAW learning (espresso only)
-        // Use short-window flow rate so auto-tune learns from the same signal
-        if (state != DE1::State::HotWater) {
-            m_sawTriggeredThisShot = true;
-            m_flowRateAtStop = m_flowRateShort;
-            m_weightAtStop = m_weight;
-            m_targetWeightAtStop = target;
-            qDebug() << "[SAW] Stop triggered: weight=" << m_weightAtStop
-                     << "threshold=" << stopThreshold
-                     << "flow=" << m_flowRateAtStop << "(short)"
-                     << "target=" << m_targetWeightAtStop;
-        }
-
-        emit stopAtWeightReached();
-    }
+    // Called by WeightProcessor (via QueuedConnection) when SAW triggers on worker thread.
+    // Captures state for SAW learning — settling will run after the shot ends.
+    m_stopAtWeightTriggered = true;
+    m_sawTriggeredThisShot = true;
+    m_flowRateAtStop = flowRateAtStop;
+    m_weightAtStop = weightAtStop;
+    m_targetWeightAtStop = targetWeight;
+    qDebug() << "[SAW] Worker thread triggered stop: weight=" << weightAtStop
+             << "flow=" << flowRateAtStop << "target=" << targetWeight;
 }
 
-void ShotTimingController::checkPerFrameWeight(int frameNumber)
+void ShotTimingController::recordWeightExit(int frameNumber)
 {
-    if (!m_currentProfile || !m_device) return;
-    if (frameNumber < 0 || frameNumber == m_frameWeightSkipSent) return;
-    if (m_tareState != TareState::Complete) return;
-
-    // Same sanity check as SAW - skip if weight is unreasonably high early in extraction
-    if (m_extractionStarted && m_displayTimeBase > 0) {
-        double extractionTime = (QDateTime::currentMSecsSinceEpoch() - m_displayTimeBase) / 1000.0;
-        if (extractionTime < 3.0 && m_weight > 50.0) {
-            return;  // Likely untared cup
-        }
-    }
-
-    const auto& steps = m_currentProfile->steps();
-    if (frameNumber >= steps.size()) return;
-
-    const ProfileFrame& frame = steps[frameNumber];
-
-    if (frame.exitWeight > 0 && m_weight >= frame.exitWeight) {
-        qDebug() << "FRAME-WEIGHT EXIT: weight" << m_weight << ">=" << frame.exitWeight
-                 << "on frame" << frameNumber << "(" << frame.name << ")";
-        m_frameWeightSkipSent = frameNumber;
-        m_weightExitFrames.insert(frameNumber);
-        emit perFrameWeightReached(frameNumber);
-    }
+    // Called by WeightProcessor (via QueuedConnection) when per-frame weight exit fires.
+    // Tracks which frames exited by weight for transition reason inference.
+    m_weightExitFrames.insert(frameNumber);
 }
 
 void ShotTimingController::startSettlingTimer()

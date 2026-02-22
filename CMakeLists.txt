@@ -182,7 +182,9 @@ set(SOURCES
     src/ble/scales/variaakuscale.cpp
     src/ble/scales/flowscale.cpp
     src/ble/transport/qtscalebletransport.cpp
+    src/core/asynclogger.cpp
     src/machine/machinestate.cpp
+    src/machine/weightprocessor.cpp
     src/profile/profile.cpp
     src/profile/profileframe.cpp
     src/profile/profileconverter.cpp
@@ -276,7 +278,9 @@ set(HEADERS
     src/ble/scales/flowscale.h
     src/ble/transport/scalebletransport.h
     src/ble/transport/qtscalebletransport.h
+    src/core/asynclogger.h
     src/machine/machinestate.h
+    src/machine/weightprocessor.h
     src/profile/profile.h
     src/profile/profileframe.h
     src/profile/profileconverter.h

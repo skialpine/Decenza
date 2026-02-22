@@ -78,14 +78,14 @@ void MachineState::setScale(ScaleDevice* scale) {
     }
 
     m_scale = scale;
-    m_weightSamples.clear();
 
     if (m_scale) {
         connect(m_scale, &ScaleDevice::weightChanged,
                 this, &MachineState::onScaleWeightChanged);
         // Relay weight changes to QML via scaleWeightChanged signal
-        connect(m_scale, &ScaleDevice::weightChanged, this, [this](double weight) {
-            recordWeightSample();
+        // LSLR flow rate is computed by WeightProcessor on a worker thread
+        // and cached via updateCachedFlowRates()
+        connect(m_scale, &ScaleDevice::weightChanged, this, [this](double) {
             emit scaleWeightChanged();
         });
         // Emit immediately so QML picks up current weight
@@ -585,99 +585,18 @@ double MachineState::scaleFlowRate() const {
     return smoothedScaleFlowRate();
 }
 
-void MachineState::recordWeightSample() {
-    if (!m_scale) return;
-    // Accumulate during EspressoPreheating (so a brief BLE phase glitch doesn't
-    // wipe the LSLR buffer mid-extraction), extraction, and the Ending phase
-    // (espresso still drips after the pump stops).  Stop once we leave Ending
-    // so Idle-phase scale noise doesn't pollute the LSLR buffer.
-    if (m_phase != Phase::EspressoPreheating && m_phase != Phase::Preinfusion && m_phase != Phase::Pouring && m_phase != Phase::Ending) {
-        m_weightSamples.clear();
-        return;
-    }
-    qint64 now = QDateTime::currentMSecsSinceEpoch();
-    double w = m_scale->weight();
-    m_weightSamples.append({now, w});
-    // Prune samples older than 1 second
-    while (!m_weightSamples.isEmpty() && (now - m_weightSamples.first().timestamp) > 1000) {
-        m_weightSamples.removeFirst();
-    }
-}
-
+// LSLR flow rate is now computed by WeightProcessor on a dedicated worker thread.
+// These methods return cached values updated via updateCachedFlowRates().
 double MachineState::smoothedScaleFlowRate() const {
-    if (m_weightSamples.size() < 2) {
-        return 0.0;
-    }
-    // Wait until the buffer spans ~1 second before reporting
-    double dt = (m_weightSamples.last().timestamp - m_weightSamples.first().timestamp) / 1000.0;
-    if (dt < 0.8) {
-        return 0.0;
-    }
-
-    // Least-squares linear regression across all samples in the window.
-    // Fits a line w = slope*t + intercept; slope = flow rate in g/s.
-    // This uses every sample (not just endpoints), averaging out noise from
-    // scale quantization (0.1g on Skale) and BLE timing jitter.
-    // Reference: de1app uses LSLR as one of its 3 selectable smoothing algorithms.
-    int n = m_weightSamples.size();
-    // Use relative time (seconds from first sample) to avoid floating-point issues
-    qint64 t0 = m_weightSamples.first().timestamp;
-    double sumT = 0, sumW = 0, sumTW = 0, sumTT = 0;
-    for (const auto& s : m_weightSamples) {
-        double t = (s.timestamp - t0) / 1000.0;
-        sumT += t;
-        sumW += s.weight;
-        sumTW += t * s.weight;
-        sumTT += t * t;
-    }
-    double denom = n * sumTT - sumT * sumT;
-    double slope = (denom > 1e-12) ? (n * sumTW - sumT * sumW) / denom : 0.0;
-
-    return qMax(0.0, slope);
+    return m_cachedFlowRate;
 }
 
-double MachineState::smoothedScaleFlowRateShort() const {
-    // Short-window LSLR (500ms) for SOW decisions.
-    // Responds faster to flow changes near end-of-shot, reducing systematic
-    // over-prediction of drip that the 1s window causes.
-    // Falls back to 1s LSLR if insufficient data (< 3 samples or < 300ms span).
-    if (m_weightSamples.size() < 3) {
-        return smoothedScaleFlowRate();
-    }
-
-    qint64 now = m_weightSamples.last().timestamp;
-    qint64 cutoff = now - 500;  // 500ms window
-
-    // Find first sample within the 500ms window
-    int startIdx = m_weightSamples.size() - 1;
-    while (startIdx > 0 && m_weightSamples[startIdx - 1].timestamp >= cutoff) {
-        --startIdx;
-    }
-
-    int n = m_weightSamples.size() - startIdx;
-    if (n < 3) {
-        return smoothedScaleFlowRate();
-    }
-
-    double span = (m_weightSamples.last().timestamp - m_weightSamples[startIdx].timestamp) / 1000.0;
-    if (span < 0.3) {
-        return smoothedScaleFlowRate();
-    }
-
-    // LSLR over the short window
-    qint64 t0 = m_weightSamples[startIdx].timestamp;
-    double sumT = 0, sumW = 0, sumTW = 0, sumTT = 0;
-    for (int i = startIdx; i < m_weightSamples.size(); ++i) {
-        double t = (m_weightSamples[i].timestamp - t0) / 1000.0;
-        sumT += t;
-        sumW += m_weightSamples[i].weight;
-        sumTW += t * m_weightSamples[i].weight;
-        sumTT += t * t;
-    }
-    double denom = n * sumTT - sumT * sumT;
-    double slope = (denom > 1e-12) ? (n * sumTW - sumT * sumW) / denom : 0.0;
-
-    return qMax(0.0, slope);
+void MachineState::updateCachedFlowRates(double flowRate, double flowRateShort) {
+    m_cachedFlowRate = flowRate;
+    m_cachedFlowRateShort = flowRateShort;
+    // Don't emit scaleWeightChanged here — the next scale weight update will
+    // trigger it, and the QML property read will pick up the new flow rate.
+    // This avoids double-emission on every sample.
 }
 
 void MachineState::tareScale() {

@@ -3027,6 +3027,24 @@ double Settings::getExpectedDrip(double currentFlowRate) const {
     return expectedDrip;
 }
 
+QList<QPair<double, double>> Settings::sawLearningEntries(const QString& scaleType, int maxEntries) const {
+    ensureSawCacheLoaded();
+    QList<QPair<double, double>> result;
+    for (int i = m_sawHistoryCache.size() - 1; i >= 0 && result.size() < maxEntries; --i) {
+        QJsonObject obj = m_sawHistoryCache[i].toObject();
+        if (obj["scale"].toString() == scaleType) {
+            if (obj.contains("drip")) {
+                result.append({obj["drip"].toDouble(), obj["flow"].toDouble()});
+            } else if (obj.contains("lag")) {
+                // Convert old lag format: drip ≈ lag * typical_flow
+                double lag = obj["lag"].toDouble();
+                result.append({lag * 4.0, 4.0});
+            }
+        }
+    }
+    return result;
+}
+
 void Settings::addSawLearningPoint(double drip, double flowRate, const QString& scaleType, double overshoot) {
     // Validate physical constraints (scale glitches can produce negative values)
     if (drip < 0 || flowRate < 0) {
