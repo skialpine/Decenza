@@ -33,9 +33,15 @@ Page {
     property string sortDirection: Settings.shotHistorySortDirection
 
     readonly property var sortFieldLabels: ({
-        "timestamp": "Date", "profile_name": "Profile", "bean_brand": "Roaster",
-        "bean_type": "Coffee", "enjoyment": "Rating", "ratio": "Ratio",
-        "duration_seconds": "Duration", "dose_weight": "Dose", "final_weight": "Yield"
+        "timestamp": TranslationManager.translate("shothistory.sort.date", "Date"),
+        "profile_name": TranslationManager.translate("shothistory.sort.profile", "Profile"),
+        "bean_brand": TranslationManager.translate("shothistory.sort.roaster", "Roaster"),
+        "bean_type": TranslationManager.translate("shothistory.sort.coffee", "Coffee"),
+        "enjoyment": TranslationManager.translate("shothistory.sort.rating", "Rating"),
+        "ratio": TranslationManager.translate("shothistory.sort.ratio", "Ratio"),
+        "duration_seconds": TranslationManager.translate("shothistory.sort.duration", "Duration"),
+        "dose_weight": TranslationManager.translate("shothistory.sort.dose", "Dose"),
+        "final_weight": TranslationManager.translate("shothistory.sort.yield", "Yield")
     })
     readonly property var sortFieldKeys: [
         "timestamp", "profile_name", "bean_brand", "bean_type",

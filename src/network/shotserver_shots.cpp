@@ -72,6 +72,7 @@ QString ShotServer::generateShotListPage() const
         // Escape for JavaScript string (single quotes) and HTML attribute
         auto escapeForJs = [](const QString& s) -> QString {
             QString escaped = s;
+            escaped.replace("%", "%%");      // Must be first — protect QString::arg() placeholders
             escaped.replace("\\", "\\\\");
             escaped.replace("'", "\\'");
             escaped.replace("\"", "&quot;");
@@ -1111,13 +1112,20 @@ QString ShotServer::generateShotDetailPage(qint64 shotId) const
             QVariantMap phase = p.toMap();
             QString label = phase["label"].toString();
             if (label == "Start") continue;  // Skip start marker
-            QString reason = phase["transitionReason"].toString();
-            reason.replace(QLatin1String("\\"), QLatin1String("\\\\"));
-            reason.replace(QLatin1String("\""), QLatin1String("\\\""));
-            reason.replace(QLatin1String("<"), QLatin1String("\\u003c"));
+            // Escape both label and reason for safe embedding in JS string literals
+            auto jsStringEscape = [](QString s) -> QString {
+                s.replace(QLatin1String("\\"), QLatin1String("\\\\"));
+                s.replace(QLatin1String("\""), QLatin1String("\\\""));
+                s.replace(QLatin1String("\n"), QLatin1String("\\n"));
+                s.replace(QLatin1String("\r"), QLatin1String(""));
+                s.replace(QLatin1String("<"), QLatin1String("\\u003c"));
+                return s;
+            };
+            QString reason = jsStringEscape(phase["transitionReason"].toString());
+            label = jsStringEscape(label);
             items << QString("{time:%1,label:\"%2\",reason:\"%3\"}")
                 .arg(phase["time"].toDouble(), 0, 'f', 2)
-                .arg(label.replace(QStringLiteral("\""), QStringLiteral("\\\"")))
+                .arg(label)
                 .arg(reason);
         }
         return "[" + items.join(",") + "]";

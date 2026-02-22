@@ -658,6 +658,7 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
         } else if (method == "POST") {
             int bodyStart = request.indexOf("\r\n\r\n");
             QJsonObject result;
+            bool hasError = false;
             if (bodyStart != -1 && m_settings) {
                 QByteArray body = request.mid(bodyStart + 4);
                 QJsonObject obj = QJsonDocument::fromJson(body).object();
@@ -667,14 +668,21 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
                     result["success"] = true;
                 } else {
                     result["error"] = "Empty search";
+                    hasError = true;
                 }
             } else {
                 result["error"] = "Invalid request";
+                hasError = true;
             }
-            sendJson(socket, QJsonDocument(result).toJson(QJsonDocument::Compact));
+            QByteArray json = QJsonDocument(result).toJson(QJsonDocument::Compact);
+            if (hasError)
+                sendResponse(socket, 400, "application/json", json);
+            else
+                sendJson(socket, json);
         } else if (method == "DELETE") {
             int bodyStart = request.indexOf("\r\n\r\n");
             QJsonObject result;
+            bool hasError = false;
             if (bodyStart != -1 && m_settings) {
                 QByteArray body = request.mid(bodyStart + 4);
                 QJsonObject obj = QJsonDocument::fromJson(body).object();
@@ -684,11 +692,17 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
                     result["success"] = true;
                 } else {
                     result["error"] = "Empty search";
+                    hasError = true;
                 }
             } else {
                 result["error"] = "Invalid request";
+                hasError = true;
             }
-            sendJson(socket, QJsonDocument(result).toJson(QJsonDocument::Compact));
+            QByteArray json = QJsonDocument(result).toJson(QJsonDocument::Compact);
+            if (hasError)
+                sendResponse(socket, 400, "application/json", json);
+            else
+                sendJson(socket, json);
         }
     }
     else if (path == "/api/debug" || path.startsWith("/api/debug?")) {
