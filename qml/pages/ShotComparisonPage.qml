@@ -48,7 +48,7 @@ Page {
             width: parent.width
             spacing: Theme.spacingSmall
 
-            // Graph with resize handle and swipe navigation
+            // Graph with resize handle and window navigation
             Rectangle {
                 id: graphCard
                 Layout.fillWidth: true
@@ -66,42 +66,112 @@ Page {
                     comparisonModel: shotComparisonPage.comparisonModel
                 }
 
-                // Crosshair drag handler (tap or drag to scrub; no swipe navigation)
+                // Crosshair drag handler (tap or horizontal drag to scrub)
                 MouseArea {
                     id: graphMouseArea
                     anchors.fill: parent
                     anchors.bottomMargin: resizeHandle.height
-                    preventStealing: true
 
-                    onPressed:  function(mouse) {
-                        var graphPos = mapToItem(comparisonGraph, mouse.x, mouse.y)
-                        comparisonGraph.inspectAtPosition(graphPos.x, graphPos.y)
+                    Accessible.role: Accessible.Button
+                    Accessible.name: TranslationManager.translate("comparison.crosshair", "Graph crosshair inspector")
+                    Accessible.focusable: true
+                    Accessible.onPressAction: graphMouseArea.clicked(null)
+
+                    property bool scrubbing: false
+                    property real pressX: 0
+                    property real pressY: 0
+                    readonly property real dragThreshold: Theme.scaled(10)
+
+                    onPressed: function(mouse) {
+                        scrubbing = false
+                        pressX = mouse.x
+                        pressY = mouse.y
                     }
                     onPositionChanged: function(mouse) {
-                        var graphPos = mapToItem(comparisonGraph, mouse.x, mouse.y)
-                        comparisonGraph.inspectAtPosition(graphPos.x, graphPos.y)
+                        if (!scrubbing) {
+                            var dx = Math.abs(mouse.x - pressX)
+                            var dy = Math.abs(mouse.y - pressY)
+                            // Only steal the gesture for horizontal drags (scrubbing)
+                            if (dx > dragThreshold && dx > dy) {
+                                scrubbing = true
+                                preventStealing = true
+                            }
+                        }
+                        if (scrubbing) {
+                            var graphPos = mapToItem(comparisonGraph, mouse.x, mouse.y)
+                            comparisonGraph.inspectAtPosition(graphPos.x, graphPos.y)
+                        }
+                    }
+                    onReleased: function(mouse) {
+                        if (!scrubbing) {
+                            // Simple tap — inspect at tap position
+                            var graphPos = mapToItem(comparisonGraph, mouse.x, mouse.y)
+                            comparisonGraph.inspectAtPosition(graphPos.x, graphPos.y)
+                        }
+                        scrubbing = false
+                        preventStealing = false
                     }
                 }
 
-                // Position indicator (only show if more than 3 shots)
-                Rectangle {
+                // Window navigation bar (only show when more shots than display window)
+                Row {
                     visible: comparisonModel.totalShots > 3
                     anchors.bottom: resizeHandle.top
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.bottomMargin: Theme.spacingSmall
-                    width: windowPositionText.width + Theme.scaled(16)
-                    height: Theme.scaled(24)
-                    radius: Theme.scaled(12)
-                    color: Qt.rgba(0, 0, 0, 0.5)
+                    spacing: 0
 
-                    Text {
-                        id: windowPositionText
-                        anchors.centerIn: parent
-                        text: (comparisonModel.windowStart + 1) + "-" +
-                              Math.min(comparisonModel.windowStart + 3, comparisonModel.totalShots) +
-                              " / " + comparisonModel.totalShots
-                        font: Theme.captionFont
-                        color: "white"
+                    AccessibleButton {
+                        width: Theme.scaled(28)
+                        height: Theme.scaled(24)
+                        radius: Theme.scaled(12)
+                        color: comparisonModel.canShiftLeft ? Qt.rgba(0, 0, 0, 0.6) : Qt.rgba(0, 0, 0, 0.3)
+                        accessibleName: TranslationManager.translate("comparison.previousShots", "Previous shots")
+                        enabled: comparisonModel.canShiftLeft
+                        onClicked: comparisonModel.shiftWindowLeft()
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "\u25C0"
+                            font.pixelSize: Theme.captionFont.pixelSize
+                            color: parent.enabled ? "white" : Qt.rgba(1, 1, 1, 0.4)
+                            Accessible.ignored: true
+                        }
+                    }
+
+                    Rectangle {
+                        width: windowPositionText.width + Theme.scaled(12)
+                        height: Theme.scaled(24)
+                        color: Qt.rgba(0, 0, 0, 0.5)
+
+                        Text {
+                            id: windowPositionText
+                            anchors.centerIn: parent
+                            text: (comparisonModel.windowStart + 1) + "-" +
+                                  Math.min(comparisonModel.windowStart + 3, comparisonModel.totalShots) +
+                                  " / " + comparisonModel.totalShots
+                            font: Theme.captionFont
+                            color: "white"
+                            Accessible.ignored: true
+                        }
+                    }
+
+                    AccessibleButton {
+                        width: Theme.scaled(28)
+                        height: Theme.scaled(24)
+                        radius: Theme.scaled(12)
+                        color: comparisonModel.canShiftRight ? Qt.rgba(0, 0, 0, 0.6) : Qt.rgba(0, 0, 0, 0.3)
+                        accessibleName: TranslationManager.translate("comparison.nextShots", "Next shots")
+                        enabled: comparisonModel.canShiftRight
+                        onClicked: comparisonModel.shiftWindowRight()
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "\u25B6"
+                            font.pixelSize: Theme.captionFont.pixelSize
+                            color: parent.enabled ? "white" : Qt.rgba(1, 1, 1, 0.4)
+                            Accessible.ignored: true
+                        }
                     }
                 }
 
