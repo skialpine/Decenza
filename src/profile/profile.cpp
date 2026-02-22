@@ -495,12 +495,8 @@ Profile Profile::fromJson(const QJsonDocument& doc) {
         }
     }
 
-    // Sync espresso_temperature with first frame if they differ
-    // This handles profiles edited before the bug fix where only frame temps were updated
-    // Skip for recipe-mode profiles: their espresso_temperature is the pour/hold temp
-    // (set by regenerateFromRecipe), which intentionally differs from first frame temp
-    // (e.g. D-Flow/Q: fill=84°C, pour=94°C — espresso_temperature should be 94)
-    if (!profile.m_isRecipeMode && !profile.m_steps.isEmpty()) {
+    // Sync espresso_temperature with first frame temperature (matches de1app behavior)
+    if (!profile.m_steps.isEmpty()) {
         double firstFrameTemp = profile.m_steps.first().temperature;
         if (qAbs(profile.m_espressoTemperature - firstFrameTemp) > 0.1) {
             qDebug() << "Syncing espresso_temperature from" << profile.m_espressoTemperature
@@ -1236,12 +1232,9 @@ void Profile::regenerateFromRecipe() {
 
     // Update profile metadata from recipe
     m_targetWeight = m_recipeParams.targetWeight;
-    // For pressure/flow profiles, use tempHold as the machine's baseline temp
-    // (must match RecipeGenerator::createProfile logic)
-    if (m_recipeParams.editorType == EditorType::Pressure || m_recipeParams.editorType == EditorType::Flow) {
-        m_espressoTemperature = m_recipeParams.tempHold;
-    } else {
-        m_espressoTemperature = m_recipeParams.pourTemperature;
+    // Use first frame temperature (matches de1app behavior)
+    if (!m_steps.isEmpty()) {
+        m_espressoTemperature = m_steps.first().temperature;
     }
 
     // Count preinfuse frames from actual generated frames (authoritative)

@@ -79,19 +79,16 @@ Profile RecipeGenerator::createProfile(const RecipeParams& recipe, const QString
     // Targets
     profile.setTargetWeight(recipe.targetWeight);
     profile.setTargetVolume(recipe.targetVolume > 0 ? recipe.targetVolume : 100.0);
-    // For pressure/flow profiles, use tempHold as the machine's baseline temp
-    // (tempStart is a 2-second boost and doesn't represent the main extraction temp)
-    if (recipe.editorType == EditorType::Pressure || recipe.editorType == EditorType::Flow) {
-        profile.setEspressoTemperature(recipe.tempHold);
-    } else {
-        profile.setEspressoTemperature(recipe.pourTemperature);
-    }
-
     // Mode
     profile.setMode(Profile::Mode::FrameBased);
 
     // Generate and set frames
     profile.setSteps(generateFrames(recipe));
+
+    // Use first frame temperature (matches de1app behavior)
+    if (!profile.steps().isEmpty()) {
+        profile.setEspressoTemperature(profile.steps().first().temperature);
+    }
 
     if (profile.steps().size() == 1 && profile.steps()[0].name == "empty") {
         qWarning() << "RecipeGenerator::createProfile: recipe produced fallback empty frame for" << title;
