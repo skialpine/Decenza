@@ -87,6 +87,10 @@ class Settings : public QObject {
     Q_PROPERTY(double screenBrightness READ screenBrightness WRITE setScreenBrightness NOTIFY screenBrightnessChanged)
     Q_PROPERTY(QVariantMap customFontSizes READ customFontSizes WRITE setCustomFontSizes NOTIFY customFontSizesChanged)
 
+    // Screen shaders
+    Q_PROPERTY(QString activeShader READ activeShader WRITE setActiveShader NOTIFY activeShaderChanged)
+    Q_PROPERTY(QVariantMap shaderParams READ shaderParams NOTIFY shaderParamsChanged)
+
     // Theme flash (in-memory only, for identifying colors on device)
     Q_PROPERTY(QString flashColorName READ flashColorName NOTIFY flashColorNameChanged)
     Q_PROPERTY(int flashPhase READ flashPhase NOTIFY flashPhaseChanged)
@@ -388,6 +392,16 @@ public:
     QString activeThemeName() const;
     void setActiveThemeName(const QString& name);
 
+    // Screen effects (empty string = none, "crt" = CRT/Pip-Boy, extensible for future effects)
+    QString activeShader() const;
+    void setActiveShader(const QString& shader);
+    QVariantMap shaderParams() const;  // Returns active effect's params
+    Q_INVOKABLE void setShaderParam(const QString& name, double value);  // Sets on active effect
+    Q_INVOKABLE QVariantMap effectParams(const QString& effectId) const;  // Get any effect's params
+    Q_INVOKABLE void setEffectParam(const QString& effectId, const QString& name, double value);
+    QJsonObject screenEffectJson() const;       // Build screenEffect block for theme saving
+    void applyScreenEffect(const QJsonObject& screenEffect);  // Restore from theme JSON
+
     Q_INVOKABLE void setThemeColor(const QString& colorName, const QString& colorValue);
     Q_INVOKABLE QString getThemeColor(const QString& colorName) const;
     Q_INVOKABLE void resetThemeToDefault();
@@ -647,6 +661,7 @@ public:
     Q_INVOKABLE void removeItem(const QString& itemId, const QString& zone);
     Q_INVOKABLE void reorderItem(const QString& zoneName, int fromIndex, int toIndex);
     Q_INVOKABLE void resetLayoutToDefault();
+    Q_INVOKABLE void factoryReset();
     Q_INVOKABLE bool hasItemType(const QString& type) const;
     Q_INVOKABLE int getZoneYOffset(const QString& zoneName) const;
     Q_INVOKABLE void setZoneYOffset(const QString& zoneName, int offset);
@@ -701,6 +716,8 @@ signals:
     void customThemeColorsChanged();
     void colorGroupsChanged();
     void activeThemeNameChanged();
+    void activeShaderChanged();
+    void shaderParamsChanged();
     void customFontSizesChanged();
     void flashColorNameChanged();
     void flashPhaseChanged();
@@ -791,8 +808,15 @@ private:
 
     // SAW convergence detection helper
     bool isSawConverged(const QString& scaleType) const;
+    void ensureSawCacheLoaded() const;
 
     QSettings m_settings;
+
+    // SAW learning history cache (avoids re-parsing JSON from QSettings on every weight sample)
+    mutable QJsonArray m_sawHistoryCache;
+    mutable bool m_sawHistoryCacheDirty = true;
+    mutable int m_sawConvergedCache = -1;  // -1 = unknown, 0 = no, 1 = yes
+    mutable QString m_sawConvergedScaleType;  // Scale type for cached convergence result
     QString m_flashColorName;
     int m_flashPhase = 0;
     QTimer* m_flashTimer = nullptr;

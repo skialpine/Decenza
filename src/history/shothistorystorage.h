@@ -174,6 +174,15 @@ public:
     // groupBy: "bean", "profile", "bean_profile", "bean_profile_grinder"
     Q_INVOKABLE QVariantList getAutoFavorites(const QString& groupBy, int maxItems);
 
+    // Get aggregated details for a specific auto-favorite group
+    // Returns: avgTds, avgEy, avgDuration, avgDose, avgYield, avgTemperature, notes[]
+    Q_INVOKABLE QVariantMap getAutoFavoriteGroupDetails(const QString& groupBy,
+                                                         const QString& beanBrand,
+                                                         const QString& beanType,
+                                                         const QString& profileName,
+                                                         const QString& grinderModel,
+                                                         const QString& grinderSetting);
+
     // Export debug log for bug report
     Q_INVOKABLE QString exportShotData(qint64 shotId);
 
@@ -196,6 +205,9 @@ public:
 
     // Get database path
     QString databasePath() const { return m_dbPath; }
+
+    // Close the database (for factory reset before file deletion)
+    void close();
 
     // Checkpoint WAL to main database file
     void checkpoint();

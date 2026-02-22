@@ -113,6 +113,25 @@ Settings::Settings(QObject* parent)
         m_settings.setValue("bean/presets", QJsonDocument(emptyPresets).toJson());
     }
 
+    // Migrate flat shader/* keys to shader/crt/* (one-time, v1.5.x → v1.6)
+    if (m_settings.contains("shader/scanlineIntensity") && !m_settings.contains("shader/migrated")) {
+        static const QStringList crtParams = {
+            "scanlineIntensity", "scanlineSize", "noiseIntensity", "bloomStrength",
+            "aberration", "jitterAmount", "vignetteStrength", "tintStrength",
+            "flickerAmount", "glitchRate", "glowStart", "noiseSize",
+            "reflectionStrength"
+        };
+        for (const QString& name : crtParams) {
+            const QString oldKey = "shader/" + name;
+            if (m_settings.contains(oldKey)) {
+                m_settings.setValue("shader/crt/" + name, m_settings.value(oldKey));
+                m_settings.remove(oldKey);
+            }
+        }
+        m_settings.setValue("shader/migrated", true);
+        qDebug() << "Settings: Migrated flat shader params to shader/crt/ namespace";
+    }
+
     // Load brew parameter overrides (persistent)
     m_hasTemperatureOverride = m_settings.value("brew/hasTemperatureOverride", false).toBool();
     if (m_hasTemperatureOverride) {
@@ -1276,6 +1295,96 @@ void Settings::setActiveThemeName(const QString& name) {
     }
 }
 
+QString Settings::activeShader() const {
+    return m_settings.value("theme/activeShader", "").toString();
+}
+
+void Settings::setActiveShader(const QString& shader) {
+    if (activeShader() != shader) {
+        m_settings.setValue("theme/activeShader", shader);
+        emit activeShaderChanged();
+    }
+}
+
+// Known parameter names per effect (for const-correct enumeration)
+static const QMap<QString, QStringList>& knownEffectParams() {
+    static const QMap<QString, QStringList> params = {
+        {"crt", {
+            "scanlineIntensity", "scanlineSize", "noiseIntensity", "bloomStrength",
+            "aberration", "jitterAmount", "vignetteStrength", "tintStrength",
+            "flickerAmount", "glitchRate", "glowStart", "noiseSize",
+            "reflectionStrength",
+            "colorGain", "colorContrast", "colorSaturation", "hueShift"
+        }}
+        // Future: {"vhs", {"trackingError", "colorBleed", ...}}
+    };
+    return params;
+}
+
+QVariantMap Settings::shaderParams() const {
+    return effectParams(activeShader());
+}
+
+void Settings::setShaderParam(const QString& name, double value) {
+    setEffectParam(activeShader(), name, value);
+}
+
+QVariantMap Settings::effectParams(const QString& effectId) const {
+    if (effectId.isEmpty()) return {};
+    const auto& allParams = knownEffectParams();
+    if (!allParams.contains(effectId)) return {};
+
+    QVariantMap params;
+    for (const QString& name : allParams[effectId]) {
+        const QString key = "shader/" + effectId + "/" + name;
+        if (m_settings.contains(key))
+            params[name] = m_settings.value(key).toDouble();
+    }
+    return params;
+}
+
+void Settings::setEffectParam(const QString& effectId, const QString& name, double value) {
+    if (effectId.isEmpty()) return;
+    const QString key = "shader/" + effectId + "/" + name;
+    double current = m_settings.value(key, -99999.0).toDouble();
+    if (qAbs(current - value) > 0.0001) {
+        m_settings.setValue(key, value);
+        emit shaderParamsChanged();
+    }
+}
+
+QJsonObject Settings::screenEffectJson() const {
+    QJsonObject result;
+    result["active"] = activeShader();
+
+    QJsonObject effects;
+    const auto& allParams = knownEffectParams();
+    for (auto it = allParams.begin(); it != allParams.end(); ++it) {
+        QVariantMap params = effectParams(it.key());
+        if (!params.isEmpty()) {
+            effects[it.key()] = QJsonObject::fromVariantMap(params);
+        }
+    }
+    result["effects"] = effects;
+    return result;
+}
+
+void Settings::applyScreenEffect(const QJsonObject& screenEffect) {
+    // Set active effect (empty = none)
+    QString active = screenEffect["active"].toString();
+    setActiveShader(active);
+
+    // Restore per-effect params
+    QJsonObject effects = screenEffect["effects"].toObject();
+    for (auto it = effects.begin(); it != effects.end(); ++it) {
+        QString effectId = it.key();
+        QJsonObject params = it.value().toObject();
+        for (auto pit = params.begin(); pit != params.end(); ++pit) {
+            setEffectParam(effectId, pit.key(), pit.value().toDouble());
+        }
+    }
+}
+
 double Settings::screenBrightness() const {
     return m_settings.value("theme/screenBrightness", 1.0).toDouble();
 }
@@ -1456,6 +1565,7 @@ void Settings::applyPresetTheme(const QString& name) {
         palette["weightColor"] = "#a2693d";
 
         setCustomThemeColors(palette);
+        setActiveShader("");  // Default theme has no screen effect
         setActiveThemeName(name);
         return;
     }
@@ -1473,6 +1583,11 @@ void Settings::applyPresetTheme(const QString& name) {
                 palette[key] = colors[key].toString();
             }
             setCustomThemeColors(palette);
+            // Restore screen effect (or disable for old presets without it)
+            if (obj.contains("screenEffect"))
+                applyScreenEffect(obj["screenEffect"].toObject());
+            else
+                setActiveShader("");
             setActiveThemeName(name);
             return;
         }
@@ -1500,6 +1615,7 @@ void Settings::saveCurrentTheme(const QString& name) {
     QJsonObject newTheme;
     newTheme["name"] = name;
     newTheme["colors"] = QJsonObject::fromVariantMap(customThemeColors());
+    newTheme["screenEffect"] = screenEffectJson();
     userThemes.append(newTheme);
 
     // Save to settings
@@ -2348,6 +2464,7 @@ double Settings::temperatureOverride() const {
 
 void Settings::setTemperatureOverride(double temp) {
     if (!qFuzzyCompare(m_temperatureOverride, temp) || !m_hasTemperatureOverride) {
+        qDebug() << "setTemperatureOverride:" << m_temperatureOverride << "→" << temp;
         m_temperatureOverride = temp;
         m_hasTemperatureOverride = true;
         m_settings.setValue("brew/temperatureOverride", temp);
@@ -2653,13 +2770,12 @@ void Settings::setFlowCalibrationMultiplier(double multiplier) {
 
 // Returns average lag for display in QML settings (calculated from stored drip/flow)
 double Settings::sawLearnedLag() const {
-    QByteArray data = m_settings.value("saw/learningHistory").toByteArray();
-    if (data.isEmpty()) {
+    ensureSawCacheLoaded();
+
+    const QJsonArray& arr = m_sawHistoryCache;
+    if (arr.isEmpty()) {
         return 1.5;  // Default
     }
-
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-    QJsonArray arr = doc.array();
 
     QString currentScale = scaleType();
     double sumLag = 0;
@@ -2686,12 +2802,33 @@ double Settings::sawLearnedLag() const {
     return count > 0 ? sumLag / count : 1.5;
 }
 
-bool Settings::isSawConverged(const QString& scaleType) const {
+void Settings::ensureSawCacheLoaded() const {
+    if (!m_sawHistoryCacheDirty) return;
     QByteArray data = m_settings.value("saw/learningHistory").toByteArray();
-    if (data.isEmpty()) return false;
+    if (data.isEmpty()) {
+        m_sawHistoryCache = QJsonArray();
+    } else {
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        m_sawHistoryCache = doc.array();
+    }
+    m_sawHistoryCacheDirty = false;
+    m_sawConvergedCache = -1;  // Invalidate convergence cache too
+}
 
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-    QJsonArray arr = doc.array();
+bool Settings::isSawConverged(const QString& scaleType) const {
+    ensureSawCacheLoaded();
+
+    // Return cached result if available and for the same scale
+    if (m_sawConvergedCache >= 0 && m_sawConvergedScaleType == scaleType) {
+        return m_sawConvergedCache == 1;
+    }
+
+    const QJsonArray& arr = m_sawHistoryCache;
+    if (arr.isEmpty()) {
+        m_sawConvergedCache = 0;
+        m_sawConvergedScaleType = scaleType;
+        return false;
+    }
 
     // Collect |overshoot| from last 5 entries for this scale that have overshoot data
     QVector<double> overshoots;
@@ -2703,29 +2840,61 @@ bool Settings::isSawConverged(const QString& scaleType) const {
     }
 
     // Converged = at least 3 entries with avg |overshoot| < 1.5g
-    if (overshoots.size() < 3) return false;
+    if (overshoots.size() < 3) {
+        m_sawConvergedCache = 0;
+        m_sawConvergedScaleType = scaleType;
+        return false;
+    }
 
     double sum = 0;
     for (double v : overshoots) sum += v;
-    return (sum / overshoots.size()) < 1.5;
+    bool converged = (sum / overshoots.size()) < 1.5;
+
+    // Divergence detector: if last 3 signed overshoots are all >1g in the same
+    // direction, the prediction is systematically off (bean/grind change) — force
+    // adaptation mode without requiring manual reset.
+    if (converged && overshoots.size() >= 3) {
+        QVector<double> signedOvershoots;
+        for (int i = arr.size() - 1; i >= 0 && signedOvershoots.size() < 3; --i) {
+            QJsonObject obj = arr[i].toObject();
+            if (obj["scale"].toString() == scaleType && obj.contains("overshoot")) {
+                signedOvershoots.append(obj["overshoot"].toDouble());
+            }
+        }
+        if (signedOvershoots.size() >= 3) {
+            bool allPositive = true, allNegative = true;
+            for (double v : signedOvershoots) {
+                if (v <= 1.0) allPositive = false;
+                if (v >= -1.0) allNegative = false;
+            }
+            if (allPositive || allNegative) {
+                qDebug() << "[SAW] Divergence detected: last 3 overshoots all"
+                         << (allPositive ? "positive" : "negative") << "- forcing adaptation mode";
+                converged = false;
+            }
+        }
+    }
+
+    m_sawConvergedCache = converged ? 1 : 0;
+    m_sawConvergedScaleType = scaleType;
+    return converged;
 }
 
 double Settings::getExpectedDrip(double currentFlowRate) const {
-    QByteArray data = m_settings.value("saw/learningHistory").toByteArray();
-    if (data.isEmpty()) {
+    ensureSawCacheLoaded();
+
+    const QJsonArray& arr = m_sawHistoryCache;
+    if (arr.isEmpty()) {
         // Default: assume 1.5s lag worth of drip
         return currentFlowRate * 1.5;
     }
 
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-    QJsonArray arr = doc.array();
-
     // Check convergence state to determine adaptive parameters
     QString currentScale = scaleType();
     bool converged = isSawConverged(currentScale);
-    int maxEntries = converged ? 20 : 10;
+    int maxEntries = converged ? 12 : 8;
     double recencyMax = 10.0;
-    double recencyMin = converged ? 5.0 : 1.0;  // Flat (10→5) when converged, steep (10→1) when adapting
+    double recencyMin = converged ? 3.0 : 1.0;  // Steeper recency = faster adaptation
 
     // Filter to current scale type and collect recent entries
     struct Entry { double drip; double flow; };
@@ -2762,9 +2931,9 @@ double Settings::getExpectedDrip(double currentFlowRate) const {
         // Recency weight: linear interpolation from max to min across entry count
         double recencyWeight = recencyMax - i * (recencyMax - recencyMin) / qMax(1, entries.size() - 1);
 
-        // Flow similarity weight: gaussian with sigma=2 ml/s
+        // Flow similarity weight: gaussian with sigma=1.5 ml/s
         double flowDiff = qAbs(e.flow - currentFlowRate);
-        double flowWeight = qExp(-(flowDiff * flowDiff) / 8.0);  // sigma^2 * 2 = 8
+        double flowWeight = qExp(-(flowDiff * flowDiff) / 4.5);  // sigma^2 * 2 = 4.5
 
         double weight = recencyWeight * flowWeight;
         weightedDripSum += e.drip * weight;
@@ -2778,9 +2947,9 @@ double Settings::getExpectedDrip(double currentFlowRate) const {
 
     double expectedDrip = weightedDripSum / totalWeight;
 
-    // Clamp to reasonable range (0.5 to 15 grams)
+    // Clamp to reasonable range (0.5 to 20 grams)
     if (expectedDrip < 0.5) expectedDrip = 0.5;
-    if (expectedDrip > 15.0) expectedDrip = 15.0;
+    if (expectedDrip > 20.0) expectedDrip = 20.0;
 
     return expectedDrip;
 }
@@ -2795,7 +2964,7 @@ void Settings::addSawLearningPoint(double drip, double flowRate, const QString& 
     // Outlier rejection: when converged, skip learning points that deviate too far
     if (isSawConverged(scaleType)) {
         double expectedDrip = getExpectedDrip(flowRate);
-        double threshold = qMax(3.0, expectedDrip);  // Floor of 3g prevents over-rejection
+        double threshold = qMax(3.0, expectedDrip);  // Reject if deviation exceeds expected drip (or 3g floor)
         if (qAbs(drip - expectedDrip) > threshold) {
             qDebug() << "[SAW] Outlier rejected: drip=" << drip
                      << "g expected=" << expectedDrip
@@ -2823,11 +2992,15 @@ void Settings::addSawLearningPoint(double drip, double flowRate, const QString& 
     }
 
     m_settings.setValue("saw/learningHistory", QJsonDocument(arr).toJson());
+    m_sawHistoryCacheDirty = true;
+    m_sawConvergedCache = -1;
     emit sawLearnedLagChanged();
 }
 
 void Settings::resetSawLearning() {
     m_settings.remove("saw/learningHistory");
+    m_sawHistoryCacheDirty = true;
+    m_sawConvergedCache = -1;
     emit sawLearnedLagChanged();
 }
 
@@ -3199,4 +3372,94 @@ QVariant Settings::value(const QString& key, const QVariant& defaultValue) const
 void Settings::setValue(const QString& key, const QVariant& value) {
     m_settings.setValue(key, value);
     emit valueChanged(key);
+}
+
+void Settings::factoryReset()
+{
+    qWarning() << "Settings::factoryReset() - WIPING ALL DATA";
+
+    // 1. Clear primary QSettings (favorites, presets, theme, all preferences)
+    m_settings.clear();
+    m_settings.sync();
+
+    // 2. Clear secondary QSettings store (used by AI, location, profilestorage)
+    QSettings defaultSettings;
+    defaultSettings.clear();
+    defaultSettings.sync();
+
+    // 3. Delete all data directories under AppDataLocation
+    QString appDataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QStringList dataDirs = {
+        "profiles",
+        "library",
+        "skins",
+        "translations",
+        "screensaver_videos"
+    };
+
+    for (const QString& subdir : dataDirs) {
+        QDir dir(appDataDir + "/" + subdir);
+        if (dir.exists()) {
+            qWarning() << "  Removing:" << dir.absolutePath();
+            if (!dir.removeRecursively())
+                qWarning() << "  WARNING: Failed to completely remove" << dir.absolutePath();
+        }
+    }
+
+    // 4. Delete shot database files
+    QStringList dbFiles = {"shots.db", "shots.db-wal", "shots.db-shm"};
+    for (const QString& dbFile : dbFiles) {
+        QString path = appDataDir + "/" + dbFile;
+        if (QFile::exists(path)) {
+            qWarning() << "  Removing:" << path;
+            if (!QFile::remove(path))
+                qWarning() << "  WARNING: Failed to remove" << path;
+        }
+    }
+
+    // 5. Delete log files in AppDataLocation
+    QStringList logFiles = {"debug.log", "crash.log", "steam_debug.log"};
+    for (const QString& logFile : logFiles) {
+        QString path = appDataDir + "/" + logFile;
+        if (QFile::exists(path)) {
+            if (!QFile::remove(path))
+                qWarning() << "  WARNING: Failed to remove" << path;
+        }
+    }
+
+    // 6. Delete public Documents directories
+    QString docsDir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    QStringList publicDirs = {"Decenza", "Decenza Backups", "ai_logs"};
+    for (const QString& pubDir : publicDirs) {
+        QDir dir(docsDir + "/" + pubDir);
+        if (dir.exists()) {
+            qWarning() << "  Removing:" << dir.absolutePath();
+            if (!dir.removeRecursively())
+                qWarning() << "  WARNING: Failed to completely remove" << dir.absolutePath();
+        }
+    }
+
+    // 7. Delete visualizer debug files in Documents
+    QStringList debugFiles = {
+        docsDir + "/last_upload.json",
+        docsDir + "/last_upload_debug.txt",
+        docsDir + "/last_upload_response.txt"
+    };
+    for (const QString& debugFile : debugFiles) {
+        if (QFile::exists(debugFile)) {
+            if (!QFile::remove(debugFile))
+                qWarning() << "  WARNING: Failed to remove" << debugFile;
+        }
+    }
+
+    // 8. Clear cache directory
+    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    QDir cache(cacheDir);
+    if (cache.exists()) {
+        qWarning() << "  Clearing cache:" << cache.absolutePath();
+        if (!cache.removeRecursively())
+            qWarning() << "  WARNING: Failed to completely clear cache";
+    }
+
+    qWarning() << "Settings::factoryReset() - COMPLETE";
 }

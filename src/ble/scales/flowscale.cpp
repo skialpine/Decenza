@@ -30,7 +30,7 @@ void FlowScale::tare() {
 }
 
 void FlowScale::addFlowSample(double flowRate, double deltaTime) {
-    // Skip integration if FlowScale is disabled
+    // Skip integration if FlowScale is disabled (redundant on shadow path since MainController checks useFlowScale)
     if (m_settings && !m_settings->useFlowScale())
         return;
 

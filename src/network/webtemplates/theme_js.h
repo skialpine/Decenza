@@ -154,6 +154,7 @@ function renderAll(data) {
     renderColors(data.colors, data.pageColors);
     renderFonts(data.fonts);
     renderPresets(data.presets, data.activeThemeName);
+    if (typeof initShaderState === 'function') initShaderState(data);
 }
 
 // -- API calls --
@@ -261,8 +262,9 @@ async function deletePreset(name) {
 function openSaveDialog() {
     document.getElementById('saveDialog').classList.add('open');
     var input = document.getElementById('saveNameInput');
-    input.value = '';
+    input.value = (currentTheme && currentTheme.activeThemeName) ? currentTheme.activeThemeName : '';
     input.focus();
+    input.select();
 }
 
 function closeSaveDialog() {

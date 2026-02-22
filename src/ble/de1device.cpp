@@ -309,6 +309,13 @@ void DE1Device::onControllerDisconnected() {
     clearDE1AddressForShutdown();
 #endif
 
+    // Clear pending BLE operations to prevent writes against a dead connection,
+    // which causes DeadObjectException crashes on Android (issue #189)
+    m_commandQueue.clear();
+    m_writePending = false;
+    m_writeTimeoutTimer.stop();
+    m_commandTimer.stop();
+
     m_connecting = false;
     emit connectingChanged();
     emit connectedChanged();
@@ -928,6 +935,20 @@ void DE1Device::startClean() {
 void DE1Device::stopOperation() {
 //    qDebug() << "[REFACTOR] DE1Device::stopOperation() - requesting Idle state to stop current operation";
     requestState(DE1::State::Idle);
+}
+
+void DE1Device::stopOperationUrgent() {
+    // Bypass the 50ms command queue for lowest-latency stop (used by SOW).
+    // Clears any pending commands and writes directly to the characteristic.
+#if (defined(Q_OS_WIN) || defined(Q_OS_MACOS)) && defined(QT_DEBUG)
+    if (m_simulationMode && m_simulator) {
+        m_simulator->stop();
+        return;
+    }
+#endif
+    clearCommandQueue();
+    QByteArray data(1, static_cast<char>(DE1::State::Idle));
+    writeCharacteristic(DE1::Characteristic::REQUESTED_STATE, data);
 }
 
 void DE1Device::requestIdle() {

@@ -287,17 +287,18 @@ void MachineState::updatePhase() {
                 bool startingExtraction = (oldPhase == Phase::EspressoPreheating);
 
                 if (startingExtraction) {
-                    // Extraction starting - reset and start scale timer (like de1app)
+                    // Extraction starting from preheating - properly start the shot timer
+                    startShotTimer();
+
+                    // Reset and start scale timer (like de1app)
                     if (m_scale) {
                         m_scale->resetTimer();
                         m_scale->startTimer();
                         qDebug() << "=== SCALE TIMER: Reset + Started (espresso extraction began) ===";
                     }
-                }
-
-                // Glitch recovery: restart timer without resetting state
-                // This preserves stop-at-weight triggers and cumulative tracking
-                if (!m_shotTimer->isActive()) {
+                } else if (!m_shotTimer->isActive()) {
+                    // Actual glitch recovery: restart timer without resetting state
+                    // This preserves stop-at-weight triggers and cumulative tracking
                     qDebug() << "=== TIMER RESTART: recovering from mid-espresso phase glitch ===";
                     // If m_shotStartTime is invalid (0 or in the future), reset it
                     qint64 now = QDateTime::currentMSecsSinceEpoch();
@@ -570,10 +571,11 @@ double MachineState::scaleFlowRate() const {
 
 void MachineState::recordWeightSample() {
     if (!m_scale) return;
-    // Accumulate during extraction and the Ending phase (espresso still drips
-    // through the puck after the pump stops).  Stop once we leave Ending so
-    // Idle-phase scale noise doesn't pollute the LSLR buffer.
-    if (m_phase != Phase::Preinfusion && m_phase != Phase::Pouring && m_phase != Phase::Ending) {
+    // Accumulate during EspressoPreheating (so a brief BLE phase glitch doesn't
+    // wipe the LSLR buffer mid-extraction), extraction, and the Ending phase
+    // (espresso still drips after the pump stops).  Stop once we leave Ending
+    // so Idle-phase scale noise doesn't pollute the LSLR buffer.
+    if (m_phase != Phase::EspressoPreheating && m_phase != Phase::Preinfusion && m_phase != Phase::Pouring && m_phase != Phase::Ending) {
         m_weightSamples.clear();
         return;
     }
@@ -618,9 +620,58 @@ double MachineState::smoothedScaleFlowRate() const {
     return qMax(0.0, slope);
 }
 
+double MachineState::smoothedScaleFlowRateShort() const {
+    // Short-window LSLR (500ms) for SOW decisions.
+    // Responds faster to flow changes near end-of-shot, reducing systematic
+    // over-prediction of drip that the 1s window causes.
+    // Falls back to 1s LSLR if insufficient data (< 3 samples or < 300ms span).
+    if (m_weightSamples.size() < 3) {
+        return smoothedScaleFlowRate();
+    }
+
+    qint64 now = m_weightSamples.last().timestamp;
+    qint64 cutoff = now - 500;  // 500ms window
+
+    // Find first sample within the 500ms window
+    int startIdx = m_weightSamples.size() - 1;
+    while (startIdx > 0 && m_weightSamples[startIdx - 1].timestamp >= cutoff) {
+        --startIdx;
+    }
+
+    int n = m_weightSamples.size() - startIdx;
+    if (n < 3) {
+        return smoothedScaleFlowRate();
+    }
+
+    double span = (m_weightSamples.last().timestamp - m_weightSamples[startIdx].timestamp) / 1000.0;
+    if (span < 0.3) {
+        return smoothedScaleFlowRate();
+    }
+
+    // LSLR over the short window
+    qint64 t0 = m_weightSamples[startIdx].timestamp;
+    double sumT = 0, sumW = 0, sumTW = 0, sumTT = 0;
+    for (int i = startIdx; i < m_weightSamples.size(); ++i) {
+        double t = (m_weightSamples[i].timestamp - t0) / 1000.0;
+        sumT += t;
+        sumW += m_weightSamples[i].weight;
+        sumTW += t * m_weightSamples[i].weight;
+        sumTT += t * t;
+    }
+    double denom = n * sumTT - sumT * sumT;
+    double slope = (denom > 1e-12) ? (n * sumTW - sumT * sumW) / denom : 0.0;
+
+    return qMax(0.0, slope);
+}
+
 void MachineState::tareScale() {
     // Delegate to timing controller if available (new centralized timing)
-    if (m_timingController) {
+    // Exception: Hot water uses legacy tare that waits for scale response.
+    // ShotTimingController::tare() is fire-and-forget (sets m_tareCompleted immediately),
+    // which is fine for espresso (preheat phase absorbs the delay), but hot water
+    // starts flowing immediately — stale pre-tare weight samples would trigger
+    // checkStopAtWeightHotWater() and stop the operation instantly.
+    if (m_timingController && m_phase != Phase::HotWater) {
         m_timingController->tare();
         return;
     }

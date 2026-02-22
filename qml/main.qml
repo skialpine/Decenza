@@ -22,6 +22,11 @@ ApplicationWindow {
     // Flag to open BrewDialog when IdlePage becomes active (set by AutoFavoritesPage)
     property bool pendingBrewDialog: false
 
+    // Track page to return to after steam/flush/water operations complete
+    // This allows returning to postShotReviewPage instead of always going to idlePage
+    property string returnToPageName: ""
+    property int returnToShotId: 0
+
     // True while the first-run restore dialog is active (prevents SettingsDataTab from also handling restore signals)
 
     // Global accessibility: find closest Text within radius of tap
@@ -216,6 +221,7 @@ ApplicationWindow {
                 // Navigate to SteamPage immediately so user sees heating progress
                 var currentPage = pageStack.currentItem ? pageStack.currentItem.objectName : ""
                 if (currentPage !== "steamPage" && !pageStack.busy) {
+                    saveReturnToPage(currentPage)
                     pageStack.replace(steamPage)
                 }
             }
@@ -705,6 +711,10 @@ ApplicationWindow {
         anchors.fill: parent
         initialItem: idlePage
 
+        // CRT shader: render to FBO and process through GPU shader
+        layer.enabled: Settings.activeShader === "crt"
+        layer.effect: CrtShaderEffect {}
+
         // Default: instant transitions (no animation)
         pushEnter: Transition {}
         pushExit: Transition {}
@@ -816,6 +826,17 @@ ApplicationWindow {
         Component {
             id: profileInfoPage
             ProfileInfoPage {}
+        }
+
+        // Status bar (inside pageStack so it's included in the CRT shader FBO)
+        StatusBar {
+            id: statusBar
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: Theme.statusBarHeight
+            z: 600
+            visible: !screensaverActive
         }
     }
 
@@ -1482,6 +1503,7 @@ ApplicationWindow {
     // Completion overlay
     property string completionMessage: ""
     property string completionType: ""  // "steam", "hotwater", "flush"
+    property bool completionPending: false
 
     // Translatable completion messages
     Tr { id: trSteamComplete; key: "main.completion.steam"; fallback: "Steam Complete"; visible: false }
@@ -1551,20 +1573,56 @@ ApplicationWindow {
         id: completionTimer
         interval: 3000
         onTriggered: {
-            console.log("completionTimer: triggered, navigating to idlePage")
+            completionPending = false
             completionOverlay.opacity = 0
-            if (pageStack.currentItem && pageStack.currentItem.objectName !== "idlePage") {
-                pageStack.replace(idlePage)
+
+            // Return to saved page if set, otherwise go to idlePage
+            if (root.returnToPageName === "postShotReviewPage") {
+                var shotId = root.returnToShotId > 0 ? root.returnToShotId : MainController.lastSavedShotId
+                pageStack.replace(postShotReviewPage, { editShotId: shotId })
+            } else {
+                if (pageStack.currentItem && pageStack.currentItem.objectName !== "idlePage") {
+                    pageStack.replace(idlePage)
+                }
             }
+
+            // Clear return-to tracking
+            root.returnToPageName = ""
+            root.returnToShotId = 0
         }
     }
 
     function showCompletion(message, type) {
-        console.log("showCompletion: message='" + message + "' type='" + type + "' currentPage=" + (pageStack.currentItem ? pageStack.currentItem.objectName : "null"))
         completionMessage = message
         completionType = type
+        completionPending = true
         completionOverlay.opacity = 1  // Instant (Behavior disabled when opacity is 0)
-        completionTimer.start()
+        completionTimer.restart()
+    }
+
+    // Save current page info before navigating to operation pages (steam/flush/water)
+    // so we can return there after the operation completes
+    function saveReturnToPage(pageName) {
+        // Only save if we're on a "return-worthy" page
+        // If we're on an operation page (steam/flush/water), preserve any existing return tracking
+        // This handles chained operations like: postShotReview → steam → flush → postShotReview
+        if (pageName === "postShotReviewPage") {
+            root.returnToPageName = pageName
+            // Get the editShotId from the current page, fallback to lastSavedShotId
+            var currentItem = pageStack.currentItem
+            var hasEditShotId = currentItem && typeof currentItem.editShotId !== "undefined"
+            if (hasEditShotId && currentItem.editShotId > 0) {
+                root.returnToShotId = currentItem.editShotId
+            } else {
+                root.returnToShotId = MainController.lastSavedShotId
+            }
+        } else if (pageName === "steamPage" || pageName === "hotWaterPage" || pageName === "flushPage") {
+            // On an operation page - preserve existing return tracking (if any)
+        } else {
+            // For other pages (like idlePage), clear the return tracking
+            root.returnToPageName = ""
+            root.returnToShotId = 0
+        }
     }
 
     // BLE refresh overlay - shown while cycling BLE connections
@@ -1597,6 +1655,13 @@ ApplicationWindow {
                 font: Theme.bodyFont
             }
         }
+    }
+
+    // CRT / Pip-Boy shader overlay (renders above all content including status bar)
+    CrtOverlay {
+        id: crtOverlay
+        anchors.fill: parent
+        z: 950  // Above statusBar (600), below touch capture (1000)
     }
 
     // Espresso stop reason overlay (shown on top of any page)
@@ -1912,17 +1977,6 @@ ApplicationWindow {
         onTriggered: BLEManager.startScan()
     }
 
-    // Status bar overlay (hidden during screensaver)
-    StatusBar {
-        id: statusBar
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: Theme.statusBarHeight
-        z: 600  // Above completionOverlay (500)
-        visible: !screensaverActive
-    }
-
     // Track previous phase to detect operation starts
     property int previousPhase: MachineStateType.Phase.Disconnected
 
@@ -1979,6 +2033,22 @@ ApplicationWindow {
             // Update previous phase tracking
             root.previousPhase = phase
 
+            // Cancel any pending completion overlay when a new operation starts
+            // (e.g., second GHC flush within 3s of first flush ending)
+            if (phase === MachineStateType.Phase.Flushing ||
+                phase === MachineStateType.Phase.Steaming ||
+                phase === MachineStateType.Phase.HotWater ||
+                phase === MachineStateType.Phase.EspressoPreheating ||
+                phase === MachineStateType.Phase.Preinfusion ||
+                phase === MachineStateType.Phase.Pouring) {
+                if (completionPending) {
+                    console.log("Cancelling pending completion - new operation started (phase=" + phase + ")")
+                    completionPending = false
+                    completionTimer.stop()
+                    completionOverlay.opacity = 0
+                }
+            }
+
             // Navigate to active operation pages (skip during page transition)
             if (phase === MachineStateType.Phase.EspressoPreheating ||
                 phase === MachineStateType.Phase.Preinfusion ||
@@ -1989,14 +2059,17 @@ ApplicationWindow {
                 }
             } else if (phase === MachineStateType.Phase.Steaming) {
                 if (currentPage !== "steamPage" && !pageStack.busy) {
+                    saveReturnToPage(currentPage)
                     pageStack.replace(steamPage)
                 }
             } else if (phase === MachineStateType.Phase.HotWater) {
                 if (currentPage !== "hotWaterPage" && !pageStack.busy) {
+                    saveReturnToPage(currentPage)
                     pageStack.replace(hotWaterPage)
                 }
             } else if (phase === MachineStateType.Phase.Flushing) {
                 if (currentPage !== "flushPage" && !pageStack.busy) {
+                    saveReturnToPage(currentPage)
                     pageStack.replace(flushPage)
                 }
             } else if (phase === MachineStateType.Phase.Descaling) {
@@ -2048,9 +2121,24 @@ ApplicationWindow {
     // Note: Page announcements are handled centrally by announceCurrentPage() on page change
     function goToIdle() {
         if (!startNavigation()) return
-        if (pageStack.currentItem && pageStack.currentItem.objectName !== "idlePage") {
+        var currentPage = pageStack.currentItem ? pageStack.currentItem.objectName : ""
+
+        // When leaving operation pages, check if we should return to a saved page
+        if ((currentPage === "steamPage" || currentPage === "hotWaterPage" || currentPage === "flushPage") &&
+            root.returnToPageName === "postShotReviewPage") {
+            var shotId = root.returnToShotId > 0 ? root.returnToShotId : MainController.lastSavedShotId
+            pageStack.replace(postShotReviewPage, { editShotId: shotId })
+            root.returnToPageName = ""
+            root.returnToShotId = 0
+            return
+        }
+
+        if (currentPage !== "idlePage") {
             pageStack.replace(idlePage)
         }
+        // Clear return tracking when going to idle from non-operation pages
+        root.returnToPageName = ""
+        root.returnToShotId = 0
     }
 
     function goToEspresso() {

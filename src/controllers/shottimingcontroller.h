@@ -67,7 +67,7 @@ public:
     // Data ingestion (called by MainController)
     void onShotSample(const ShotSample& sample, double pressureGoal, double flowGoal,
                       double tempGoal, int frameNumber, bool isFlowMode);
-    void onWeightSample(double weight, double flowRate);
+    void onWeightSample(double weight, double flowRate, double flowRateShort = 0);
 
     // Tare control
     void tare();
@@ -118,6 +118,7 @@ private:
     // Weight state
     double m_weight = 0;
     double m_flowRate = 0;
+    double m_flowRateShort = 0;  // 500ms LSLR for SOW decisions (less stale than 1s)
     double m_targetWeight = 0;
     bool m_stopAtWeightTriggered = false;
     int m_frameWeightSkipSent = -1;  // Frame for which we've sent weight-based skip
@@ -134,6 +135,17 @@ private:
     double m_lastStableWeight = 0.0;  // For detecting weight stabilization
     qint64 m_lastWeightChangeTime = 0; // Timestamp of last significant weight change (ms)
     double m_settlingPeakWeight = 0.0; // Peak weight seen during settling (for cup removal detection)
+
+    // Rolling average for settling stability detection
+    // Tolerates oscillations by checking if the average weight has stopped drifting
+    static constexpr int SETTLING_WINDOW_SIZE = 6;    // ~1.5s of samples at ~4Hz
+    static constexpr double SETTLING_AVG_THRESHOLD = 0.3; // Max avg drift to declare stable (g)
+    static constexpr int SETTLING_STABLE_MS = 1000;   // How long avg must be stable (ms)
+    double m_settlingWindow[SETTLING_WINDOW_SIZE] = {};
+    int m_settlingWindowCount = 0;
+    int m_settlingWindowIndex = 0;
+    double m_lastSettlingAvg = 0.0;
+    qint64 m_settlingAvgStableSince = 0; // When the rolling avg stopped drifting
 
     // Tare state machine
     TareState m_tareState = TareState::Idle;

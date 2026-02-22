@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(Decenza_DE1 VERSION 1.5.4 LANGUAGES CXX)
+project(Decenza_DE1 VERSION 1.5.5 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -52,6 +52,14 @@ find_package(Qt6 REQUIRED COMPONENTS
     Sql
     Positioning
 )
+
+# Optional: ShaderTools (for GPU CRT/Pip-Boy shader effect)
+find_package(Qt6 QUIET COMPONENTS ShaderTools)
+if(Qt6ShaderTools_FOUND)
+    message(STATUS "Qt6ShaderTools found - GPU shader effects enabled")
+else()
+    message(STATUS "Qt6ShaderTools not found - GPU shader effects disabled (Canvas fallback)")
+endif()
 
 # Optional: Quick3D (only used for screensavers)
 if(ENABLE_QUICK3D)
@@ -407,6 +415,7 @@ set(QML_FILES
     qml/pages/DialingAssistantPage.qml
     qml/pages/ShotHistoryPage.qml
     qml/pages/AutoFavoritesPage.qml
+    qml/pages/AutoFavoriteInfoPage.qml
     qml/pages/ShotDetailPage.qml
     qml/pages/ShotComparisonPage.qml
     qml/pages/FlowCalibrationPage.qml
@@ -449,6 +458,7 @@ set(QML_FILES
     qml/components/AccessibleMouseArea.qml
     qml/components/AccessibleTapHandler.qml
     qml/components/AccessibleButton.qml
+    qml/components/ExpandableTextArea.qml
     qml/components/FocusIndicator.qml
     qml/components/ColorWheel.qml
     qml/components/ColorEditor.qml
@@ -477,6 +487,8 @@ set(QML_FILES
     qml/components/UnsavedChangesDialog.qml
     qml/components/SwipeableArea.qml
     qml/components/CrashReportDialog.qml
+    qml/components/CrtOverlay.qml
+    qml/components/CrtShaderEffect.qml
     qml/components/ReportAdviceDialog.qml
 
     qml/components/layout/LayoutItemDelegate.qml
@@ -536,6 +548,16 @@ qt_add_qml_module(Decenza_DE1
     QML_FILES ${QML_FILES}
     NO_GENERATE_EXTRA_QMLDIRS
 )
+
+# Compile CRT shader for GPU effect (requires ShaderTools)
+if(Qt6ShaderTools_FOUND)
+    qt_add_shaders(Decenza_DE1 "crt_shaders"
+        BATCHABLE
+        PREFIX "/"
+        FILES
+            shaders/crt.frag
+    )
+endif()
 
 # Increment version code on every build.
 # BYPRODUCTS tells Ninja that this target produces version_code.cpp, so dependents

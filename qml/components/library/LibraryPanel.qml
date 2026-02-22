@@ -20,6 +20,7 @@ Rectangle {
     property bool showItems: true
     property bool showZones: true
     property bool showLayouts: true
+    property bool showThemes: true
 
     // Type of the currently selected entry ("item", "zone", "layout", or "")
     readonly property string selectedEntryType: {
@@ -106,11 +107,12 @@ Rectangle {
                 border.color: displayMode === 1 ? Theme.primaryColor : Theme.borderColor
                 border.width: 1
 
-                Text {
+                Image {
                     anchors.centerIn: parent
-                    text: "\u2630"  // List icon
-                    color: displayMode === 1 ? "white" : Theme.textSecondaryColor
-                    font.pixelSize: Theme.scaled(14)
+                    source: "qrc:/icons/list.svg"
+                    sourceSize.width: Theme.scaled(14)
+                    sourceSize.height: Theme.scaled(14)
+                    opacity: displayMode === 1 ? 1.0 : 0.4
                 }
 
                 MouseArea {
@@ -295,7 +297,7 @@ Rectangle {
                 border.width: 1
                 opacity: applyEnabled ? 1.0 : 0.4
 
-                property bool applyEnabled: WidgetLibrary.selectedEntryId !== "" && (selectedEntryType === "layout" || selectedZoneName !== "")
+                property bool applyEnabled: WidgetLibrary.selectedEntryId !== "" && (selectedEntryType === "layout" || selectedEntryType === "theme" || selectedZoneName !== "")
 
                 Image {
                     anchors.centerIn: parent
@@ -411,6 +413,22 @@ Rectangle {
                 }
                 MouseArea { anchors.fill: parent; onClicked: showLayouts = !showLayouts }
             }
+
+            // Type filter: Themes
+            Rectangle {
+                width: Theme.scaled(30); height: Theme.scaled(30)
+                radius: Theme.scaled(4)
+                color: showThemes ? Theme.primaryColor : "transparent"
+                border.color: showThemes ? Theme.primaryColor : Theme.borderColor
+                border.width: 1
+                Text {
+                    anchors.centerIn: parent; text: "T"
+                    color: showThemes ? "white" : Theme.textSecondaryColor
+                    font.family: Theme.captionFont.family
+                    font.pixelSize: Theme.scaled(12); font.bold: true
+                }
+                MouseArea { anchors.fill: parent; onClicked: showThemes = !showThemes }
+            }
         }
 
         // Library entries list
@@ -426,13 +444,14 @@ Rectangle {
                 var entries = activeTab === "local" ? WidgetLibrary.entries
                             : activeTab === "community" ? LibrarySharing.communityEntries
                             : []
-                if (showItems && showZones && showLayouts) return entries
+                if (showItems && showZones && showLayouts && showThemes) return entries
                 var result = []
                 for (var i = 0; i < entries.length; i++) {
                     var t = entries[i].type || ""
                     if ((t === "item" && showItems) ||
                         (t === "zone" && showZones) ||
-                        (t === "layout" && showLayouts))
+                        (t === "layout" && showLayouts) ||
+                        (t === "theme" && showThemes))
                         result.push(entries[i])
                 }
                 return result
@@ -557,7 +576,7 @@ Rectangle {
         // Local entry - apply directly
         var entry = WidgetLibrary.getEntry(entryId)
         if (entry && entry.type) {
-            if (entry.type !== "layout" && !selectedZoneName) {
+            if (entry.type !== "layout" && entry.type !== "theme" && !selectedZoneName) {
                 showToast("Select a zone to apply to", Theme.warningColor)
                 return
             }
@@ -575,7 +594,7 @@ Rectangle {
             }
         }
         if (!type) return
-        if (type !== "layout" && !selectedZoneName) {
+        if (type !== "layout" && type !== "theme" && !selectedZoneName) {
             showToast("Select a zone to apply to", Theme.warningColor)
             return
         }
@@ -595,6 +614,9 @@ Rectangle {
                 break
             case "layout":
                 WidgetLibrary.applyLayout(entryId)
+                break
+            case "theme":
+                WidgetLibrary.applyThemeEntry(entryId)
                 break
         }
     }

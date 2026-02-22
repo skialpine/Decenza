@@ -31,6 +31,10 @@
 #include <QVariantMap>
 #include <QRandomGenerator>
 #include <algorithm>
+#include <QCoreApplication>
+#ifdef Q_OS_ANDROID
+#include <QJniObject>
+#endif
 
 #ifndef Q_OS_WIN
 #include <dlfcn.h>   // For dladdr() to resolve caller symbols
@@ -1606,11 +1610,7 @@ void MainController::createNewProfileWithEditorType(EditorType type, const QStri
     recipe.editorType = type;
     recipe.clamp();  // Ensure values are within hardware limits
 
-    // Preserve notes from original profile
-    QString notes = m_currentProfile.profileNotes();
-
     m_currentProfile = RecipeGenerator::createProfile(recipe, title);
-    m_currentProfile.setProfileNotes(notes);
     m_baseProfileName = "";
     m_profileModified = true;
 
@@ -2090,6 +2090,7 @@ void MainController::sendMachineSettings() {
              << ", phase:" << phase << ", configuredTemp:" << m_settings->steamTemperature() << ")";
 
     double groupTemp = getGroupTemperature();
+    qDebug() << "sendMachineSettings: sending groupTemp" << groupTemp << "°C";
 
     // Hot water volume: only send actual ml in volume mode (machine auto-stops via flowmeter).
     // In weight mode send 0 so the app controls stop via scale instead.
@@ -2191,8 +2192,13 @@ void MainController::applyHeaterTweaks() {
 
 double MainController::getGroupTemperature() const {
     if (m_settings && m_settings->hasTemperatureOverride()) {
-        return m_settings->temperatureOverride();
+        double overrideTemp = m_settings->temperatureOverride();
+        qDebug() << "getGroupTemperature: using override" << overrideTemp << "°C"
+                 << "(profile base:" << m_currentProfile.espressoTemperature() << "°C)";
+        return overrideTemp;
     }
+    qDebug() << "getGroupTemperature: no override, using profile"
+             << m_currentProfile.espressoTemperature() << "°C";
     return m_currentProfile.espressoTemperature();
 }
 
@@ -2817,6 +2823,36 @@ void MainController::clearCrashLog() {
     }
 }
 
+void MainController::factoryResetAndQuit()
+{
+    qWarning() << "MainController::factoryResetAndQuit() - Starting factory reset";
+
+    // 1. Stop the web server so it can't serve during wipe
+    if (m_shotServer) {
+        m_shotServer->stop();
+    }
+
+    // 2. Close the shot database so files can be deleted
+    if (m_shotHistory) {
+        m_shotHistory->close();
+    }
+
+    // 3. Wipe all data
+    m_settings->factoryReset();
+
+    // 4. Platform-specific exit
+#ifdef Q_OS_ANDROID
+    // Launch system uninstall dialog
+    QJniObject::callStaticMethod<void>(
+        "io/github/kulitorum/decenza_de1/StorageHelper",
+        "requestUninstall",
+        "()V");
+#endif
+
+    // 5. Quit the app
+    QCoreApplication::quit();
+}
+
 void MainController::onShotSampleReceived(const ShotSample& sample) {
     if (!m_shotDataModel || !m_machineState) {
         return;
@@ -2839,7 +2875,9 @@ void MainController::onShotSampleReceived(const ShotSample& sample) {
             // Shadow: feed FlowScale in parallel when a physical scale is active.
             // When FlowScale IS the active scale, MachineState already feeds it,
             // so only feed here when using a physical scale (to avoid double-counting).
-            if (m_flowScale && m_bleManager && m_bleManager->scaleDevice() &&
+            // Only runs when useFlowScale is enabled (virtual scale preference).
+            if (m_flowScale && m_settings && m_settings->useFlowScale() &&
+                m_bleManager && m_bleManager->scaleDevice() &&
                 m_bleManager->scaleDevice()->isConnected()) {
                 m_flowScale->addFlowSample(sample.groupFlow, deltaTime);
             }
@@ -2983,9 +3021,18 @@ void MainController::onScaleWeightChanged(double weight) {
         return;
     }
 
+    // Forward to timing controller FIRST (handles stop-at-weight on the critical path)
+    // SOW check must run before any debug logging to minimize latency.
+    // Pass both 1s LSLR (for graph) and 500ms LSLR (for SOW decisions).
+    if (m_timingController) {
+        m_timingController->onWeightSample(weight, m_machineState->smoothedScaleFlowRate(),
+                                           m_machineState->smoothedScaleFlowRateShort());
+    }
+
     // FlowScale comparison logging: log both physical scale and FlowScale estimated weight
-    // during espresso extraction to validate puck absorption model
-    if (m_flowScale && m_extractionStarted) {
+    // during espresso extraction to validate puck absorption model.
+    // Only logs when useFlowScale is enabled to avoid confusing 0.0g entries.
+    if (m_flowScale && m_extractionStarted && m_settings && m_settings->useFlowScale()) {
         MachineState::Phase phase = m_machineState->phase();
         if (phase == MachineState::Phase::Preinfusion ||
             phase == MachineState::Phase::Pouring ||
@@ -3001,13 +3048,6 @@ void MainController::onScaleWeightChanged(double weight) {
                 << " err=" << QString::number(error, 'f', 1) << "g"
                 << " phase=" << (phase == MachineState::Phase::Preinfusion ? "PI" : "Pour");
         }
-    }
-
-    // Forward to timing controller which handles stop-at-weight and graph data
-    // Use 1-second time-windowed average — the raw scale derivative is too noisy
-    // (variable BLE timing amplifies small weight deltas into huge g/s spikes)
-    if (m_timingController) {
-        m_timingController->onWeightSample(weight, m_machineState->smoothedScaleFlowRate());
     }
 }
 

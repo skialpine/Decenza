@@ -23,6 +23,13 @@ inline constexpr const char* WEB_HTML_THEME_BODY = R"HTML(
             </div>
         </div>
 
+        <!-- Shaders -->
+        <div class="shader-panel">
+            <div class="shader-panel-title">Screen Effects</div>
+            <div class="shader-list" id="shaderList"></div>
+            <div id="shaderParams"></div>
+        </div>
+
         <!-- Library & Community -->
         <div class="library-section">
             <div class="section-title">Library & Community</div>
@@ -83,6 +90,13 @@ inline constexpr const char* WEB_HTML_THEME_BODY = R"HTML(
             <button class="btn btn-primary" onclick="saveTheme()">Save</button>
         </div>
     </div>
+</div>
+
+<!-- Shader overlay (fixed, covers viewport, pointer-events:none) -->
+<div class="shader-overlay" id="shaderOverlay">
+    <div class="shader-scanlines" id="shaderScanlines" style="display:none"></div>
+    <canvas class="shader-noise" id="shaderNoise" style="display:none"></canvas>
+    <div class="shader-vignette" id="shaderVignette" style="display:none"></div>
 </div>
 
 <div class="lib-toast" id="libToast"></div>
