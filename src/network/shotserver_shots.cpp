@@ -1445,7 +1445,7 @@ QString ShotServer::generateShotDetailPage(qint64 shotId) const
             drinkTds: %37,
             drinkEy: %38
         };
-    </script>
+    </script>)HTML" R"HTML(
 
     <script>
         function downloadProfile() {
