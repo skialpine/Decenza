@@ -79,20 +79,6 @@ if(Qt6_VERSION VERSION_GREATER_EQUAL "6.5.0")
     qt_policy(SET QTP0004 NEW)
 endif()
 
-# Fetch Eclipse Paho MQTT C library (industry-standard, works with FetchContent)
-include(FetchContent)
-FetchContent_Declare(
-    paho_mqtt_c
-    GIT_REPOSITORY https://github.com/eclipse/paho.mqtt.c.git
-    GIT_TAG        v1.3.13
-)
-set(PAHO_BUILD_STATIC ON CACHE BOOL "" FORCE)
-set(PAHO_BUILD_SHARED OFF CACHE BOOL "" FORCE)
-set(PAHO_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
-set(PAHO_WITH_SSL OFF CACHE BOOL "" FORCE)
-set(PAHO_HIGH_PERFORMANCE OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(paho_mqtt_c)
-
 # Enable QML debugging in debug builds
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_definitions(QT_QML_DEBUG)
@@ -129,11 +115,29 @@ if(NOT ANDROID AND NOT IOS)
     find_package(OpenSSL REQUIRED)
 endif()
 
-# Paho MQTT bundles its own SHA1 which conflicts with OpenSSL's SHA1_* symbols
-# when both are linked as static libraries. Suppress duplicate symbol errors.
-if(APPLE AND NOT IOS)
-    add_link_options("-Wl,-ld_classic" "-Wl,-multiply_defined,suppress")
+# Fetch Eclipse Paho MQTT C library (industry-standard, works with FetchContent)
+# OpenSSL must be found BEFORE this block so Paho can link against it.
+# PAHO_WITH_SSL ON makes Paho use OpenSSL's SHA1 instead of bundling its own,
+# which avoids duplicate SHA1_Init/Final/Update symbols on macOS when both
+# Paho and OpenSSL are linked as static libraries.
+include(FetchContent)
+FetchContent_Declare(
+    paho_mqtt_c
+    GIT_REPOSITORY https://github.com/eclipse/paho.mqtt.c.git
+    GIT_TAG        v1.3.13
+)
+set(PAHO_BUILD_STATIC ON CACHE BOOL "" FORCE)
+set(PAHO_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(PAHO_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+if(NOT ANDROID AND NOT IOS)
+    # Desktop: use OpenSSL's SHA1 to avoid duplicate symbols with libcrypto.a
+    set(PAHO_WITH_SSL ON CACHE BOOL "" FORCE)
+else()
+    # Android: KDAB provides OpenSSL separately; iOS: no OpenSSL at all
+    set(PAHO_WITH_SSL OFF CACHE BOOL "" FORCE)
 endif()
+set(PAHO_HIGH_PERFORMANCE OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(paho_mqtt_c)
 
 # Address Sanitizer - enabled for single-config Debug builds (Makefiles, Ninja).
 # Multi-config generators (Visual Studio, Xcode) don't set CMAKE_BUILD_TYPE at
@@ -376,8 +380,15 @@ target_link_libraries(Decenza_DE1 PRIVATE
     Qt6::Network
     Qt6::Sql
     Qt6::Positioning
-    paho-mqtt3a-static
 )
+
+# Link Paho MQTT - use SSL variant (paho-mqtt3as) on desktop where OpenSSL is
+# statically linked (avoids duplicate SHA1 symbols), non-SSL on mobile
+if(NOT ANDROID AND NOT IOS)
+    target_link_libraries(Decenza_DE1 PRIVATE paho-mqtt3as-static)
+else()
+    target_link_libraries(Decenza_DE1 PRIVATE paho-mqtt3a-static)
+endif()
 
 # Link OpenSSL (non-Android, non-iOS; Android uses add_android_openssl_libraries below)
 if(NOT ANDROID AND NOT IOS)
