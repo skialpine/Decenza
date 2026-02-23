@@ -123,9 +123,9 @@ if(IOS)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -x objective-c++")
 endif()
 
-# OpenSSL for HTTPS/TLS and WebAuthn signature verification
-# Android uses KDAB android_openssl (fetched above), other platforms use system OpenSSL
-if(NOT ANDROID)
+# OpenSSL for HTTPS/TLS and self-signed certificate generation
+# Android uses KDAB android_openssl (fetched above), iOS doesn't need it (no web server)
+if(NOT ANDROID AND NOT IOS)
     find_package(OpenSSL REQUIRED)
 endif()
 
@@ -373,8 +373,8 @@ target_link_libraries(Decenza_DE1 PRIVATE
     paho-mqtt3a-static
 )
 
-# Link OpenSSL (non-Android; Android uses add_android_openssl_libraries below)
-if(NOT ANDROID)
+# Link OpenSSL (non-Android, non-iOS; Android uses add_android_openssl_libraries below)
+if(NOT ANDROID AND NOT IOS)
     target_link_libraries(Decenza_DE1 PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
