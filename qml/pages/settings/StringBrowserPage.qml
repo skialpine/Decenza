@@ -222,11 +222,13 @@ Page {
                         anchors.margins: Theme.scaled(8)
                         spacing: Theme.scaled(8)
 
-                        Text {
+                        Image {
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "\u{1F50D}"
-                            font.pixelSize: Theme.scaled(14)
-                            color: Theme.textSecondaryColor
+                            source: Theme.emojiToImage("🔍")
+                            sourceSize.width: Theme.scaled(14)
+                            sourceSize.height: Theme.scaled(14)
+                            width: Theme.scaled(14)
+                            height: Theme.scaled(14)
                         }
 
                         TextInput {
