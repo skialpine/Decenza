@@ -66,6 +66,7 @@ public:
     Q_INVOKABLE QString modelDisplayName(const QString& providerId) const;
     AIConversation* conversation() const { return m_conversation; }
     bool hasAnyConversation() const { return !m_conversationIndex.isEmpty(); }
+    QList<ConversationEntry> conversationIndex() const { return m_conversationIndex; }
 
     // Conversation routing
     Q_INVOKABLE QString switchConversation(const QString& beanBrand, const QString& beanType, const QString& profileName);
@@ -191,7 +192,9 @@ private:
     QString m_lastSystemPrompt;
     QString m_lastUserPrompt;
 
-    // Conversation routing
+public:
+    void reloadConversations() { loadConversationIndex(); }
+private:
     void loadConversationIndex();
     void saveConversationIndex();
     void touchConversationEntry(const QString& key);
