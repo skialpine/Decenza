@@ -237,6 +237,7 @@ void ShotServer::stop()
         m_cleanupTimer->stop();
         m_sseLayoutClients.clear();
         m_sseThemeClients.clear();
+        m_keepAliveTimers.clear();
         m_server->close();
         delete m_server;
         m_server = nullptr;
@@ -264,6 +265,10 @@ void ShotServer::onReadyRead()
     // SSE clients keep connections open — ignore further data from them
     if (m_sseLayoutClients.contains(socket)) return;
     if (m_sseThemeClients.contains(socket)) return;
+
+    // Stop keep-alive idle timer while processing incoming request data
+    if (QTimer* t = m_keepAliveTimers.value(socket))
+        t->stop();
 
     try {
         PendingRequest& pending = m_pendingRequests[socket];
@@ -451,6 +456,7 @@ void ShotServer::onDisconnected()
     if (socket) {
         m_sseLayoutClients.remove(socket);
         m_sseThemeClients.remove(socket);
+        m_keepAliveTimers.remove(socket);
         cleanupPendingRequest(socket);
         m_pendingRequests.remove(socket);
         socket->deleteLater();
@@ -1121,6 +1127,8 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
         socket->write(sseHeaders);
         socket->flush();
         m_sseThemeClients.insert(socket);
+        if (QTimer* t = m_keepAliveTimers.take(socket))
+            t->stop();
     }
     // Theme API endpoints
     else if (path == "/api/theme" || path.startsWith("/api/theme/")) {
@@ -1142,6 +1150,8 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
         socket->write(headers);
         socket->flush();
         m_sseLayoutClients.insert(socket);
+        if (QTimer* t = m_keepAliveTimers.take(socket))
+            t->stop();
     }
     else if (path == "/api/layout" || path.startsWith("/api/layout/") || path.startsWith("/api/layout?")
              || path.startsWith("/api/library") || path.startsWith("/api/community")) {
@@ -1188,7 +1198,8 @@ void ShotServer::sendResponse(QTcpSocket* socket, int statusCode, const QString&
     if (!isSecurityEnabled()) {
         response.append("Access-Control-Allow-Origin: *\r\n");
     }
-    response.append("Connection: close\r\n");
+    response.append("Connection: keep-alive\r\n");
+    response.append(QString("Keep-Alive: timeout=%1\r\n").arg(KEEPALIVE_TIMEOUT_S).toUtf8());
     if (!extraHeaders.isEmpty()) {
         response.append(extraHeaders);
     }
@@ -1197,18 +1208,24 @@ void ShotServer::sendResponse(QTcpSocket* socket, int statusCode, const QString&
 
     socket->write(response);
     socket->flush();
-    // Defer close to allow SSL to finish sending encrypted data
-    connect(socket, &QTcpSocket::bytesWritten, socket, [socket](qint64) {
-        if (socket->bytesToWrite() == 0) {
+
+    // Reset idle timer — close connection if no new request arrives
+    resetKeepAliveTimer(socket);
+}
+
+void ShotServer::resetKeepAliveTimer(QTcpSocket* socket)
+{
+    QTimer* timer = m_keepAliveTimers.value(socket);
+    if (!timer) {
+        timer = new QTimer(socket);
+        timer->setSingleShot(true);
+        connect(timer, &QTimer::timeout, socket, [this, socket]() {
+            m_keepAliveTimers.remove(socket);
             socket->disconnectFromHost();
-        }
-    });
-    // Fallback: close after timeout if bytesWritten never fires
-    QTimer::singleShot(5000, socket, [socket]() {
-        if (socket->state() != QAbstractSocket::UnconnectedState) {
-            socket->close();
-        }
-    });
+        });
+        m_keepAliveTimers[socket] = timer;
+    }
+    timer->start(KEEPALIVE_TIMEOUT_S * 1000);
 }
 
 void ShotServer::sendJson(QTcpSocket* socket, const QByteArray& json)
@@ -1293,20 +1310,12 @@ void ShotServer::sendRedirect(QTcpSocket* socket, const QString& location, const
         response.append(QString("Set-Cookie: %1\r\n").arg(setCookie).toUtf8());
     }
     response.append("Content-Length: 0\r\n");
-    response.append("Connection: close\r\n");
+    response.append("Connection: keep-alive\r\n");
+    response.append(QString("Keep-Alive: timeout=%1\r\n").arg(KEEPALIVE_TIMEOUT_S).toUtf8());
     response.append("\r\n");
     socket->write(response);
     socket->flush();
-    connect(socket, &QTcpSocket::bytesWritten, socket, [socket](qint64) {
-        if (socket->bytesToWrite() == 0) {
-            socket->disconnectFromHost();
-        }
-    });
-    QTimer::singleShot(5000, socket, [socket]() {
-        if (socket->state() != QAbstractSocket::UnconnectedState) {
-            socket->close();
-        }
-    });
+    resetKeepAliveTimer(socket);
 }
 
 #ifdef Q_OS_IOS
