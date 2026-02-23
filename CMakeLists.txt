@@ -129,6 +129,12 @@ if(NOT ANDROID AND NOT IOS)
     find_package(OpenSSL REQUIRED)
 endif()
 
+# Paho MQTT bundles its own SHA1 which conflicts with OpenSSL's SHA1_* symbols
+# when both are linked as static libraries. Use ld_classic to allow duplicates.
+if(APPLE AND NOT IOS)
+    add_link_options("-Wl,-ld_classic")
+endif()
+
 # Address Sanitizer - enabled for single-config Debug builds (Makefiles, Ninja).
 # Multi-config generators (Visual Studio, Xcode) don't set CMAKE_BUILD_TYPE at
 # configure time, so flags would leak into Release builds. Android requires special
