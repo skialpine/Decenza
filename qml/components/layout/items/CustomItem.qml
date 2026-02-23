@@ -58,6 +58,7 @@ Item {
             void(MainController.brewByRatio); void(MainController.brewByRatioDose)
         }
         if (typeof DE1Device !== "undefined") void(DE1Device.connected)
+        if (typeof MachineState !== "undefined") void(MachineState.phase)
         if (typeof ScaleDevice !== "undefined" && ScaleDevice) { void(ScaleDevice.name); void(ScaleDevice.connected) }
         if (typeof Settings !== "undefined") { void(Settings.dyeGrinderSetting); void(Settings.dyeGrinderModel) }
         return substituteVariables(_c)
@@ -124,6 +125,11 @@ Item {
         // Grinder
         result = result.replace(/%GRIND%/g, typeof Settings !== "undefined" && Settings.dyeGrinderSetting ? Settings.dyeGrinderSetting : "—")
         result = result.replace(/%GRINDER%/g, typeof Settings !== "undefined" && Settings.dyeGrinderModel ? Settings.dyeGrinderModel : "—")
+        // Machine ready status
+        var machineReady = typeof MachineState !== "undefined" && MachineState.isReady
+        result = result.replace(/%MACHINE_READY%/g, machineReady ? "Ready" : "Not ready")
+        if (result.indexOf("%MACHINE_READY_COLOR%") >= 0)
+            result = result.replace(/%MACHINE_READY_COLOR%/g, machineReady ? Theme.successColor : Theme.errorColor)
         // Connection status
         var machineOn = typeof DE1Device !== "undefined" && DE1Device.connected
         var scaleOn = typeof ScaleDevice !== "undefined" && ScaleDevice && ScaleDevice.connected

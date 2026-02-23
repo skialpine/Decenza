@@ -129,6 +129,8 @@ Variables are placeholders replaced with live data. Wrap them in percent signs: 
 | `%DATE%` | Current date (YYYY-MM-DD) | 2025-01-15 |
 | `%RATIO%` | Brew ratio | 2.0 |
 | `%DOSE%` | Dose weight (g) | 18.0 |
+| `%MACHINE_READY%` | Machine ready status | Ready |
+| `%MACHINE_READY_COLOR%` | Color for ready status (green/red) | #00cc6d |
 | `%CONNECTED%` | Machine connection status | Online |
 | `%CONNECTED_COLOR%` | Color for connection status (green/red) | #00cc6d |
 | `%DEVICES%` | Connected devices description | Machine + Scale |

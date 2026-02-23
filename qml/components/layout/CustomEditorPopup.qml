@@ -153,6 +153,8 @@ Popup {
         result = result.replace(/%SCALE%/g, "Lunar")
         result = result.replace(/%GRIND%/g, "1.8.0")
         result = result.replace(/%GRINDER%/g, "Niche Zero")
+        result = result.replace(/%MACHINE_READY%/g, "Ready")
+        result = result.replace(/%MACHINE_READY_COLOR%/g, Theme.successColor)
         result = result.replace(/%CONNECTED%/g, "Online")
         result = result.replace(/%CONNECTED_COLOR%/g, Theme.successColor)
         result = result.replace(/%DEVICES%/g, "Machine + Scale")
@@ -757,6 +759,8 @@ Popup {
                             { token: "%DOSE%", label: "Dose (g)" },
                             { token: "%GRIND%", label: "Grind Setting" },
                             { token: "%GRINDER%", label: "Grinder Model" },
+                            { token: "%MACHINE_READY%", label: "Ready/Not ready" },
+                            { token: "%MACHINE_READY_COLOR%", label: "Ready Color" },
                             { token: "%CONNECTED%", label: "Online/Offline" },
                             { token: "%CONNECTED_COLOR%", label: "Status Color" },
                             { token: "%DEVICES%", label: "Devices" },

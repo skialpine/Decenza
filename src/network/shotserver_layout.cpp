@@ -1717,6 +1717,8 @@ QString ShotServer::generateLayoutPage() const
                             <div class="var-item" onclick="insertVar('%DATE%')">Date</div>
                             <div class="var-item" onclick="insertVar('%RATIO%')">Ratio</div>
                             <div class="var-item" onclick="insertVar('%DOSE%')">Dose</div>
+                            <div class="var-item" onclick="insertVar('%MACHINE_READY%')">Ready</div>
+                            <div class="var-item" onclick="insertVar('%MACHINE_READY_COLOR%')">Ready Clr</div>
                             <div class="var-item" onclick="insertVar('%CONNECTED%')">Online</div>
                             <div class="var-item" onclick="insertVar('%CONNECTED_COLOR%')">Status Clr</div>
                             <div class="var-item" onclick="insertVar('%DEVICES%')">Devices</div>
@@ -3335,6 +3337,7 @@ QString ShotServer::generateLayoutPage() const
             .replace(/%TARGET_WEIGHT%/g,"36.0").replace(/%PROFILE%/g,"Adaptive v2")
             .replace(/%TARGET_TEMP%/g,"93.0").replace(/%RATIO%/g,"2.0")
             .replace(/%DOSE%/g,"18.0").replace(/%SCALE%/g,"Lunar")
+            .replace(/%MACHINE_READY%/g,"Ready").replace(/%MACHINE_READY_COLOR%/g,"#18c37e")
             .replace(/%CONNECTED%/g,"Online").replace(/%CONNECTED_COLOR%/g,"#18c37e")
             .replace(/%DEVICES%/g,"Machine + Scale")
             .replace(/%MACHINE_CONNECTED%/g,"✅").replace(/%SCALE_CONNECTED%/g,"✅")
@@ -3426,8 +3429,9 @@ QString ShotServer::generateLayoutPage() const
         "%WATER%":"78","%WATER_ML%":"850","%WEIGHT%":"36.2","%SHOT_TIME%":"28.5",
         "%TARGET_WEIGHT%":"36.0","%VOLUME%":"42","%PROFILE%":"Profile","%STATE%":"Idle",
         "%TARGET_TEMP%":"93.0","%SCALE%":"Scale","%RATIO%":"2.0","%DOSE%":"18.0",
-        "%TIME%":"12:30","%DATE%":"2025-01-15","%CONNECTED%":"Online",
-        "%CONNECTED_COLOR%":"#00cc6d","%DEVICES%":"Machine",
+        "%TIME%":"12:30","%DATE%":"2025-01-15",
+        "%MACHINE_READY%":"Ready","%MACHINE_READY_COLOR%":"#00cc6d",
+        "%CONNECTED%":"Online","%CONNECTED_COLOR%":"#00cc6d","%DEVICES%":"Machine",
         "%MACHINE_CONNECTED%":"✅","%SCALE_CONNECTED%":"❌"
     };
 
