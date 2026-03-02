@@ -186,6 +186,11 @@ bool VisualizerImporter::compareProfileFrames(const Profile& a, const Profile& b
     const auto& stepsA = a.steps();
     const auto& stepsB = b.steps();
 
+    // Compare profile-level fields
+    if (qAbs(a.maximumPressure() - b.maximumPressure()) > 0.1) return false;
+    if (qAbs(a.maximumFlow() - b.maximumFlow()) > 0.1) return false;
+    if (qAbs(a.minimumPressure() - b.minimumPressure()) > 0.1) return false;
+
     if (stepsA.size() != stepsB.size()) {
         return false;
     }
@@ -214,9 +219,15 @@ bool VisualizerImporter::compareProfileFrames(const Profile& a, const Profile& b
             if (qAbs(fa.exitFlowUnder - fb.exitFlowUnder) > 0.1) return false;
         }
 
+        // Weight exit (independent of exitIf)
+        if (qAbs(fa.exitWeight - fb.exitWeight) > 0.1) return false;
+
         // Limiter
         if (qAbs(fa.maxFlowOrPressure - fb.maxFlowOrPressure) > 0.1) return false;
         if (qAbs(fa.maxFlowOrPressureRange - fb.maxFlowOrPressureRange) > 0.1) return false;
+
+        // Popup notification
+        if (fa.popup != fb.popup) return false;
     }
 
     return true;
