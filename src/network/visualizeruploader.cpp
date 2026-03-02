@@ -959,10 +959,12 @@ QJsonObject VisualizerUploader::buildVisualizerProfileJson(const Profile* profil
     obj["minimum_pressure"] = QString::number(profile->minimumPressure(), 'f', 1);
     obj["maximum_flow_range_advanced"] = QString::number(profile->maximumFlowRangeAdvanced(), 'f', 1);
     obj["maximum_pressure_range_advanced"] = QString::number(profile->maximumPressureRangeAdvanced(), 'f', 1);
-    obj["tank_temperature"] = QString::number(profile->tankDesiredWaterTemperature(), 'f', 1);
+    obj["tank_desired_water_temperature"] = QString::number(profile->tankDesiredWaterTemperature(), 'f', 1);
+    obj["tank_temperature"] = obj["tank_desired_water_temperature"];  // Legacy key for Visualizer compat
     obj["target_weight"] = QString::number(profile->targetWeight(), 'f', 0);
     obj["target_volume"] = QString::number(profile->targetVolume(), 'f', 0);
-    obj["target_volume_count_start"] = QString::number(profile->preinfuseFrameCount());
+    obj["number_of_preinfuse_frames"] = QString::number(profile->preinfuseFrameCount());
+    obj["target_volume_count_start"] = obj["number_of_preinfuse_frames"];  // Legacy key for Visualizer compat
     obj["legacy_profile_type"] = profile->profileType();
 
     // Derive type from profile_type (matches de1app convention)

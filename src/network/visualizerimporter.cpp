@@ -723,6 +723,11 @@ Profile VisualizerImporter::parseVisualizerProfile(const QJsonObject& json) {
         profile.setTitle(json["title"].toString("Imported Profile"));
     }
 
+    // Safety net: if profile is recipe mode with no steps, generate frames from recipe params
+    if (profile.steps().isEmpty() && profile.isRecipeMode()) {
+        profile.regenerateFromRecipe();
+    }
+
     qDebug() << "Parsed Visualizer profile:" << profile.title()
              << "with" << profile.steps().size() << "steps";
 

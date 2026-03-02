@@ -428,10 +428,10 @@ There are two types of exit conditions:
    - Machine autonomously checks and advances frames
    - Types: `pressure_over`, `pressure_under`, `flow_over`, `flow_under`
 
-2. **App-side exits** (weight): Controlled by `exit_weight` field INDEPENDENTLY
+2. **App-side exits** (weight): Controlled by `weight` field INDEPENDENTLY (legacy `exit_weight` also accepted when reading)
    - App monitors scale weight and sends `SkipToNext` (0x0E) command
    - **CRITICAL**: Weight exit is independent of `exit_if` flag!
-   - A frame can have `exit_if: false` (no machine exit) with `exit_weight: 3.6` (app exit)
+   - A frame can have no `exit` object (no machine exit) with `"weight": 3.6` (app exit)
    - Both can coexist: machine checks pressure/flow, app checks weight
 
 ### Weight Exit Implementation
@@ -523,10 +523,10 @@ Supported metadata fields:
 - Duplicate handling: `saveOverwrite()`, `saveAsNew()`, `saveWithNewName(newTitle)`
 - Keyboard handling for Android: FocusScope + keyboardOffset pattern for text input
 
-### Visualizer Profile Format Conversion
-- Visualizer stores values as strings (we convert to doubles)
-- Exit conditions: `{type, value, condition}` → `exitType`, `exitPressureOver`, etc.
-- Limiter: `{value, range}` → `maxFlowOrPressure`, `maxFlowOrPressureRange`
+### Visualizer Profile Format
+- Visualizer and de1app use the same JSON format with string-encoded numbers (Tcl huddle serialization)
+- The unified `jsonToDouble()` helper and `ProfileFrame::fromJson()` handle string-to-double conversion and nested-to-flat field mapping transparently
+- The Visualizer uploader (`buildVisualizerProfileJson()`) string-encodes numbers to match de1app convention
 
 ## BLE Protocol Notes
 

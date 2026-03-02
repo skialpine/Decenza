@@ -28,6 +28,8 @@ QJsonObject ProfileFrame::toJson() const {
     obj["volume"] = volume;
 
     // Exit condition (de1app nested format)
+    // Note: weight-only exits (exitType == "weight") are NOT written to the exit object —
+    // weight is app-side only, serialized separately as the standalone "weight" key below
     if (exitIf && !exitType.isEmpty()) {
         QJsonObject exitObj;
         if (exitType == "pressure_over") {
@@ -46,6 +48,8 @@ QJsonObject ProfileFrame::toJson() const {
             exitObj["type"] = QStringLiteral("flow");
             exitObj["condition"] = QStringLiteral("under");
             exitObj["value"] = exitFlowUnder;
+        } else if (exitType != "weight") {
+            qWarning() << "ProfileFrame::toJson: unrecognized exitType" << exitType;
         }
         if (!exitObj.isEmpty()) obj["exit"] = exitObj;
     }
@@ -116,6 +120,15 @@ ProfileFrame ProfileFrame::fromJson(const QJsonObject& json) {
         // Flat fields (legacy Decenza format, pre-migration)
         frame.exitIf = json["exit_if"].toBool(false);
         frame.exitType = json["exit_type"].toString();
+        if (frame.exitIf && !frame.exitType.isEmpty()
+            && frame.exitType != "pressure_over" && frame.exitType != "pressure_under"
+            && frame.exitType != "flow_over" && frame.exitType != "flow_under"
+            && frame.exitType != "weight") {
+            qWarning() << "ProfileFrame::fromJson: unrecognized legacy exit_type"
+                       << frame.exitType << "- disabling exit condition";
+            frame.exitIf = false;
+            frame.exitType.clear();
+        }
         frame.exitPressureOver = jsonToDouble(json["exit_pressure_over"], 0.0);
         frame.exitPressureUnder = jsonToDouble(json["exit_pressure_under"], 0.0);
         frame.exitFlowOver = jsonToDouble(json["exit_flow_over"], 0.0);
