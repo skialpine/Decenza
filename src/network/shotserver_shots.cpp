@@ -3361,7 +3361,9 @@ QString ShotServer::generateDebugPage() const
         </div>
     </main>
     <script>
-        /* --- Memory section --- */
+)HTML"
+// Split string literal to stay within MSVC's 16380-char per-segment limit (C2026)
+R"HTML(        /* --- Memory section --- */
         var memoryCollapsed = false;
         var memoryChart = null;
 
