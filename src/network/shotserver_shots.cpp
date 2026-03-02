@@ -3099,6 +3099,7 @@ QString ShotServer::generateDebugPage() const
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Debug &amp; Dev Tools - Decenza DE1</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <style>
         :root {
             --bg: #0d1117;
@@ -3175,15 +3176,73 @@ QString ShotServer::generateDebugPage() const
             margin: 0 auto;
             padding: 1rem;
         }
+        /* Memory section */
+        .memory-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+        .memory-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            user-select: none;
+        }
+        .memory-header:hover { background: rgba(255,255,255,0.03); }
+        .memory-header h2 { font-size: 0.875rem; font-weight: 600; }
+        .memory-toggle { color: var(--text-secondary); font-size: 0.75rem; }
+        .memory-body { padding: 0 1rem 1rem; }
+        .memory-body.collapsed { display: none; }
+        .memory-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .memory-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.75rem;
+            text-align: center;
+        }
+        .memory-card .label {
+            font-size: 0.6875rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .memory-card .value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-top: 0.25rem;
+        }
+        .memory-card .unit {
+            font-size: 0.75rem;
+            font-weight: 400;
+            color: var(--text-secondary);
+        }
+        .chart-container {
+            position: relative;
+            height: 200px;
+        }
         .log-container {
             background: #000;
             border: 1px solid var(--border);
             border-radius: 8px;
-            height: calc(100vh - 120px);
+            height: calc(100vh - 500px);
             overflow-y: auto;
             font-family: "Consolas", "Monaco", "Courier New", monospace;
             font-size: 12px;
             padding: 0.5rem;
+        }
+        .log-container.expanded {
+            height: calc(100vh - 120px);
         }
         .log-line {
             white-space: pre;
@@ -3215,6 +3274,43 @@ QString ShotServer::generateDebugPage() const
         </div>
     </header>
     <main class="container">
+        <div class="memory-section" id="memorySection">
+            <div class="memory-header" onclick="toggleMemory()">
+                <h2>Memory</h2>
+                <span class="memory-toggle" id="memoryToggle">Collapse</span>
+            </div>
+            <div class="memory-body" id="memoryBody">
+                <div class="memory-cards">
+                    <div class="memory-card">
+                        <div class="label">Current RSS</div>
+                        <div class="value" id="memCurrent">--</div>
+                    </div>
+                    <div class="memory-card">
+                        <div class="label">Peak RSS</div>
+                        <div class="value" id="memPeak">--</div>
+                    </div>
+                    <div class="memory-card">
+                        <div class="label">Startup RSS</div>
+                        <div class="value" id="memStartup">--</div>
+                    </div>
+                    <div class="memory-card">
+                        <div class="label">Growth</div>
+                        <div class="value" id="memGrowth">--</div>
+                    </div>
+                    <div class="memory-card">
+                        <div class="label">QObjects</div>
+                        <div class="value" id="memObjects">--</div>
+                    </div>
+                    <div class="memory-card">
+                        <div class="label">Uptime</div>
+                        <div class="value" id="memUptime">--</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="memoryChart"></canvas>
+                </div>
+            </div>
+        </div>
         <div style="margin-bottom:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
             <a href="/database.db" class="btn" style="text-decoration:none;">&#128190; Download Database</a>
             <button class="btn" onclick="downloadLog()">&#128196; Download Log</button>
@@ -3223,6 +3319,138 @@ QString ShotServer::generateDebugPage() const
         <div class="log-container" id="logContainer"></div>
     </main>
     <script>
+        /* --- Memory section --- */
+        var memoryCollapsed = false;
+        var memoryChart = null;
+
+        function toggleMemory() {
+            memoryCollapsed = !memoryCollapsed;
+            document.getElementById("memoryBody").classList.toggle("collapsed", memoryCollapsed);
+            document.getElementById("memoryToggle").textContent = memoryCollapsed ? "Expand" : "Collapse";
+            document.getElementById("logContainer").classList.toggle("expanded", memoryCollapsed);
+        }
+
+        function formatUptime(minutes) {
+            if (minutes < 60) return minutes + "m";
+            var h = Math.floor(minutes / 60);
+            var m = minutes % 60;
+            return h + "h " + m + "m";
+        }
+
+        function initChart() {
+            var ctx = document.getElementById("memoryChart").getContext("2d");
+            memoryChart = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "RSS (MB)",
+                            data: [],
+                            borderColor: "#c9a227",
+                            backgroundColor: "rgba(201,162,39,0.1)",
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "y",
+                            tension: 0.3
+                        },
+                        {
+                            label: "QObjects",
+                            data: [],
+                            borderColor: "#58a6ff",
+                            backgroundColor: "rgba(88,166,255,0.1)",
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false,
+                            yAxisID: "y1",
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: "index", intersect: false },
+                    plugins: {
+                        legend: {
+                            labels: { color: "#8b949e", boxWidth: 12, font: { size: 11 } }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: "#8b949e", font: { size: 10 }, maxTicksLimit: 12 },
+                            grid: { color: "rgba(48,54,61,0.5)" }
+                        },
+                        y: {
+                            type: "linear",
+                            position: "left",
+                            title: { display: true, text: "RSS (MB)", color: "#c9a227", font: { size: 11 } },
+                            ticks: { color: "#c9a227", font: { size: 10 } },
+                            grid: { color: "rgba(48,54,61,0.5)" }
+                        },
+                        y1: {
+                            type: "linear",
+                            position: "right",
+                            title: { display: true, text: "QObjects", color: "#58a6ff", font: { size: 11 } },
+                            ticks: { color: "#58a6ff", font: { size: 10 } },
+                            grid: { drawOnChartArea: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        function setCardText(id, text) {
+            document.getElementById(id).textContent = text;
+        }
+
+        function updateMemory(data) {
+            setCardText("memCurrent", data.current.rssMB.toFixed(1) + " MB");
+            setCardText("memPeak", data.peak.rssMB.toFixed(1) + " MB");
+            setCardText("memStartup", data.startup.rssMB.toFixed(1) + " MB");
+
+            var growthMB = data.current.rssMB - data.startup.rssMB;
+            var growthPct = data.startup.rssMB > 0 ? (growthMB / data.startup.rssMB * 100) : 0;
+            var sign = growthMB >= 0 ? "+" : "";
+            setCardText("memGrowth", sign + growthMB.toFixed(1) + " MB (" + sign + growthPct.toFixed(1) + "%)");
+
+            setCardText("memObjects", data.current.qobjectCount.toLocaleString());
+            setCardText("memUptime", formatUptime(data.uptimeMinutes));
+
+            if (memoryChart && data.samples && data.samples.length > 0) {
+                var firstT = data.samples[0].t;
+                var labels = data.samples.map(function(s) {
+                    var mins = Math.round((s.t - firstT) / 60000);
+                    if (mins < 60) return mins + "m";
+                    return Math.floor(mins / 60) + "h" + (mins % 60 ? (mins % 60) + "m" : "");
+                });
+                memoryChart.data.labels = labels;
+                memoryChart.data.datasets[0].data = data.samples.map(function(s) { return s.rss; });
+                memoryChart.data.datasets[1].data = data.samples.map(function(s) { return s.obj; });
+                memoryChart.update("none");
+            }
+        }
+
+        function fetchMemory() {
+            fetch("/api/memory")
+                .then(function(r) {
+                    if (!r.ok) throw new Error("Server error " + r.status);
+                    return r.json();
+                })
+                .then(updateMemory)
+                .catch(function() {});
+        }
+
+        initChart();
+        fetchMemory();
+        var memTimer = setInterval(fetchMemory, 30000);
+        document.addEventListener("visibilitychange", function() {
+            if (document.hidden) { clearInterval(memTimer); }
+            else { fetchMemory(); memTimer = setInterval(fetchMemory, 30000); }
+        });
+
+        /* --- Log section --- */
         var lastIndex = 0;
         var autoScroll = true;
         var container = document.getElementById("logContainer");
