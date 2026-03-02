@@ -769,6 +769,7 @@ void VisualizerUploader::sendUpload(const QByteArray& jsonData)
     QString authHeaderValue = authHeader();
     request.setRawHeader("Authorization", authHeaderValue.toUtf8());
     request.setRawHeader("Content-Type", QString("multipart/form-data; boundary=%1").arg(boundary).toUtf8());
+    // Prevent Qt from following redirects (which can lose auth headers)
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                          QNetworkRequest::NoLessSafeRedirectPolicy);
 
@@ -856,6 +857,7 @@ QByteArray VisualizerUploader::buildHistoryShotJson(const QVariantMap& shotData)
     QJsonObject flow;
     flow["flow"] = extractValues(flowData);
     flow["goal"] = interpolateGoalData(flowGoalData, pressureData);
+    // Weight-based flow rate (g/s from scale)
     if (!weightFlowRateData.isEmpty()) {
         flow["by_weight"] = interpolateGoalData(weightFlowRateData, pressureData);
     }
