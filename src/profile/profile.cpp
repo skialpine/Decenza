@@ -696,6 +696,9 @@ Profile Profile::loadFromTclString(const QString& content) {
     val = extractValue("maximum_pressure");
     if (!val.isEmpty()) profile.m_maximumPressure = val.toDouble();
 
+    val = extractValue("flow_profile_minimum_pressure");
+    if (!val.isEmpty()) profile.m_minimumPressure = val.toDouble();
+
     val = extractValue("tank_desired_water_temperature");
     if (!val.isEmpty()) profile.m_tankDesiredWaterTemperature = val.toDouble();
 
@@ -1018,8 +1021,10 @@ QByteArray Profile::toHeaderBytes() const {
     header[0] = 1;  // HeaderV
     header[1] = static_cast<char>(m_steps.size());  // NumberOfFrames
     header[2] = static_cast<char>(m_preinfuseFrameCount);  // NumberOfPreinfuseFrames
-    header[3] = BinaryCodec::encodeU8P4(m_minimumPressure);  // MinimumPressure
-    header[4] = BinaryCodec::encodeU8P4(m_maximumFlow);  // MaximumFlow
+    // De1app defaults to IgnoreLimit, so MinimumPressure and MaximumFlow are not
+    // used as constraints. Hardcode to match de1app (binary.tcl:867-868).
+    header[3] = 0;  // MinimumPressure
+    header[4] = BinaryCodec::encodeU8P4(6.0);  // MaximumFlow
 
     return header;
 }
