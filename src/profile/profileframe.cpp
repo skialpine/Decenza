@@ -97,17 +97,27 @@ ProfileFrame ProfileFrame::fromJson(const QJsonObject& json) {
             if (exitCondition == "over") {
                 frame.exitType = "pressure_over";
                 frame.exitPressureOver = exitValue;
-            } else {
+            } else if (exitCondition == "under") {
                 frame.exitType = "pressure_under";
                 frame.exitPressureUnder = exitValue;
+            } else {
+                qWarning() << "ProfileFrame::fromJson: unrecognized exit condition"
+                           << exitCondition << "for type" << exitType << "- defaulting to over";
+                frame.exitType = "pressure_over";
+                frame.exitPressureOver = exitValue;
             }
         } else if (exitType == "flow") {
             if (exitCondition == "over") {
                 frame.exitType = "flow_over";
                 frame.exitFlowOver = exitValue;
-            } else {
+            } else if (exitCondition == "under") {
                 frame.exitType = "flow_under";
                 frame.exitFlowUnder = exitValue;
+            } else {
+                qWarning() << "ProfileFrame::fromJson: unrecognized exit condition"
+                           << exitCondition << "for type" << exitType << "- defaulting to over";
+                frame.exitType = "flow_over";
+                frame.exitFlowOver = exitValue;
             }
         } else if (exitType == "weight") {
             frame.exitType = "weight";
