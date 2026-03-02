@@ -1089,12 +1089,34 @@ void Profile::regenerateFromRecipe() {
         return;
     }
 
+    // Save old frames so we can preserve passthrough fields after regeneration
+    QList<ProfileFrame> oldSteps = m_steps;
+
     // Regenerate frames from recipe parameters
     m_steps = RecipeGenerator::generateFrames(m_recipeParams);
 
     if (m_steps.size() == 1 && m_steps[0].name == "empty") {
         qWarning() << "regenerateFromRecipe: recipe produced fallback empty frame"
                    << "- check recipe parameters for" << m_title;
+    }
+
+    // Preserve passthrough fields (volume cap, fill weight safety exit) from old frames.
+    // RecipeParams controls volume/exitWeight only on infuse frames ("Infusing"/"Infuse");
+    // for all other frames these fields are hardcoded defaults in RecipeGenerator, so we
+    // restore the stored values to avoid silently dropping them on each save (issue #331).
+    if (!oldSteps.isEmpty()) {
+        for (ProfileFrame& newFrame : m_steps) {
+            // Skip infuse frames — RecipeParams is authoritative for their volume/exitWeight
+            if (newFrame.name == "Infusing" || newFrame.name == "Infuse")
+                continue;
+            for (const ProfileFrame& oldFrame : oldSteps) {
+                if (oldFrame.name == newFrame.name) {
+                    newFrame.volume = oldFrame.volume;
+                    newFrame.exitWeight = oldFrame.exitWeight;
+                    break;
+                }
+            }
+        }
     }
 
     // Update profile metadata from recipe
