@@ -188,9 +188,6 @@ public:
     // Import from de1app TCL format string (used by Visualizer API)
     static Profile loadFromTclString(const QString& tclContent);
 
-    // Import from DE1 app / Visualizer JSON format (different field names than native format)
-    static Profile loadFromDE1AppJson(const QString& jsonContent);
-
     // === BLE Data Generation ===
     // Generate profile header for upload (5 bytes)
     QByteArray toHeaderBytes() const;
