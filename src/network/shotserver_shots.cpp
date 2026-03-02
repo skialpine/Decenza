@@ -3099,7 +3099,8 @@ QString ShotServer::generateDebugPage() const
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Debug &amp; Dev Tools - Decenza DE1</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script>if (typeof Chart === "undefined") document.getElementById("memoryBody").innerHTML = "<p style='color:#8b949e;padding:1em'>Chart.js failed to load (no internet?). Memory data is still available via <code>/api/memory</code>.</p>";</script>
     <style>
         :root {
             --bg: #0d1117;
@@ -3449,6 +3450,10 @@ QString ShotServer::generateDebugPage() const
         }
 
         function updateMemory(data) {
+            if (!data || !data.current || !data.peak || !data.startup) {
+                console.warn("[Memory] Unexpected JSON shape:", data);
+                return;
+            }
             lastMemoryData = data;
             setCardText("memCurrent", data.current.rssMB.toFixed(1) + " MB");
             setCardText("memPeak", data.peak.rssMB.toFixed(1) + " MB");
@@ -3504,11 +3509,36 @@ QString ShotServer::generateDebugPage() const
             lines.push("");
             lines.push("RSS: " + lastMemoryData.current.rssMB.toFixed(1) + " MB (peak: " + lastMemoryData.peak.rssMB.toFixed(1) + " MB, startup: " + lastMemoryData.startup.rssMB.toFixed(1) + " MB)");
             lines.push("QObjects: " + lastMemoryData.current.qobjectCount + ", Uptime: " + formatUptime(lastMemoryData.uptimeMinutes));
-            navigator.clipboard.writeText(lines.join("\n")).then(function() {
-                var btn = document.getElementById("copyClassesBtn");
+            var text = lines.join("\n");
+            var btn = document.getElementById("copyClassesBtn");
+            function onCopied() {
                 btn.textContent = "Copied!";
                 setTimeout(function() { btn.textContent = "Copy to clipboard"; }, 2000);
-            });
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(onCopied).catch(function() {
+                    // Fallback for HTTP (clipboard API requires HTTPS)
+                    var ta = document.createElement("textarea");
+                    ta.value = text;
+                    ta.style.position = "fixed";
+                    ta.style.opacity = "0";
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(ta);
+                    onCopied();
+                });
+            } else {
+                var ta = document.createElement("textarea");
+                ta.value = text;
+                ta.style.position = "fixed";
+                ta.style.opacity = "0";
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand("copy");
+                document.body.removeChild(ta);
+                onCopied();
+            }
         }
 
         function fetchMemory() {
@@ -3518,7 +3548,7 @@ QString ShotServer::generateDebugPage() const
                     return r.json();
                 })
                 .then(updateMemory)
-                .catch(function() {});
+                .catch(function(err) { console.warn("[Memory] fetch failed:", err); });
         }
 
         initChart();

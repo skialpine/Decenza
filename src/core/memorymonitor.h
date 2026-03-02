@@ -4,6 +4,7 @@
 #include <QTimer>
 #include <QVector>
 #include <QHash>
+#include <QSet>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QElapsedTimer>

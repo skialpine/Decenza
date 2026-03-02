@@ -987,7 +987,7 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             QJsonDocument doc(m_memoryMonitor->toJson());
             sendJson(socket, doc.toJson(QJsonDocument::Compact));
         } else {
-            sendJson(socket, R"({"error":"Memory monitor not available"})");
+            sendResponse(socket, 503, "application/json", R"({"error":"Memory monitor not available"})");
         }
     }
     else if (path == "/debug") {

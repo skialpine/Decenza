@@ -42,7 +42,7 @@ void MemoryMonitor::takeSample()
     m_lastRss = rss;
     m_lastQObjectCount = objCount;
 
-    if (m_firstSample) {
+    if (m_firstSample && rss > 0) {
         m_startupRss = rss;
         m_firstSample = false;
     }
@@ -72,6 +72,7 @@ quint64 MemoryMonitor::readRss() const
     PROCESS_MEMORY_COUNTERS pmc;
     if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
         return pmc.WorkingSetSize;
+    qWarning("[Memory] GetProcessMemoryInfo failed");
     return 0;
 #elif defined(Q_OS_MACOS) || defined(Q_OS_IOS)
     task_vm_info_data_t info;
@@ -79,7 +80,8 @@ quint64 MemoryMonitor::readRss() const
     kern_return_t kr = task_info(mach_task_self(), TASK_VM_INFO,
                                  reinterpret_cast<task_info_t>(&info), &count);
     if (kr == KERN_SUCCESS)
-        return info.phys_footprint;
+        return info.phys_footprint;  // phys_footprint is the "real" memory cost (compressed + swapped), more accurate than resident_size
+    qWarning("[Memory] task_info failed: %d", kr);
     return 0;
 #elif defined(Q_OS_LINUX) || defined(Q_OS_ANDROID)
     QFile f("/proc/self/status");
@@ -96,9 +98,12 @@ quint64 MemoryMonitor::readRss() const
                     if (ok)
                         return kb * 1024;
                 }
+                qWarning("[Memory] Failed to parse VmRSS line: %s", qPrintable(line));
                 break;
             }
         }
+    } else {
+        qWarning("[Memory] Failed to open /proc/self/status");
     }
     return 0;
 #else
