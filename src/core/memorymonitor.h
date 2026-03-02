@@ -63,6 +63,8 @@ private:
     bool m_firstSample = true;
 
     // Per-class QObject tracking
-    QHash<QString, int> m_classCounts;      // Current snapshot
-    QHash<QString, int> m_prevClassCounts;   // Previous snapshot (for delta)
+    QHash<QString, int> m_classCounts;          // Current snapshot
+    QHash<QString, int> m_prevClassCounts;       // Previous snapshot (for per-tick delta log)
+    QHash<QString, int> m_baselineClassCounts;   // First snapshot after engine set (for growth-since-startup)
+    bool m_baselineCaptured = false;
 };

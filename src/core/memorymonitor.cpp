@@ -151,6 +151,12 @@ int MemoryMonitor::countQObjects()
         m_classCounts[QString::fromLatin1(name)]++;
     }
 
+    // Capture baseline on first sample after engine is set (when QML tree is populated)
+    if (!m_baselineCaptured && m_engine) {
+        m_baselineClassCounts = m_classCounts;
+        m_baselineCaptured = true;
+    }
+
     // Log classes with biggest growth since last sample
     if (!m_prevClassCounts.isEmpty()) {
         QVector<QPair<QString, int>> deltas;
@@ -233,14 +239,17 @@ QJsonObject MemoryMonitor::toJson() const
         return a.second > b.second;
     });
 
+    // Delta is vs. baseline (first sample after engine set) — shows growth since startup
+    const auto& deltaBase = m_baselineCaptured ? m_baselineClassCounts : m_prevClassCounts;
+
     QJsonArray classesArr;
     int classLimit = qMin(sorted.size(), 30);
     for (int i = 0; i < classLimit; ++i) {
         QJsonObject cls;
         cls["name"] = sorted[i].first;
         cls["count"] = sorted[i].second;
-        int prev = m_prevClassCounts.value(sorted[i].first, 0);
-        cls["delta"] = sorted[i].second - prev;
+        int base = deltaBase.value(sorted[i].first, 0);
+        cls["delta"] = sorted[i].second - base;
         classesArr.append(cls);
     }
 

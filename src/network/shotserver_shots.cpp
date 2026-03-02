@@ -3348,7 +3348,7 @@ QString ShotServer::generateDebugPage() const
                 </div>
                 <div class="class-table-wrap">
                     <table class="class-table">
-                        <thead><tr><th>Class</th><th style="text-align:right">Count</th><th style="text-align:right">Delta</th></tr></thead>
+                        <thead><tr><th>Class</th><th style="text-align:right">Count</th><th style="text-align:right">Since startup</th></tr></thead>
                         <tbody id="classTableBody"></tbody>
                     </table>
                 </div>
@@ -3495,7 +3495,7 @@ QString ShotServer::generateDebugPage() const
 
         function copyClassTable() {
             if (!lastMemoryData || !lastMemoryData.topClasses) return;
-            var lines = ["Class\tCount\tDelta"];
+            var lines = ["Class\tCount\tSince startup"];
             for (var i = 0; i < lastMemoryData.topClasses.length; i++) {
                 var c = lastMemoryData.topClasses[i];
                 var ds = c.delta > 0 ? "+" + c.delta : (c.delta === 0 ? "0" : String(c.delta));
