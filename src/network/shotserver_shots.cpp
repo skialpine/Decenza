@@ -3343,6 +3343,9 @@ QString ShotServer::generateDebugPage() const
                 <div class="chart-container">
                     <canvas id="memoryChart"></canvas>
                 </div>
+                <div style="display:flex;justify-content:flex-end;margin-top:0.75rem;margin-bottom:0.25rem;">
+                    <button class="btn" id="copyClassesBtn" onclick="copyClassTable()">Copy to clipboard</button>
+                </div>
                 <div class="class-table-wrap">
                     <table class="class-table">
                         <thead><tr><th>Class</th><th style="text-align:right">Count</th><th style="text-align:right">Delta</th></tr></thead>
@@ -3446,6 +3449,7 @@ QString ShotServer::generateDebugPage() const
         }
 
         function updateMemory(data) {
+            lastMemoryData = data;
             setCardText("memCurrent", data.current.rssMB.toFixed(1) + " MB");
             setCardText("memPeak", data.peak.rssMB.toFixed(1) + " MB");
             setCardText("memStartup", data.startup.rssMB.toFixed(1) + " MB");
@@ -3485,6 +3489,26 @@ QString ShotServer::generateDebugPage() const
                 }
                 tbody.innerHTML = rows;
             }
+        }
+
+        var lastMemoryData = null;
+
+        function copyClassTable() {
+            if (!lastMemoryData || !lastMemoryData.topClasses) return;
+            var lines = ["Class\tCount\tDelta"];
+            for (var i = 0; i < lastMemoryData.topClasses.length; i++) {
+                var c = lastMemoryData.topClasses[i];
+                var ds = c.delta > 0 ? "+" + c.delta : (c.delta === 0 ? "0" : String(c.delta));
+                lines.push(c.name + "\t" + c.count + "\t" + ds);
+            }
+            lines.push("");
+            lines.push("RSS: " + lastMemoryData.current.rssMB.toFixed(1) + " MB (peak: " + lastMemoryData.peak.rssMB.toFixed(1) + " MB, startup: " + lastMemoryData.startup.rssMB.toFixed(1) + " MB)");
+            lines.push("QObjects: " + lastMemoryData.current.qobjectCount + ", Uptime: " + formatUptime(lastMemoryData.uptimeMinutes));
+            navigator.clipboard.writeText(lines.join("\n")).then(function() {
+                var btn = document.getElementById("copyClassesBtn");
+                btn.textContent = "Copied!";
+                setTimeout(function() { btn.textContent = "Copy to clipboard"; }, 2000);
+            });
         }
 
         function fetchMemory() {
