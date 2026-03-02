@@ -2,8 +2,6 @@
 #include "../controllers/maincontroller.h"
 #include "../core/settings.h"
 #include "../core/profilestorage.h"
-#include "../profile/recipeparams.h"
-#include "../profile/recipegenerator.h"
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -716,145 +714,19 @@ void VisualizerImporter::onProfileFetchFinished(QNetworkReply* reply) {
 }
 
 Profile VisualizerImporter::parseVisualizerProfile(const QJsonObject& json) {
-    Profile profile;
+    // Use the unified Profile::fromJson() which handles both de1app v2 and legacy formats,
+    // including string-encoded numbers, nested exit/limiter objects, recipe mode, etc.
+    Profile profile = Profile::fromJson(QJsonDocument(json));
 
-    // setTitle() automatically strips leading "*" (de1app modified indicator)
-    profile.setTitle(json["title"].toString("Imported Profile"));
-    profile.setAuthor(json["author"].toString());
-    // Support both "profile_notes" and "notes" keys
-    QString notes = json["profile_notes"].toString();
-    if (notes.isEmpty()) notes = json["notes"].toString();
-    profile.setProfileNotes(notes);
-    profile.setBeverageType(json["beverage_type"].toString("espresso"));
-
-    QString profileType = json["legacy_profile_type"].toString();
-    if (profileType.isEmpty()) {
-        profileType = json["profile_type"].toString("settings_2c");
+    // Override default title for imports (fromJson defaults to "Default")
+    if (profile.title() == "Default" || profile.title().isEmpty()) {
+        profile.setTitle(json["title"].toString("Imported Profile"));
     }
-    profile.setProfileType(profileType);
-
-    QJsonValue targetWeight = json["target_weight"];
-    if (targetWeight.isString()) {
-        profile.setTargetWeight(targetWeight.toString().toDouble());
-    } else {
-        profile.setTargetWeight(targetWeight.toDouble(36.0));
-    }
-
-    QJsonValue targetVolume = json["target_volume"];
-    if (targetVolume.isString()) {
-        profile.setTargetVolume(targetVolume.toString().toDouble());
-    } else {
-        profile.setTargetVolume(targetVolume.toDouble(0.0));
-    }
-
-    QJsonArray stepsArray = json["steps"].toArray();
-    for (const auto& stepVal : stepsArray) {
-        ProfileFrame frame = parseVisualizerStep(stepVal.toObject());
-        profile.addStep(frame);
-    }
-
-    // Handle recipe mode for simple profiles (2a/2b) that may not have pre-generated steps
-    // If steps are empty but we have recipe data, generate frames from the recipe
-    bool isRecipeMode = json["is_recipe_mode"].toBool(false);
-    if (profile.steps().isEmpty() && isRecipeMode && json.contains("recipe")) {
-        qDebug() << "Profile has no steps but is recipe mode - generating frames from recipe";
-        RecipeParams recipeParams = RecipeParams::fromJson(json["recipe"].toObject());
-        QList<ProfileFrame> frames = RecipeGenerator::generateFrames(recipeParams);
-        for (const auto& frame : frames) {
-            profile.addStep(frame);
-        }
-        profile.setRecipeMode(true);
-        profile.setRecipeParams(recipeParams);
-    }
-
-    if (!profile.steps().isEmpty()) {
-        profile.setEspressoTemperature(profile.steps().first().temperature);
-    }
-
-    profile.setPreinfuseFrameCount(Profile::countPreinfuseFrames(profile.steps()));
 
     qDebug() << "Parsed Visualizer profile:" << profile.title()
              << "with" << profile.steps().size() << "steps";
 
     return profile;
-}
-
-ProfileFrame VisualizerImporter::parseVisualizerStep(const QJsonObject& json) {
-    ProfileFrame frame;
-
-    auto toDouble = [](const QJsonValue& val, double defaultVal = 0.0) -> double {
-        if (val.isString()) {
-            return val.toString().toDouble();
-        }
-        return val.toDouble(defaultVal);
-    };
-
-    frame.name = json["name"].toString();
-    frame.temperature = toDouble(json["temperature"], 93.0);
-    frame.sensor = json["sensor"].toString("coffee");
-    frame.pump = json["pump"].toString("pressure");
-    frame.transition = json["transition"].toString("fast");
-    frame.pressure = toDouble(json["pressure"], 9.0);
-    frame.flow = toDouble(json["flow"], 2.0);
-    frame.seconds = toDouble(json["seconds"], 30.0);
-    frame.volume = toDouble(json["volume"], 0.0);
-
-    // Handle exit conditions - support both nested "exit" object format (Visualizer)
-    // and flat field format (DE1 app native)
-    QJsonObject exitObj = json["exit"].toObject();
-    if (!exitObj.isEmpty()) {
-        // Nested format: {"exit": {"type": "pressure", "condition": "over", "value": 4}}
-        frame.exitIf = true;
-        QString exitType = exitObj["type"].toString();
-        QString condition = exitObj["condition"].toString();
-        double value = toDouble(exitObj["value"]);
-
-        frame.exitType = exitType + "_" + condition;
-
-        if (exitType == "pressure") {
-            if (condition == "over") {
-                frame.exitPressureOver = value;
-            } else {
-                frame.exitPressureUnder = value;
-            }
-        } else if (exitType == "flow") {
-            if (condition == "over") {
-                frame.exitFlowOver = value;
-            } else {
-                frame.exitFlowUnder = value;
-            }
-        }
-    } else if (json.contains("exit_if")) {
-        // Flat format: {"exit_if": true, "exit_type": "pressure_over", "exit_pressure_over": 4}
-        frame.exitIf = json["exit_if"].toBool(false);
-        frame.exitType = json["exit_type"].toString();
-        frame.exitPressureOver = toDouble(json["exit_pressure_over"]);
-        frame.exitPressureUnder = toDouble(json["exit_pressure_under"]);
-        frame.exitFlowOver = toDouble(json["exit_flow_over"]);
-        frame.exitFlowUnder = toDouble(json["exit_flow_under"]);
-    }
-
-    // Handle weight exit (independent of other exit conditions)
-    double weightExit = toDouble(json["weight"], 0.0);
-    if (weightExit <= 0) {
-        weightExit = toDouble(json["exit_weight"], 0.0);
-    }
-    if (weightExit > 0) {
-        frame.exitWeight = weightExit;
-    }
-
-    // Handle limiter - support both nested "limiter" object and flat fields
-    QJsonObject limiterObj = json["limiter"].toObject();
-    if (!limiterObj.isEmpty()) {
-        frame.maxFlowOrPressure = toDouble(limiterObj["value"]);
-        frame.maxFlowOrPressureRange = toDouble(limiterObj["range"], 0.6);
-    } else {
-        // Flat format fields
-        frame.maxFlowOrPressure = toDouble(json["max_flow_or_pressure"]);
-        frame.maxFlowOrPressureRange = toDouble(json["max_flow_or_pressure_range"], 0.6);
-    }
-
-    return frame;
 }
 
 void VisualizerImporter::fetchProfileDetailsForShots() {
