@@ -28,7 +28,18 @@ void WeightProcessor::processWeight(double weight)
 
     // Compute flow rates (always, even outside extraction — for QML display and settling)
     double flowRate = computeLSLR(1000);
-    double flowRateShort = computeLSLR(500);
+
+    // Adaptive short window: ensure at least 3 samples are included regardless of
+    // the scale's reporting rate. At 5Hz (Decent Scale) this stays at 500ms; at
+    // 2Hz (Bookoo) it expands to ~1050ms so LSLR has 3 points instead of 2.
+    // Without this, sparse scales flicker flowRateShort near 0 and SAW is gated out.
+    int shortWindowMs = 500;
+    if (m_weightSamples.size() >= 3) {
+        qint64 spanOf3 = m_weightSamples.last().timestamp
+                         - m_weightSamples[m_weightSamples.size() - 3].timestamp;
+        shortWindowMs = qMax(shortWindowMs, (int)spanOf3 + 50);
+    }
+    double flowRateShort = computeLSLR(shortWindowMs);
 
     emit flowRatesReady(weight, flowRate, flowRateShort);
 
@@ -159,6 +170,17 @@ void WeightProcessor::startExtraction()
 void WeightProcessor::stopExtraction()
 {
     m_active = false;
+
+    // Log measured scale reporting rate — captured in shot debug log.
+    // Helps diagnose SAW issues on slow-reporting scales (Bookoo ~2Hz, etc.).
+    if (m_weightSamples.size() >= 3) {
+        qint64 span = m_weightSamples.last().timestamp - m_weightSamples.first().timestamp;
+        double avgIntervalMs = span / (double)(m_weightSamples.size() - 1);
+        qDebug() << "[Weight-Worker] Scale interval: avg" << (int)avgIntervalMs << "ms"
+                 << "(" << QString::number(1000.0 / avgIntervalMs, 'f', 1) << "Hz)"
+                 << "over" << m_weightSamples.size() << "samples (last 1s)";
+    }
+
     // Don't clear weight samples — settling still needs flow rate data
 }
 
