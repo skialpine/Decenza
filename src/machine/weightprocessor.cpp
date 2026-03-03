@@ -62,8 +62,8 @@ void WeightProcessor::processWeight(double weight)
     }
 
     // Mid-shot oscillation recovery: once scale returns to ~0g stably, re-arm SAW
-    // with a clean LSLR baseline. Requires 3 consecutive near-zero readings (~0.6s
-    // at 5Hz) to avoid re-arming while the scale is still mid-oscillation.
+    // with a clean LSLR baseline. Requires 3 consecutive near-zero readings (~0.4s
+    // at 5Hz, ~1.0s at 2Hz) to avoid re-arming while the scale is still mid-oscillation.
     // This mirrors de1app's _tare_awaiting_zero / on_tare_seen mechanism.
     if (!m_tareComplete && m_oscillationDetected) {
         if (qAbs(weight) < 2.0) {
