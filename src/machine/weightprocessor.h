@@ -65,6 +65,10 @@ private:
     int m_currentFrame = -1;
     qint64 m_extractionStartTime = 0;
 
+    // Oscillation recovery (e.g. Bookoo mid-shot tare reset)
+    bool m_oscillationDetected = false;  // true while waiting for scale to re-settle after oscillation
+    int m_settleCount = 0;               // consecutive near-zero readings since oscillation detected
+
     // Configuration (set once at shot start, read-only during extraction)
     double m_targetWeight = 0;
     QVector<double> m_frameExitWeights;

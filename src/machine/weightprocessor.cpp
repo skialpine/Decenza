@@ -36,14 +36,34 @@ void WeightProcessor::processWeight(double weight)
     if (!m_active) return;
 
     // Bookoo (and any scale) tare oscillation guard: large negative swing during
-    // extraction means the scale is mid-reset. Disable SAW for the remainder of
-    // this shot — m_tareComplete is not restored mid-shot (setTareComplete is
-    // only called once at shot start), so this is a one-way latch until the
-    // shot ends.
+    // extraction means the scale is mid-reset. Block SAW and enter recovery mode —
+    // matching de1app's on_tare_seen pattern: clear the LSLR and wait for the scale
+    // to return to ~0g before re-arming, so oscillation samples never corrupt SAW.
     if (m_tareComplete && weight < -5.0) {
         m_tareComplete = false;
+        m_oscillationDetected = true;
+        m_settleCount = 0;
+        m_weightSamples.clear();  // Discard oscillation samples from LSLR
         qWarning() << "[SAW-Worker] Scale oscillation detected (weight=" << weight
-                   << "g) - SAW disabled for remainder of shot (scale mid-reset)";
+                   << "g) - SAW blocked, awaiting settle";
+    }
+
+    // Mid-shot oscillation recovery: once scale returns to ~0g stably, re-arm SAW
+    // with a clean LSLR baseline. Requires 3 consecutive near-zero readings (~0.6s
+    // at 5Hz) to avoid re-arming while the scale is still mid-oscillation.
+    // This mirrors de1app's _tare_awaiting_zero / on_tare_seen mechanism.
+    if (!m_tareComplete && m_oscillationDetected) {
+        if (qAbs(weight) < 2.0) {
+            if (++m_settleCount >= 3) {
+                m_tareComplete = true;
+                m_oscillationDetected = false;
+                m_settleCount = 0;
+                m_weightSamples.clear();  // Fresh LSLR baseline from post-settle readings
+                qDebug() << "[SAW-Worker] Scale settled after oscillation, SAW re-armed";
+            }
+        } else {
+            m_settleCount = 0;  // Reset counter if weight leaves the near-zero band
+        }
     }
 
     if (!m_tareComplete) {
@@ -132,6 +152,8 @@ void WeightProcessor::startExtraction()
     m_weightSamples.clear();
     m_currentFrame = -1;
     m_tareComplete = false;
+    m_oscillationDetected = false;
+    m_settleCount = 0;
 }
 
 void WeightProcessor::stopExtraction()
