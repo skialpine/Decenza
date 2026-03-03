@@ -2,6 +2,10 @@
 #include <QDebug>
 #include <QTimer>
 
+#ifdef Q_OS_ANDROID
+#include <QJniObject>
+#endif
+
 // Helper macro for consistent logging
 #define QT_TRANSPORT_LOG(msg) log(msg)
 
@@ -245,6 +249,17 @@ bool QtScaleBleTransport::isConnected() const {
 void QtScaleBleTransport::onControllerConnected() {
     QT_TRANSPORT_LOG("Controller connected!");
     m_connected = true;
+
+#ifdef Q_OS_ANDROID
+    // Request a shorter BLE connection interval to reduce post-GC-pause delivery latency.
+    // Default interval is ~30-50ms; HIGH priority is 7.5-15ms. See issue #342.
+    QJniObject::callStaticMethod<jboolean>(
+        "io/github/kulitorum/decenza_de1/BleHelper",
+        "requestHighConnectionPriority",
+        "(Ljava/lang/String;)Z",
+        QJniObject::fromString(m_deviceAddress).object());
+#endif
+
     emit connected();
 }
 

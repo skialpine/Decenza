@@ -281,6 +281,16 @@ void BleTransport::connectToDevice(const QBluetoothDeviceInfo& device) {
 // -- Private slots --
 
 void BleTransport::onControllerConnected() {
+#ifdef Q_OS_ANDROID
+    // Request a shorter BLE connection interval to reduce post-GC-pause delivery latency.
+    // Default interval is ~30-50ms; HIGH priority is 7.5-15ms. See issue #342.
+    const QString addr = m_controller->remoteAddress().toString();
+    QJniObject::callStaticMethod<jboolean>(
+        "io/github/kulitorum/decenza_de1/BleHelper",
+        "requestHighConnectionPriority",
+        "(Ljava/lang/String;)Z",
+        QJniObject::fromString(addr).object());
+#endif
     m_controller->discoverServices();
 }
 
