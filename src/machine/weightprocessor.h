@@ -69,6 +69,10 @@ private:
     bool m_oscillationDetected = false;  // true while waiting for scale to re-settle after oscillation
     int m_settleCount = 0;               // consecutive near-zero readings since oscillation detected
 
+    // Log throttle timestamps — reset each shot so warnings are never suppressed at shot start
+    qint64 m_lastTareWarnMs = 0;
+    qint64 m_lastLowFlowLogMs = 0;
+
     // Configuration (set once at shot start, read-only during extraction)
     double m_targetWeight = 0;
     QVector<double> m_frameExitWeights;

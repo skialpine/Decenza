@@ -542,11 +542,12 @@ int main(int argc, char *argv[])
 
                          // Tare already happened synchronously in onEspressoCycleStarted
                          bool tareComplete = timingController.isTareComplete();
+                         double sensorLagSeconds = Settings::sensorLag(scaleType);
 
                          QMetaObject::invokeMethod(&weightProcessor,
-                             [&weightProcessor, targetWeight, frameExitWeights, drips, flows, converged, tareComplete]() {
+                             [&weightProcessor, targetWeight, frameExitWeights, drips, flows, converged, tareComplete, sensorLagSeconds]() {
                                  weightProcessor.configure(targetWeight, frameExitWeights, drips, flows, converged,
-                                                           Settings::sensorLag(scaleType));
+                                                           sensorLagSeconds);
                                  weightProcessor.startExtraction();
                                  if (tareComplete) {
                                      weightProcessor.setTareComplete(true);

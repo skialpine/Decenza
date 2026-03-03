@@ -3071,17 +3071,18 @@ bool Settings::isSawConverged(const QString& scaleType) const {
 double Settings::getExpectedDrip(double currentFlowRate) const {
     ensureSawCacheLoaded();
 
+    // Read scale type once — consistent across all fallback paths.
+    const QString currentScale = scaleType();
+
     const QJsonArray& arr = m_sawHistoryCache;
     if (arr.isEmpty()) {
         // No history at all — use scale-specific sensor lag as first-shot default.
         // Formula: flow × (sensor_lag + 0.1s DE1 machine lag), capped at 8g.
         // Matches de1app's first-shot behaviour (lag_time_estimation=0 before learning).
-        QString currentScale = scaleType();
         return qMin(currentFlowRate * (sensorLag(currentScale) + 0.1), 8.0);
     }
 
     // Check convergence state to determine adaptive parameters
-    QString currentScale = scaleType();
     bool converged = isSawConverged(currentScale);
     int maxEntries = converged ? 12 : 8;
     double recencyMax = 10.0;
@@ -3165,17 +3166,18 @@ QList<QPair<double, double>> Settings::sawLearningEntries(const QString& scaleTy
 
 double Settings::sensorLag(const QString& scaleType)
 {
-    // BLE sensor lag per scale type, sourced from de1app device_scale.tcl.
-    // Derived from James Hoffmann's video analysis + 0.05s for half the BLE poll period.
+    // BLE sensor lag per scale type, empirically derived from de1app device_scale.tcl values.
     // Used as the first-shot SAW default before adaptive learning has any data.
     // The +0.1s DE1 machine lag is added at call sites: default_drip = flow * (sensorLag + 0.1).
     if (scaleType == "Bookoo")           return 0.50;
     if (scaleType == "Acaia")            return 0.69;
+    if (scaleType == "Acaia Pyxis")      return 0.69;  // Same Acaia BLE protocol
     if (scaleType == "Felicita")         return 0.50;
     if (scaleType == "Atomheart Eclair") return 0.50;
     if (scaleType == "Hiroia Jimmy")     return 0.25;
     if (scaleType == "Decent Scale")     return 0.38;
     if (scaleType == "Skale")            return 0.38;
+    qWarning() << "[SAW] Unknown scale type for sensorLag:" << scaleType << "- using default 0.38s";
     return 0.38;  // de1app default for unknown/unlisted scales
 }
 

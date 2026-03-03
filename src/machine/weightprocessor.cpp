@@ -29,15 +29,17 @@ void WeightProcessor::processWeight(double weight)
     // Compute flow rates (always, even outside extraction — for QML display and settling)
     double flowRate = computeLSLR(1000);
 
-    // Adaptive short window: ensure at least 3 samples are included regardless of
-    // the scale's reporting rate. At 5Hz (Decent Scale) this stays at 500ms; at
-    // 2Hz (Bookoo) it expands to ~1050ms so LSLR has 3 points instead of 2.
+    // Adaptive short window: ensure at least 3 samples are covered regardless of
+    // the scale's reporting rate. At 5Hz (Decent Scale) the span of 2 intervals is
+    // 400ms; the 500ms floor dominates and the window stays at 500ms. At 2Hz (Bookoo)
+    // the span of 2 intervals is ~1000ms, giving 1000ms+50ms, capped at 1000ms to
+    // match the rolling buffer — covers 2–3 samples vs. only 1–2 at 500ms.
     // Without this, sparse scales flicker flowRateShort near 0 and SAW is gated out.
     int shortWindowMs = 500;
     if (m_weightSamples.size() >= 3) {
         qint64 spanOf3 = m_weightSamples.last().timestamp
                          - m_weightSamples[m_weightSamples.size() - 3].timestamp;
-        shortWindowMs = qMax(shortWindowMs, (int)spanOf3 + 50);
+        shortWindowMs = qBound(500, (int)spanOf3 + 50, 1000);
     }
     double flowRateShort = computeLSLR(shortWindowMs);
 
@@ -79,10 +81,9 @@ void WeightProcessor::processWeight(double weight)
 
     if (!m_tareComplete) {
         // Throttle warning to every 5s to avoid log spam at 5Hz
-        static qint64 s_lastTareWarnMs = 0;
-        if (now - s_lastTareWarnMs >= 5000) {
+        if (now - m_lastTareWarnMs >= 5000) {
             qWarning() << "[SAW-Worker] Active but tare not complete - skipping SAW, weight=" << weight;
-            s_lastTareWarnMs = now;
+            m_lastTareWarnMs = now;
         }
         return;
     }
@@ -96,11 +97,10 @@ void WeightProcessor::processWeight(double weight)
     // Stop-at-weight check (requires valid flow rate for drip prediction)
     if (!m_stopTriggered && m_targetWeight > 0 && flowRateShort < 0.5) {
         // Throttle this log to every 5s
-        static qint64 s_lastLowFlowLogMs = 0;
-        if (now - s_lastLowFlowLogMs >= 5000) {
+        if (now - m_lastLowFlowLogMs >= 5000) {
             qDebug() << "[SAW-Worker] Flow too low for SAW check: flowShort=" << flowRateShort
                      << "weight=" << weight << "target=" << m_targetWeight;
-            s_lastLowFlowLogMs = now;
+            m_lastLowFlowLogMs = now;
         }
     }
     if (!m_stopTriggered && m_targetWeight > 0 && flowRateShort >= 0.5) {
@@ -153,6 +153,12 @@ void WeightProcessor::setCurrentFrame(int frameNumber)
 void WeightProcessor::setTareComplete(bool complete)
 {
     m_tareComplete = complete;
+    if (complete) {
+        // Confirm tare clears any pending oscillation recovery — ensures SAW is
+        // re-armed if called mid-shot (e.g. scale reconnects, source switches to FlowScale).
+        m_oscillationDetected = false;
+        m_settleCount = 0;
+    }
 }
 
 void WeightProcessor::startExtraction()
@@ -166,6 +172,8 @@ void WeightProcessor::startExtraction()
     m_tareComplete = false;
     m_oscillationDetected = false;
     m_settleCount = 0;
+    m_lastTareWarnMs = 0;
+    m_lastLowFlowLogMs = 0;
 }
 
 void WeightProcessor::stopExtraction()
@@ -176,10 +184,12 @@ void WeightProcessor::stopExtraction()
     // Helps diagnose SAW issues on slow-reporting scales (Bookoo ~2Hz, etc.).
     if (m_weightSamples.size() >= 3) {
         qint64 span = m_weightSamples.last().timestamp - m_weightSamples.first().timestamp;
-        double avgIntervalMs = span / (double)(m_weightSamples.size() - 1);
-        qDebug() << "[Weight-Worker] Scale interval: avg" << (int)avgIntervalMs << "ms"
-                 << "(" << QString::number(1000.0 / avgIntervalMs, 'f', 1) << "Hz)"
-                 << "over" << m_weightSamples.size() << "samples (last 1s)";
+        if (span > 0) {
+            double avgIntervalMs = span / (double)(m_weightSamples.size() - 1);
+            qDebug() << "[Weight-Worker] Scale interval: avg" << (int)avgIntervalMs << "ms"
+                     << "(" << QString::number(1000.0 / avgIntervalMs, 'f', 1) << "Hz)"
+                     << "over" << m_weightSamples.size() << "samples (last 1s)";
+        }
     }
 
     // Don't clear weight samples — settling still needs flow rate data
