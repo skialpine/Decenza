@@ -290,6 +290,14 @@ void ShotServer::setSettings(Settings* settings)
     }
 }
 
+// Precondition: no socket in `clients` has an entry in m_keepAliveTimers.
+// This is enforced at each SSE registration site by calling take() on the map:
+//   /api/theme/subscribe  — see handleRequest(), "m_sseThemeClients.insert"
+//   /api/layout/events    — see handleRequest(), "m_sseLayoutClients.insert"
+// If a new SSE endpoint is added WITHOUT calling take(), this function will call
+// deleteLater() on the socket while its timer lambda still holds a raw pointer to
+// it — causing use-after-free when the timer fires. This static function has no
+// access to m_keepAliveTimers, so callers must maintain the invariant.
 static void broadcastSseEvent(QSet<QTcpSocket*>& clients, const QByteArray& event)
 {
     QList<QTcpSocket*> dead;
@@ -438,7 +446,13 @@ void ShotServer::stop()
         auto themeCopy = m_sseThemeClients;
         m_sseThemeClients.clear();
         for (QTcpSocket* s : themeCopy) s->close();
-        for (QTimer* t : m_keepAliveTimers) t->stop();
+        // Stop all remaining keep-alive timers and clear the map.
+        // All entries here have valid timer pointers: dangling-pointer entries (sockets that
+        // went through cleanupStaleConnections) were already removed from the map by that
+        // function before calling deleteLater(). Sockets that disconnected normally were
+        // removed by onDisconnected(). So every pointer remaining in the map is live.
+        for (QTimer* t : std::as_const(m_keepAliveTimers))
+            t->stop();
         m_keepAliveTimers.clear();
         m_server->close();
         delete m_server;
@@ -662,7 +676,12 @@ void ShotServer::onDisconnected()
     if (socket) {
         m_sseLayoutClients.remove(socket);
         m_sseThemeClients.remove(socket);
-        m_keepAliveTimers.remove(socket);
+        // Stop the keep-alive timer if one is active. The timer is a child of
+        // `socket` and will be destroyed with it when deleteLater() processes —
+        // no explicit delete needed. Stopping it here prevents the timeout lambda
+        // from firing in the window between now and socket destruction.
+        if (QTimer* t = m_keepAliveTimers.take(socket))
+            t->stop();
         cleanupPendingRequest(socket);
         m_pendingRequests.remove(socket);
 
@@ -755,10 +774,38 @@ void ShotServer::cleanupStaleConnections()
         QString addr = (socket->state() != QAbstractSocket::UnconnectedState)
             ? socket->peerAddress().toString() : "unknown";
         qWarning() << "ShotServer: Cleaning up stale connection from" << addr;
+        // Remove the keep-alive timer from the map before scheduling deletion.
+        // If disconnected() doesn't fire synchronously from close(), the socket
+        // and its child timer will be destroyed by deleteLater() while the pointer
+        // still sits in m_keepAliveTimers — causing a dangling-pointer crash in stop().
+        if (QTimer* t = m_keepAliveTimers.take(socket))
+            t->stop();
         cleanupPendingRequest(socket);
         m_pendingRequests.remove(socket);
         socket->close();
         socket->deleteLater();
+    }
+
+    // SSE clients are long-lived and never appear in m_pendingRequests, so the
+    // stale-connection loop above won't catch them. Probe each client with an SSE
+    // keepalive comment every 30 s to detect silently-dropped connections.
+    // Inlined rather than delegating to broadcastSseEvent() so we can defensively
+    // call m_keepAliveTimers.take() before deleteLater() — the static helper has
+    // no access to the map and cannot enforce the no-timer-in-map invariant itself.
+    for (QSet<QTcpSocket*>* clientSet : {&m_sseLayoutClients, &m_sseThemeClients}) {
+        QList<QTcpSocket*> dead;
+        for (QTcpSocket* c : *clientSet) {
+            if (c->state() != QAbstractSocket::ConnectedState || c->write(": keepalive\n\n") == -1)
+                dead.append(c);
+            else
+                c->flush();
+        }
+        for (QTcpSocket* c : dead) {
+            clientSet->remove(c);
+            if (QTimer* t = m_keepAliveTimers.take(c)) t->stop();
+            c->close();
+            c->deleteLater();
+        }
     }
 }
 
