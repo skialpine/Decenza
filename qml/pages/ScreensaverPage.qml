@@ -310,30 +310,36 @@ Page {
     }
 
     // Flip Clock screensaver
-    FlipClockScreensaver {
-        id: flipClockScreensaver
+    Loader {
+        id: flipClockLoader
         anchors.fill: parent
+        active: isFlipClockMode
         visible: isFlipClockMode
-        running: isFlipClockMode && screensaverPage.visible
         z: 0
+        source: "qrc:/qt/qml/Decenza/qml/components/FlipClockScreensaver.qml"
+        onLoaded: item.running = Qt.binding(function() { return isFlipClockMode && screensaverPage.visible })
     }
 
     // Strange Attractor screensaver
-    StrangeAttractorScreensaver {
-        id: attractorScreensaver
+    Loader {
+        id: attractorLoader
         anchors.fill: parent
+        active: isAttractorMode
         visible: isAttractorMode
-        running: isAttractorMode && screensaverPage.visible
         z: 0
+        source: "qrc:/qt/qml/Decenza/qml/components/StrangeAttractorScreensaver.qml"
+        onLoaded: item.running = Qt.binding(function() { return isAttractorMode && screensaverPage.visible })
     }
 
     // Shot Map screensaver (flat map works without Quick3D, globe loaded conditionally)
-    ShotMapScreensaver {
-        id: shotMapScreensaver
+    Loader {
+        id: shotMapLoader
         anchors.fill: parent
+        active: isShotMapMode
         visible: isShotMapMode
-        running: isShotMapMode && screensaverPage.visible
         z: 0
+        source: "qrc:/qt/qml/Decenza/qml/components/ShotMapScreensaver.qml"
+        onLoaded: item.running = Qt.binding(function() { return isShotMapMode && screensaverPage.visible })
     }
 
     // Fallback: show a subtle animation while no cached media (videos mode only)
