@@ -5,7 +5,7 @@ import Decenza
 import "../components"
 
 // Screensaver modes:
-// "disabled"  - Simulate screen-off (black overlay, screen stays on to avoid EGL surface loss)
+// "disabled"  - Dims backlight to minimum with black overlay (keeps screen on to avoid EGL surface issues)
 // "videos"    - Video/image slideshow from catalog
 // "pipes"     - Classic 3D pipes animation
 // "flipclock" - Classic flip clock display
@@ -61,7 +61,7 @@ Page {
                     ScreensaverManager.dimDelayMinutes, "min)")
         dimOverlay.opacity = ScreensaverManager.dimPercent / 100.0
         ScreensaverManager.setScreenDimming(ScreensaverManager.dimPercent)
-        // Stop unnecessary animations to save power once dimmed
+        // Stop gradient animation (only relevant in videos fallback mode)
         gradientAnimation.running = false
     }
 

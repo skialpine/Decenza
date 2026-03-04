@@ -2340,8 +2340,7 @@ ApplicationWindow {
 
     function goToIdleFromScreensaver() {
         screensaverActive = false
-        // Restore screen brightness in case disabled mode dimmed it
-        ScreensaverManager.restoreScreenBrightness()
+        // Brightness is restored in ScreensaverPage.StackView.onRemoved
         // Initialize sleep countdown (stayAwake is set separately by onAutoWakeTriggered if needed)
         root.sleepCountdownNormal = root.autoSleepMinutes
         root.sleepCountdownStayAwake = 0  // Already satisfied unless auto-wake sets it
