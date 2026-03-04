@@ -66,6 +66,7 @@ inline QString generateThemePageHtml(const QString& deviceId = QString())
     }
 
     html += WEB_JS_MENU;
+    html += WEB_JS_POWER_CONTROL;
     html += WEB_JS_THEME_EDITOR;
     html += WEB_JS_THEME_LIBRARY;
     html += WEB_JS_SHADERS;

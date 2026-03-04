@@ -15,6 +15,7 @@
 #include <QDebug>
 #include <QThread>
 #include <algorithm>
+#include "core/dbutils.h"
 
 #ifdef Q_OS_ANDROID
 #include <QJniObject>
@@ -1462,7 +1463,7 @@ ShotRecord ShotHistoryStorage::loadShotRecordStatic(QSqlDatabase& db, qint64 sho
     ShotRecord record;
 
     QSqlQuery query(db);
-    query.prepare(R"(
+    if (!query.prepare(R"(
         SELECT id, uuid, timestamp, profile_name, profile_json,
                duration_seconds, final_weight, dose_weight,
                bean_brand, bean_type, roast_date, roast_level,
@@ -1471,7 +1472,10 @@ ShotRecord ShotHistoryStorage::loadShotRecordStatic(QSqlDatabase& db, qint64 sho
                profile_notes, visualizer_id, visualizer_url, debug_log,
                temperature_override, yield_override, beverage_type
         FROM shots WHERE id = ?
-    )");
+    )")) {
+        qWarning() << "ShotHistoryStorage::loadShotRecordStatic: prepare failed:" << query.lastError().text();
+        return record;
+    }
     query.bindValue(0, shotId);
 
     if (!query.exec() || !query.next()) {
@@ -1508,25 +1512,27 @@ ShotRecord ShotHistoryStorage::loadShotRecordStatic(QSqlDatabase& db, qint64 sho
     record.summary.beverageType = query.value(26).toString();
     record.summary.hasVisualizerUpload = !record.visualizerId.isEmpty();
 
-    query.prepare("SELECT data_blob FROM shot_samples WHERE shot_id = ?");
-    query.bindValue(0, shotId);
-    if (query.exec() && query.next()) {
-        QByteArray blob = query.value(0).toByteArray();
-        decompressSampleData(blob, &record);
+    if (query.prepare("SELECT data_blob FROM shot_samples WHERE shot_id = ?")) {
+        query.bindValue(0, shotId);
+        if (query.exec() && query.next()) {
+            QByteArray blob = query.value(0).toByteArray();
+            decompressSampleData(blob, &record);
+        }
     }
 
-    query.prepare("SELECT time_offset, label, frame_number, is_flow_mode, transition_reason "
-                  "FROM shot_phases WHERE shot_id = ? ORDER BY time_offset");
-    query.bindValue(0, shotId);
-    if (query.exec()) {
-        while (query.next()) {
-            HistoryPhaseMarker marker;
-            marker.time = query.value(0).toDouble();
-            marker.label = query.value(1).toString();
-            marker.frameNumber = query.value(2).toInt();
-            marker.isFlowMode = query.value(3).toInt() != 0;
-            marker.transitionReason = query.value(4).toString();
-            record.phases.append(marker);
+    if (query.prepare("SELECT time_offset, label, frame_number, is_flow_mode, transition_reason "
+                      "FROM shot_phases WHERE shot_id = ? ORDER BY time_offset")) {
+        query.bindValue(0, shotId);
+        if (query.exec()) {
+            while (query.next()) {
+                HistoryPhaseMarker marker;
+                marker.time = query.value(0).toDouble();
+                marker.label = query.value(1).toString();
+                marker.frameNumber = query.value(2).toInt();
+                marker.isFlowMode = query.value(3).toInt() != 0;
+                marker.transitionReason = query.value(4).toString();
+                record.phases.append(marker);
+            }
         }
     }
 
@@ -1738,21 +1744,10 @@ void ShotHistoryStorage::requestUpdateShotMetadata(qint64 shotId, const QVariant
     auto destroyed = m_destroyed;
 
     QThread* thread = QThread::create([this, dbPath, shotId, metadata, destroyed]() {
-        const QString connName = QString("shs_rupd_%1")
-            .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
-
         bool success = false;
-        {
-            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-            db.setDatabaseName(dbPath);
-            if (db.open()) {
-                QSqlQuery(db).exec("PRAGMA busy_timeout = 5000");
-                success = updateShotMetadataStatic(db, shotId, metadata);
-            } else {
-                qWarning() << "ShotHistoryStorage: Failed to open DB for async updateShotMetadata";
-            }
-        }
-        QSqlDatabase::removeDatabase(connName);
+        withTempDb(dbPath, "shs_rupd", [&](QSqlDatabase& db) {
+            success = updateShotMetadataStatic(db, shotId, metadata);
+        });
 
         QMetaObject::invokeMethod(this, [this, shotId, success, destroyed]() {
             if (*destroyed) {

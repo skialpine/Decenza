@@ -117,12 +117,8 @@ private:
     void sendFile(QTcpSocket* socket, const QString& path, const QString& contentType);
 
     QString getLocalIpAddress() const;
-    QString generateIndexPage() const;
-    QString generateShotListPage() const;
     QString generateShotListPage(const QVariantList& shots) const;
-    QString generateShotDetailPage(qint64 shotId) const;
     QString generateShotDetailPage(qint64 shotId, const QVariantMap& shot) const;
-    QString generateComparisonPage(const QList<qint64>& shotIds) const;
     QString generateComparisonPage(const QList<ShotRecord>& shots) const;
     QString generateDebugPage() const;
     QString generateUploadPage() const;

@@ -744,6 +744,7 @@ QString ShotServer::generateRestorePage() const
     <script>
 )HTML";
     html += WEB_JS_MENU;
+    html += WEB_JS_POWER_CONTROL;
     html += R"HTML(
         var uploadZone = document.getElementById("uploadZone");
         var progressBar = document.getElementById("progressBar");

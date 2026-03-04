@@ -39,16 +39,6 @@
 #include <QJniObject>
 #endif
 
-QString ShotServer::generateIndexPage() const
-{
-    return generateShotListPage();
-}
-
-QString ShotServer::generateShotListPage() const
-{
-    return generateShotListPage(m_storage->getShots(0, 1000));
-}
-
 QString ShotServer::generateShotListPage(const QVariantList& shots) const
 {
     QString rows;
@@ -1022,11 +1012,6 @@ QString ShotServer::generateShotListPage(const QVariantList& shots) const
 )HTML";
 
     return html;
-}
-
-QString ShotServer::generateShotDetailPage(qint64 shotId) const
-{
-    return generateShotDetailPage(shotId, m_storage->getShot(shotId));
 }
 
 QString ShotServer::generateShotDetailPage(qint64 shotId, const QVariantMap& shot) const
@@ -2128,11 +2113,6 @@ QString ShotServer::generateShotDetailPage(qint64 shotId, const QVariantMap& sho
     .arg(shot["drinkTds"].toDouble(), 0, 'f', 2)                                    // %37 drinkTds
     .arg(shot["drinkEy"].toDouble(), 0, 'f', 1)                                     // %38 drinkEy
     .arg(resistanceData);                                                            // %39 resistance
-}
-
-QString ShotServer::generateComparisonPage(const QList<qint64>& shotIds) const
-{
-    return generateComparisonPage(m_storage->getShotsForComparison(shotIds));
 }
 
 QString ShotServer::generateComparisonPage(const QList<ShotRecord>& shots) const

@@ -211,6 +211,7 @@ QString ShotServer::generateAIConversationsPage() const
     <script>
 )HTML";
     html += WEB_JS_MENU;
+    html += WEB_JS_POWER_CONTROL;
     html += R"HTML(
         function openHelpIssue(key, label) {
             // Step 1: Trigger JSON file download so user has it ready

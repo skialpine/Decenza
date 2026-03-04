@@ -1,7 +1,7 @@
 #pragma once
 
-// Menu JavaScript: toggle menu, power control, click-outside-to-close
-// Used by all web pages with the header menu
+// Menu JavaScript: toggle menu dropdown, click-outside-to-close
+// Used by all web pages with the header menu (pair with WEB_JS_POWER_CONTROL)
 
 inline constexpr const char* WEB_JS_MENU = R"JS(
         function toggleMenu() {
@@ -14,48 +14,10 @@ inline constexpr const char* WEB_JS_MENU = R"JS(
                 menu.classList.remove("open");
             }
         });
-
-        function togglePower() {
-            var el = document.getElementById("powerToggle");
-            var isAwake = el.dataset.awake === "true";
-            fetch(isAwake ? "/api/power/sleep" : "/api/power/wake", { method: "POST" })
-                .then(function() { updatePowerStatus(); })
-                .catch(function(e) { console.warn('Power toggle failed:', e); });
-        }
-
-        function updatePowerStatus() {
-            fetch("/api/power/status")
-                .then(function(r) {
-                    if (!r.ok) throw new Error('Server error (' + r.status + ')');
-                    return r.json();
-                })
-                .then(function(data) {
-                    var el = document.getElementById("powerToggle");
-                    if (data.awake) {
-                        el.textContent = "💤 Sleep";
-                        el.dataset.awake = "true";
-                    } else {
-                        el.textContent = "⚡ Wake";
-                        el.dataset.awake = "false";
-                    }
-                })
-                .catch(function(e) { console.warn('Power status update failed:', e); });
-        }
-
-        updatePowerStatus();
-        var powerTimer = setInterval(updatePowerStatus, 10000);
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) {
-                clearInterval(powerTimer);
-            } else {
-                updatePowerStatus();
-                powerTimer = setInterval(updatePowerStatus, 10000);
-            }
-        });
 )JS";
 
-// Power control JavaScript for shot pages (list, detail, comparison)
-// Uses powerState object pattern with "powerToggle" button element.
+// Power control JavaScript for all pages with the menu "powerToggle" button.
+// Uses powerState object pattern with disconnected/awake/sleep states.
 // innerHTML values are hardcoded HTML entity strings (not user input).
 inline constexpr const char* WEB_JS_POWER_CONTROL = R"JS(
         var powerState = {awake: false, state: "Unknown"};

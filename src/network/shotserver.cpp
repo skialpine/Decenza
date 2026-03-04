@@ -9,6 +9,7 @@
 #include "../core/settings.h"
 #include "../core/profilestorage.h"
 #include "../core/settingsserializer.h"
+#include "../core/dbutils.h"
 #include "../ai/aimanager.h"
 #include "../core/memorymonitor.h"
 #include "version.h"
@@ -256,26 +257,44 @@ private:
 
 // ---------------------------------------------------------------------------
 
-// Open a scoped QSQLITE connection, set busy_timeout, run work, clean up.
-// Returns true if DB opened. work() is only called if the DB opens successfully.
-template<typename Work>
-static bool withTempDb(const QString& dbPath, const QString& connPrefix, Work&& work) {
-    const QString connName = connPrefix + QString("_%1")
-        .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
-    bool opened = false;
-    {
-        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-        db.setDatabaseName(dbPath);
-        if (!db.open()) {
-            qWarning() << "ShotServer: DB open failed for" << connPrefix << ":" << db.lastError().text();
-        } else {
-            QSqlQuery(db).exec("PRAGMA busy_timeout = 5000");
-            opened = true;
-            work(db);
-        }
+// Query shot list from DB. Returns true on success, false on query failure.
+static bool queryShotList(QSqlDatabase& db, QVariantList& result) {
+    QSqlQuery query(db);
+    if (!query.prepare(R"(
+        SELECT id, uuid, timestamp, profile_name, duration_seconds,
+               final_weight, dose_weight, bean_brand, bean_type,
+               enjoyment, visualizer_id, grinder_setting,
+               temperature_override, yield_override, beverage_type,
+               drink_tds, drink_ey
+        FROM shots ORDER BY timestamp DESC LIMIT 1000
+    )") || !query.exec()) {
+        qWarning() << "ShotServer: Shot list query failed:" << query.lastError().text();
+        return false;
     }
-    QSqlDatabase::removeDatabase(connName);
-    return opened;
+    while (query.next()) {
+        QVariantMap row;
+        row["id"] = query.value(0).toLongLong();
+        row["uuid"] = query.value(1).toString();
+        row["timestamp"] = query.value(2).toLongLong();
+        row["profileName"] = query.value(3).toString();
+        row["duration"] = query.value(4).toDouble();
+        row["finalWeight"] = query.value(5).toDouble();
+        row["doseWeight"] = query.value(6).toDouble();
+        row["beanBrand"] = query.value(7).toString();
+        row["beanType"] = query.value(8).toString();
+        row["enjoyment"] = query.value(9).toDouble();
+        row["hasVisualizerUpload"] = !query.value(10).toString().isEmpty();
+        row["grinderSetting"] = query.value(11).toString();
+        row["temperatureOverride"] = query.value(12).toDouble();
+        row["yieldOverride"] = query.value(13).toDouble();
+        row["beverageType"] = query.value(14).toString();
+        row["drinkTds"] = query.value(15).toDouble();
+        row["drinkEy"] = query.value(16).toDouble();
+        QDateTime dt = QDateTime::fromSecsSinceEpoch(query.value(2).toLongLong());
+        row["dateTime"] = dt.toString("yyyy-MM-dd HH:mm");
+        result.append(row);
+    }
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -940,42 +959,7 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             QVariantList shots;
             bool success = false;
             withTempDb(dbPath, "shs_web_list", [&](QSqlDatabase& db) {
-                QSqlQuery query(db);
-                if (!query.prepare(R"(
-                    SELECT id, uuid, timestamp, profile_name, duration_seconds,
-                           final_weight, dose_weight, bean_brand, bean_type,
-                           enjoyment, visualizer_id, grinder_setting,
-                           temperature_override, yield_override, beverage_type,
-                           drink_tds, drink_ey
-                    FROM shots ORDER BY timestamp DESC LIMIT 1000
-                )") || !query.exec()) {
-                    qWarning() << "ShotServer: Shot list query failed:" << query.lastError().text();
-                    return;
-                }
-                while (query.next()) {
-                    QVariantMap row;
-                    row["id"] = query.value(0).toLongLong();
-                    row["uuid"] = query.value(1).toString();
-                    row["timestamp"] = query.value(2).toLongLong();
-                    row["profileName"] = query.value(3).toString();
-                    row["duration"] = query.value(4).toDouble();
-                    row["finalWeight"] = query.value(5).toDouble();
-                    row["doseWeight"] = query.value(6).toDouble();
-                    row["beanBrand"] = query.value(7).toString();
-                    row["beanType"] = query.value(8).toString();
-                    row["enjoyment"] = query.value(9).toDouble();
-                    row["hasVisualizerUpload"] = !query.value(10).toString().isEmpty();
-                    row["grinderSetting"] = query.value(11).toString();
-                    row["temperatureOverride"] = query.value(12).toDouble();
-                    row["yieldOverride"] = query.value(13).toDouble();
-                    row["beverageType"] = query.value(14).toString();
-                    row["drinkTds"] = query.value(15).toDouble();
-                    row["drinkEy"] = query.value(16).toDouble();
-                    QDateTime dt = QDateTime::fromSecsSinceEpoch(query.value(2).toLongLong());
-                    row["dateTime"] = dt.toString("yyyy-MM-dd HH:mm");
-                    shots.append(row);
-                }
-                success = true;
+                success = queryShotList(db, shots);
             });
 
             if (*destroyed) return;
@@ -1107,52 +1091,22 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
         QString dbPath = m_storage->databasePath();
         auto destroyed = m_destroyed;
         QThread* thread = QThread::create([this, socketGuard, dbPath, destroyed]() {
-            QJsonArray arr;
+            QVariantList shots;
             bool success = false;
             withTempDb(dbPath, "shs_web_api", [&](QSqlDatabase& db) {
-                QSqlQuery query(db);
-                if (!query.prepare(R"(
-                    SELECT id, uuid, timestamp, profile_name, duration_seconds,
-                           final_weight, dose_weight, bean_brand, bean_type,
-                           enjoyment, visualizer_id, grinder_setting,
-                           temperature_override, yield_override, beverage_type,
-                           drink_tds, drink_ey
-                    FROM shots ORDER BY timestamp DESC LIMIT 1000
-                )") || !query.exec()) {
-                    qWarning() << "ShotServer: /api/shots query failed:" << query.lastError().text();
-                    return;
-                }
-                while (query.next()) {
-                    QJsonObject obj;
-                    obj["id"] = query.value(0).toLongLong();
-                    obj["uuid"] = query.value(1).toString();
-                    obj["timestamp"] = query.value(2).toLongLong();
-                    obj["profileName"] = query.value(3).toString();
-                    obj["duration"] = query.value(4).toDouble();
-                    obj["finalWeight"] = query.value(5).toDouble();
-                    obj["doseWeight"] = query.value(6).toDouble();
-                    obj["beanBrand"] = query.value(7).toString();
-                    obj["beanType"] = query.value(8).toString();
-                    obj["enjoyment"] = query.value(9).toDouble();
-                    obj["hasVisualizerUpload"] = !query.value(10).toString().isEmpty();
-                    obj["grinderSetting"] = query.value(11).toString();
-                    obj["temperatureOverride"] = query.value(12).toDouble();
-                    obj["yieldOverride"] = query.value(13).toDouble();
-                    obj["beverageType"] = query.value(14).toString();
-                    obj["drinkTds"] = query.value(15).toDouble();
-                    obj["drinkEy"] = query.value(16).toDouble();
-                    arr.append(obj);
-                }
-                success = true;
+                success = queryShotList(db, shots);
             });
 
             if (*destroyed) return;
             QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, success,
-                                             arr = std::move(arr)]() {
+                                             shots = std::move(shots)]() {
                 if (*destroyed || !socketGuard) return;
                 if (!success) {
                     sendResponse(socketGuard, 500, "application/json", R"({"error":"Database unavailable"})");
                 } else {
+                    QJsonArray arr;
+                    for (const QVariant& v : shots)
+                        arr.append(QJsonObject::fromVariantMap(v.toMap()));
                     sendJson(socketGuard, QJsonDocument(arr).toJson(QJsonDocument::Compact));
                 }
             }, Qt::QueuedConnection);
@@ -1274,9 +1228,13 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
                 }
                 for (qint64 id : shotIds) {
                     query.bindValue(0, id);
-                    if (query.exec() && query.numRowsAffected() > 0) {
-                        deleted++;
-                        deletedIds << id;
+                    if (query.exec()) {
+                        if (query.numRowsAffected() > 0) {
+                            deleted++;
+                            deletedIds << id;
+                        }
+                    } else {
+                        qWarning() << "ShotServer: Failed to delete shot" << id << ":" << query.lastError().text();
                     }
                 }
             });
