@@ -46,7 +46,7 @@ void WeightProcessor::processWeight(double weight)
             qDebug() << "[SAW-Worker] De-jitter: wall-clock" << wallClock
                      << "behind last synthetic" << m_lastSampleTs
                      << "— clamping to preserve monotonicity";
-            sampleTs = m_lastSampleTs + 1;
+            sampleTs = m_lastSampleTs + (m_estimatedIntervalMs > 0 ? m_estimatedIntervalMs : 1);
         }
         if (sinceLast > kBatchThresholdMs && sinceLast < kReconnectGapMs) {
             // EMA calibration (ignores gaps > 2s as reconnects)
