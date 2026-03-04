@@ -3609,33 +3609,36 @@ R"HTML(        /* --- Memory section --- */
 
         function clearLog() {
             fetch("/api/debug/clear", { method: "POST" })
-                .then(function() {
-                    container.innerHTML = "";
+                .then(function(r) {
+                    if (!r.ok) throw new Error("Server error " + r.status);
+                    container.textContent = "";
                     lastIndex = 0;
-                });
+                })
+                .catch(function(e) { alert("Clear failed: " + e.message); });
         }
 
         function clearAll() {
             if (confirm("Clear both live log and saved log file?")) {
                 fetch("/api/debug/clearall", { method: "POST" })
-                    .then(function() {
-                        container.innerHTML = "";
+                    .then(function(r) {
+                        if (!r.ok) throw new Error("Server error " + r.status);
+                        container.textContent = "";
                         lastIndex = 0;
-                    });
+                    })
+                    .catch(function(e) { alert("Clear failed: " + e.message); });
             }
         }
 
         function downloadLog() {
-            fetch("/api/debug/file")
+            fetch("/api/debug/file/zip")
                 .then(function(r) {
                     if (!r.ok) throw new Error("Server error " + r.status);
-                    return r.json();
+                    return r.blob();
                 })
-                .then(function(data) {
-                    var blob = new Blob([data.log || ""], {type: "text/plain"});
+                .then(function(blob) {
                     var a = document.createElement("a");
                     a.href = URL.createObjectURL(blob);
-                    a.download = "debug.log";
+                    a.download = "debug.zip";
                     a.click();
                     URL.revokeObjectURL(a.href);
                 })
@@ -3644,7 +3647,10 @@ R"HTML(        /* --- Memory section --- */
 
         function loadPersistedLog() {
             fetch("/api/debug/file")
-                .then(function(r) { return r.json(); })
+                .then(function(r) {
+                    if (!r.ok) throw new Error("Server error " + r.status);
+                    return r.json();
+                })
                 .then(function(data) {
                     if (data.log) {
                         container.innerHTML = "";
@@ -3661,7 +3667,8 @@ R"HTML(        /* --- Memory section --- */
                     } else {
                         alert("No saved log file found");
                     }
-                });
+                })
+                .catch(function(e) { alert("Load failed: " + e.message); });
         }
 
         // Poll every 500ms

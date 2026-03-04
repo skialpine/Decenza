@@ -18,6 +18,7 @@
 #include <QSet>
 #include <QFile>
 #include <QBuffer>
+#include <private/qzipwriter_p.h>
 #include <algorithm>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -1199,6 +1200,31 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
         result["log"] = log;
         result["path"] = WebDebugLogger::instance() ? WebDebugLogger::instance()->logFilePath() : QString();
         sendJson(socket, QJsonDocument(result).toJson(QJsonDocument::Compact));
+    }
+    else if (path == "/api/debug/file/zip") {
+        // Return persisted log as a ZIP file for smaller downloads
+        QString log = WebDebugLogger::instance() ? WebDebugLogger::instance()->getPersistedLog() : QString();
+        if (m_memoryMonitor)
+            log += m_memoryMonitor->toSummaryString();
+
+        QBuffer zipBuffer;
+        zipBuffer.open(QIODevice::WriteOnly);
+        bool zipOk = false;
+        {
+            QZipWriter writer(&zipBuffer);
+            writer.setCompressionPolicy(QZipWriter::AlwaysCompress);
+            writer.addFile("debug.log", log.toUtf8());
+            zipOk = (writer.status() == QZipWriter::NoError);
+            writer.close();
+        }
+
+        if (zipOk) {
+            sendResponse(socket, 200, "application/zip", zipBuffer.data(),
+                         "Content-Disposition: attachment; filename=\"debug.zip\"\r\n");
+        } else {
+            qWarning() << "ShotServer: QZipWriter failed to create debug ZIP";
+            sendResponse(socket, 500, "text/plain", "Failed to create ZIP file");
+        }
     }
     else if (path == "/api/power" || path == "/api/power/status") {
         // Return current power state

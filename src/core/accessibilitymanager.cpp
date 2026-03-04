@@ -11,7 +11,8 @@ AccessibilityManager::AccessibilityManager(QObject *parent)
 {
     loadSettings();
     initTts();
-    initTickSound();
+    if (m_enabled && m_tickEnabled)
+        initTickSound();
 }
 
 AccessibilityManager::~AccessibilityManager()
@@ -116,6 +117,9 @@ void AccessibilityManager::initTts()
 
 void AccessibilityManager::initTickSound()
 {
+    if (m_tickSounds[0])
+        return;  // Already initialized
+
     // Pre-load all 4 tick sounds for instant playback
     qreal vol = m_tickVolume / 100.0;
     for (int i = 0; i < 4; i++) {
@@ -164,6 +168,8 @@ void AccessibilityManager::setTickSoundIndex(int index)
     saveSettings();
     emit tickSoundIndexChanged();
 
+    initTickSound();
+
     // Play the selected sound immediately (all sounds are pre-loaded)
     int idx = index - 1;
     if (idx >= 0 && idx < 4 && m_tickSounds[idx] && m_tickSounds[idx]->status() == QSoundEffect::Ready) {
@@ -178,6 +184,8 @@ void AccessibilityManager::setTickVolume(int volume)
     m_tickVolume = volume;
     saveSettings();
     emit tickVolumeChanged();
+
+    initTickSound();
 
     // Update all sound volumes
     qreal vol = volume / 100.0;
@@ -264,6 +272,8 @@ void AccessibilityManager::announceLabel(const QString& text)
 void AccessibilityManager::playTick()
 {
     if (m_shuttingDown || !m_enabled || !m_tickEnabled) return;
+
+    initTickSound();
 
     int idx = m_tickSoundIndex - 1;  // Convert 1-4 to 0-3
     if (idx >= 0 && idx < 4 && m_tickSounds[idx] && m_tickSounds[idx]->status() == QSoundEffect::Ready) {
