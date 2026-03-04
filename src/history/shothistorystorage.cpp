@@ -15,6 +15,7 @@
 #include <QDebug>
 #include <QThread>
 #include <algorithm>
+#include "core/dbutils.h"
 
 #ifdef Q_OS_ANDROID
 #include <QJniObject>
@@ -1462,7 +1463,7 @@ ShotRecord ShotHistoryStorage::loadShotRecordStatic(QSqlDatabase& db, qint64 sho
     ShotRecord record;
 
     QSqlQuery query(db);
-    query.prepare(R"(
+    if (!query.prepare(R"(
         SELECT id, uuid, timestamp, profile_name, profile_json,
                duration_seconds, final_weight, dose_weight,
                bean_brand, bean_type, roast_date, roast_level,
@@ -1471,7 +1472,10 @@ ShotRecord ShotHistoryStorage::loadShotRecordStatic(QSqlDatabase& db, qint64 sho
                profile_notes, visualizer_id, visualizer_url, debug_log,
                temperature_override, yield_override, beverage_type
         FROM shots WHERE id = ?
-    )");
+    )")) {
+        qWarning() << "ShotHistoryStorage::loadShotRecordStatic: prepare failed:" << query.lastError().text();
+        return record;
+    }
     query.bindValue(0, shotId);
 
     if (!query.exec() || !query.next()) {
@@ -1508,25 +1512,27 @@ ShotRecord ShotHistoryStorage::loadShotRecordStatic(QSqlDatabase& db, qint64 sho
     record.summary.beverageType = query.value(26).toString();
     record.summary.hasVisualizerUpload = !record.visualizerId.isEmpty();
 
-    query.prepare("SELECT data_blob FROM shot_samples WHERE shot_id = ?");
-    query.bindValue(0, shotId);
-    if (query.exec() && query.next()) {
-        QByteArray blob = query.value(0).toByteArray();
-        decompressSampleData(blob, &record);
+    if (query.prepare("SELECT data_blob FROM shot_samples WHERE shot_id = ?")) {
+        query.bindValue(0, shotId);
+        if (query.exec() && query.next()) {
+            QByteArray blob = query.value(0).toByteArray();
+            decompressSampleData(blob, &record);
+        }
     }
 
-    query.prepare("SELECT time_offset, label, frame_number, is_flow_mode, transition_reason "
-                  "FROM shot_phases WHERE shot_id = ? ORDER BY time_offset");
-    query.bindValue(0, shotId);
-    if (query.exec()) {
-        while (query.next()) {
-            HistoryPhaseMarker marker;
-            marker.time = query.value(0).toDouble();
-            marker.label = query.value(1).toString();
-            marker.frameNumber = query.value(2).toInt();
-            marker.isFlowMode = query.value(3).toInt() != 0;
-            marker.transitionReason = query.value(4).toString();
-            record.phases.append(marker);
+    if (query.prepare("SELECT time_offset, label, frame_number, is_flow_mode, transition_reason "
+                      "FROM shot_phases WHERE shot_id = ? ORDER BY time_offset")) {
+        query.bindValue(0, shotId);
+        if (query.exec()) {
+            while (query.next()) {
+                HistoryPhaseMarker marker;
+                marker.time = query.value(0).toDouble();
+                marker.label = query.value(1).toString();
+                marker.frameNumber = query.value(2).toInt();
+                marker.isFlowMode = query.value(3).toInt() != 0;
+                marker.transitionReason = query.value(4).toString();
+                record.phases.append(marker);
+            }
         }
     }
 
@@ -1673,30 +1679,24 @@ void ShotHistoryStorage::requestDeleteShot(qint64 shotId)
     thread->start();
 }
 
-bool ShotHistoryStorage::updateShotMetadata(qint64 shotId, const QVariantMap& metadata)
+bool ShotHistoryStorage::updateShotMetadataStatic(QSqlDatabase& db, qint64 shotId, const QVariantMap& metadata)
 {
-    if (!m_ready) return false;
-
-    QSqlQuery query(m_db);
-    query.prepare(R"(
+    QSqlQuery query(db);
+    if (!query.prepare(R"(
         UPDATE shots SET
-            bean_brand = :bean_brand,
-            bean_type = :bean_type,
-            roast_date = :roast_date,
-            roast_level = :roast_level,
-            grinder_model = :grinder_model,
-            grinder_setting = :grinder_setting,
-            drink_tds = :drink_tds,
-            drink_ey = :drink_ey,
-            enjoyment = :enjoyment,
-            espresso_notes = :espresso_notes,
-            barista = :barista,
-            dose_weight = :dose_weight,
-            final_weight = :final_weight,
-            beverage_type = :beverage_type,
+            bean_brand = :bean_brand, bean_type = :bean_type,
+            roast_date = :roast_date, roast_level = :roast_level,
+            grinder_model = :grinder_model, grinder_setting = :grinder_setting,
+            drink_tds = :drink_tds, drink_ey = :drink_ey,
+            enjoyment = :enjoyment, espresso_notes = :espresso_notes,
+            barista = :barista, dose_weight = :dose_weight,
+            final_weight = :final_weight, beverage_type = :beverage_type,
             updated_at = strftime('%s', 'now')
         WHERE id = :id
-    )");
+    )")) {
+        qWarning() << "ShotHistoryStorage: Metadata update prepare failed:" << query.lastError().text();
+        return false;
+    }
 
     query.bindValue(":bean_brand", metadata.value("beanBrand").toString());
     query.bindValue(":bean_type", metadata.value("beanType").toString());
@@ -1718,6 +1718,15 @@ bool ShotHistoryStorage::updateShotMetadata(qint64 shotId, const QVariantMap& me
         qWarning() << "ShotHistoryStorage: Failed to update shot metadata:" << query.lastError().text();
         return false;
     }
+    return true;
+}
+
+bool ShotHistoryStorage::updateShotMetadata(qint64 shotId, const QVariantMap& metadata)
+{
+    if (!m_ready) return false;
+
+    if (!updateShotMetadataStatic(m_db, shotId, metadata))
+        return false;
 
     invalidateDistinctCache();
     qDebug() << "ShotHistoryStorage: Updated metadata for shot" << shotId;
@@ -1735,62 +1744,10 @@ void ShotHistoryStorage::requestUpdateShotMetadata(qint64 shotId, const QVariant
     auto destroyed = m_destroyed;
 
     QThread* thread = QThread::create([this, dbPath, shotId, metadata, destroyed]() {
-        const QString connName = QString("shs_rupd_%1")
-            .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
-
         bool success = false;
-        {
-            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-            db.setDatabaseName(dbPath);
-            if (db.open()) {
-                QSqlQuery(db).exec("PRAGMA busy_timeout = 5000");
-                QSqlQuery query(db);
-                query.prepare(R"(
-                    UPDATE shots SET
-                        bean_brand = :bean_brand,
-                        bean_type = :bean_type,
-                        roast_date = :roast_date,
-                        roast_level = :roast_level,
-                        grinder_model = :grinder_model,
-                        grinder_setting = :grinder_setting,
-                        drink_tds = :drink_tds,
-                        drink_ey = :drink_ey,
-                        enjoyment = :enjoyment,
-                        espresso_notes = :espresso_notes,
-                        barista = :barista,
-                        dose_weight = :dose_weight,
-                        final_weight = :final_weight,
-                        beverage_type = :beverage_type,
-                        updated_at = strftime('%s', 'now')
-                    WHERE id = :id
-                )");
-
-                query.bindValue(":bean_brand", metadata.value("beanBrand").toString());
-                query.bindValue(":bean_type", metadata.value("beanType").toString());
-                query.bindValue(":roast_date", metadata.value("roastDate").toString());
-                query.bindValue(":roast_level", metadata.value("roastLevel").toString());
-                query.bindValue(":grinder_model", metadata.value("grinderModel").toString());
-                query.bindValue(":grinder_setting", metadata.value("grinderSetting").toString());
-                query.bindValue(":drink_tds", metadata.value("drinkTds").toDouble());
-                query.bindValue(":drink_ey", metadata.value("drinkEy").toDouble());
-                query.bindValue(":enjoyment", metadata.value("enjoyment").toInt());
-                query.bindValue(":espresso_notes", metadata.value("espressoNotes").toString());
-                query.bindValue(":barista", metadata.value("barista").toString());
-                query.bindValue(":dose_weight", metadata.value("doseWeight").toDouble());
-                query.bindValue(":final_weight", metadata.value("finalWeight").toDouble());
-                query.bindValue(":beverage_type", metadata.value("beverageType", "espresso").toString());
-                query.bindValue(":id", shotId);
-
-                if (query.exec()) {
-                    success = true;
-                } else {
-                    qWarning() << "ShotHistoryStorage: Failed to async update metadata:" << query.lastError().text();
-                }
-            } else {
-                qWarning() << "ShotHistoryStorage: Failed to open DB for async updateShotMetadata";
-            }
-        }
-        QSqlDatabase::removeDatabase(connName);
+        withTempDb(dbPath, "shs_rupd", [&](QSqlDatabase& db) {
+            success = updateShotMetadataStatic(db, shotId, metadata);
+        });
 
         QMetaObject::invokeMethod(this, [this, shotId, success, destroyed]() {
             if (*destroyed) {

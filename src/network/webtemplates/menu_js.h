@@ -1,7 +1,7 @@
 #pragma once
 
-// Menu JavaScript: toggle menu, power control, click-outside-to-close
-// Used by all web pages with the header menu
+// Menu JavaScript: toggle menu dropdown, click-outside-to-close
+// Used by all web pages with the header menu (pair with WEB_JS_POWER_CONTROL)
 
 inline constexpr const char* WEB_JS_MENU = R"JS(
         function toggleMenu() {
@@ -14,42 +14,46 @@ inline constexpr const char* WEB_JS_MENU = R"JS(
                 menu.classList.remove("open");
             }
         });
+)JS";
 
-        function togglePower() {
-            var el = document.getElementById("powerToggle");
-            var isAwake = el.dataset.awake === "true";
-            fetch(isAwake ? "/api/power/sleep" : "/api/power/wake", { method: "POST" })
-                .then(function() { updatePowerStatus(); })
-                .catch(function(e) { console.warn('Power toggle failed:', e); });
+// Power control JavaScript for all pages with the menu "powerToggle" button.
+// Uses powerState object pattern with disconnected/awake/sleep states.
+// innerHTML values are hardcoded HTML entity strings (not user input).
+inline constexpr const char* WEB_JS_POWER_CONTROL = R"JS(
+        var powerState = {awake: false, state: "Unknown"};
+        function updatePowerButton() {
+            var btn = document.getElementById("powerToggle");
+            if (powerState.state === "Unknown" || !powerState.connected) {
+                btn.innerHTML = "&#128268; Disconnected";
+            } else if (powerState.awake) {
+                btn.innerHTML = "&#128164; Put to Sleep";
+            } else {
+                btn.innerHTML = "&#9889; Wake Up";
+            }
         }
-
-        function updatePowerStatus() {
+        function fetchPowerState() {
             fetch("/api/power/status")
                 .then(function(r) {
-                    if (!r.ok) throw new Error('Server error (' + r.status + ')');
+                    if (!r.ok) throw new Error("Server error (" + r.status + ")");
                     return r.json();
                 })
-                .then(function(data) {
-                    var el = document.getElementById("powerToggle");
-                    if (data.awake) {
-                        el.textContent = "💤 Sleep";
-                        el.dataset.awake = "true";
-                    } else {
-                        el.textContent = "⚡ Wake";
-                        el.dataset.awake = "false";
-                    }
-                })
-                .catch(function(e) { console.warn('Power status update failed:', e); });
+                .then(function(data) { powerState = data; updatePowerButton(); })
+                .catch(function(e) { console.warn("fetchPowerState:", e.message); });
         }
-
-        updatePowerStatus();
-        var powerTimer = setInterval(updatePowerStatus, 10000);
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) {
-                clearInterval(powerTimer);
-            } else {
-                updatePowerStatus();
-                powerTimer = setInterval(updatePowerStatus, 10000);
-            }
+        function togglePower() {
+            var action = powerState.awake ? "sleep" : "wake";
+            fetch("/api/power/" + action)
+                .then(function(r) {
+                    if (!r.ok) throw new Error("Server error (" + r.status + ")");
+                    return r.json();
+                })
+                .then(function() { setTimeout(fetchPowerState, 1000); })
+                .catch(function(e) { alert("Power toggle failed: " + e.message); });
+        }
+        fetchPowerState();
+        var _pwrTimer = setInterval(fetchPowerState, 5000);
+        document.addEventListener("visibilitychange", function() {
+            if (document.hidden) { clearInterval(_pwrTimer); }
+            else { fetchPowerState(); _pwrTimer = setInterval(fetchPowerState, 5000); }
         });
 )JS";

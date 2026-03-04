@@ -222,6 +222,10 @@ public:
     // Update shot metadata (for editing existing shots)
     Q_INVOKABLE bool updateShotMetadata(qint64 shotId, const QVariantMap& metadata);
 
+    // Thread-safe metadata update: caller provides their own connection.
+    // Safe to call from any thread (does not use m_db). Returns true on success.
+    static bool updateShotMetadataStatic(QSqlDatabase& db, qint64 shotId, const QVariantMap& metadata);
+
     // Async version: runs update on background thread, emits shotMetadataUpdated()
     Q_INVOKABLE void requestUpdateShotMetadata(qint64 shotId, const QVariantMap& metadata);
 
@@ -299,6 +303,9 @@ public:
     // Get database path
     QString databasePath() const { return m_dbPath; }
 
+    // Invalidate all cached getDistinct*() results (call after save/delete/import/update)
+    void invalidateDistinctCache();
+
     // Close the database (for factory reset before file deletion)
     void close();
 
@@ -352,11 +359,8 @@ private:
     // Helper to apply smart sorting for grinder settings
     void sortGrinderSettings(QStringList& settings);
 
-    // Invalidate all cached getDistinct*() results (call after save/delete/import)
-    void invalidateDistinctCache();
-
-    // Convert ShotRecord to QVariantMap (shared by getShot and requestShot)
-    QVariantMap convertShotRecord(const ShotRecord& record);
+    // Convert ShotRecord to QVariantMap (shared by getShot, requestShot, and ShotServer)
+    static QVariantMap convertShotRecord(const ShotRecord& record);
 
     // Backfill beverage_type from profile_json for existing rows
     void backfillBeverageType();

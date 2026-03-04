@@ -1,6 +1,7 @@
 #include "shotserver.h"
 #include "webdebuglogger.h"
 #include "webtemplates.h"
+#include "webtemplates/menu_js.h"
 #include "../history/shothistorystorage.h"
 #include "../ble/de1device.h"
 #include "../machine/machinestate.h"
@@ -38,15 +39,8 @@
 #include <QJniObject>
 #endif
 
-QString ShotServer::generateIndexPage() const
+QString ShotServer::generateShotListPage(const QVariantList& shots) const
 {
-    return generateShotListPage();
-}
-
-QString ShotServer::generateShotListPage() const
-{
-    QVariantList shots = m_storage->getShots(0, 1000);  // Get more shots for filtering
-
     QString rows;
     for (const QVariant& v : std::as_const(shots)) {
         QVariantMap shot = v.toMap();
@@ -706,14 +700,16 @@ QString ShotServer::generateShotListPage() const
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ids: selectedShots })
-            }).then(function(resp) { return resp.json(); })
-              .then(function(data) {
+            }).then(function(resp) {
+                if (!resp.ok) throw new Error("Server error (" + resp.status + ")");
+                return resp.json();
+            }).then(function(data) {
                 if (data.deleted > 0) {
                     window.location.reload();
                 } else {
                     alert("Failed to delete shots.");
                 }
-            }).catch(function() { alert("Failed to delete shots."); });
+            }).catch(function(e) { alert("Failed to delete shots: " + e.message); });
         }
 
 )HTML";
@@ -843,12 +839,15 @@ QString ShotServer::generateShotListPage() const
 
         function loadSavedSearches() {
             fetch('/api/saved-searches')
-                .then(function(r) { return r.json(); })
+                .then(function(r) {
+                    if (!r.ok) throw new Error('Server error (' + r.status + ')');
+                    return r.json();
+                })
                 .then(function(data) {
                     savedSearches = data.searches || [];
                     updateSavedUI();
                 })
-                .catch(function() {});
+                .catch(function(e) { console.warn('loadSavedSearches:', e.message); });
         }
 
         function saveSearch() {
@@ -859,14 +858,16 @@ QString ShotServer::generateShotListPage() const
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ search: text })
-            }).then(function(r) { return r.json(); })
-              .then(function(data) {
+            }).then(function(r) {
+                if (!r.ok) throw new Error('Server error (' + r.status + ')');
+                return r.json();
+            }).then(function(data) {
                 if (data.success) {
                     savedSearches.push(text);
                     updateSavedUI();
                     updateSaveButton();
                 }
-            }).catch(function() {});
+            }).catch(function(e) { alert('Failed to save search: ' + e.message); });
         }
 
         function deleteSavedSearch(text) {
@@ -874,15 +875,17 @@ QString ShotServer::generateShotListPage() const
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ search: text })
-            }).then(function(r) { return r.json(); })
-              .then(function(data) {
+            }).then(function(r) {
+                if (!r.ok) throw new Error('Server error (' + r.status + ')');
+                return r.json();
+            }).then(function(data) {
                 if (data.success) {
                     var idx = savedSearches.indexOf(text);
                     if (idx >= 0) savedSearches.splice(idx, 1);
                     updateSavedUI();
                     updateSaveButton();
                 }
-            }).catch(function() {});
+            }).catch(function(e) { alert('Failed to delete search: ' + e.message); });
         }
 
         function applySavedSearch(text) {
@@ -1000,41 +1003,9 @@ QString ShotServer::generateShotListPage() const
 )HTML";
 
     // Part 15: Script - power functions and init
+    html += WEB_JS_POWER_CONTROL;
     html += R"HTML(
-        var powerState = {awake: false, state: "Unknown"};
-
-        function updatePowerButton() {
-            var btn = document.getElementById("powerToggle");
-            if (powerState.state === "Unknown" || !powerState.connected) {
-                btn.innerHTML = "&#128268; Disconnected";
-            } else if (powerState.awake) {
-                btn.innerHTML = "&#128164; Put to Sleep";
-            } else {
-                btn.innerHTML = "&#9889; Wake Up";
-            }
-        }
-
-        function fetchPowerState() {
-            fetch("/api/power/status")
-                .then(function(r) { return r.json(); })
-                .then(function(data) { powerState = data; updatePowerButton(); })
-                .catch(function() {});
-        }
-
-        function togglePower() {
-            var action = powerState.awake ? "sleep" : "wake";
-            fetch("/api/power/" + action)
-                .then(function(r) { return r.json(); })
-                .then(function() { setTimeout(fetchPowerState, 1000); });
-        }
-
-        fetchPowerState();
         loadSavedSearches();
-        var pwrTimer = setInterval(fetchPowerState, 5000);
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) { clearInterval(pwrTimer); }
-            else { fetchPowerState(); pwrTimer = setInterval(fetchPowerState, 5000); }
-        });
     </script>
 </body>
 </html>
@@ -1043,9 +1014,8 @@ QString ShotServer::generateShotListPage() const
     return html;
 }
 
-QString ShotServer::generateShotDetailPage(qint64 shotId) const
+QString ShotServer::generateShotDetailPage(qint64 shotId, const QVariantMap& shot) const
 {
-    QVariantMap shot = m_storage->getShot(shotId);
     if (shot.isEmpty()) {
         return QStringLiteral("<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Not Found</title></head>"
                   "<body style=\"background:#0d1117;color:#fff;font-family:sans-serif;padding:2rem;\">"
@@ -1767,8 +1737,10 @@ QString ShotServer::generateShotDetailPage(qint64 shotId) const
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
-            }).then(function(r) { return r.json(); })
-            .then(function(result) {
+            }).then(function(r) {
+                if (!r.ok) throw new Error('Server error (' + r.status + ')');
+                return r.json();
+            }).then(function(result) {
                 if (result.success) {
                     window.location.reload();
                 } else {
@@ -2090,35 +2062,9 @@ QString ShotServer::generateShotDetailPage(qint64 shotId) const
         });
 
         // Power toggle
-        var powerState = {awake: false, state: "Unknown"};
-        function updatePowerButton() {
-            var btn = document.getElementById("powerToggle");
-            if (powerState.state === "Unknown" || !powerState.connected) {
-                btn.innerHTML = "&#128268; Disconnected";
-            } else if (powerState.awake) {
-                btn.innerHTML = "&#128164; Put to Sleep";
-            } else {
-                btn.innerHTML = "&#9889; Wake Up";
-            }
-        }
-        function fetchPowerState() {
-            fetch("/api/power/status")
-                .then(function(r) { return r.json(); })
-                .then(function(data) { powerState = data; updatePowerButton(); })
-                .catch(function() {});
-        }
-        function togglePower() {
-            var action = powerState.awake ? "sleep" : "wake";
-            fetch("/api/power/" + action)
-                .then(function(r) { return r.json(); })
-                .then(function() { setTimeout(fetchPowerState, 1000); });
-        }
-        fetchPowerState();
-        var pwrTimer2 = setInterval(fetchPowerState, 5000);
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) { clearInterval(pwrTimer2); }
-            else { fetchPowerState(); pwrTimer2 = setInterval(fetchPowerState, 5000); }
-        });
+)HTML");
+    html += WEB_JS_POWER_CONTROL;
+    html += R"HTML(
     </script>
 </body>
 </html>
@@ -2169,11 +2115,8 @@ QString ShotServer::generateShotDetailPage(qint64 shotId) const
     .arg(resistanceData);                                                            // %39 resistance
 }
 
-QString ShotServer::generateComparisonPage(const QList<qint64>& shotIds) const
+QString ShotServer::generateComparisonPage(const QList<ShotRecord>& shots) const
 {
-    // Batch-load all shots in one pass (avoids per-shot QVariantMap conversion)
-    QList<ShotRecord> shots = m_storage->getShotsForComparison(shotIds);
-
     if (shots.size() < 2) {
         return QStringLiteral("<!DOCTYPE html><html><body>Not enough valid shots to compare</body></html>");
     }
@@ -3050,34 +2993,9 @@ QString ShotServer::generateComparisonPage(const QList<qint64>& shotIds) const
         });
 
         // === Power toggle ===
-        var powerState = {awake: false, state: "Unknown"};
-        function updatePowerButton() {
-            var btn = document.getElementById("powerToggle");
-            if (powerState.state === "Unknown" || !powerState.connected)
-                btn.innerHTML = "&#128268; Disconnected";
-            else if (powerState.awake)
-                btn.innerHTML = "&#128164; Put to Sleep";
-            else
-                btn.innerHTML = "&#9889; Wake Up";
-        }
-        function fetchPowerState() {
-            fetch("/api/power/status")
-                .then(function(r) { return r.json(); })
-                .then(function(data) { powerState = data; updatePowerButton(); })
-                .catch(function() {});
-        }
-        function togglePower() {
-            var action = powerState.awake ? "sleep" : "wake";
-            fetch("/api/power/" + action)
-                .then(function(r) { return r.json(); })
-                .then(function() { setTimeout(fetchPowerState, 1000); });
-        }
-        fetchPowerState();
-        var pwrTimer3 = setInterval(fetchPowerState, 5000);
-        document.addEventListener("visibilitychange", function() {
-            if (document.hidden) clearInterval(pwrTimer3);
-            else { fetchPowerState(); pwrTimer3 = setInterval(fetchPowerState, 5000); }
-        });
+)HTML";
+    html += WEB_JS_POWER_CONTROL;
+    html += R"HTML(
 
         // === Init ===
         buildPhasePills();
@@ -3582,7 +3500,10 @@ R"HTML(        /* --- Memory section --- */
 
         function fetchLogs() {
             fetch("/api/debug?after=" + lastIndex)
-                .then(function(r) { return r.json(); })
+                .then(function(r) {
+                    if (!r.ok) throw new Error("Server error (" + r.status + ")");
+                    return r.json();
+                })
                 .then(function(data) {
                     if (data.lines && data.lines.length > 0) {
                         var html = "";
@@ -3596,7 +3517,8 @@ R"HTML(        /* --- Memory section --- */
                     }
                     lastIndex = data.lastIndex;
                     lineCountEl.textContent = lastIndex + " lines";
-                });
+                })
+                .catch(function(e) { console.warn("fetchLogs:", e.message); });
         }
 
         function toggleAutoScroll() {

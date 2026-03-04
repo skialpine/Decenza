@@ -9,10 +9,15 @@
 #include "../core/settings.h"
 #include "../core/profilestorage.h"
 #include "../core/settingsserializer.h"
+#include "../core/dbutils.h"
 #include "../ai/aimanager.h"
 #include "../core/memorymonitor.h"
 #include "version.h"
 
+#include <QThread>
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QSqlError>
 #include <QNetworkInterface>
 #include <QUdpSocket>
 #include <QSet>
@@ -249,6 +254,48 @@ private:
 #endif
     }
 };
+
+// ---------------------------------------------------------------------------
+
+// Query shot list from DB. Returns true on success, false on query failure.
+static bool queryShotList(QSqlDatabase& db, QVariantList& result) {
+    QSqlQuery query(db);
+    if (!query.prepare(R"(
+        SELECT id, uuid, timestamp, profile_name, duration_seconds,
+               final_weight, dose_weight, bean_brand, bean_type,
+               enjoyment, visualizer_id, grinder_setting,
+               temperature_override, yield_override, beverage_type,
+               drink_tds, drink_ey
+        FROM shots ORDER BY timestamp DESC LIMIT 1000
+    )") || !query.exec()) {
+        qWarning() << "ShotServer: Shot list query failed:" << query.lastError().text();
+        return false;
+    }
+    while (query.next()) {
+        QVariantMap row;
+        row["id"] = query.value(0).toLongLong();
+        row["uuid"] = query.value(1).toString();
+        row["timestamp"] = query.value(2).toLongLong();
+        row["profileName"] = query.value(3).toString();
+        row["duration"] = query.value(4).toDouble();
+        row["finalWeight"] = query.value(5).toDouble();
+        row["doseWeight"] = query.value(6).toDouble();
+        row["beanBrand"] = query.value(7).toString();
+        row["beanType"] = query.value(8).toString();
+        row["enjoyment"] = query.value(9).toDouble();
+        row["hasVisualizerUpload"] = !query.value(10).toString().isEmpty();
+        row["grinderSetting"] = query.value(11).toString();
+        row["temperatureOverride"] = query.value(12).toDouble();
+        row["yieldOverride"] = query.value(13).toDouble();
+        row["beverageType"] = query.value(14).toString();
+        row["drinkTds"] = query.value(15).toDouble();
+        row["drinkEy"] = query.value(16).toDouble();
+        QDateTime dt = QDateTime::fromSecsSinceEpoch(query.value(2).toLongLong());
+        row["dateTime"] = dt.toString("yyyy-MM-dd HH:mm");
+        result.append(row);
+    }
+    return true;
+}
 
 // ---------------------------------------------------------------------------
 
@@ -904,11 +951,30 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
     }
 
     // Route requests
-    if (path == "/" || path == "/index.html") {
-        sendHtml(socket, generateShotListPage());
-    }
-    else if (path == "/shots" || path == "/shots/") {
-        sendHtml(socket, generateShotListPage());
+    if (path == "/" || path == "/index.html" || path == "/shots" || path == "/shots/") {
+        QPointer<QTcpSocket> socketGuard(socket);
+        QString dbPath = m_storage->databasePath();
+        auto destroyed = m_destroyed;
+        QThread* thread = QThread::create([this, socketGuard, dbPath, destroyed]() {
+            QVariantList shots;
+            bool success = false;
+            withTempDb(dbPath, "shs_web_list", [&](QSqlDatabase& db) {
+                success = queryShotList(db, shots);
+            });
+
+            if (*destroyed) return;
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, success,
+                                             shots = std::move(shots)]() {
+                if (*destroyed || !socketGuard) return;
+                if (!success) {
+                    sendResponse(socketGuard, 500, "text/plain", "Database unavailable");
+                } else {
+                    sendHtml(socketGuard, generateShotListPage(shots));
+                }
+            }, Qt::QueuedConnection);
+        });
+        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+        thread->start();
     }
     else if (path.startsWith("/compare/")) {
         // /compare/1,2,3 - compare shots with IDs 1, 2, 3
@@ -920,11 +986,35 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             qint64 id = p.toLongLong(&ok);
             if (ok) ids << id;
         }
-        if (ids.size() >= 2) {
-            sendHtml(socket, generateComparisonPage(ids));
-        } else {
+        if (ids.size() < 2) {
             sendResponse(socket, 400, "text/plain", "Need at least 2 shot IDs to compare");
+            return;
         }
+        QPointer<QTcpSocket> socketGuard(socket);
+        QString dbPath = m_storage->databasePath();
+        auto destroyed = m_destroyed;
+        QThread* thread = QThread::create([this, socketGuard, dbPath, ids, destroyed]() {
+            QList<ShotRecord> shots;
+            bool dbOpened = withTempDb(dbPath, "shs_web_cmp", [&](QSqlDatabase& db) {
+                for (qint64 id : ids) {
+                    ShotRecord r = ShotHistoryStorage::loadShotRecordStatic(db, id);
+                    if (r.summary.id > 0) shots.append(std::move(r));
+                }
+            });
+
+            if (*destroyed) return;
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, dbOpened,
+                                             shots = std::move(shots)]() {
+                if (*destroyed || !socketGuard) return;
+                if (!dbOpened) {
+                    sendResponse(socketGuard, 500, "text/plain", "Database unavailable");
+                } else {
+                    sendHtml(socketGuard, generateComparisonPage(shots));
+                }
+            }, Qt::QueuedConnection);
+        });
+        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+        thread->start();
     }
     else if (path.startsWith("/shot/") && path.endsWith("/profile.json")) {
         // /shot/123/profile.json - download profile JSON for a shot
@@ -932,42 +1022,97 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
         idPart = idPart.left(idPart.indexOf("/profile.json"));
         bool ok;
         qint64 shotId = idPart.toLongLong(&ok);
-        if (ok) {
-            QVariantMap shot = m_storage->getShot(shotId);
-            QString profileJson = shot["profileJson"].toString();
-            QString profileName = shot["profileName"].toString();
-            if (!profileJson.isEmpty()) {
-                // Pretty-print the JSON for readability
-                QJsonDocument doc = QJsonDocument::fromJson(profileJson.toUtf8());
-                QByteArray prettyJson = doc.toJson(QJsonDocument::Indented);
-                // Set Content-Disposition to suggest filename
-                QString filename = profileName.isEmpty() ? "profile" : profileName;
-                filename = filename.replace(QRegularExpression("[^a-zA-Z0-9_-]"), "_");
-                QByteArray headers = QString("Content-Disposition: attachment; filename=\"%1.json\"\r\n").arg(filename).toUtf8();
-                sendResponse(socket, 200, "application/json", prettyJson, headers);
-            } else {
-                sendResponse(socket, 404, "application/json", R"({"error":"No profile data for this shot"})");
-            }
-        } else {
+        if (!ok) {
             sendResponse(socket, 400, "application/json", R"({"error":"Invalid shot ID"})");
+            return;
         }
+        QPointer<QTcpSocket> socketGuard(socket);
+        QString dbPath = m_storage->databasePath();
+        auto destroyed = m_destroyed;
+        QThread* thread = QThread::create([this, socketGuard, dbPath, shotId, destroyed]() {
+            ShotRecord record;
+            bool dbOpened = withTempDb(dbPath, "shs_web_prof", [&](QSqlDatabase& db) {
+                record = ShotHistoryStorage::loadShotRecordStatic(db, shotId);
+            });
+
+            if (*destroyed) return;
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, dbOpened, record]() {
+                if (*destroyed || !socketGuard) return;
+                if (!dbOpened) {
+                    sendResponse(socketGuard, 500, "application/json", R"({"error":"Database unavailable"})");
+                } else if (!record.profileJson.isEmpty()) {
+                    QJsonDocument doc = QJsonDocument::fromJson(record.profileJson.toUtf8());
+                    QByteArray prettyJson = doc.toJson(QJsonDocument::Indented);
+                    QString filename = record.summary.profileName.isEmpty() ? "profile" : record.summary.profileName;
+                    filename = filename.replace(QRegularExpression("[^a-zA-Z0-9_-]"), "_");
+                    QByteArray headers = QString("Content-Disposition: attachment; filename=\"%1.json\"\r\n").arg(filename).toUtf8();
+                    sendResponse(socketGuard, 200, "application/json", prettyJson, headers);
+                } else {
+                    sendResponse(socketGuard, 404, "application/json", R"({"error":"No profile data for this shot"})");
+                }
+            }, Qt::QueuedConnection);
+        });
+        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+        thread->start();
     }
     else if (path.startsWith("/shot/")) {
         bool ok;
         qint64 shotId = path.mid(6).split("?").first().toLongLong(&ok);
-        if (ok) {
-            sendHtml(socket, generateShotDetailPage(shotId));
-        } else {
+        if (!ok) {
             sendResponse(socket, 400, "text/plain", "Invalid shot ID");
+            return;
         }
+        QPointer<QTcpSocket> socketGuard(socket);
+        QString dbPath = m_storage->databasePath();
+        auto destroyed = m_destroyed;
+        QThread* thread = QThread::create([this, socketGuard, dbPath, shotId, destroyed]() {
+            QVariantMap shot;
+            bool dbOpened = withTempDb(dbPath, "shs_web_det", [&](QSqlDatabase& db) {
+                ShotRecord record = ShotHistoryStorage::loadShotRecordStatic(db, shotId);
+                shot = ShotHistoryStorage::convertShotRecord(record);
+            });
+
+            if (*destroyed) return;
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, dbOpened, shotId,
+                                             shot = std::move(shot)]() {
+                if (*destroyed || !socketGuard) return;
+                if (!dbOpened) {
+                    sendResponse(socketGuard, 500, "text/plain", "Database unavailable");
+                    return;
+                }
+                sendHtml(socketGuard, generateShotDetailPage(shotId, shot));
+            }, Qt::QueuedConnection);
+        });
+        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+        thread->start();
     }
     else if (path == "/api/shots") {
-        QVariantList shots = m_storage->getShots(0, 1000);
-        QJsonArray arr;
-        for (const QVariant& v : std::as_const(shots)) {
-            arr.append(QJsonObject::fromVariantMap(v.toMap()));
-        }
-        sendJson(socket, QJsonDocument(arr).toJson(QJsonDocument::Compact));
+        QPointer<QTcpSocket> socketGuard(socket);
+        QString dbPath = m_storage->databasePath();
+        auto destroyed = m_destroyed;
+        QThread* thread = QThread::create([this, socketGuard, dbPath, destroyed]() {
+            QVariantList shots;
+            bool success = false;
+            withTempDb(dbPath, "shs_web_api", [&](QSqlDatabase& db) {
+                success = queryShotList(db, shots);
+            });
+
+            if (*destroyed) return;
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, success,
+                                             shots = std::move(shots)]() {
+                if (*destroyed || !socketGuard) return;
+                if (!success) {
+                    sendResponse(socketGuard, 500, "application/json", R"({"error":"Database unavailable"})");
+                } else {
+                    QJsonArray arr;
+                    for (const QVariant& v : shots)
+                        arr.append(QJsonObject::fromVariantMap(v.toMap()));
+                    sendJson(socketGuard, QJsonDocument(arr).toJson(QJsonDocument::Compact));
+                }
+            }, Qt::QueuedConnection);
+        });
+        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+        thread->start();
     }
     else if (path.startsWith("/api/shot/") && path.endsWith("/metadata") && method == "POST") {
         // POST /api/shot/123/metadata - update shot metadata
@@ -991,21 +1136,65 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             return;
         }
         QVariantMap metadata = doc.object().toVariantMap();
-        if (m_storage->updateShotMetadata(shotId, metadata)) {
-            sendJson(socket, R"({"success":true})");
-        } else {
-            sendResponse(socket, 500, "application/json", R"({"error":"Failed to update metadata"})");
-        }
+        QPointer<QTcpSocket> socketGuard(socket);
+        QString dbPath = m_storage->databasePath();
+        auto destroyed = m_destroyed;
+        QThread* thread = QThread::create([this, socketGuard, dbPath, shotId, metadata, destroyed]() {
+            bool success = false;
+            bool dbOpened = withTempDb(dbPath, "shs_web_upd", [&](QSqlDatabase& db) {
+                success = ShotHistoryStorage::updateShotMetadataStatic(db, shotId, metadata);
+            });
+
+            if (*destroyed) return;
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, shotId, success, dbOpened]() {
+                if (*destroyed) return;
+                if (success) {
+                    m_storage->invalidateDistinctCache();
+                    emit m_storage->shotMetadataUpdated(shotId, true);
+                }
+                if (!socketGuard) return;
+                if (!dbOpened) {
+                    sendResponse(socketGuard, 500, "application/json", R"({"error":"Database unavailable"})");
+                } else if (success) {
+                    sendJson(socketGuard, R"({"success":true})");
+                } else {
+                    sendResponse(socketGuard, 500, "application/json", R"({"error":"Failed to update metadata"})");
+                }
+            }, Qt::QueuedConnection);
+        });
+        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+        thread->start();
     }
     else if (path.startsWith("/api/shot/")) {
         bool ok;
         qint64 shotId = path.mid(10).toLongLong(&ok);
-        if (ok) {
-            QVariantMap shot = m_storage->getShot(shotId);
-            sendJson(socket, QJsonDocument(QJsonObject::fromVariantMap(shot)).toJson());
-        } else {
+        if (!ok) {
             sendResponse(socket, 400, "application/json", R"({"error":"Invalid shot ID"})");
+            return;
         }
+        QPointer<QTcpSocket> socketGuard(socket);
+        QString dbPath = m_storage->databasePath();
+        auto destroyed = m_destroyed;
+        QThread* thread = QThread::create([this, socketGuard, dbPath, shotId, destroyed]() {
+            QVariantMap shot;
+            bool dbOpened = withTempDb(dbPath, "shs_web_get", [&](QSqlDatabase& db) {
+                ShotRecord record = ShotHistoryStorage::loadShotRecordStatic(db, shotId);
+                shot = ShotHistoryStorage::convertShotRecord(record);
+            });
+
+            if (*destroyed) return;
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, dbOpened,
+                                             shot = std::move(shot)]() {
+                if (*destroyed || !socketGuard) return;
+                if (!dbOpened) {
+                    sendResponse(socketGuard, 500, "application/json", R"({"error":"Database unavailable"})");
+                } else {
+                    sendJson(socketGuard, QJsonDocument(QJsonObject::fromVariantMap(shot)).toJson());
+                }
+            }, Qt::QueuedConnection);
+        });
+        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+        thread->start();
     }
     else if (path == "/api/shots/delete" && method == "POST") {
         int bodyStart = request.indexOf("\r\n\r\n");
@@ -1016,19 +1205,99 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
         QByteArray body = request.mid(bodyStart + 4);
         QJsonDocument doc = QJsonDocument::fromJson(body);
         QJsonArray ids = doc.object().value("ids").toArray();
-        int deleted = 0;
+        QList<qint64> shotIds;
         for (const QJsonValue& v : std::as_const(ids)) {
             qint64 id = v.toInteger();
-            if (id > 0 && m_storage->deleteShot(id))
-                deleted++;
+            if (id > 0) shotIds << id;
         }
-        sendJson(socket, QString(R"({"deleted":%1})").arg(deleted).toUtf8());
+        if (shotIds.isEmpty()) {
+            sendResponse(socket, 400, "application/json", R"({"error":"No valid shot IDs provided"})");
+            return;
+        }
+        QPointer<QTcpSocket> socketGuard(socket);
+        QString dbPath = m_storage->databasePath();
+        auto destroyed = m_destroyed;
+        QThread* thread = QThread::create([this, socketGuard, dbPath, shotIds, destroyed]() {
+            int deleted = 0;
+            QList<qint64> deletedIds;
+            bool dbOpened = withTempDb(dbPath, "shs_web_del", [&](QSqlDatabase& db) {
+                QSqlQuery query(db);
+                if (!query.prepare("DELETE FROM shots WHERE id = ?")) {
+                    qWarning() << "ShotServer: Batch delete prepare failed:" << query.lastError().text();
+                    return;
+                }
+                for (qint64 id : shotIds) {
+                    query.bindValue(0, id);
+                    if (query.exec()) {
+                        if (query.numRowsAffected() > 0) {
+                            deleted++;
+                            deletedIds << id;
+                        }
+                    } else {
+                        qWarning() << "ShotServer: Failed to delete shot" << id << ":" << query.lastError().text();
+                    }
+                }
+            });
+
+            if (*destroyed) return;
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, deleted, deletedIds, dbOpened]() {
+                if (*destroyed) return;
+                if (deleted > 0) {
+                    m_storage->invalidateDistinctCache();
+                    m_storage->refreshTotalShots();
+                    for (qint64 id : deletedIds)
+                        emit m_storage->shotDeleted(id);
+                }
+                if (!socketGuard) return;
+                if (!dbOpened) {
+                    sendResponse(socketGuard, 500, "application/json", R"({"error":"Database unavailable"})");
+                } else {
+                    sendJson(socketGuard, QString(R"({"deleted":%1})").arg(deleted).toUtf8());
+                }
+            }, Qt::QueuedConnection);
+        });
+        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+        thread->start();
     }
     else if (path == "/api/database" || path == "/database.db") {
-        // Checkpoint WAL to ensure all data is in main .db file before download
-        m_storage->checkpoint();
+        // Checkpoint WAL and send DB file from background thread
+        QPointer<QTcpSocket> socketGuard(socket);
         QString dbPath = m_storage->databasePath();
-        sendFile(socket, dbPath, "application/x-sqlite3");
+        auto destroyed = m_destroyed;
+        QThread* thread = QThread::create([this, socketGuard, dbPath, destroyed]() {
+            bool checkpointOk = false;
+            withTempDb(dbPath, "shs_web_db", [&](QSqlDatabase& db) {
+                QSqlQuery walQuery(db);
+                if (!walQuery.exec("PRAGMA wal_checkpoint(FULL)")) {
+                    qWarning() << "ShotServer: WAL checkpoint failed:" << walQuery.lastError().text();
+                } else {
+                    checkpointOk = true;
+                }
+            });
+
+            QByteArray fileData;
+            if (checkpointOk) {
+                QFile dbFile(dbPath);
+                if (dbFile.open(QIODevice::ReadOnly)) {
+                    fileData = dbFile.readAll();
+                } else {
+                    qWarning() << "ShotServer: Failed to read DB file for download:" << dbPath << dbFile.errorString();
+                }
+            }
+
+            if (*destroyed) return;
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed,
+                                             fileData = std::move(fileData)]() {
+                if (*destroyed || !socketGuard) return;
+                if (!fileData.isEmpty()) {
+                    sendResponse(socketGuard, 200, "application/x-sqlite3", fileData);
+                } else {
+                    sendResponse(socketGuard, 500, "application/json", R"({"error":"Database checkpoint failed - download may be incomplete"})");
+                }
+            }, Qt::QueuedConnection);
+        });
+        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+        thread->start();
     }
     else if (path == "/api/memory") {
         if (m_memoryMonitor) {
@@ -1427,22 +1696,42 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
         }
     }
     else if (path == "/api/backup/shots") {
-        // Create a safe backup copy in temp directory, then send it
-        // This ensures database is properly checkpointed and closed during copy
-        QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
-        QString tempPath = tempDir + "/backup_web_" + QString::number(QDateTime::currentMSecsSinceEpoch()) + ".db";
+        // Create a safe backup copy on background thread, then send it
+        QPointer<QTcpSocket> socketGuard(socket);
+        QString dbPath = m_storage->databasePath();
+        auto destroyed = m_destroyed;
+        QThread* thread = QThread::create([this, socketGuard, dbPath, destroyed]() {
+            QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+            QString tempPath = tempDir + "/backup_web_" + QString::number(QDateTime::currentMSecsSinceEpoch()) + ".db";
 
-        QString result = m_storage->createBackup(tempPath);
-        if (!result.isEmpty()) {
-            sendFile(socket, tempPath, "application/x-sqlite3");  // Reads file fully into memory
-            QFile::remove(tempPath);
-        } else {
-            // Clean up temp file if it was partially created
-            if (QFile::exists(tempPath)) {
-                QFile::remove(tempPath);
+            QString result = ShotHistoryStorage::createBackupStatic(dbPath, tempPath);
+            QByteArray fileData;
+            if (!result.isEmpty()) {
+                QFile f(tempPath);
+                if (f.open(QIODevice::ReadOnly)) {
+                    fileData = f.readAll();
+                } else {
+                    qWarning() << "ShotServer: Failed to read backup file:" << f.errorString();
+                }
+            } else {
+                qWarning() << "ShotServer: createBackupStatic failed for" << dbPath << "->" << tempPath;
             }
-            sendResponse(socket, 500, "application/json", R"({"error":"Failed to create backup"})");
-        }
+            if (QFile::exists(tempPath))
+                QFile::remove(tempPath);
+
+            if (*destroyed) return;
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed,
+                                             fileData = std::move(fileData)]() {
+                if (*destroyed || !socketGuard) return;
+                if (!fileData.isEmpty()) {
+                    sendResponse(socketGuard, 200, "application/x-sqlite3", fileData);
+                } else {
+                    sendResponse(socketGuard, 500, "application/json", R"({"error":"Failed to create backup"})");
+                }
+            }, Qt::QueuedConnection);
+        });
+        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+        thread->start();
     }
     else if (path == "/api/backup/media") {
         handleBackupMediaList(socket);
