@@ -14,7 +14,12 @@
 
 #ifdef Q_OS_ANDROID
 #include <QJniObject>
+#include <QJniEnvironment>
 #include <QCoreApplication>
+#endif
+
+#ifdef Q_OS_IOS
+#include "iosbrightness.h"
 #endif
 
 // New unified S3 bucket structure
@@ -116,63 +121,135 @@ void ScreensaverVideoManager::setKeepScreenOn(bool on)
 {
 #ifdef Q_OS_ANDROID
     QNativeInterface::QAndroidApplication::runOnAndroidMainThread([on]() {
-        // FLAG_KEEP_SCREEN_ON = 128 (WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         constexpr int FLAG_KEEP_SCREEN_ON = 128;
 
         QJniObject activity = QNativeInterface::QAndroidApplication::context();
         if (!activity.isValid()) {
-//            qWarning() << "[Screensaver] Failed to get Android activity";
+            qWarning() << "[Screensaver] setKeepScreenOn: activity not valid";
             return;
         }
 
         QJniObject window = activity.callObjectMethod(
             "getWindow", "()Landroid/view/Window;");
         if (!window.isValid()) {
-//            qWarning() << "[Screensaver] Failed to get window";
+            qWarning() << "[Screensaver] setKeepScreenOn: window not valid";
             return;
         }
 
         if (on) {
             window.callMethod<void>("addFlags", "(I)V", FLAG_KEEP_SCREEN_ON);
-//            qDebug() << "[Screensaver] Keep screen on: enabled";
         } else {
             window.callMethod<void>("clearFlags", "(I)V", FLAG_KEEP_SCREEN_ON);
-//            qDebug() << "[Screensaver] Keep screen on: disabled";
+        }
+
+        QJniEnvironment env;
+        if (env.checkAndClearExceptions()) {
+            qWarning() << "[Screensaver] JNI exception in setKeepScreenOn(" << on << ")";
         }
     });
 #else
     Q_UNUSED(on)
-//    qDebug() << "[Screensaver] Keep screen on not available on this platform";
 #endif
 }
 
 void ScreensaverVideoManager::restoreScreenBrightness()
 {
+    qDebug() << "[Screensaver] Restoring screen brightness to system default";
 #ifdef Q_OS_ANDROID
     QNativeInterface::QAndroidApplication::runOnAndroidMainThread([]() {
         QJniObject activity = QNativeInterface::QAndroidApplication::context();
         if (!activity.isValid()) {
-//            qWarning() << "[Screensaver] Failed to get Android activity for brightness restore";
+            qWarning() << "[Screensaver] restoreScreenBrightness: activity not valid";
             return;
         }
 
         QJniObject window = activity.callObjectMethod(
             "getWindow", "()Landroid/view/Window;");
-        if (window.isValid()) {
-            QJniObject layoutParams = window.callObjectMethod(
-                "getAttributes", "()Landroid/view/WindowManager$LayoutParams;");
-            if (layoutParams.isValid()) {
-                // Set screen brightness to -1.0f (use system default)
-                layoutParams.setField<jfloat>("screenBrightness", -1.0f);
-                window.callMethod<void>("setAttributes",
-                    "(Landroid/view/WindowManager$LayoutParams;)V",
-                    layoutParams.object());
-//                qDebug() << "[Screensaver] Screen brightness restored to system default";
-            }
+        if (!window.isValid()) {
+            qWarning() << "[Screensaver] restoreScreenBrightness: window not valid";
+            return;
+        }
+
+        QJniObject layoutParams = window.callObjectMethod(
+            "getAttributes", "()Landroid/view/WindowManager$LayoutParams;");
+        if (!layoutParams.isValid()) {
+            qWarning() << "[Screensaver] restoreScreenBrightness: layoutParams not valid";
+            return;
+        }
+
+        layoutParams.setField<jfloat>("screenBrightness", -1.0f);
+        window.callMethod<void>("setAttributes",
+            "(Landroid/view/WindowManager$LayoutParams;)V",
+            layoutParams.object());
+
+        QJniEnvironment env;
+        if (env.checkAndClearExceptions()) {
+            qWarning() << "[Screensaver] JNI exception restoring screen brightness";
         }
     });
+#elif defined(Q_OS_IOS)
+    ios_restoreScreenBrightness();
+#endif
+}
+
+void ScreensaverVideoManager::setScreenDimming(int dimPercent)
+{
+    // Map dim percent to platform screen brightness:
+    //   <=0   → system default (restore)
+    //   1-99  → brightness 0.99 down to 0.01 (linear)
+    //   100+  → clamped to 99, so 0.01 (minimum, not off)
+    float brightness;
+    if (dimPercent <= 0) {
+        brightness = -1.0f;  // System default (Android), or restore saved (iOS)
+    } else {
+        int clamped = qMin(dimPercent, 99);
+        brightness = 1.0f - (clamped / 100.0f);
+        if (brightness < 0.01f)
+            brightness = 0.01f;
+    }
+
+    qDebug() << "[Screensaver] setScreenDimming: dim=" << dimPercent << "% brightness=" << brightness;
+
+#ifdef Q_OS_ANDROID
+    QNativeInterface::QAndroidApplication::runOnAndroidMainThread([brightness]() {
+        QJniObject activity = QNativeInterface::QAndroidApplication::context();
+        if (!activity.isValid()) {
+            qWarning() << "[Screensaver] setScreenDimming: activity not valid";
+            return;
+        }
+
+        QJniObject window = activity.callObjectMethod(
+            "getWindow", "()Landroid/view/Window;");
+        if (!window.isValid()) {
+            qWarning() << "[Screensaver] setScreenDimming: window not valid";
+            return;
+        }
+
+        QJniObject layoutParams = window.callObjectMethod(
+            "getAttributes", "()Landroid/view/WindowManager$LayoutParams;");
+        if (!layoutParams.isValid()) {
+            qWarning() << "[Screensaver] setScreenDimming: layoutParams not valid";
+            return;
+        }
+
+        layoutParams.setField<jfloat>("screenBrightness", brightness);
+        window.callMethod<void>("setAttributes",
+            "(Landroid/view/WindowManager$LayoutParams;)V",
+            layoutParams.object());
+
+        QJniEnvironment env;
+        if (env.checkAndClearExceptions()) {
+            qWarning() << "[Screensaver] JNI exception setting screen brightness to" << brightness;
+        }
+    });
+#elif defined(Q_OS_IOS)
+    if (brightness < 0) {
+        ios_restoreScreenBrightness();
+    } else {
+        ios_setScreenBrightness(brightness);
+    }
 #else
-//    qDebug() << "[Screensaver] Restore screen brightness not available on this platform";
+    Q_UNUSED(dimPercent)
 #endif
 }
 
@@ -986,6 +1063,77 @@ void ScreensaverVideoManager::clearCacheWithRateLimit()
     if (m_cacheEnabled && !m_catalog.isEmpty()) {
         startBackgroundDownload();
     }
+}
+
+bool ScreensaverVideoManager::hasHardwareVideoDecoder() const
+{
+#ifdef Q_OS_ANDROID
+    QJniEnvironment env;
+
+    // Get MediaCodecList with ALL_CODECS
+    QJniObject codecList("android/media/MediaCodecList", "(I)V", 1); // ALL_CODECS = 1
+    if (!codecList.isValid()) {
+        qWarning() << "[Screensaver] Failed to create MediaCodecList";
+        return true; // Assume available if we can't check
+    }
+
+    QJniObject codecInfos = codecList.callObjectMethod(
+        "getCodecInfos", "()[Landroid/media/MediaCodecInfo;");
+    if (!codecInfos.isValid()) {
+        qWarning() << "[Screensaver] Failed to get codec infos";
+        return true;
+    }
+
+    auto infosArray = codecInfos.object<jobjectArray>();
+    jsize count = env->GetArrayLength(infosArray);
+
+    for (jsize i = 0; i < count; i++) {
+        QJniObject info = QJniObject::fromLocalRef(env->GetObjectArrayElement(infosArray, i));
+        if (!info.isValid()) continue;
+
+        // Skip encoders, we only care about decoders
+        if (info.callMethod<jboolean>("isEncoder")) continue;
+
+        QJniObject nameObj = info.callObjectMethod("getName", "()Ljava/lang/String;");
+        if (!nameObj.isValid()) continue;
+        QString name = nameObj.toString();
+
+        // Check if this decoder handles video/avc (H.264)
+        QJniObject types = info.callObjectMethod(
+            "getSupportedTypes", "()[Ljava/lang/String;");
+        if (!types.isValid()) continue;
+
+        auto typesArray = types.object<jobjectArray>();
+        jsize typeCount = env->GetArrayLength(typesArray);
+        bool handlesH264 = false;
+        for (jsize j = 0; j < typeCount; j++) {
+            QJniObject typeStr = QJniObject::fromLocalRef(env->GetObjectArrayElement(typesArray, j));
+            if (typeStr.isValid() && typeStr.toString().contains("avc", Qt::CaseInsensitive)) {
+                handlesH264 = true;
+                break;
+            }
+        }
+        if (!handlesH264) continue;
+
+        // isHardwareAccelerated() is unreliable — c2.goldfish.* (emulator) reports true.
+        // Filter by name: skip known software/emulator decoders.
+        bool isSoftware = name.startsWith("c2.goldfish.") ||
+                          name.startsWith("c2.android.") ||
+                          name.startsWith("OMX.google.");
+        qDebug() << "[Screensaver] H.264 decoder:" << name
+                 << "hwAccel:" << info.callMethod<jboolean>("isHardwareAccelerated")
+                 << "software:" << isSoftware;
+        if (!isSoftware) {
+            return true;
+        }
+    }
+
+    // No hardware H.264 decoder found — software-only (e.g. emulator)
+    qWarning() << "[Screensaver] No hardware H.264 decoder found — video playback disabled";
+    return false;
+#else
+    return true; // Desktop/iOS always have hardware decoders
+#endif
 }
 
 bool ScreensaverVideoManager::isRateLimited() const

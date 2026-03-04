@@ -3,34 +3,31 @@
 ### DYE (Describe Your Espresso) Metadata
 - **Location**: `qml/pages/PostShotReviewPage.qml` and `qml/pages/BeanInfoPage.qml`
 - **Settings**: `src/core/settings.h` - dye* properties (sticky between shots)
-- **Feature toggle**: Settings → Visualizer → "Extended metadata"
+- **Feature toggle**: `visualizerExtendedMetadata` setting (no UI toggle — controlled via layout system and backup/restore)
 - **Auto-show**: Settings → Visualizer → "Edit after shot"
-- **Access**: Shot Info button on IdlePage (between Espresso and Steam)
+- **Access**: BeansItem in layout system (`qml/components/layout/items/BeansItem.qml`), auto-show after shot, or shot history tap
 
 Supported metadata fields:
 - `bean_brand`, `bean_type`, `roast_date`, `roast_level`
 - `grinder_model`, `grinder_setting`
 - `drink_tds`, `drink_ey`, `espresso_enjoyment`
-- `espresso_notes`, `barista`
+- `dyeShotNotes`, `barista`
 
 ### Profile Import (VisualizerImporter)
 - **Location**: `src/network/visualizerimporter.cpp/.h`
 - **QML Page**: `qml/pages/VisualizerBrowserPage.qml`
-- **Browser**: Uses QtWebEngineQuick (full Chromium) - NOT QtWebView (native WebView looks bad on old Android)
-- **API**: `GET https://visualizer.coffee/api/shots/{id}/profile.json`
+- **Input**: User enters a 4-character share code (no embedded browser)
+- **API**: `GET https://visualizer.coffee/api/shots/{id}/profile?format=json`
+- **Multi-import**: `qml/pages/VisualizerMultiImportPage.qml` — imports all profiles the user has shared
 
 ### Import Flow
-1. User browses visualizer.coffee in embedded WebEngineView
-2. User navigates to a shot page and clicks "Import Profile"
-3. JavaScript searches DOM for `profile.json` link
-4. VisualizerImporter fetches profile JSON and converts to native format
-5. If duplicate exists, shows overwrite/save-as-new dialog
+1. User enters a 4-character share code from visualizer.coffee
+2. VisualizerImporter resolves the share code to a shot ID via the API
+3. VisualizerImporter fetches the profile JSON and converts to native format
+4. If duplicate exists, shows overwrite/save-as-new/rename dialog
 
 ### Key Implementation Notes
-- `QtWebEngineQuick::initialize()` must be called before QApplication in main.cpp
-- WebEngineView respects `visible` property (unlike native WebView which needs size=0 hack)
-- WebEngineView properly tracks SPA navigation URL changes
-- Duplicate handling: `saveOverwrite()`, `saveAsNew()`, `saveWithNewName(newTitle)`
+- Duplicate handling: `saveOverwrite()`, `saveAsNew()`, `saveWithNewName(newTitle)`, `cancelPending()`
 - Keyboard handling for Android: FocusScope + keyboardOffset pattern for text input
 
 ### Visualizer Profile Format

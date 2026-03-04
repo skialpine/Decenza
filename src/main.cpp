@@ -60,6 +60,9 @@
 #include "ai/aimanager.h"
 #include "ai/aiconversation.h"
 #include "screensaver/screensavervideomanager.h"
+#ifdef Q_OS_IOS
+#include "screensaver/iosbrightness.h"
+#endif
 #include "screensaver/strangeattractorrenderer.h"
 #include "rendering/fastlinerenderer.h"
 #ifdef ENABLE_QUICK3D
@@ -653,6 +656,10 @@ int main(int argc, char *argv[])
                      &mainController, &MainController::onScaleWeightChanged);
 
     ScreensaverVideoManager screensaverManager(&sharedNetworkManager, &settings, &profileStorage);
+#ifdef Q_OS_IOS
+    // Restore screen brightness if the app crashed while dimmed
+    ios_checkAndRestoreBrightness();
+#endif
     checkpoint("ScreensaverVideoManager");
 
     // Connect screensaver manager and AI manager to shot server

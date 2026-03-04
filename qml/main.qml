@@ -2332,16 +2332,15 @@ ApplicationWindow {
         }
 
         // Navigate to screensaver page for all modes (including "disabled")
-        // For "disabled" mode, ScreensaverPage keeps the screen on and uses a
-        // full-opacity black overlay to simulate screen-off (avoids EGL surface
-        // loss on Samsung tablets, QTBUG-45019)
+        // For "disabled" mode, ScreensaverPage dims the backlight to minimum
+        // and shows a black overlay. We keep FLAG_KEEP_SCREEN_ON set to avoid
+        // potential EGL surface issues (QTBUG-45019 class of bugs).
         pageStack.replace(null, screensaverPage)
     }
 
     function goToIdleFromScreensaver() {
         screensaverActive = false
-        // Restore screen brightness in case disabled mode dimmed it
-        ScreensaverManager.restoreScreenBrightness()
+        // Brightness is restored in ScreensaverPage.StackView.onRemoved
         // Initialize sleep countdown (stayAwake is set separately by onAutoWakeTriggered if needed)
         root.sleepCountdownNormal = root.autoSleepMinutes
         root.sleepCountdownStayAwake = 0  // Already satisfied unless auto-wake sets it

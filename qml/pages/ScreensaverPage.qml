@@ -5,7 +5,7 @@ import Decenza
 import "../components"
 
 // Screensaver modes:
-// "disabled"  - Simulate screen-off (black overlay, screen stays on to avoid EGL surface loss)
+// "disabled"  - Dims backlight to minimum with black overlay (keeps screen on to avoid EGL surface issues)
 // "videos"    - Video/image slideshow from catalog
 // "pipes"     - Classic 3D pipes animation
 // "flipclock" - Classic flip clock display
@@ -32,19 +32,22 @@ Page {
     property string lastFailedSource: ""
     property string currentImageSource: ""
     property bool useFirstImage: true  // Toggle for cross-fade between two images
+    // No hardware video decoder (e.g. Android emulator) — skip all videos
+    property bool videoDecoderBroken: !ScreensaverManager.hasHardwareVideoDecoder
 
     Component.onCompleted: {
         console.log("[ScreensaverPage] Loaded, type:", screensaverType,
                     "videos:", isVideosMode, "pipes:", isPipesMode, "flipclock:", isFlipClockMode,
                     "disabled:", isDisabledMode)
         if (isDisabledMode) {
-            // Simulate screen-off with black overlay instead of actually turning
-            // off the screen. Letting Android turn off the display destroys the
-            // EGL surface on Samsung tablets (QTBUG-45019), causing a blank screen
-            // on wake. Keep the screen on and use full-opacity dim overlay instead.
+            // Dim backlight to minimum (1%) and show black overlay.
+            // We keep FLAG_KEEP_SCREEN_ON set to avoid potential EGL surface
+            // destruction on some Android devices (QTBUG-45019 class of issues).
+            console.log("[Screensaver] Disabled mode: dimming backlight to minimum")
             dimBehavior.enabled = false
             dimOverlay.opacity = 1
             dimBehavior.enabled = true
+            ScreensaverManager.setScreenDimming(100)
         }
         if (isVideosMode) {
             playNextMedia()
@@ -56,7 +59,12 @@ Page {
     }
 
     function applyDim() {
+        console.log("[Screensaver] Applying dim:", ScreensaverManager.dimPercent + "% (delay was",
+                    ScreensaverManager.dimDelayMinutes, "min)")
         dimOverlay.opacity = ScreensaverManager.dimPercent / 100.0
+        ScreensaverManager.setScreenDimming(ScreensaverManager.dimPercent)
+        // Stop gradient animation (only relevant in videos fallback mode)
+        gradientAnimation.running = false
     }
 
     function startDimming() {
@@ -85,10 +93,11 @@ Page {
             }
         }
         function onDimPercentChanged() {
-            if (isDisabledMode) return  // Disabled mode keeps overlay at 100%
+            if (isDisabledMode) return  // Disabled mode keeps brightness at minimum
             if (ScreensaverManager.dimPercent === 0) {
                 dimTimer.stop()
                 dimOverlay.opacity = 0
+                ScreensaverManager.setScreenDimming(0)
             } else if (dimOverlay.opacity > 0) {
                 applyDim()
             } else {
@@ -104,6 +113,8 @@ Page {
         }
     }
 
+    property int videoSkipCount: 0  // Guard against deep recursion when skipping broken videos
+
     function playNextMedia() {
         if (!ScreensaverManager.enabled) {
             return
@@ -117,6 +128,7 @@ Page {
                 // Display image with cross-fade transition
                 mediaPlayer.stop()
                 mediaPlaying = true
+                videoSkipCount = 0
 
                 // Load into the inactive image, then cross-fade
                 if (useFirstImage) {
@@ -126,6 +138,21 @@ Page {
                 }
                 currentImageSource = source
                 // Cross-fade will be triggered when image loads (onStatusChanged)
+            } else if (videoDecoderBroken) {
+                // No hardware decoder — skip videos, try next item (might be an image)
+                videoSkipCount++
+                if (videoSkipCount > ScreensaverManager.itemCount + 5) {
+                    // All catalog items are videos — no playable content, auto-wake
+                    console.warn("[Screensaver] No playable content (no hardware decoder) — auto-waking")
+                    videoSkipCount = 0
+                    mediaPlaying = false
+                    isCurrentItemImage = false
+                    wake()
+                    return
+                }
+                ScreensaverManager.markVideoPlayed(source)
+                playNextMedia()
+                return
             } else {
                 // Play video - reset image state
                 imageDisplayTimer.stop()
@@ -134,12 +161,17 @@ Page {
                 imageDisplay1.source = ""
                 imageDisplay2.source = ""
                 mediaPlaying = true
+                videoSkipCount = 0
                 mediaPlayer.source = source
                 mediaPlayer.play()
             }
         } else {
             mediaPlaying = false
             isCurrentItemImage = false
+            if (videoDecoderBroken) {
+                console.warn("[Screensaver] No content available (no hardware decoder) — auto-waking")
+                wake()
+            }
         }
     }
 
@@ -239,8 +271,9 @@ Page {
 
             onStatusChanged: {
                 if (status === Image.Ready && useFirstImage && source.toString().length > 0) {
-                    // Image loaded, start display timer
-                    imageDisplayTimer.restart()
+                    // Image loaded — only cycle if there are multiple items to show
+                    if (ScreensaverManager.itemCount > 1 || ScreensaverManager.personalMediaCount > 1)
+                        imageDisplayTimer.restart()
                 }
             }
         }
@@ -258,8 +291,8 @@ Page {
 
             onStatusChanged: {
                 if (status === Image.Ready && !useFirstImage && source.toString().length > 0) {
-                    // Image loaded, start display timer
-                    imageDisplayTimer.restart()
+                    if (ScreensaverManager.itemCount > 1 || ScreensaverManager.personalMediaCount > 1)
+                        imageDisplayTimer.restart()
                 }
             }
         }
@@ -277,30 +310,36 @@ Page {
     }
 
     // Flip Clock screensaver
-    FlipClockScreensaver {
-        id: flipClockScreensaver
+    Loader {
+        id: flipClockLoader
         anchors.fill: parent
+        active: isFlipClockMode
         visible: isFlipClockMode
-        running: isFlipClockMode && screensaverPage.visible
         z: 0
+        source: "qrc:/qt/qml/Decenza/qml/components/FlipClockScreensaver.qml"
+        onLoaded: item.running = Qt.binding(function() { return isFlipClockMode && screensaverPage.visible })
     }
 
     // Strange Attractor screensaver
-    StrangeAttractorScreensaver {
-        id: attractorScreensaver
+    Loader {
+        id: attractorLoader
         anchors.fill: parent
+        active: isAttractorMode
         visible: isAttractorMode
-        running: isAttractorMode && screensaverPage.visible
         z: 0
+        source: "qrc:/qt/qml/Decenza/qml/components/StrangeAttractorScreensaver.qml"
+        onLoaded: item.running = Qt.binding(function() { return isAttractorMode && screensaverPage.visible })
     }
 
     // Shot Map screensaver (flat map works without Quick3D, globe loaded conditionally)
-    ShotMapScreensaver {
-        id: shotMapScreensaver
+    Loader {
+        id: shotMapLoader
         anchors.fill: parent
+        active: isShotMapMode
         visible: isShotMapMode
-        running: isShotMapMode && screensaverPage.visible
         z: 0
+        source: "qrc:/qt/qml/Decenza/qml/components/ShotMapScreensaver.qml"
+        onLoaded: item.running = Qt.binding(function() { return isShotMapMode && screensaverPage.visible })
     }
 
     // Fallback: show a subtle animation while no cached media (videos mode only)
@@ -327,6 +366,7 @@ Page {
             }
 
             NumberAnimation on gradientHue {
+                id: gradientAnimation
                 from: 0
                 to: 1
                 duration: 30000
@@ -483,6 +523,10 @@ Page {
     Keys.onPressed: wake()
 
     function wake() {
+        mediaPlayer.stop()
+        mediaPlayer.source = ""
+        mediaPlaying = false
+
         // Wake up the DE1, or try to reconnect if disconnected
         if (DE1Device.connected) {
             DE1Device.wakeUp()
@@ -506,13 +550,17 @@ Page {
 
     // Clean up media when page is being removed
     StackView.onRemoved: {
+        console.log("[Screensaver] Waking: restoring brightness and cleaning up")
         mediaPlayer.stop()
+        mediaPlayer.source = ""
+        mediaPlaying = false
         imageDisplayTimer.stop()
         dimTimer.stop()
         dimBehavior.enabled = false
         dimOverlay.opacity = 0
         dimBehavior.enabled = true
-        // Re-enable keep-screen-on when leaving screensaver
+        // Restore screen brightness and keep-screen-on when leaving screensaver
+        ScreensaverManager.restoreScreenBrightness()
         ScreensaverManager.setKeepScreenOn(true)
     }
 
