@@ -1033,7 +1033,7 @@ QString ShotServer::generateShotListPage(const QVariantList& shots) const
                     return r.json();
                 })
                 .then(function(data) { powerState = data; updatePowerButton(); })
-                .catch(function() {});
+                .catch(function(e) { console.warn("fetchPowerState:", e.message); });
         }
 
         function togglePower() {
@@ -2134,7 +2134,7 @@ QString ShotServer::generateShotDetailPage(qint64 shotId, const QVariantMap& sho
                     return r.json();
                 })
                 .then(function(data) { powerState = data; updatePowerButton(); })
-                .catch(function() {});
+                .catch(function(e) { console.warn("fetchPowerState:", e.message); });
         }
         function togglePower() {
             var action = powerState.awake ? "sleep" : "wake";
@@ -3102,7 +3102,7 @@ QString ShotServer::generateComparisonPage(const QList<ShotRecord>& shots) const
                     return r.json();
                 })
                 .then(function(data) { powerState = data; updatePowerButton(); })
-                .catch(function() {});
+                .catch(function(e) { console.warn("fetchPowerState:", e.message); });
         }
         function togglePower() {
             var action = powerState.awake ? "sleep" : "wake";

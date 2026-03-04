@@ -916,20 +916,26 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             const QString connName = QString("shs_web_list_%1")
                 .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
             QVariantList shots;
+            bool dbError = false;
             {
                 QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
                 db.setDatabaseName(dbPath);
-                if (db.open()) {
+                if (!db.open()) {
+                    qWarning() << "ShotServer: Failed to open DB for shot list:" << db.lastError().text();
+                    dbError = true;
+                } else {
                     QSqlQuery query(db);
-                    query.prepare(R"(
+                    if (!query.prepare(R"(
                         SELECT id, uuid, timestamp, profile_name, duration_seconds,
                                final_weight, dose_weight, bean_brand, bean_type,
                                enjoyment, visualizer_id, grinder_setting,
                                temperature_override, yield_override, beverage_type,
                                drink_tds, drink_ey
                         FROM shots ORDER BY timestamp DESC LIMIT 1000
-                    )");
-                    query.exec();
+                    )") || !query.exec()) {
+                        qWarning() << "ShotServer: Shot list query failed:" << query.lastError().text();
+                        dbError = true;
+                    }
                     while (query.next()) {
                         QVariantMap row;
                         row["id"] = query.value(0).toLongLong();
@@ -950,17 +956,21 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
                         row["drinkTds"] = query.value(15).toDouble();
                         row["drinkEy"] = query.value(16).toDouble();
                         QDateTime dt = QDateTime::fromSecsSinceEpoch(query.value(2).toLongLong());
-                        row["dateTime"] = dt.toString("yyyy-MM-dd hh:mm");
+                        row["dateTime"] = dt.toString("yyyy-MM-dd HH:mm");
                         shots.append(row);
                     }
                 }
             }
             QSqlDatabase::removeDatabase(connName);
 
-            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed,
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, dbError,
                                              shots = std::move(shots)]() {
                 if (*destroyed || !socketGuard) return;
-                sendHtml(socketGuard, generateShotListPage(shots));
+                if (dbError) {
+                    sendResponse(socketGuard, 500, "text/plain", "Database unavailable");
+                } else {
+                    sendHtml(socketGuard, generateShotListPage(shots));
+                }
             }, Qt::QueuedConnection);
         });
         connect(thread, &QThread::finished, thread, &QObject::deleteLater);
@@ -987,10 +997,14 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             const QString connName = QString("shs_web_cmp_%1")
                 .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
             QList<ShotRecord> shots;
+            bool dbError = false;
             {
                 QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
                 db.setDatabaseName(dbPath);
-                if (db.open()) {
+                if (!db.open()) {
+                    qWarning() << "ShotServer: Failed to open DB for comparison:" << db.lastError().text();
+                    dbError = true;
+                } else {
                     for (qint64 id : ids) {
                         ShotRecord r = ShotHistoryStorage::loadShotRecordStatic(db, id);
                         if (r.summary.id > 0) shots.append(std::move(r));
@@ -999,10 +1013,14 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             }
             QSqlDatabase::removeDatabase(connName);
 
-            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed,
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, dbError,
                                              shots = std::move(shots)]() {
                 if (*destroyed || !socketGuard) return;
-                sendHtml(socketGuard, generateComparisonPage(shots));
+                if (dbError) {
+                    sendResponse(socketGuard, 500, "text/plain", "Database unavailable");
+                } else {
+                    sendHtml(socketGuard, generateComparisonPage(shots));
+                }
             }, Qt::QueuedConnection);
         });
         connect(thread, &QThread::finished, thread, &QObject::deleteLater);
@@ -1025,17 +1043,24 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             const QString connName = QString("shs_web_prof_%1")
                 .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
             ShotRecord record;
+            bool dbError = false;
             {
                 QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
                 db.setDatabaseName(dbPath);
-                if (db.open())
+                if (!db.open()) {
+                    qWarning() << "ShotServer: Failed to open DB for profile download:" << db.lastError().text();
+                    dbError = true;
+                } else {
                     record = ShotHistoryStorage::loadShotRecordStatic(db, shotId);
+                }
             }
             QSqlDatabase::removeDatabase(connName);
 
-            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, record]() {
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, dbError, record]() {
                 if (*destroyed || !socketGuard) return;
-                if (!record.profileJson.isEmpty()) {
+                if (dbError) {
+                    sendResponse(socketGuard, 500, "application/json", R"({"error":"Database unavailable"})");
+                } else if (!record.profileJson.isEmpty()) {
                     QJsonDocument doc = QJsonDocument::fromJson(record.profileJson.toUtf8());
                     QByteArray prettyJson = doc.toJson(QJsonDocument::Indented);
                     QString filename = record.summary.profileName.isEmpty() ? "profile" : record.summary.profileName;
@@ -1064,19 +1089,27 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             const QString connName = QString("shs_web_det_%1")
                 .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
             QVariantMap shot;
+            bool dbError = false;
             {
                 QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
                 db.setDatabaseName(dbPath);
-                if (db.open()) {
+                if (!db.open()) {
+                    qWarning() << "ShotServer: Failed to open DB for shot detail:" << db.lastError().text();
+                    dbError = true;
+                } else {
                     ShotRecord record = ShotHistoryStorage::loadShotRecordStatic(db, shotId);
                     shot = ShotHistoryStorage::convertShotRecord(record);
                 }
             }
             QSqlDatabase::removeDatabase(connName);
 
-            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, shotId,
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, dbError, shotId,
                                              shot = std::move(shot)]() {
                 if (*destroyed || !socketGuard) return;
+                if (dbError) {
+                    sendResponse(socketGuard, 500, "text/plain", "Database unavailable");
+                    return;
+                }
                 sendHtml(socketGuard, generateShotDetailPage(shotId, shot));
             }, Qt::QueuedConnection);
         });
@@ -1091,20 +1124,26 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             const QString connName = QString("shs_web_api_%1")
                 .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
             QJsonArray arr;
+            bool dbError = false;
             {
                 QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
                 db.setDatabaseName(dbPath);
-                if (db.open()) {
+                if (!db.open()) {
+                    qWarning() << "ShotServer: Failed to open DB for /api/shots:" << db.lastError().text();
+                    dbError = true;
+                } else {
                     QSqlQuery query(db);
-                    query.prepare(R"(
+                    if (!query.prepare(R"(
                         SELECT id, uuid, timestamp, profile_name, duration_seconds,
                                final_weight, dose_weight, bean_brand, bean_type,
                                enjoyment, visualizer_id, grinder_setting,
                                temperature_override, yield_override, beverage_type,
                                drink_tds, drink_ey
                         FROM shots ORDER BY timestamp DESC LIMIT 1000
-                    )");
-                    query.exec();
+                    )") || !query.exec()) {
+                        qWarning() << "ShotServer: /api/shots query failed:" << query.lastError().text();
+                        dbError = true;
+                    }
                     while (query.next()) {
                         QJsonObject obj;
                         obj["id"] = query.value(0).toLongLong();
@@ -1130,11 +1169,14 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             }
             QSqlDatabase::removeDatabase(connName);
 
-            QByteArray json = QJsonDocument(arr).toJson(QJsonDocument::Compact);
-            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed,
-                                             json = std::move(json)]() {
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, dbError,
+                                             arr = std::move(arr)]() {
                 if (*destroyed || !socketGuard) return;
-                sendJson(socketGuard, json);
+                if (dbError) {
+                    sendResponse(socketGuard, 500, "application/json", R"({"error":"Database unavailable"})");
+                } else {
+                    sendJson(socketGuard, QJsonDocument(arr).toJson(QJsonDocument::Compact));
+                }
             }, Qt::QueuedConnection);
         });
         connect(thread, &QThread::finished, thread, &QObject::deleteLater);
@@ -1169,13 +1211,17 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             const QString connName = QString("shs_web_upd_%1")
                 .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
             bool success = false;
+            bool dbError = false;
             {
                 QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
                 db.setDatabaseName(dbPath);
-                if (db.open()) {
+                if (!db.open()) {
+                    qWarning() << "ShotServer: Failed to open DB for metadata update:" << db.lastError().text();
+                    dbError = true;
+                } else {
                     QSqlQuery(db).exec("PRAGMA busy_timeout = 5000");
                     QSqlQuery query(db);
-                    query.prepare(R"(
+                    if (!query.prepare(R"(
                         UPDATE shots SET
                             bean_brand = :bean_brand, bean_type = :bean_type,
                             roast_date = :roast_date, roast_level = :roast_level,
@@ -1186,31 +1232,42 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
                             final_weight = :final_weight, beverage_type = :beverage_type,
                             updated_at = strftime('%s', 'now')
                         WHERE id = :id
-                    )");
-                    query.bindValue(":bean_brand", metadata.value("beanBrand").toString());
-                    query.bindValue(":bean_type", metadata.value("beanType").toString());
-                    query.bindValue(":roast_date", metadata.value("roastDate").toString());
-                    query.bindValue(":roast_level", metadata.value("roastLevel").toString());
-                    query.bindValue(":grinder_model", metadata.value("grinderModel").toString());
-                    query.bindValue(":grinder_setting", metadata.value("grinderSetting").toString());
-                    query.bindValue(":drink_tds", metadata.value("drinkTds").toDouble());
-                    query.bindValue(":drink_ey", metadata.value("drinkEy").toDouble());
-                    query.bindValue(":enjoyment", metadata.value("enjoyment").toInt());
-                    query.bindValue(":espresso_notes", metadata.value("espressoNotes").toString());
-                    query.bindValue(":barista", metadata.value("barista").toString());
-                    query.bindValue(":dose_weight", metadata.value("doseWeight").toDouble());
-                    query.bindValue(":final_weight", metadata.value("finalWeight").toDouble());
-                    query.bindValue(":beverage_type", metadata.value("beverageType", "espresso").toString());
-                    query.bindValue(":id", shotId);
-                    success = query.exec();
+                    )")) {
+                        qWarning() << "ShotServer: Metadata update prepare failed:" << query.lastError().text();
+                    } else {
+                        query.bindValue(":bean_brand", metadata.value("beanBrand").toString());
+                        query.bindValue(":bean_type", metadata.value("beanType").toString());
+                        query.bindValue(":roast_date", metadata.value("roastDate").toString());
+                        query.bindValue(":roast_level", metadata.value("roastLevel").toString());
+                        query.bindValue(":grinder_model", metadata.value("grinderModel").toString());
+                        query.bindValue(":grinder_setting", metadata.value("grinderSetting").toString());
+                        query.bindValue(":drink_tds", metadata.value("drinkTds").toDouble());
+                        query.bindValue(":drink_ey", metadata.value("drinkEy").toDouble());
+                        query.bindValue(":enjoyment", metadata.value("enjoyment").toInt());
+                        query.bindValue(":espresso_notes", metadata.value("espressoNotes").toString());
+                        query.bindValue(":barista", metadata.value("barista").toString());
+                        query.bindValue(":dose_weight", metadata.value("doseWeight").toDouble());
+                        query.bindValue(":final_weight", metadata.value("finalWeight").toDouble());
+                        query.bindValue(":beverage_type", metadata.value("beverageType", "espresso").toString());
+                        query.bindValue(":id", shotId);
+                        success = query.exec();
+                        if (!success)
+                            qWarning() << "ShotServer: Metadata update exec failed:" << query.lastError().text();
+                    }
                 }
             }
             QSqlDatabase::removeDatabase(connName);
 
-            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, shotId, success]() {
-                if (*destroyed || !socketGuard) return;
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, shotId, success, dbError]() {
+                if (*destroyed) return;
                 if (success) {
                     m_storage->invalidateDistinctCache();
+                    emit m_storage->shotMetadataUpdated(shotId, true);
+                }
+                if (!socketGuard) return;
+                if (dbError) {
+                    sendResponse(socketGuard, 500, "application/json", R"({"error":"Database unavailable"})");
+                } else if (success) {
                     sendJson(socketGuard, R"({"success":true})");
                 } else {
                     sendResponse(socketGuard, 500, "application/json", R"({"error":"Failed to update metadata"})");
@@ -1234,21 +1291,28 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             const QString connName = QString("shs_web_get_%1")
                 .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
             QVariantMap shot;
+            bool dbError = false;
             {
                 QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
                 db.setDatabaseName(dbPath);
-                if (db.open()) {
+                if (!db.open()) {
+                    qWarning() << "ShotServer: Failed to open DB for /api/shot:" << db.lastError().text();
+                    dbError = true;
+                } else {
                     ShotRecord record = ShotHistoryStorage::loadShotRecordStatic(db, shotId);
                     shot = ShotHistoryStorage::convertShotRecord(record);
                 }
             }
             QSqlDatabase::removeDatabase(connName);
 
-            QByteArray json = QJsonDocument(QJsonObject::fromVariantMap(shot)).toJson();
-            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed,
-                                             json = std::move(json)]() {
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, dbError,
+                                             shot = std::move(shot)]() {
                 if (*destroyed || !socketGuard) return;
-                sendJson(socketGuard, json);
+                if (dbError) {
+                    sendResponse(socketGuard, 500, "application/json", R"({"error":"Database unavailable"})");
+                } else {
+                    sendJson(socketGuard, QJsonDocument(QJsonObject::fromVariantMap(shot)).toJson());
+                }
             }, Qt::QueuedConnection);
         });
         connect(thread, &QThread::finished, thread, &QObject::deleteLater);
@@ -1276,10 +1340,14 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
                 .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
             int deleted = 0;
             QList<qint64> deletedIds;
+            bool dbError = false;
             {
                 QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
                 db.setDatabaseName(dbPath);
-                if (db.open()) {
+                if (!db.open()) {
+                    qWarning() << "ShotServer: Failed to open DB for batch delete:" << db.lastError().text();
+                    dbError = true;
+                } else {
                     QSqlQuery(db).exec("PRAGMA busy_timeout = 5000");
                     QSqlQuery query(db);
                     query.prepare("DELETE FROM shots WHERE id = ?");
@@ -1294,14 +1362,20 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             }
             QSqlDatabase::removeDatabase(connName);
 
-            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, deleted, deletedIds]() {
+            QMetaObject::invokeMethod(this, [this, socketGuard, destroyed, deleted, deletedIds, dbError]() {
                 if (*destroyed) return;
                 if (deleted > 0) {
                     m_storage->invalidateDistinctCache();
                     m_storage->refreshTotalShots();
+                    for (qint64 id : deletedIds)
+                        emit m_storage->shotDeleted(id);
                 }
                 if (!socketGuard) return;
-                sendJson(socketGuard, QString(R"({"deleted":%1})").arg(deleted).toUtf8());
+                if (dbError) {
+                    sendResponse(socketGuard, 500, "application/json", R"({"error":"Database unavailable"})");
+                } else {
+                    sendJson(socketGuard, QString(R"({"deleted":%1})").arg(deleted).toUtf8());
+                }
             }, Qt::QueuedConnection);
         });
         connect(thread, &QThread::finished, thread, &QObject::deleteLater);
@@ -1318,7 +1392,9 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             {
                 QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
                 db.setDatabaseName(dbPath);
-                if (db.open()) {
+                if (!db.open()) {
+                    qWarning() << "ShotServer: Failed to open DB for checkpoint:" << db.lastError().text();
+                } else {
                     QSqlQuery(db).exec("PRAGMA busy_timeout = 5000");
                     QSqlQuery(db).exec("PRAGMA wal_checkpoint(FULL)");
                 }
@@ -1333,7 +1409,11 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             QMetaObject::invokeMethod(this, [this, socketGuard, destroyed,
                                              fileData = std::move(fileData)]() {
                 if (*destroyed || !socketGuard) return;
-                sendResponse(socketGuard, 200, "application/x-sqlite3", fileData);
+                if (!fileData.isEmpty()) {
+                    sendResponse(socketGuard, 200, "application/x-sqlite3", fileData);
+                } else {
+                    sendResponse(socketGuard, 500, "application/json", R"({"error":"Failed to read database file"})");
+                }
             }, Qt::QueuedConnection);
         });
         connect(thread, &QThread::finished, thread, &QObject::deleteLater);
