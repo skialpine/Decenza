@@ -1,6 +1,6 @@
 # CLAUDE.md C++ Compliance Audit
 
-Audit date: 2026-03-01
+Last updated: 2026-03-04 (originally audited 2026-03-01)
 
 This document tracks C++ code violations of the conventions defined in CLAUDE.md.
 Work through each category and check off items as they are fixed.
@@ -27,7 +27,17 @@ Slots declared in `public slots:` or `private slots:` sections that do not follo
 - [ ] `src/usb/usbmanager.h:56` — `pollPorts()` (private slot)
 - [ ] `src/usb/usbscalemanager.h:47` — `pollPorts()` (private slot)
 
-**Note:** Some are setter-style slots (`setChargingMode`) or data-model API slots (`addSample`, `clear`) where the `on*` convention reads poorly. Consider renaming only where the slot is clearly a signal handler (e.g. `updateShotTimer` → `onShotTimerTimeout`, `publishTelemetry` → `onTelemetryTimerTimeout`).
+**Additional violations found 2026-03-04** (timer/signal-connected slots that clearly should use `on*`):
+
+- [ ] `src/core/memorymonitor.h` — `takeSample()` (private slot, timer-connected → `onSampleTimer()`)
+- [ ] `src/simulator/de1simulator.h` — `simulationTick()` (private slot, timer-connected → `onSimulationTick()`)
+- [ ] `src/ble/bletransport.h` — `processCommandQueue()` (private slot → `onProcessCommandQueue()`)
+- [ ] `src/network/shotserver.h` — `cleanupStaleConnections()` (private slot, timer-driven → `onCleanupTimer()`)
+- [ ] `src/profile/profileconverter.h` — `processNextFile()` (private slot → `onProcessNextFile()`)
+- [ ] `src/profile/profileimporter.h` — `processNextScan()`, `processNextImport()` (private slots → `onProcessNext*()`)
+- [ ] `src/history/shotimporter.h` — `processNextFile()` (private slot → `onProcessNextFile()`)
+
+**Note:** Some are setter-style slots (`setChargingMode`) or data-model API slots (`addSample`, `clear`) where the `on*` convention reads poorly. Consider renaming only where the slot is clearly a signal/timer handler. Public API slots in `maincontroller.h` (`loadProfile()`, `refreshProfiles()`, etc.) are imperative commands invoked from QML, not event handlers — these are acceptable as-is.
 
 ### 1b. Class naming — PascalCase
 
@@ -63,7 +73,7 @@ These use timers because Android/iOS BLE stacks provide no "ready after wake/res
 
 ### Platform constraint (improvable)
 
-- [ ] `src/main.cpp` — `QTimer::singleShot(2000, &waitLoop, ...)` blocks 2s before exit for BLE writes. Could be improved by adding a `queueDrained` signal to `BleTransport` (emit when `m_commandQueue.isEmpty() && !m_writePending`), then quit the event loop on that signal or on a shorter timeout.
+- [ ] `src/main.cpp:1501` — `QTimer::singleShot(2000, &waitLoop, ...)` blocks 2s before exit for BLE writes. Could be improved by adding a `queueDrained` signal to `BleTransport` (emit when `m_commandQueue.isEmpty() && !m_writePending`), then quit the event loop on that signal or on a shorter timeout.
 
 ### Fixed (cpp-compliance-audit)
 
@@ -81,23 +91,43 @@ Many async equivalents already exist (`requestShotsFiltered()`, `requestShot()`,
 
 ### 3a. ShotHistoryStorage synchronous Q_INVOKABLE methods
 
-All declared in `src/history/shothistorystorage.h` and callable from QML on the main thread:
+All declared in `src/history/shothistorystorage.h` and callable from QML on the main thread.
 
-- [ ] Line 189 — `getShots(int offset, int limit)` — blocking SQL SELECT with pagination
-- [ ] Line 190 — `getShotsFiltered(...)` — blocking SQL SELECT with full filter/FTS evaluation
-- [ ] Line 196 — `getShotTimestamp(qint64 shotId)` — blocking SQL SELECT
-- [ ] Line 199 — `getShot(qint64 shotId)` — blocking full record load + blob decompression
-- [ ] Line 200 — `getShotRecord(qint64 shotId)` — same (C++ return type, not Q_INVOKABLE)
-- [ ] Line 206 — `getShotsForComparison(...)` — blocking batch full-record load loop
-- [ ] Line 216 — `deleteShot(qint64 shotId)` — blocking SQL DELETE
-- [ ] Line 223 — `updateShotMetadata(...)` — blocking SQL UPDATE
-- [ ] Lines 229–244 — `getDistinct*()` methods (12 total) — each executes `SELECT DISTINCT`
-- [ ] Line 247 — `getFilteredShotCount(...)` — blocking SQL SELECT COUNT
-- [ ] Line 251 — `getAutoFavorites(...)` — blocking SQL aggregate
-- [ ] Lines 258–263 — `getAutoFavoriteGroupDetails(...)` — blocking SQL aggregate
-- [ ] Line 274 — `exportShotData(...)` — blocking full record load + JSON serialization
-- [ ] Line 277 — `createBackup(...)` — blocking WAL checkpoint + file copy
-- [ ] Line 283 — `importDatabase(...)` — blocking full DB import
+**Confirmed called from QML on the main thread (2026-03-04 re-audit):**
+
+| Method | QML Callers |
+|--------|-------------|
+| `getShots()` | `LastShotItem.qml` |
+| `getShot()` | `PostShotReviewPage.qml` |
+| `getDistinctBeanBrands()` | `BrewDialog.qml`, `PostShotReviewPage.qml`, `BeanInfoPage.qml` |
+| `getDistinctBeanTypesForBrand()` | `BrewDialog.qml`, `PostShotReviewPage.qml`, `BeanInfoPage.qml` |
+| `getDistinctGrinders()` | `BrewDialog.qml`, `PostShotReviewPage.qml`, `BeanInfoPage.qml` |
+| `getDistinctGrinderSettingsForGrinder()` | `BrewDialog.qml`, `PostShotReviewPage.qml`, `BeanInfoPage.qml` |
+| `getDistinctBaristas()` | `PostShotReviewPage.qml`, `BeanInfoPage.qml` |
+| `updateVisualizerInfo()` | `PostShotReviewPage.qml`, `ShotDetailPage.qml` |
+
+**Declared synchronous but no direct QML callers found (called from C++ or unused):**
+
+- [ ] `getShotsFiltered(...)` — has async counterpart `requestShotsFiltered()`
+- [ ] `getShotTimestamp(qint64 shotId)` — blocking SQL SELECT
+- [ ] `getShotRecord(qint64 shotId)` — C++ return type, not Q_INVOKABLE
+- [ ] `getShotsForComparison(...)` — blocking batch full-record load loop
+- [ ] `deleteShot(qint64 shotId)` — blocking SQL DELETE; batch `deleteShots()` is async
+- [ ] `updateShotMetadata(...)` — has async counterpart `requestUpdateShotMetadata()`
+- [ ] `getDistinctProfiles()`, `getDistinctBeanTypes()`, `getDistinctGrinderSettings()`, `getDistinctRoastLevels()` — synchronous with caching
+- [ ] `getDistinctProfilesFiltered()`, `getDistinctBeanBrandsFiltered()`, `getDistinctBeanTypesFiltered()` — synchronous
+- [ ] `getFilteredShotCount(...)` — blocking SQL SELECT COUNT
+- [ ] `getAutoFavorites(...)` — has async counterpart `requestAutoFavorites()`
+- [ ] `getAutoFavoriteGroupDetails(...)` — has async counterpart `requestAutoFavoriteGroupDetails()`
+- [ ] `exportShotData(...)` — blocking full record load + JSON serialization
+- [ ] `createBackup(...)` — blocking WAL checkpoint + file copy; has async `requestCreateBackup()`
+- [ ] `importDatabase(...)` — blocking full DB import; has async `requestImportDatabase()`
+
+**Mitigating factors:**
+- The `getDistinct*()` methods have an in-memory cache (`m_distinctCache`), so repeat calls are fast. First call after cache invalidation still hits SQLite on the main thread.
+- Async counterparts exist for many methods but QML callers are not consistently using them.
+
+**Recommendation:** Migrate the 8 confirmed QML callers to use async counterparts. Where no async version exists (e.g., `updateVisualizerInfo()`), add one following the `requestShot()` pattern. The `getDistinct*()` methods are lower priority due to caching.
 
 ### 3b. ShotServer synchronous DB calls in HTTP handlers
 
@@ -145,6 +175,8 @@ All declared in `src/history/shothistorystorage.h` and callable from QML on the 
 
 ## 4. ShotServer JavaScript Fetch Conventions
 
+**Status (2026-03-04 re-audit): All 28 fetch() calls across shotserver_*.cpp are compliant. No new violations.**
+
 ### 4a. fetch() missing .catch() handler
 
 CLAUDE.md: "Every `fetch()` must have a `.catch()` handler. Never leave a fetch chain without error handling."
@@ -190,10 +222,6 @@ CLAUDE.md: "Check `r.ok` before `r.json()` in fetch chains. Non-2xx responses wi
 - [x] Line 789 — `connectMqtt()` — added `resp.ok` check
 - [x] Line 810 — `publishDiscovery()` — moved `resp.ok` check before `.json()`
 
-**Compliant examples (for reference):**
-- `shotserver_shots.cpp:3293` — `downloadLog()` — correctly checks `r.ok` before `r.json()`
-- `shotserver_settings.cpp:821` — `pollMqttStatus()` — correctly checks `resp.ok` before `.json()`
-
 ---
 
 ## 5. BLE Error Logging (4 violation areas)
@@ -217,11 +245,9 @@ CLAUDE.md: "BLE errors are automatically captured (use `qWarning()` for errors).
 | `src/ble/scales/atomhearteclairscale.cpp` | `ECLAIR_WARN` | Transport error, service not found, XOR checksum failed |
 | `src/ble/scales/felicitascale.cpp` | `FELICITA_WARN` | Transport error, service not found |
 
-**Compliant exception:** `src/ble/scales/decentscale.cpp` uses `DECENT_LOG` → `qDebug()` for informational messages, but correctly uses direct `qWarning()` calls for error conditions (lines 66, 74, 202).
+**Minor inconsistency (2026-03-04):** `src/ble/scales/decentscale.cpp` uses its own `DECENT_LOG` macro instead of the shared `scalelogging.h` macros and has no `DECENT_WARN` macro. It uses direct `qWarning()` for transport errors (line 74) but the "service not found" path (line 86-88) only calls `emit errorOccurred()` without a warning log.
 
 ### 5b. BLE write timeout logging uses `qDebug` instead of `qWarning` (`bletransport.cpp`)
-
-**Note:** The original audit was stale — logging IS present via `log()` calls (e.g., "Write timeout, retrying 1/3", "Write FAILED after 3 retries", "!!! CONTROLLER ERROR: ... !!!"). However, `log()` routed all messages through `qDebug()`.
 
 **Fix applied (cpp-compliance-audit):** Added `warn()` method using `qWarning()` and switched all error paths to use it:
 
@@ -239,7 +265,7 @@ CLAUDE.md: "BLE errors are automatically captured (use `qWarning()` for errors).
 
 ### 5d. Commented-out log statement
 
-- [ ] `src/ble/bletransport.cpp:235` — `clearQueue` log is commented out: `// qDebug() << "BleTransport::clearQueue: Cleared" << cleared << "pending commands"`
+- [ ] `src/ble/bletransport.cpp:242` — `clearQueue` log is commented out: `// qDebug() << "BleTransport::clearQueue: Cleared" << cleared << "pending commands"`
 
 ---
 
@@ -247,17 +273,24 @@ CLAUDE.md: "BLE errors are automatically captured (use `qWarning()` for errors).
 
 These are not rule violations but reduce code maintainability.
 
-- [ ] `src/screensaver/screensavervideomanager.cpp` — ~80 commented-out `qDebug()`/`qWarning()` lines throughout the file (e.g., lines 46, 97, 124, 253, 504, 715)
-- [ ] `src/ble/bletransport.cpp:235` — Commented-out clearQueue log (also listed in 5d)
-- [ ] `src/core/translationmanager.cpp:2231-2232` — Two AI providers disabled via comments: Gemini ("aggressive rate limiting") and Ollama
+- [ ] `src/screensaver/screensavervideomanager.cpp` — ~72 commented-out `qDebug()`/`qWarning()` lines throughout the file
+- [ ] `src/ble/bletransport.cpp:242` — Commented-out clearQueue log (also listed in 5d)
+- [ ] `src/core/translationmanager.cpp:2231-2232` — Gemini and Ollama disabled in auto-discovery provider list via comments. The actual implementation code is active and works when explicitly selected by the user — only auto-detection is disabled.
 
 ---
 
 ## No Violations Found
 
-- **Q_PROPERTY without NOTIFY** — All non-CONSTANT `Q_PROPERTY` declarations have `NOTIFY` signals. Checked: `machinestate.h`, `maincontroller.h`, `settings.h`, `de1device.h`.
-- **Profile system (weight exit independence)** — Weight exit is correctly independent of `exitIf` in `weightprocessor.cpp`.
-- **BLE write retry pattern** — Timeout (5s) and retry count (3) match CLAUDE.md spec. Missing log messages are covered in Category 5.
+These areas were verified clean on 2026-03-04:
+
+- **Q_PROPERTY without NOTIFY** — All non-CONSTANT `Q_PROPERTY` declarations have `NOTIFY` signals. Verified across all header files including recently added `mqttclient.h`, `flowcalibrationmodel.h`, `solobaristascale.h`.
+- **Profile system (weight exit independence)** — Weight exit is correctly independent of `exitIf` in `weightprocessor.cpp` (line 179-184). Checks `exitWeight > 0 && weight >= exitWeight` with no coupling to machine-side exit flags.
+- **BLE write retry pattern** — Timeout (5s) and retry count (3) match CLAUDE.md spec.
+- **MQTT conventions** — `mqttclient.h/cpp` uses correct naming (`PascalCase` class, `camelCase` methods, `m_` prefixes, `on*` slots for signal handlers). Timers are used for genuinely periodic tasks (`m_publishTimer`) and reconnection with exponential backoff (`m_reconnectTimer`). Paho callbacks use `Qt::QueuedConnection` signals to marshal to the main thread.
+- **SettingsSerializer thread safety** — `exportToJson()`/`importFromJson()` run on the main thread (correct — `Settings` wraps `QSettings` which uses platform APIs). Heavy I/O in backup workflows is properly offloaded to `QThread::create()`.
+- **ShotServer JS fetch conventions** — All 28 `fetch()` calls across `shotserver_shots.cpp`, `shotserver_settings.cpp`, and `shotserver_layout.cpp` have `.catch()` handlers and check `r.ok`/`resp.ok` before `.json()`.
+- **Scale error logging** — All scale files use `*_WARN` macros (via `qWarning()`) for error conditions. No regressions.
+- **New files** — `src/core/dbutils.h`, `src/ble/scales/scalelogging.h`, `src/ble/scales/solobaristascale.h`, `src/models/flowcalibrationmodel.h` — all clean.
 
 ---
 
@@ -269,23 +302,30 @@ These are not rule violations but reduce code maintainability.
 | **High** | Main-thread I/O (QML-facing): shot metadata | 1 caller | 3c | **Fixed** |
 | **High** | Main-thread I/O (QML-facing): flow calibration | 1 caller | 3d | **Fixed** |
 | **High** | Timer guards (fixable) | 3 instances | 2 | **Fixed** |
+| **Medium** | Main-thread I/O (QML sync callers) | 8 confirmed callers | 3a | Open — migrate to async counterparts |
 | **Medium** | Timer guards (platform constraints) | 5+1 instances | 2 | Accepted / 1 improvable |
 | **Medium** | Main-thread I/O (ShotServer) | 10 call sites | 3b | **Fixed** |
-| **Medium** | Main-thread I/O (sync Q_INVOKABLEs) | 30+ methods | 3a | Open (mostly mitigated by caching) |
 | **Medium** | Scale LOG macros route errors to `qDebug()` | 10 files | 5a | **Fixed** |
 | **Medium** | Scale connection timeout uses `qDebug` | 1 | 5c | **Fixed** |
 | **Low** | ShotServer JS fetch missing `.catch()` | 7 | 4a | **Fixed** |
 | **Low** | ShotServer JS fetch missing `r.ok` check | 21 | 4b | **Fixed** |
 | **Low** | BLE write timeout logging level | 7 paths | 5b | **Fixed** |
-| **Low** | Slot naming convention | ~20 slots across 11 files | 1a | Open |
+| **Low** | Slot naming convention | ~27 slots across 18 files | 1a | Open |
 | **Low** | Class naming (USBManager) | 1 | 1b | Open |
 | **Low** | Member variable missing `m_` prefix | 1 | 1c | Open |
 | **Low** | Class/filename spelling inconsistency | 1 | 1d | **Fixed** |
 | **Low** | Dead / commented-out code | 3 areas | 6 | Open |
 | **Low** | Commented-out log statement | 1 | 5d | Open |
+| **Low** | DecentScale missing `DECENT_WARN` macro | 1 file | 5a | Open |
 
 ### Priority rationale
 
 - **High = directly affects primary touch UI.** Sections 3c/3d/3e blocked the QML UI thread during user interactions (loading shots, flow calibration, AI queries) — all now fixed.
-- **Medium = affects secondary interfaces, mitigated, or developer experience.** Timer platform constraints (§2) have no event-based alternative — accepted. ShotHistoryStorage sync Q_INVOKABLEs (§3a) are mostly mitigated by in-memory `m_distinctCache`; the remaining ones (`getShot()` in PostShotReview) are low-frequency. ShotServer async (§3b) only stalls the web UI. Scale log macros (§5a) and connection timeout (§5c) now use `qWarning()` for errors.
-- **Low = correctness improvements with minimal user impact.** JS fetch fixes protect against edge cases on a localhost server. BLE log levels and naming conventions are hygiene.
+- **Medium = affects secondary interfaces, mitigated, or developer experience.** Section 3a has 8 confirmed QML callers still using synchronous methods on the main thread — these should be migrated to async counterparts but are partially mitigated by `m_distinctCache` for the `getDistinct*()` family. Timer platform constraints (§2) have no event-based alternative — accepted. ShotServer async (§3b) only stalls the web UI. Scale log macros (§5a) and connection timeout (§5c) now use `qWarning()` for errors.
+- **Low = correctness improvements with minimal user impact.** JS fetch fixes protect against edge cases on a localhost server. BLE log levels, naming conventions, and dead code removal are hygiene.
+
+### Recommended next steps
+
+1. **Migrate QML sync callers to async** (§3a, Medium priority): The 8 confirmed QML callers of synchronous `ShotHistoryStorage` methods should switch to their `request*()` counterparts. Where no async version exists (e.g., `updateVisualizerInfo()`), add one. This is the largest remaining compliance gap with real user impact (UI jank on slower devices).
+2. **Add `queueDrained` signal** (§2, Medium): Would allow replacing the 2s exit timer with an event-driven approach.
+3. **Slot naming cleanup** (§1a, Low): Rename timer/signal-connected slots to `on*` pattern. Skip public API slots where the convention reads poorly.
