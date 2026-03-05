@@ -17,6 +17,12 @@
 #include <QCryptographicHash>
 #include <QJsonDocument>
 #include <QJsonParseError>
+#include <QThread>
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QSqlError>
+#include <QPointer>
+#include <QCoreApplication>
 #include <cmath>
 
 AIManager::AIManager(QNetworkAccessManager* networkManager, Settings* settings, QObject* parent)
@@ -306,74 +312,179 @@ void AIManager::setShotHistoryStorage(ShotHistoryStorage* storage)
     m_shotHistory = storage;
 }
 
-QString AIManager::getRecentShotContext(const QString& beanBrand, const QString& beanType, const QString& profileName, int excludeShotId)
+// File-scope helper: runs on a background thread with its own SQLite connection.
+// Returns (timestamp, fullShot) pairs. Extracted from requestRecentShotContext
+// to reduce lambda nesting. NOT safe to call from the main thread (would conflict
+// with the primary DB connection).
+static QList<QPair<qint64, QVariantMap>> loadQualifiedShots(
+    const QString& dbPath, const QString& connName,
+    const QString& beanBrand, const QString& beanType,
+    const QString& profileName, int excludeShotId)
 {
-    if (!m_shotHistory || (beanBrand.isEmpty() && profileName.isEmpty()))
-        return QString();
+    QList<QPair<qint64, QVariantMap>> qualifiedShots;
 
-    // Look up the current shot's timestamp so we only include older shots
-    qint64 shotTimestamp = m_shotHistory->getShotTimestamp(excludeShotId);
-    if (shotTimestamp <= 0)
-        return QString();
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
+        db.setDatabaseName(dbPath);
+        if (!db.open()) {
+            qWarning() << "AIManager::requestRecentShotContext: Failed to open DB:" << db.lastError().text();
+            // Fall through with empty qualifiedShots; signal will emit empty context
+        } else {
+            // 1. Look up the current shot's timestamp
+            qint64 shotTimestamp = 0;
+            {
+                QSqlQuery q(db);
+                q.prepare("SELECT timestamp FROM shots WHERE id = ?");
+                q.bindValue(0, static_cast<qint64>(excludeShotId));
+                if (!q.exec()) {
+                    qWarning() << "AIManager::requestRecentShotContext: timestamp query failed:" << q.lastError().text();
+                } else if (q.next()) {
+                    shotTimestamp = q.value(0).toLongLong();
+                } else {
+                    qDebug() << "AIManager::requestRecentShotContext: no shot found for excludeShotId=" << excludeShotId;
+                }
+            }
 
-    // Build filter: match on non-empty fields, up to 3 weeks before this shot
-    QVariantMap filter;
-    if (!beanBrand.isEmpty()) filter["beanBrand"] = beanBrand;
-    if (!beanType.isEmpty()) filter["beanType"] = beanType;
-    if (!profileName.isEmpty()) filter["profileName"] = profileName;
-    filter["dateFrom"] = shotTimestamp - 21 * 24 * 3600;
-    filter["dateTo"] = shotTimestamp;  // Only shots before (or at) this shot's time
+            if (shotTimestamp > 0) {
+                // 2. Query candidates: same bean/profile, up to 3 weeks before this shot
+                qint64 dateFrom = shotTimestamp - 21 * 24 * 3600;
+                QStringList conditions;
+                QVariantList bindValues;
+                if (!beanBrand.isEmpty()) { conditions << "bean_brand = ?"; bindValues << beanBrand; }
+                if (!beanType.isEmpty()) { conditions << "bean_type = ?"; bindValues << beanType; }
+                if (!profileName.isEmpty()) { conditions << "profile_name = ?"; bindValues << profileName; }
+                conditions << "timestamp >= ?" << "timestamp <= ?";
+                bindValues << dateFrom << shotTimestamp;
 
-    // Fetch extra to have room after filtering out excludeShotId and mistakes
-    QVariantList candidates = m_shotHistory->getShotsFiltered(filter, 0, 6);
+                QString sql = "SELECT id, timestamp, profile_name, duration_seconds, final_weight "
+                              "FROM shots WHERE " + conditions.join(" AND ") +
+                              " ORDER BY timestamp DESC LIMIT 6";
 
-    qDebug() << "AIManager::getRecentShotContext: excludeShotId=" << excludeShotId
-             << "shotTimestamp=" << QDateTime::fromSecsSinceEpoch(shotTimestamp).toString("yyyy-MM-dd HH:mm")
-             << "filter: bean=" << beanBrand << beanType << "profile=" << profileName
-             << "candidates=" << candidates.size();
+                QSqlQuery q(db);
+                q.prepare(sql);
+                for (int i = 0; i < bindValues.size(); ++i)
+                    q.bindValue(i, bindValues[i]);
 
-    QStringList shotSections;
-    for (const QVariant& v : candidates) {
-        if (shotSections.size() >= 3) break;
+                struct Candidate { qint64 id; qint64 timestamp; QString profileName; double duration; double finalWeight; };
+                QList<Candidate> candidates;
+                if (q.exec()) {
+                    while (q.next()) {
+                        candidates.append({q.value(0).toLongLong(), q.value(1).toLongLong(),
+                                           q.value(2).toString(), q.value(3).toDouble(), q.value(4).toDouble()});
+                    }
+                } else {
+                    qWarning() << "AIManager::requestRecentShotContext: candidate query failed:" << q.lastError().text();
+                }
 
-        QVariantMap shot = v.toMap();
-        qint64 id = shot.value("id").toLongLong();
-        qint64 timestamp = shot.value("timestamp").toLongLong();
-        QString shotProfile = shot.value("profileName").toString();
-        QString shotDate = QDateTime::fromSecsSinceEpoch(timestamp).toString("yyyy-MM-dd HH:mm");
+                qDebug() << "AIManager::requestRecentShotContext: excludeShotId=" << excludeShotId
+                         << "shotTimestamp=" << QDateTime::fromSecsSinceEpoch(shotTimestamp).toString("yyyy-MM-dd HH:mm")
+                         << "filter: bean=" << beanBrand << beanType << "profile=" << profileName
+                         << "candidates=" << candidates.size();
 
-        if (id == excludeShotId) {
-            qDebug() << "  Shot id=" << id << "date=" << shotDate << "profile=" << shotProfile << "-> SKIPPED (current shot)";
-            continue;
+                // 3. Filter and load full records for up to 3 qualifying shots
+                int included = 0;
+                for (const auto& c : candidates) {
+                    if (included >= 3) break;
+
+                    if (c.id == excludeShotId) {
+                        qDebug() << "  Shot id=" << c.id << "-> SKIPPED (current shot)";
+                        continue;
+                    }
+
+                    // Lightweight mistake check (duration < 10s or weight < 5g)
+                    if (c.duration < 10.0 || c.finalWeight < 5.0) {
+                        qDebug() << "  Shot id=" << c.id << "-> SKIPPED (mistake)";
+                        continue;
+                    }
+
+                    QVariantMap fullShot;
+                    try {
+                        ShotRecord record = ShotHistoryStorage::loadShotRecordStatic(db, c.id);
+                        fullShot = ShotHistoryStorage::convertShotRecord(record);
+                    } catch (const std::exception& e) {
+                        qWarning() << "  Shot id=" << c.id << "-> SKIPPED (exception:" << e.what() << ")";
+                        continue;
+                    }
+                    if (fullShot.isEmpty()) {
+                        qWarning() << "  Shot id=" << c.id << "-> SKIPPED (convertShotRecord returned empty)";
+                        continue;
+                    }
+
+                    // Check targetWeight-based mistake filter (needs full record)
+                    double targetWeight = fullShot.value("targetWeight", 0.0).toDouble();
+                    if (targetWeight > 0.0 && c.finalWeight < targetWeight / 3.0) {
+                        qDebug() << "  Shot id=" << c.id << "-> SKIPPED (mistake, weight < 1/3 target)";
+                        continue;
+                    }
+
+                    qDebug() << "  Shot id=" << c.id << "-> INCLUDED";
+                    qualifiedShots.append({c.timestamp, std::move(fullShot)});
+                    ++included;
+                }
+            }
         }
-        if (isMistakeShot(shot)) {
-            qDebug() << "  Shot id=" << id << "date=" << shotDate << "profile=" << shotProfile << "-> SKIPPED (mistake)";
-            continue;
-        }
+    }
+    QSqlDatabase::removeDatabase(connName);
+    return qualifiedShots;
+}
 
-        qDebug() << "  Shot id=" << id << "date=" << shotDate << "profile=" << shotProfile << "-> INCLUDED";
-
-        // Load full shot data (with time-series) for rich summary
-        QVariantMap fullShot = m_shotHistory->getShot(id);
-        if (fullShot.isEmpty()) continue;
-
-        QString summary = generateHistoryShotSummary(fullShot);
-        if (summary.isEmpty()) continue;
-
-        // Format date for header
-        QString dateStr = QDateTime::fromSecsSinceEpoch(timestamp).toString("MMM d, HH:mm");
-
-        shotSections.prepend(QString("### Shot (%1)\n\n%2").arg(dateStr).arg(summary));
+void AIManager::requestRecentShotContext(const QString& beanBrand, const QString& beanType, const QString& profileName, int excludeShotId)
+{
+    if (!m_shotHistory || (beanBrand.isEmpty() && profileName.isEmpty())) {
+        emit recentShotContextReady(QString());
+        return;
     }
 
-    if (shotSections.isEmpty())
-        return QString();
+    const QString dbPath = m_shotHistory->databasePath();
+    QPointer<AIManager> self(this);
+    ++m_contextSerial;
+    int serial = m_contextSerial;
 
-    return "## Previous Shots with This Bean & Profile\n\n"
-           "All shots below use the same profile as the current shot. "
-           "Do NOT report profile recipe differences — focus on what the user changed "
-           "(grind, dose, temperature) and how it affected the outcome.\n\n" +
-           shotSections.join("\n\n");
+    // NOTE: QPointer is NOT thread-safe — it tracks QObject destruction via the main
+    // event loop. The background thread captures `self` by value but MUST NOT dereference
+    // it. All dereferences occur inside the QueuedConnection callback, which runs on the
+    // main thread where QPointer's tracking is valid.
+    QThread* thread = QThread::create([self, dbPath, beanBrand, beanType, profileName, excludeShotId, serial]() {
+        const QString connName = QString("ai_context_%1")
+            .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
+
+        auto qualifiedShots = loadQualifiedShots(dbPath, connName, beanBrand, beanType, profileName, excludeShotId);
+
+        // Summarization runs on main thread (ShotSummarizer is owned by AIManager)
+        QMetaObject::invokeMethod(qApp, [self, serial, qualifiedShots = std::move(qualifiedShots)]() {
+            if (!self) return;
+            if (serial != self->m_contextSerial) {
+                // Stale request superseded by a newer one — emit empty so QML clears contextLoading.
+                // The newer request's callback will overwrite with real data.
+                emit self->recentShotContextReady(QString());
+                return;
+            }
+
+            QString result;
+            QStringList shotSections;
+            for (const auto& qs : qualifiedShots) {
+                ShotSummary summary = self->m_summarizer->summarizeFromHistory(qs.second);
+                QString summaryText = self->m_summarizer->buildUserPrompt(summary);
+                if (summaryText.isEmpty()) continue;
+
+                QString dateStr = QDateTime::fromSecsSinceEpoch(qs.first).toString("MMM d, HH:mm");
+                shotSections.prepend(QString("### Shot (%1)\n\n%2").arg(dateStr).arg(summaryText));
+            }
+
+            if (!shotSections.isEmpty()) {
+                result = "## Previous Shots with This Bean & Profile\n\n"
+                         "All shots below use the same profile as the current shot. "
+                         "Do NOT report profile recipe differences — focus on what the user changed "
+                         "(grind, dose, temperature) and how it affected the outcome.\n\n" +
+                         shotSections.join("\n\n");
+            }
+
+            emit self->recentShotContextReady(result);
+        }, Qt::QueuedConnection);
+    });
+
+    connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+    thread->start();
 }
 
 void AIManager::testConnection()

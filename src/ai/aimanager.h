@@ -117,7 +117,7 @@ public:
 
     // Shot history access for contextual recommendations
     void setShotHistoryStorage(ShotHistoryStorage* storage);
-    Q_INVOKABLE QString getRecentShotContext(const QString& beanBrand, const QString& beanType, const QString& profileName, int excludeShotId);
+    Q_INVOKABLE void requestRecentShotContext(const QString& beanBrand, const QString& beanType, const QString& profileName, int excludeShotId);
 
     // Provider testing
     Q_INVOKABLE void testConnection();
@@ -140,6 +140,7 @@ signals:
     void testResultChanged();
     void ollamaModelsChanged();
     void conversationIndexChanged();
+    void recentShotContextReady(const QString& context);
     void conversationResponseReceived(const QString& response);
     void conversationErrorOccurred(const QString& error);
 
@@ -191,6 +192,9 @@ private:
     // For logging - store last prompts to pair with response
     QString m_lastSystemPrompt;
     QString m_lastUserPrompt;
+
+    // Serial counter for requestRecentShotContext (discard stale results)
+    int m_contextSerial = 0;
 
 public:
     void reloadConversations() { loadConversationIndex(); }

@@ -24,6 +24,10 @@
 #include <QDir>
 #include <QFile>
 #include <QTextStream>
+#include <QThread>
+#include <QSqlDatabase>
+#include <QSqlError>
+#include <QPointer>
 #include <tuple>
 #include <QDateTime>
 #include <QJsonDocument>
@@ -80,22 +84,15 @@ MainController::MainController(QNetworkAccessManager* networkManager,
     , m_profileStorage(profileStorage)
     , m_networkManager(networkManager)
 {
-    // Set up delayed settings timer (1 second after connection)
-    // The initial settings from DE1Device use hardcoded values; we need to send
-    // user settings quickly to set the correct steam temperature for keepHeaterOn.
-    m_settingsTimer.setSingleShot(true);
-    m_settingsTimer.setInterval(1000);
-    connect(&m_settingsTimer, &QTimer::timeout, this, &MainController::applyAllSettings);
-
     // Connect to shot sample updates
     if (m_device) {
         connect(m_device, &DE1Device::shotSampleReceived,
                 this, &MainController::onShotSampleReceived);
 
-        // Start delayed settings timer after device initial settings complete
-        connect(m_device, &DE1Device::initialSettingsComplete, this, [this]() {
-            m_settingsTimer.start();
-        });
+        // Apply user settings immediately after device sends its initial (hardcoded) settings.
+        // BleTransport's FIFO queue guarantees our writes follow the initial writes.
+        connect(m_device, &DE1Device::initialSettingsComplete,
+                this, &MainController::applyAllSettings);
     }
 
     // Send water refill level to machine when setting changes
@@ -1078,26 +1075,62 @@ bool MainController::loadProfileFromJson(const QString& jsonContent) {
 void MainController::loadShotWithMetadata(qint64 shotId) {
     if (!m_shotHistory) {
         qWarning() << "loadShotWithMetadata: No shot history storage";
+        emit shotMetadataLoaded(shotId, false);
         return;
     }
 
-    // Get full shot record from history
-    ShotRecord shotRecord = m_shotHistory->getShotRecord(shotId);
+    // Load shot record on a background thread to avoid blocking the UI
+    const QString dbPath = m_shotHistory->databasePath();
+    QPointer<MainController> self(this);
+
+    // NOTE: QPointer is NOT thread-safe — it tracks QObject destruction via the main
+    // event loop. The background thread captures `self` by value but MUST NOT dereference
+    // it. All dereferences occur inside the QueuedConnection callback, which runs on the
+    // main thread where QPointer's tracking is valid.
+    QThread* thread = QThread::create([self, dbPath, shotId]() {
+        const QString connName = QString("load_meta_%1")
+            .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
+
+        ShotRecord record;
+        try {
+            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
+            db.setDatabaseName(dbPath);
+            if (db.open())
+                record = ShotHistoryStorage::loadShotRecordStatic(db, shotId);
+            else
+                qWarning() << "loadShotWithMetadata: Failed to open DB:" << db.lastError().text();
+        } catch (const std::exception& e) {
+            qWarning() << "loadShotWithMetadata: Exception loading shot" << shotId << ":" << e.what();
+        }
+        QSqlDatabase::removeDatabase(connName);
+
+        // Apply metadata on main thread (interacts with QML state and BLE)
+        QMetaObject::invokeMethod(qApp, [self, shotId, record = std::move(record)]() {
+            if (self) self->applyLoadedShotMetadata(shotId, record);
+        }, Qt::QueuedConnection);
+    });
+
+    connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+    thread->start();
+}
+
+void MainController::applyLoadedShotMetadata(qint64 shotId, const ShotRecord& shotRecord) {
     if (shotRecord.summary.id <= 0) {
-        qWarning() << "loadShotWithMetadata: Shot not found with id:" << shotId;
+        qWarning() << "applyLoadedShotMetadata: Shot not found or DB open failed for id:" << shotId;
+        emit shotMetadataLoaded(shotId, false);
         return;
     }
 
     // Load the profile - prefer installed profile, fall back to stored JSON
     QString filename = findProfileByTitle(shotRecord.summary.profileName);
-    qDebug() << "loadShotWithMetadata: profileTitle=" << shotRecord.summary.profileName
+    qDebug() << "applyLoadedShotMetadata: profileTitle=" << shotRecord.summary.profileName
              << "filename=" << filename;
     if (!filename.isEmpty()) {
         loadProfile(filename);
     } else if (!shotRecord.profileJson.isEmpty()) {
         loadProfileFromJson(shotRecord.profileJson);
     } else {
-        qWarning() << "loadShotWithMetadata: No profile data available for shot";
+        qWarning() << "applyLoadedShotMetadata: No profile data available for shot";
     }
 
     // Copy metadata to DYE settings
@@ -1119,7 +1152,7 @@ void MainController::loadShotWithMetadata(qint64 shotId) {
         // Find matching bean preset or set to -1 for guest bean
         int beanPresetIndex = m_settings->findBeanPresetByContent(
             shotRecord.summary.beanBrand, shotRecord.summary.beanType);
-        qDebug() << "loadShotWithMetadata: Looking for bean preset - brand:" << shotRecord.summary.beanBrand
+        qDebug() << "applyLoadedShotMetadata: Looking for bean preset - brand:" << shotRecord.summary.beanBrand
                  << "type:" << shotRecord.summary.beanType << "-> found index:" << beanPresetIndex;
         m_settings->setSelectedBeanPreset(beanPresetIndex);
 
@@ -1157,6 +1190,8 @@ void MainController::loadShotWithMetadata(qint64 shotId) {
             uploadCurrentProfile();
         }
     }
+
+    emit shotMetadataLoaded(shotId, true);
 }
 
 void MainController::refreshProfiles() {

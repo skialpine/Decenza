@@ -27,6 +27,7 @@ Rectangle {
     property string overlayTitle: TranslationManager.translate("conversation.title", "AI Conversation")
     property bool isMistakeShot: false
     property string historicalContext: ""
+    property bool contextLoading: false
     property string shotDebugLog: ""
     // Saved context for re-fetching shot history after conversation clear
     property string savedBeanBrand: ""
@@ -74,12 +75,14 @@ Rectangle {
             profileName || ""
         )
 
-        // Always fetch recent shot history as context (even for existing conversations,
-        // since trimHistory() may have reduced prior shots to one-line summaries)
+        // Fetch recent shot history as context on a background thread.
+        // Result arrives via recentShotContextReady signal → Connections handler below.
         overlay.savedBeanBrand = beanBrand || ""
         overlay.savedBeanType = beanType || ""
         overlay.savedProfileName = profileName || ""
-        overlay.historicalContext = MainController.aiManager.getRecentShotContext(
+        overlay.historicalContext = ""
+        overlay.contextLoading = true
+        MainController.aiManager.requestRecentShotContext(
             overlay.savedBeanBrand, overlay.savedBeanType, overlay.savedProfileName, shotId)
 
         // Format shot timestamp as human-readable label for AI display
@@ -104,6 +107,15 @@ Rectangle {
         overlay.isMistakeShot = isMistake
         overlay.shotDebugLog = shotData.debugLog || ""
         overlay.open()
+    }
+
+    // Receive async historical context from background thread
+    Connections {
+        target: MainController.aiManager
+        function onRecentShotContextReady(context) {
+            overlay.historicalContext = context
+            overlay.contextLoading = false
+        }
     }
 
     // Consume ALL mouse/touch events - prevent pass-through to background
@@ -205,9 +217,11 @@ Rectangle {
                             onClicked: {
                                 if (MainController.aiManager) {
                                     MainController.aiManager.clearCurrentConversation()
-                                    // Re-fetch historical context so next message includes prior shots
+                                    // Re-fetch historical context on background thread
                                     if (overlay.shotId > 0) {
-                                        overlay.historicalContext = MainController.aiManager.getRecentShotContext(
+                                        overlay.historicalContext = ""
+                                        overlay.contextLoading = true
+                                        MainController.aiManager.requestRecentShotContext(
                                             overlay.savedBeanBrand, overlay.savedBeanType, overlay.savedProfileName, overlay.shotId)
                                     }
                                 }
@@ -398,7 +412,8 @@ Rectangle {
                                      ? TranslationManager.translate("conversation.placeholder.withshot", "Ask about this shot...")
                                      : TranslationManager.translate("conversation.placeholder", "Ask a follow-up question...")
                         enabled: MainController.aiManager && MainController.aiManager.conversation &&
-                                 !MainController.aiManager.conversation.busy
+                                 !MainController.aiManager.conversation.busy &&
+                                 !overlay.contextLoading
 
                         Keys.onReturnPressed: sendFollowUp()
                         Keys.onEnterPressed: sendFollowUp()
@@ -469,7 +484,8 @@ Rectangle {
                             anchors.fill: parent
                             enabled: conversationInput.text.length > 0 &&
                                      MainController.aiManager && MainController.aiManager.conversation &&
-                                     !MainController.aiManager.conversation.busy
+                                     !MainController.aiManager.conversation.busy &&
+                                     !overlay.contextLoading
                             onClicked: conversationInput.sendFollowUp()
                         }
                     }
@@ -488,6 +504,7 @@ Rectangle {
             if (MainController.aiManager && MainController.aiManager.conversation) {
                 MainController.aiManager.conversation.saveToStorage()
             }
+            overlay.contextLoading = false  // Reset in case async result never arrives
             overlay.visible = false
             overlay.closed()
         }

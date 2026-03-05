@@ -264,6 +264,9 @@ signals:
     // Shot aborted because saved scale is not connected
     void shotAbortedNoScale();
 
+    // Shot metadata loaded from history (for async loadShotWithMetadata)
+    void shotMetadataLoaded(qint64 shotId, bool success);
+
     // Auto-wake: emitted when scheduled wake time is reached
     void autoWakeTriggered();
 
@@ -286,6 +289,7 @@ private:
     QString userProfilesPath() const;
     QString downloadedProfilesPath() const;
     void applyAllSettings();
+    void applyLoadedShotMetadata(qint64 shotId, const ShotRecord& shotRecord);
     void applyWaterRefillLevel();
     void applyRefillKitOverride();
     void applyHeaterTweaks();
@@ -328,7 +332,6 @@ private:
     QString m_currentFrameName;  // For accessibility announcements
 
     bool m_profileUploadPending = false;  // Set when upload blocked during active phase; cleared on successful upload or disconnect
-    QTimer m_settingsTimer;  // Delayed settings application after connection
     QTimer m_heaterTweaksTimer;  // Debounce slider changes before sending MMR writes
 
     // DYE: pending shot data for delayed upload
