@@ -1494,12 +1494,28 @@ int main(int argc, char *argv[])
         }
 
         // Wait for BLE writes to complete before exiting
-        // de1app waits 5-10 seconds; we use 2 seconds to ensure sleep command is sent
         if (needBleWait) {
-            qDebug() << "Waiting 2s for BLE writes to complete...";
             QEventLoop waitLoop;
-            QTimer::singleShot(2000, &waitLoop, &QEventLoop::quit);
+            auto* transport = de1Device.transport();
+            bool drained = false;
+            int timeoutMs = 500; // Scale-only default
+
+            if (transport && transport->isConnected()) {
+                QObject::connect(transport, &DE1Transport::queueDrained,
+                                 &waitLoop, [&]() { drained = true; waitLoop.quit(); });
+                QObject::connect(transport, &DE1Transport::disconnected,
+                                 &waitLoop, [&]() { waitLoop.quit(); });
+                timeoutMs = 2000;
+            }
+
+            qDebug() << "Waiting for BLE queue to drain before exit...";
+            QTimer::singleShot(timeoutMs, &waitLoop, [&]() { waitLoop.quit(); });
             waitLoop.exec();
+
+            if (drained)
+                qDebug() << "BLE queue drained successfully, exiting.";
+            else
+                qWarning() << "BLE queue drain timed out after" << timeoutMs << "ms — sleep command may not have been delivered.";
         }
 
         // IMPORTANT: Ensure charger is ON before exiting
