@@ -65,6 +65,17 @@ jobs:
           key: macos-universal
           max-size: 500M
 
+      - name: Create ccache compiler wrappers
+        run: |
+          # Xcode CC/CXX build settings need a path to a single executable.
+          WRAPPER_DIR="$RUNNER_TEMP/ccache-wrappers"
+          mkdir -p "$WRAPPER_DIR"
+          printf '#!/bin/sh\nexec ccache clang "$@"\n' > "$WRAPPER_DIR/clang"
+          printf '#!/bin/sh\nexec ccache clang++ "$@"\n' > "$WRAPPER_DIR/clang++"
+          chmod +x "$WRAPPER_DIR/clang" "$WRAPPER_DIR/clang++"
+          echo "CCACHE_CC=$WRAPPER_DIR/clang" >> $GITHUB_ENV
+          echo "CCACHE_CXX=$WRAPPER_DIR/clang++" >> $GITHUB_ENV
+
       - name: Install Apple Developer ID certificate
         env:
           P12_CERTIFICATE_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 }}
@@ -145,8 +156,8 @@ jobs:
       - name: Build Release
         run: |
           cd build/macos
-          # Inject ccache via Xcode CC/CXX build settings
-          cmake --build . --config Release --parallel -- CC="ccache clang" CXX="ccache clang++"
+          # Inject ccache via Xcode CC/CXX build settings using wrapper scripts
+          cmake --build . --config Release --parallel -- CC="$CCACHE_CC" CXX="$CCACHE_CXX"
 
       - name: Bundle Qt frameworks
         run: |

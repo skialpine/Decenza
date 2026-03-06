@@ -105,18 +105,23 @@ jobs:
           # Qt's Android toolchain overrides CMAKE_*_COMPILER_LAUNCHER,
           # so we wrap the actual NDK compiler binaries with ccache instead.
           # We resolve symlinks first (clang++ is often a symlink to clang)
-          # to avoid wrapper recursion (clang++.real -> clang wrapper -> clang.real.real).
+          # and add --driver-mode=g++ for clang++ to preserve C++ linking.
           NDK_BIN="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
           REAL_CLANG="$(readlink -f "$NDK_BIN/clang")"
           for COMP in clang clang++; do
             if [ -e "$NDK_BIN/$COMP" ]; then
               rm -f "$NDK_BIN/$COMP"
+              if [ "$COMP" = "clang++" ]; then
+                DRIVER_FLAG="--driver-mode=g++ "
+              else
+                DRIVER_FLAG=""
+              fi
               cat > "$NDK_BIN/$COMP" <<WRAPPER
           #!/bin/sh
-          exec ccache "$REAL_CLANG" "\$@"
+          exec ccache "$REAL_CLANG" ${DRIVER_FLAG}"\$@"
           WRAPPER
               chmod +x "$NDK_BIN/$COMP"
-              echo "Wrapped $NDK_BIN/$COMP -> ccache $REAL_CLANG"
+              echo "Wrapped $NDK_BIN/$COMP -> ccache $REAL_CLANG $DRIVER_FLAG"
             fi
           done
 
