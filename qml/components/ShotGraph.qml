@@ -18,10 +18,17 @@ ChartView {
     property bool showWeightFlow: Settings.value("graph/showWeightFlow", true)
     property bool showResistance: Settings.value("graph/showResistance", false)
 
+    // Right axis toggle (weight vs temperature)
+    property bool showWeightAxis: Settings.value("graph/showWeightAxis", true)
+    function toggleRightAxis() {
+        showWeightAxis = !showWeightAxis
+        Settings.setValue("graph/showWeightAxis", showWeightAxis)
+    }
+
     margins.top: 0
     margins.bottom: 0
     margins.left: 0
-    margins.right: 0
+    margins.right: Theme.scaled(35)
 
     // Register goal/marker LineSeries with C++ model (infrequent updates, replace() is fine)
     Component.onCompleted: {
@@ -79,31 +86,22 @@ ChartView {
         titleBrush: Theme.textSecondaryColor
     }
 
-    // Temperature axis (right Y) - hidden during shots to make room for weight
+    // Temperature axis (right Y) - hidden; labels provided by rightAxisLabels
     ValueAxis {
         id: tempAxis
         min: 40
         max: 100
         tickCount: 5
-        labelFormat: "%.0f"
-        labelsColor: Theme.temperatureColor
-        gridLineColor: "transparent"
-        titleText: "°C"
-        titleBrush: Theme.temperatureColor
-        visible: false  // Hide temp axis - weight is more important during shots
+        visible: false
     }
 
-    // Weight axis (right Y) - scaled to target weight + 10%
+    // Weight axis (right Y) - hidden; labels provided by rightAxisLabels
     ValueAxis {
         id: weightAxis
         min: 0
         max: Math.max(10, (MainController.targetWeight || 36) * 1.1)
         tickCount: 5
-        labelFormat: "%.0f"
-        labelsColor: Theme.weightColor
-        gridLineColor: "transparent"
-        titleText: "g"
-        titleBrush: Theme.weightColor
+        visible: false
     }
 
     // === PHASE MARKER LINES ===
@@ -167,7 +165,7 @@ ChartView {
     }
 
     // Empty anchor series to keep the weight axis registered with ChartView
-    // (axes only display when at least one series references them)
+    // (required for weightAxis min/max properties to update correctly)
     LineSeries {
         name: ""
         axisX: timeAxis
@@ -362,5 +360,60 @@ ChartView {
         font: Theme.captionFont
         opacity: 0.7
         Accessible.ignored: true
+    }
+
+    // Manual right-axis labels — built-in Qt Charts axes cause layout shift
+    // (plotArea resizes when axis visibility toggles), so we draw labels at a fixed position
+    Item {
+        id: rightAxisLabels
+        x: chart.plotArea.x + chart.plotArea.width + Theme.scaled(4)
+        y: chart.plotArea.y
+        width: chart.width - x
+        height: chart.plotArea.height
+
+        Accessible.role: Accessible.Button
+        Accessible.name: chart.showWeightAxis ? TranslationManager.translate("graph.rightAxisWeight", "Right axis: Weight. Tap for Temperature")
+                                              : TranslationManager.translate("graph.rightAxisTemp", "Right axis: Temperature. Tap for Weight")
+        Accessible.focusable: true
+        Accessible.onPressAction: axisToggleArea.clicked(null)
+
+        property color labelColor: chart.showWeightAxis ? Theme.weightColor : Theme.temperatureColor
+
+        // Tick labels — count must match tickCount on tempAxis/weightAxis
+        Repeater {
+            model: 5
+            Text {
+                required property int index
+                property real value: {
+                    var axisMin = chart.showWeightAxis ? weightAxis.min : tempAxis.min
+                    var axisMax = chart.showWeightAxis ? weightAxis.max : tempAxis.max
+                    return axisMax - index * (axisMax - axisMin) / 4
+                }
+                text: value.toFixed(0)
+                x: 0
+                y: index / 4 * rightAxisLabels.height - height / 2
+                font: Theme.captionFont
+                color: rightAxisLabels.labelColor
+                Accessible.ignored: true
+            }
+        }
+
+        // Axis title
+        Text {
+            text: chart.showWeightAxis ? "g" : "°C"
+            font: Theme.captionFont
+            color: rightAxisLabels.labelColor
+            rotation: 90
+            transformOrigin: Item.Center
+            x: Theme.scaled(24)
+            y: rightAxisLabels.height / 2 - height / 2
+            Accessible.ignored: true
+        }
+
+        MouseArea {
+            id: axisToggleArea
+            anchors.fill: parent
+            onClicked: chart.toggleRightAxis()
+        }
     }
 }
