@@ -30,6 +30,7 @@ class AIManager;
 class MqttClient;
 class WidgetLibrary;
 class LibrarySharing;
+class BatteryManager;
 class MemoryMonitor;
 
 struct PendingRequest {
@@ -89,6 +90,9 @@ public:
     // Widget library and community sharing for layout editor
     void setWidgetLibrary(WidgetLibrary* library) { m_widgetLibrary = library; }
     void setLibrarySharing(LibrarySharing* sharing) { m_librarySharing = sharing; }
+
+    // System status for web telemetry
+    void setBatteryManager(BatteryManager* manager) { m_batteryManager = manager; }
     void setMemoryMonitor(MemoryMonitor* monitor) { m_memoryMonitor = monitor; }
 
 signals:
@@ -223,6 +227,7 @@ private:
     bool m_mqttConnectInFlight = false;
     WidgetLibrary* m_widgetLibrary = nullptr;
     LibrarySharing* m_librarySharing = nullptr;
+    BatteryManager* m_batteryManager = nullptr;
     MemoryMonitor* m_memoryMonitor = nullptr;
     int m_nextLibraryRequestId = 0;
     static constexpr int kLibraryTimeoutMs = 60000;
