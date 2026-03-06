@@ -59,6 +59,11 @@ jobs:
           cache: true
           cache-key-prefix: 'qt-macos-v2'
 
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: macos-universal
+
       - name: Install Apple Developer ID certificate
         env:
           P12_CERTIFICATE_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 }}
@@ -131,6 +136,8 @@ jobs:
             -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
             -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DOPENSSL_ROOT_DIR="${OPENSSL_PREFIX}" \
             -DOPENSSL_INCLUDE_DIR="${OPENSSL_PREFIX}/include" \
             -DOPENSSL_CRYPTO_LIBRARY="${OPENSSL_PREFIX}/lib/libcrypto.a" \

@@ -76,6 +76,11 @@ jobs:
           cache: true
           cache-key-prefix: 'qt-linux-arm64-v1'
 
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: linux-arm64
+
       - name: Download linuxdeploy tools
         run: |
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-aarch64.AppImage
@@ -89,7 +94,9 @@ jobs:
           $QT_ROOT_DIR/bin/qt-cmake .. -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-            -DENABLE_QUICK3D=OFF
+            -DENABLE_QUICK3D=OFF \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Build
         run: |
