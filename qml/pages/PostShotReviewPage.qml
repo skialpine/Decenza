@@ -60,7 +60,9 @@ Page {
                 editBeanType = editShotData.beanType || ""
                 editRoastDate = editShotData.roastDate || ""
                 editRoastLevel = editShotData.roastLevel || ""
+                editGrinderBrand = editShotData.grinderBrand || ""
                 editGrinderModel = editShotData.grinderModel || ""
+                editGrinderBurrs = editShotData.grinderBurrs || ""
                 editGrinderSetting = editShotData.grinderSetting || ""
                 editBarista = editShotData.barista || ""
                 editDoseWeight = editShotData.doseWeight || 0
@@ -87,7 +89,9 @@ Page {
     property string editBeanType: ""
     property string editRoastDate: ""
     property string editRoastLevel: ""
+    property string editGrinderBrand: ""
     property string editGrinderModel: ""
+    property string editGrinderBurrs: ""
     property string editGrinderSetting: ""
     property string editBarista: ""
     property double editDoseWeight: 0
@@ -115,7 +119,9 @@ Page {
         editBeanType !== (editShotData.beanType || "") ||
         editRoastDate !== (editShotData.roastDate || "") ||
         editRoastLevel !== (editShotData.roastLevel || "") ||
+        editGrinderBrand !== (editShotData.grinderBrand || "") ||
         editGrinderModel !== (editShotData.grinderModel || "") ||
+        editGrinderBurrs !== (editShotData.grinderBurrs || "") ||
         editGrinderSetting !== (editShotData.grinderSetting || "") ||
         editBarista !== (editShotData.barista || "") ||
         editDoseWeight !== (editShotData.doseWeight || 0) ||
@@ -135,7 +141,9 @@ Page {
             "beanType": editBeanType,
             "roastDate": editRoastDate,
             "roastLevel": editRoastLevel,
+            "grinderBrand": editGrinderBrand,
             "grinderModel": editGrinderModel,
+            "grinderBurrs": editGrinderBurrs,
             "grinderSetting": editGrinderSetting,
             "barista": editBarista,
             "doseWeight": editDoseWeight,
@@ -154,7 +162,9 @@ Page {
         Settings.dyeBeanType = editBeanType
         Settings.dyeRoastDate = editRoastDate
         Settings.dyeRoastLevel = editRoastLevel
+        Settings.dyeGrinderBrand = editGrinderBrand
         Settings.dyeGrinderModel = editGrinderModel
+        Settings.dyeGrinderBurrs = editGrinderBurrs
         Settings.dyeGrinderSetting = editGrinderSetting
         Settings.dyeBarista = editBarista
         Settings.dyeBeanWeight = editDoseWeight
@@ -202,7 +212,8 @@ Page {
         anchors.fill: parent
         textFields: [
             roasterField.textField, coffeeField.textField, roastDateField.textField,
-            grinderField.textField, settingField.textField, baristaField.textField,
+            grinderBrandField.textField, grinderModelField.textField, grinderBurrsField.textField,
+            settingField.textField, baristaField.textField,
             notesExpandable.textField
         ]
 
@@ -605,12 +616,69 @@ Page {
                 }
 
                 SuggestionField {
-                    id: grinderField
+                    id: grinderBrandField
                     Layout.fillWidth: true
-                    label: TranslationManager.translate("postshotreview.label.grinder", "Grinder")
+                    label: TranslationManager.translate("postshotreview.label.grinderbrand", "Grinder brand")
+                    text: editGrinderBrand
+                    suggestions: {
+                        var history = _distinctCacheVersion >= 0 ? MainController.shotHistory.getDistinctGrinderBrands() : []
+                        var known = Settings.knownGrinderBrands()
+                        var merged = history.slice()
+                        for (var i = 0; i < known.length; i++) {
+                            if (merged.indexOf(known[i]) < 0) merged.push(known[i])
+                        }
+                        return merged
+                    }
+                    onTextEdited: function(t) { editGrinderBrand = t }
+                    onSuggestionSelected: function(t) {
+                        editGrinderModel = ""
+                        editGrinderBurrs = ""
+                        var models = Settings.knownGrinderModels(t)
+                        if (models.length === 1) {
+                            editGrinderModel = models[0]
+                            var burrs = Settings.suggestedBurrs(t, models[0])
+                            if (burrs.length === 1) editGrinderBurrs = burrs[0]
+                        }
+                    }
+                }
+
+                SuggestionField {
+                    id: grinderModelField
+                    Layout.fillWidth: true
+                    label: TranslationManager.translate("postshotreview.label.grindermodel", "Model")
                     text: editGrinderModel
-                    suggestions: _distinctCacheVersion >= 0 ? MainController.shotHistory.getDistinctGrinders() : []
+                    suggestions: {
+                        var history = _distinctCacheVersion >= 0 ? MainController.shotHistory.getDistinctGrinderModelsForBrand(editGrinderBrand) : []
+                        var known = Settings.knownGrinderModels(editGrinderBrand)
+                        var merged = history.slice()
+                        for (var i = 0; i < known.length; i++) {
+                            if (merged.indexOf(known[i]) < 0) merged.push(known[i])
+                        }
+                        return merged
+                    }
                     onTextEdited: function(t) { editGrinderModel = t }
+                    onSuggestionSelected: function(t) {
+                        var burrs = Settings.suggestedBurrs(editGrinderBrand, t)
+                        if (burrs.length === 1) editGrinderBurrs = burrs[0]
+                    }
+                }
+
+                // === ROW 3: Burrs, Setting, Beverage type ===
+                SuggestionField {
+                    id: grinderBurrsField
+                    Layout.fillWidth: true
+                    label: TranslationManager.translate("postshotreview.label.grinderburrs", "Burrs")
+                    text: editGrinderBurrs
+                    suggestions: {
+                        var history = _distinctCacheVersion >= 0 ? MainController.shotHistory.getDistinctGrinderBurrsForModel(editGrinderBrand, editGrinderModel) : []
+                        var known = Settings.suggestedBurrs(editGrinderBrand, editGrinderModel)
+                        var merged = history.slice()
+                        for (var i = 0; i < known.length; i++) {
+                            if (merged.indexOf(known[i]) < 0) merged.push(known[i])
+                        }
+                        return merged
+                    }
+                    onTextEdited: function(t) { editGrinderBurrs = t }
                 }
 
                 SuggestionField {
@@ -622,7 +690,7 @@ Page {
                     onTextEdited: function(t) { editGrinderSetting = t }
                 }
 
-                // === ROW 3: Beverage type, Barista, Preset, Shot Date ===
+                // === ROW 4: Beverage type, Barista, Preset, Shot Date ===
                 LabeledComboBox {
                     Layout.fillWidth: true
                     label: TranslationManager.translate("postshotreview.label.beveragetype", "Beverage type")
@@ -634,7 +702,6 @@ Page {
                 SuggestionField {
                     id: baristaField
                     Layout.fillWidth: true
-                    Layout.columnSpan: 2
                     label: TranslationManager.translate("postshotreview.label.barista", "Barista")
                     text: editBarista
                     suggestions: _distinctCacheVersion >= 0 ? MainController.shotHistory.getDistinctBaristas() : []
@@ -843,7 +910,9 @@ Page {
                             "beanType": editBeanType,
                             "roastDate": editRoastDate,
                             "roastLevel": editRoastLevel,
+                            "grinderBrand": editGrinderBrand,
                             "grinderModel": editGrinderModel,
+                            "grinderBurrs": editGrinderBurrs,
                             "grinderSetting": editGrinderSetting,
                             "barista": editBarista,
                             "doseWeight": editDoseWeight,
@@ -864,7 +933,9 @@ Page {
                             "beanType": editBeanType,
                             "roastDate": editRoastDate,
                             "roastLevel": editRoastLevel,
+                            "grinderBrand": editGrinderBrand,
                             "grinderModel": editGrinderModel,
+                            "grinderBurrs": editGrinderBurrs,
                             "grinderSetting": editGrinderSetting,
                             "barista": editBarista,
                             "doseWeight": editDoseWeight,
