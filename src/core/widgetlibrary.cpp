@@ -32,7 +32,7 @@ QVariantList WidgetLibrary::entries() const
 
 int WidgetLibrary::count() const
 {
-    return m_index.size();
+    return static_cast<int>(m_index.size());
 }
 
 QString WidgetLibrary::selectedEntryId() const
@@ -489,7 +489,7 @@ bool WidgetLibrary::applyZone(const QString& entryId, const QString& targetZone)
 
     // Clear the target zone first - remove all existing items
     QVariantList existingItems = m_settings->getZoneItems(targetZone);
-    for (int i = existingItems.size() - 1; i >= 0; --i) {
+    for (qsizetype i = existingItems.size() - 1; i >= 0; --i) {
         QString itemId = existingItems[i].toMap()["id"].toString();
         m_settings->removeItem(itemId, targetZone);
     }

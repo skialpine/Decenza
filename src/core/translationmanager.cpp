@@ -156,7 +156,7 @@ int TranslationManager::untranslatedCount() const
 
 int TranslationManager::totalStringCount() const
 {
-    return m_stringRegistry.size();
+    return static_cast<int>(m_stringRegistry.size());
 }
 
 QStringList TranslationManager::availableLanguages() const
@@ -389,7 +389,7 @@ void TranslationManager::scanAllStrings()
         qmlFiles.append(it.next());
     }
 
-    m_scanTotal = qmlFiles.size();
+    m_scanTotal = static_cast<int>(qmlFiles.size());
     emit scanProgressChanged();
 
     qDebug() << "Scanning" << m_scanTotal << "QML files for translatable strings...";
@@ -406,7 +406,7 @@ void TranslationManager::scanAllStrings()
     QRegularExpression trFallbackRegex("\\bfallback\\s*:\\s*\"([^\"]+)\"");
 
     int stringsFound = 0;
-    int initialCount = m_stringRegistry.size();
+    qsizetype initialCount = m_stringRegistry.size();
 
     for (const QString& filePath : qmlFiles) {
         QFile file(filePath);
@@ -435,8 +435,8 @@ void TranslationManager::scanAllStrings()
 
             // Pattern 2: Property-based translations (translationKey + translationFallback pairs)
             // Collect all keys and fallbacks, then match them by proximity in the file
-            QMap<int, QString> keyPositions;  // position -> key
-            QMap<int, QString> fallbackPositions;  // position -> fallback
+            QMap<qsizetype, QString> keyPositions;  // position -> key
+            QMap<qsizetype, QString> fallbackPositions;  // position -> fallback
 
             QRegularExpressionMatchIterator keyIt = propKeyRegex.globalMatch(content);
             while (keyIt.hasNext()) {
@@ -447,17 +447,17 @@ void TranslationManager::scanAllStrings()
             QRegularExpressionMatchIterator fallbackIt = propFallbackRegex.globalMatch(content);
             while (fallbackIt.hasNext()) {
                 QRegularExpressionMatch match = fallbackIt.next();
-                fallbackPositions[static_cast<int>(match.capturedStart())] = match.captured(1);
+                fallbackPositions[match.capturedStart()] = match.captured(1);
             }
 
             // Match keys with their nearest following fallback
             for (auto it = keyPositions.constBegin(); it != keyPositions.constEnd(); ++it) {
-                int keyPos = it.key();
+                qsizetype keyPos = it.key();
                 QString key = it.value();
 
                 // Find the nearest fallback after this key (within 200 chars)
                 for (auto fbIt = fallbackPositions.constBegin(); fbIt != fallbackPositions.constEnd(); ++fbIt) {
-                    int fbPos = fbIt.key();
+                    qsizetype fbPos = fbIt.key();
                     if (fbPos > keyPos && fbPos - keyPos < 200) {
                         QString fallback = fbIt.value();
 
@@ -477,8 +477,8 @@ void TranslationManager::scanAllStrings()
             }
 
             // Pattern 3: Tr component's key/fallback properties
-            QMap<int, QString> trKeyPositions;
-            QMap<int, QString> trFallbackPositions;
+            QMap<qsizetype, QString> trKeyPositions;
+            QMap<qsizetype, QString> trFallbackPositions;
 
             QRegularExpressionMatchIterator trKeyIt = trKeyRegex.globalMatch(content);
             while (trKeyIt.hasNext()) {
@@ -494,16 +494,16 @@ void TranslationManager::scanAllStrings()
 
             // Match keys with their nearest fallback (within 200 chars, in either direction)
             for (auto it = trKeyPositions.constBegin(); it != trKeyPositions.constEnd(); ++it) {
-                int keyPos = it.key();
+                qsizetype keyPos = it.key();
                 QString key = it.value();
 
                 // Find the nearest fallback (can be before or after the key)
                 QString fallback;
-                int minDistance = 200;
+                qsizetype minDistance = 200;
 
                 for (auto fbIt = trFallbackPositions.constBegin(); fbIt != trFallbackPositions.constEnd(); ++fbIt) {
-                    int fbPos = fbIt.key();
-                    int distance = qAbs(fbPos - keyPos);
+                    qsizetype fbPos = fbIt.key();
+                    qsizetype distance = qAbs(fbPos - keyPos);
                     if (distance < minDistance) {
                         minDistance = distance;
                         fallback = fbIt.value();
@@ -543,7 +543,7 @@ void TranslationManager::scanAllStrings()
 
     m_scanning = false;
     emit scanningChanged();
-    emit scanFinished(m_stringRegistry.size() - initialCount);
+    emit scanFinished(static_cast<int>(m_stringRegistry.size() - initialCount));
 
     qDebug() << "Scan complete. Found" << stringsFound << "new strings. Total:" << m_stringRegistry.size();
 }
@@ -1279,7 +1279,7 @@ int TranslationManager::uniqueStringCount() const
     for (auto it = m_stringRegistry.constBegin(); it != m_stringRegistry.constEnd(); ++it) {
         uniqueFallbacks.insert(it.value());
     }
-    return uniqueFallbacks.size();
+    return static_cast<int>(uniqueFallbacks.size());
 }
 
 int TranslationManager::uniqueUntranslatedCount() const
@@ -1584,7 +1584,7 @@ void TranslationManager::autoTranslate()
     m_autoTranslating = true;
     m_autoTranslateCancelled = false;
     m_autoTranslateProgress = 0;
-    m_autoTranslateTotal = m_stringsToTranslate.size();
+    m_autoTranslateTotal = static_cast<int>(m_stringsToTranslate.size());
     m_pendingBatchCount = 0;
     emit autoTranslatingChanged();
     emit autoTranslateProgressChanged();
@@ -1843,8 +1843,8 @@ void TranslationManager::parseAutoTranslateResponse(const QByteArray& data)
     }
 
     // Extract JSON from response (AI might include markdown code blocks)
-    int jsonStart = content.indexOf('{');
-    int jsonEnd = content.lastIndexOf('}');
+    qsizetype jsonStart = content.indexOf('{');
+    qsizetype jsonEnd = content.lastIndexOf('}');
     if (jsonStart >= 0 && jsonEnd > jsonStart) {
         content = content.mid(jsonStart, jsonEnd - jsonStart + 1);
     }
@@ -1945,7 +1945,7 @@ void TranslationManager::clearAllAiTranslations()
 {
     if (m_currentLanguage == "en") return;
 
-    int aiCacheCount = m_aiTranslations.size();
+    qsizetype aiCacheCount = m_aiTranslations.size();
     int clearedFromMain = 0;
     int preservedUserEdits = 0;
 

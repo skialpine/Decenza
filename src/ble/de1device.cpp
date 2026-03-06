@@ -669,8 +669,8 @@ void DE1Device::uploadProfile(const Profile& profile) {
     // Track completion by counting writeComplete signals for profile-related UUIDs.
     // Only count HEADER_WRITE and FRAME_WRITE completions to avoid interference
     // from concurrent writes (e.g., MMR writes from other code paths).
-    int totalWrites = 1 + frames.size();  // header + frames
-    auto* counter = new int(0);
+    qsizetype totalWrites = 1 + frames.size();  // header + frames
+    auto* counter = new qsizetype(0);
     auto conn = std::make_shared<QMetaObject::Connection>();
     *conn = connect(m_transport, &DE1Transport::writeComplete, this,
         [this, totalWrites, counter, conn](const QBluetoothUuid& uuid, const QByteArray& /*data*/) {
@@ -718,8 +718,8 @@ void DE1Device::uploadProfileAndStartEspresso(const Profile& profile) {
 
     // Track completion: header + frames + espresso start command.
     // Count only profile-related UUIDs and the REQUESTED_STATE for espresso start.
-    int totalWrites = 1 + frames.size() + 1;
-    auto* counter = new int(0);
+    qsizetype totalWrites = 1 + frames.size() + 1;
+    auto* counter = new qsizetype(0);
     auto conn = std::make_shared<QMetaObject::Connection>();
     *conn = connect(m_transport, &DE1Transport::writeComplete, this,
         [this, totalWrites, counter, conn](const QBluetoothUuid& uuid, const QByteArray& /*data*/) {

@@ -85,7 +85,7 @@ bool ShotComparisonModel::addShot(qint64 shotId)
 
 void ShotComparisonModel::removeShot(qint64 shotId)
 {
-    int index = m_shotIds.indexOf(shotId);
+    qsizetype index = m_shotIds.indexOf(shotId);
     if (index >= 0) {
         m_shotIds.removeAt(index);
         // Adjust window start if needed

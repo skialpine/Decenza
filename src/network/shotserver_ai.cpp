@@ -168,7 +168,7 @@ QString ShotServer::generateAIConversationsPage() const
             int msgCount = 0;
             if (!messagesJson.isEmpty()) {
                 QJsonDocument doc = QJsonDocument::fromJson(messagesJson);
-                if (doc.isArray()) msgCount = doc.array().size();
+                if (doc.isArray()) msgCount = static_cast<int>(doc.array().size());
             }
 
             // Read timestamp

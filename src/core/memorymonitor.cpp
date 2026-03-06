@@ -211,8 +211,8 @@ int MemoryMonitor::countQObjects()
                 return qAbs(a.second) > qAbs(b.second);
             });
             QStringList parts;
-            int limit = qMin(deltas.size(), 5);
-            for (int i = 0; i < limit; ++i) {
+            qsizetype limit = qMin(deltas.size(), qsizetype(5));
+            for (qsizetype i = 0; i < limit; ++i) {
                 const auto& d = deltas[i];
                 parts << QStringLiteral("%1%2 %3")
                     .arg(d.second > 0 ? "+" : "").arg(d.second).arg(d.first);
@@ -221,7 +221,7 @@ int MemoryMonitor::countQObjects()
         }
     }
 
-    return all.size();
+    return static_cast<int>(all.size());
 }
 
 double MemoryMonitor::currentRssMB() const
@@ -264,8 +264,8 @@ QString MemoryMonitor::toSummaryString() const
         });
         const auto& deltaBase = m_baselineCaptured ? m_baselineClassCounts : m_prevClassCounts;
         s << "Top QObject classes (count / delta vs startup):\n";
-        int limit = qMin(sorted.size(), 20);
-        for (int i = 0; i < limit; ++i) {
+        qsizetype limit = qMin(sorted.size(), qsizetype(20));
+        for (qsizetype i = 0; i < limit; ++i) {
             int delta = sorted[i].second - deltaBase.value(sorted[i].first, 0);
             s << QString("  %1  (%2%3)  %4\n")
                      .arg(sorted[i].second, 5)
@@ -278,8 +278,8 @@ QString MemoryMonitor::toSummaryString() const
     // Last 20 samples
     if (!m_samples.isEmpty()) {
         s << "Recent samples (time / QObjects / RSS MB):\n";
-        int start = qMax(0, m_samples.size() - 20);
-        for (int i = start; i < m_samples.size(); ++i) {
+        qsizetype start = qMax(qsizetype(0), m_samples.size() - 20);
+        for (qsizetype i = start; i < m_samples.size(); ++i) {
             const auto& sample = m_samples[i];
             QDateTime dt = QDateTime::fromMSecsSinceEpoch(sample.timestampMs);
             s << QString("  [%1]  QObj=%2  RSS=%3 MB\n")
@@ -330,8 +330,8 @@ QJsonObject MemoryMonitor::toJson() const
     const auto& deltaBase = m_baselineCaptured ? m_baselineClassCounts : m_prevClassCounts;
 
     QJsonArray classesArr;
-    int classLimit = qMin(sorted.size(), 30);
-    for (int i = 0; i < classLimit; ++i) {
+    qsizetype classLimit = qMin(sorted.size(), qsizetype(30));
+    for (qsizetype i = 0; i < classLimit; ++i) {
         QJsonObject cls;
         cls["name"] = sorted[i].first;
         cls["count"] = sorted[i].second;

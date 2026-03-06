@@ -387,8 +387,8 @@ bool SettingsSerializer::importFromJson(Settings* settings, const QJsonObject& j
         if (steam.contains("pitcherPresets")) {
             // Clear existing presets first by removing them in reverse order
             QVariantList existingPresets = settings->steamPitcherPresets();
-            for (int i = existingPresets.size() - 1; i >= 0; --i) {
-                settings->removeSteamPitcherPreset(i);
+            for (qsizetype i = existingPresets.size() - 1; i >= 0; --i) {
+                settings->removeSteamPitcherPreset(static_cast<int>(i));
             }
             // Add imported presets
             QJsonArray presets = steam["pitcherPresets"].toArray();
@@ -423,8 +423,8 @@ bool SettingsSerializer::importFromJson(Settings* settings, const QJsonObject& j
         // Import vessel presets
         if (water.contains("vesselPresets")) {
             QVariantList existingPresets = settings->waterVesselPresets();
-            for (int i = existingPresets.size() - 1; i >= 0; --i) {
-                settings->removeWaterVesselPreset(i);
+            for (qsizetype i = existingPresets.size() - 1; i >= 0; --i) {
+                settings->removeWaterVesselPreset(static_cast<int>(i));
             }
             QJsonArray presets = water["vesselPresets"].toArray();
             for (const QJsonValue& v : presets) {
@@ -445,8 +445,8 @@ bool SettingsSerializer::importFromJson(Settings* settings, const QJsonObject& j
         // Import flush presets
         if (flush.contains("presets")) {
             QVariantList existingPresets = settings->flushPresets();
-            for (int i = existingPresets.size() - 1; i >= 0; --i) {
-                settings->removeFlushPreset(i);
+            for (qsizetype i = existingPresets.size() - 1; i >= 0; --i) {
+                settings->removeFlushPreset(static_cast<int>(i));
             }
             QJsonArray presets = flush["presets"].toArray();
             for (const QJsonValue& v : presets) {
@@ -463,8 +463,8 @@ bool SettingsSerializer::importFromJson(Settings* settings, const QJsonObject& j
 
         if (beans.contains("presets")) {
             QVariantList existingPresets = settings->beanPresets();
-            for (int i = existingPresets.size() - 1; i >= 0; --i) {
-                settings->removeBeanPreset(i);
+            for (qsizetype i = existingPresets.size() - 1; i >= 0; --i) {
+                settings->removeBeanPreset(static_cast<int>(i));
             }
             QJsonArray presets = beans["presets"].toArray();
             for (const QJsonValue& v : presets) {
@@ -493,8 +493,8 @@ bool SettingsSerializer::importFromJson(Settings* settings, const QJsonObject& j
         if (profile.contains("favorites")) {
             // Remove existing favorites in reverse
             QVariantList existingFavs = settings->favoriteProfiles();
-            for (int i = existingFavs.size() - 1; i >= 0; --i) {
-                settings->removeFavoriteProfile(i);
+            for (qsizetype i = existingFavs.size() - 1; i >= 0; --i) {
+                settings->removeFavoriteProfile(static_cast<int>(i));
             }
             QJsonArray favorites = profile["favorites"].toArray();
             for (const QJsonValue& v : favorites) {

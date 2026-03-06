@@ -384,7 +384,7 @@ void ShotServer::saveSessions()
         }
     }
 
-    settings.beginWriteArray("webAuth/sessions", m_sessions.size());
+    settings.beginWriteArray("webAuth/sessions", static_cast<int>(m_sessions.size()));
     int i = 0;
     for (auto sit = m_sessions.constBegin(); sit != m_sessions.constEnd(); ++sit, ++i) {
         settings.setArrayIndex(i);

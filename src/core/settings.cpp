@@ -465,7 +465,7 @@ void Settings::removeSteamPitcherPreset(int index) {
         // Adjust selected preset if needed
         int selected = selectedSteamPitcher();
         if (selected >= arr.size() && arr.size() > 0) {
-            setSelectedSteamCup(arr.size() - 1);
+            setSelectedSteamCup(static_cast<int>(arr.size()) - 1);
         }
 
         emit steamPitcherPresetsChanged();
@@ -574,7 +574,7 @@ void Settings::removeFavoriteProfile(int index) {
         // Adjust selected if needed
         int selected = selectedFavoriteProfile();
         if (selected >= arr.size() && arr.size() > 0) {
-            setSelectedFavoriteProfile(arr.size() - 1);
+            setSelectedFavoriteProfile(static_cast<int>(arr.size()) - 1);
         } else if (arr.size() == 0) {
             setSelectedFavoriteProfile(0);
         }
@@ -698,7 +698,7 @@ void Settings::removeSelectedBuiltInProfile(const QString& filename) {
             QJsonDocument doc = QJsonDocument::fromJson(data);
             QJsonArray arr = doc.array();
 
-            for (int i = arr.size() - 1; i >= 0; --i) {
+            for (qsizetype i = arr.size() - 1; i >= 0; --i) {
                 if (arr[i].toObject()["filename"].toString() == filename) {
                     arr.removeAt(i);
                     break;
@@ -710,7 +710,7 @@ void Settings::removeSelectedBuiltInProfile(const QString& filename) {
             // Adjust selected favorite if needed
             int selected = selectedFavoriteProfile();
             if (selected >= arr.size() && arr.size() > 0) {
-                setSelectedFavoriteProfile(arr.size() - 1);
+                setSelectedFavoriteProfile(static_cast<int>(arr.size()) - 1);
             }
 
             emit favoriteProfilesChanged();
@@ -747,7 +747,7 @@ void Settings::addHiddenProfile(const QString& filename) {
             QJsonDocument doc = QJsonDocument::fromJson(data);
             QJsonArray arr = doc.array();
 
-            for (int i = arr.size() - 1; i >= 0; --i) {
+            for (qsizetype i = arr.size() - 1; i >= 0; --i) {
                 if (arr[i].toObject()["filename"].toString() == filename) {
                     arr.removeAt(i);
                     break;
@@ -760,7 +760,7 @@ void Settings::addHiddenProfile(const QString& filename) {
             if (arr.isEmpty()) {
                 setSelectedFavoriteProfile(-1);
             } else if (selected >= arr.size()) {
-                setSelectedFavoriteProfile(arr.size() - 1);
+                setSelectedFavoriteProfile(static_cast<int>(arr.size()) - 1);
             }
 
             emit favoriteProfilesChanged();
@@ -939,7 +939,7 @@ void Settings::removeWaterVesselPreset(int index) {
         // Adjust selected preset if needed
         int selected = selectedWaterVessel();
         if (selected >= arr.size() && arr.size() > 0) {
-            setSelectedWaterCup(arr.size() - 1);
+            setSelectedWaterCup(static_cast<int>(arr.size()) - 1);
         }
 
         emit waterVesselPresetsChanged();
@@ -1762,7 +1762,7 @@ void Settings::deleteUserTheme(const QString& name) {
         m_settings.value("theme/userThemes", "[]").toByteArray()
     ).array();
 
-    for (int i = userThemes.size() - 1; i >= 0; --i) {
+    for (qsizetype i = userThemes.size() - 1; i >= 0; --i) {
         if (userThemes[i].toObject()["name"].toString() == name) {
             userThemes.removeAt(i);
         }
@@ -3066,7 +3066,7 @@ double Settings::sawLearnedLag() const {
     double sumLag = 0;
     int count = 0;
 
-    for (int i = arr.size() - 1; i >= 0 && count < 5; --i) {
+    for (qsizetype i = arr.size() - 1; i >= 0 && count < 5; --i) {
         QJsonObject obj = arr[i].toObject();
         if (obj["scale"].toString() == currentScale) {
             if (obj.contains("drip") && obj.contains("flow")) {
@@ -3117,7 +3117,7 @@ bool Settings::isSawConverged(const QString& scaleType) const {
 
     // Collect |overshoot| from last 5 entries for this scale that have overshoot data
     QVector<double> overshoots;
-    for (int i = arr.size() - 1; i >= 0 && overshoots.size() < 5; --i) {
+    for (qsizetype i = arr.size() - 1; i >= 0 && overshoots.size() < 5; --i) {
         QJsonObject obj = arr[i].toObject();
         if (obj["scale"].toString() == scaleType && obj.contains("overshoot")) {
             overshoots.append(qAbs(obj["overshoot"].toDouble()));
@@ -3140,7 +3140,7 @@ bool Settings::isSawConverged(const QString& scaleType) const {
     // adaptation mode without requiring manual reset.
     if (converged && overshoots.size() >= 3) {
         QVector<double> signedOvershoots;
-        for (int i = arr.size() - 1; i >= 0 && signedOvershoots.size() < 3; --i) {
+        for (qsizetype i = arr.size() - 1; i >= 0 && signedOvershoots.size() < 3; --i) {
             QJsonObject obj = arr[i].toObject();
             if (obj["scale"].toString() == scaleType && obj.contains("overshoot")) {
                 signedOvershoots.append(obj["overshoot"].toDouble());
@@ -3189,7 +3189,7 @@ double Settings::getExpectedDrip(double currentFlowRate) const {
     struct Entry { double drip; double flow; };
     QVector<Entry> entries;
 
-    for (int i = arr.size() - 1; i >= 0 && entries.size() < maxEntries; --i) {
+    for (qsizetype i = arr.size() - 1; i >= 0 && entries.size() < maxEntries; --i) {
         QJsonObject obj = arr[i].toObject();
         if (obj["scale"].toString() == currentScale) {
             // Support both old format (lag) and new format (drip, flow)
@@ -3246,7 +3246,7 @@ double Settings::getExpectedDrip(double currentFlowRate) const {
 QList<QPair<double, double>> Settings::sawLearningEntries(const QString& scaleType, int maxEntries) const {
     ensureSawCacheLoaded();
     QList<QPair<double, double>> result;
-    for (int i = m_sawHistoryCache.size() - 1; i >= 0 && result.size() < maxEntries; --i) {
+    for (qsizetype i = m_sawHistoryCache.size() - 1; i >= 0 && result.size() < maxEntries; --i) {
         QJsonObject obj = m_sawHistoryCache[i].toObject();
         if (obj["scale"].toString() == scaleType) {
             if (obj.contains("drip")) {
@@ -3335,7 +3335,7 @@ void Settings::addSawLearningPoint(double drip, double flowRate, const QString& 
     // an early return here, or the reset will wipe history without saving anything.
     if (isAutoResetCandidate) {
         bool prevAlsoEarly = false;
-        for (int i = arr.size() - 1; i >= 0; --i) {
+        for (qsizetype i = arr.size() - 1; i >= 0; --i) {
             QJsonObject obj = arr[i].toObject();
             if (obj["scale"].toString() == scaleType) {
                 prevAlsoEarly = (obj["overshoot"].toDouble() < -6.0);
@@ -3521,7 +3521,7 @@ QString Settings::generateItemId(const QString& type) const {
             if (item["type"].toString() == type) {
                 QString id = item["id"].toString();
                 // Extract trailing number from id
-                int i = id.length() - 1;
+                qsizetype i = id.length() - 1;
                 while (i >= 0 && id[i].isDigit()) --i;
                 int num = id.mid(i + 1).toInt();
                 if (num > maxNum) maxNum = num;

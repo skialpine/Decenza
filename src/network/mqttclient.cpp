@@ -72,7 +72,7 @@ MqttClient::~MqttClient()
 
             MQTTAsync_message msg = MQTTAsync_message_initializer;
             msg.payload = payload.data();
-            msg.payloadlen = payload.length();
+            msg.payloadlen = static_cast<int>(payload.length());
             msg.qos = 0;
             msg.retained = 1;
 
@@ -537,7 +537,7 @@ void MqttClient::publish(const QString& topic, const QString& payload, bool reta
 
     MQTTAsync_message msg = MQTTAsync_message_initializer;
     msg.payload = payloadBytes.data();
-    msg.payloadlen = payloadBytes.length();
+    msg.payloadlen = static_cast<int>(payloadBytes.length());
     msg.qos = 0;
     msg.retained = shouldRetain ? 1 : 0;
 

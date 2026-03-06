@@ -75,10 +75,10 @@ void AutoWakeManager::scheduleNextWake() {
     }
 
     if (minMsToWake > 0) {
-        int totalSeconds = minMsToWake / 1000;
-        int hours = totalSeconds / 3600;
-        int minutes = (totalSeconds % 3600) / 60;
-        int seconds = totalSeconds % 60;
+        qint64 totalSeconds = minMsToWake / 1000;
+        qint64 hours = totalSeconds / 3600;
+        qint64 minutes = (totalSeconds % 3600) / 60;
+        qint64 seconds = totalSeconds % 60;
 
         QString timeStr;
         if (hours > 0) {
@@ -91,7 +91,7 @@ void AutoWakeManager::scheduleNextWake() {
 
         qDebug() << "AutoWakeManager: Next wake:" << dayNames[wakeDay]
                  << wakeTime.toString("HH:mm") << "in" << timeStr;
-        m_checkTimer->start(minMsToWake);
+        m_checkTimer->start(static_cast<int>(minMsToWake));
     } else {
         qDebug() << "AutoWakeManager: No wake times enabled";
     }

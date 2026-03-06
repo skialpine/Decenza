@@ -140,7 +140,7 @@ void ShotServer::handleBackupManifest(QTcpSocket* socket)
 
     // AI conversations info
     if (m_aiManager) {
-        int convCount = m_aiManager->conversationIndex().size();
+        qsizetype convCount = m_aiManager->conversationIndex().size();
         manifest["aiConversationCount"] = convCount;
         // Estimate size: read messages JSON for each conversation
         qint64 aiSize = 0;

@@ -143,7 +143,7 @@ private:
         it.value().notifier->setEnabled(false);
 
         unsigned char peek = 0;
-        int n = ::recv(toNativeFd(fd), reinterpret_cast<char*>(&peek), 1, MSG_PEEK);
+        auto n = ::recv(toNativeFd(fd), reinterpret_cast<char*>(&peek), 1, MSG_PEEK);
 
         if (n <= 0) {
             if (n < 0) {
@@ -174,7 +174,7 @@ private:
     void sendHttpRedirect(qintptr fd) {
         // Read whatever HTTP data is available (up to 4 KB is plenty for a request line + headers)
         char buf[4096];
-        int n = ::recv(toNativeFd(fd), buf, sizeof(buf) - 1, 0);
+        auto n = ::recv(toNativeFd(fd), buf, sizeof(buf) - 1, 0);
         if (n <= 0) {
             closeFd(fd);
             return;
@@ -184,9 +184,9 @@ private:
         // Parse path from "GET /path HTTP/1.x"
         QString path = "/";
         QByteArray request(buf, n);
-        int firstSpace = request.indexOf(' ');
+        qsizetype firstSpace = request.indexOf(' ');
         if (firstSpace > 0) {
-            int secondSpace = request.indexOf(' ', firstSpace + 1);
+            qsizetype secondSpace = request.indexOf(' ', firstSpace + 1);
             if (secondSpace > firstSpace + 1) {
                 path = QString::fromLatin1(request.mid(firstSpace + 1, secondSpace - firstSpace - 1));
             }
@@ -194,23 +194,23 @@ private:
 
         // Parse Host header
         QString host = "localhost";
-        int hostIdx = request.indexOf("Host:");
+        qsizetype hostIdx = request.indexOf("Host:");
         if (hostIdx < 0) hostIdx = request.indexOf("host:");
         if (hostIdx >= 0) {
-            int start = hostIdx + 5;
+            qsizetype start = hostIdx + 5;
             while (start < request.size() && request.at(start) == ' ') ++start;
-            int end = request.indexOf('\r', start);
+            qsizetype end = request.indexOf('\r', start);
             if (end < 0) end = request.indexOf('\n', start);
             if (end > start) {
                 host = QString::fromLatin1(request.mid(start, end - start));
                 // Strip port from host if present (we'll add our own)
                 if (host.startsWith('[')) {
                     // IPv6 literal: [::1]:port – strip after closing bracket
-                    int closeBracket = host.indexOf(']');
+                    qsizetype closeBracket = host.indexOf(']');
                     if (closeBracket > 0)
                         host = host.left(closeBracket + 1);
                 } else {
-                    int colonIdx = host.lastIndexOf(':');
+                    qsizetype colonIdx = host.lastIndexOf(':');
                     if (colonIdx > 0) host = host.left(colonIdx);
                 }
             }
@@ -941,7 +941,7 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
         if (isAuthRoute) {
             // Extract body for POST requests
             QByteArray body;
-            int bodyStart = request.indexOf("\r\n\r\n");
+            qsizetype bodyStart = request.indexOf("\r\n\r\n");
             if (bodyStart != -1) {
                 body = request.mid(bodyStart + 4);
             }
@@ -1126,7 +1126,7 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             sendResponse(socket, 400, "application/json", R"({"error":"Invalid shot ID"})");
             return;
         }
-        int bodyStart = request.indexOf("\r\n\r\n");
+        qsizetype bodyStart = request.indexOf("\r\n\r\n");
         if (bodyStart == -1) {
             sendResponse(socket, 400, "application/json", R"({"error":"Invalid request"})");
             return;
@@ -1199,7 +1199,7 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
         thread->start();
     }
     else if (path == "/api/shots/delete" && method == "POST") {
-        int bodyStart = request.indexOf("\r\n\r\n");
+        qsizetype bodyStart = request.indexOf("\r\n\r\n");
         if (bodyStart == -1) {
             sendResponse(socket, 400, "application/json", R"({"error":"Invalid request"})");
             return;
@@ -1319,7 +1319,7 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
         sendHtml(socket, generateSettingsPage());
     }
     else if (path == "/api/settings/visualizer/test" && method == "POST") {
-        int bodyStart = request.indexOf("\r\n\r\n");
+        qsizetype bodyStart = request.indexOf("\r\n\r\n");
         if (bodyStart != -1) {
             handleVisualizerTest(socket, request.mid(bodyStart + 4));
         } else {
@@ -1327,7 +1327,7 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
         }
     }
     else if (path == "/api/settings/ai/test" && method == "POST") {
-        int bodyStart = request.indexOf("\r\n\r\n");
+        qsizetype bodyStart = request.indexOf("\r\n\r\n");
         if (bodyStart != -1) {
             handleAiTest(socket, request.mid(bodyStart + 4));
         } else {
@@ -1335,7 +1335,7 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
         }
     }
     else if (path == "/api/settings/mqtt/connect" && method == "POST") {
-        int bodyStart = request.indexOf("\r\n\r\n");
+        qsizetype bodyStart = request.indexOf("\r\n\r\n");
         QByteArray body = (bodyStart != -1) ? request.mid(bodyStart + 4) : QByteArray();
         handleMqttConnect(socket, body);
     }
@@ -1351,7 +1351,7 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
     else if (path == "/api/settings") {
         if (method == "POST") {
             // Extract body from request
-            int bodyStart = request.indexOf("\r\n\r\n");
+            qsizetype bodyStart = request.indexOf("\r\n\r\n");
             if (bodyStart != -1) {
                 QByteArray body = request.mid(bodyStart + 4);
                 handleSaveSettings(socket, body);
@@ -1374,7 +1374,7 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             result["searches"] = arr;
             sendJson(socket, QJsonDocument(result).toJson(QJsonDocument::Compact));
         } else if (method == "POST") {
-            int bodyStart = request.indexOf("\r\n\r\n");
+            qsizetype bodyStart = request.indexOf("\r\n\r\n");
             QJsonObject result;
             bool hasError = false;
             if (bodyStart != -1 && m_settings) {
@@ -1398,7 +1398,7 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             else
                 sendJson(socket, json);
         } else if (method == "DELETE") {
-            int bodyStart = request.indexOf("\r\n\r\n");
+            qsizetype bodyStart = request.indexOf("\r\n\r\n");
             QJsonObject result;
             bool hasError = false;
             if (bodyStart != -1 && m_settings) {
@@ -1694,7 +1694,7 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
         // /api/backup/profile/{category}/{filename} - download individual profile
         // Category can be compound (e.g., "external/user"), so split on LAST slash
         QString remainder = path.mid(20);  // After "/api/backup/profile/"
-        int slashIdx = remainder.lastIndexOf('/');
+        qsizetype slashIdx = remainder.lastIndexOf('/');
         if (slashIdx > 0) {
             QString category = remainder.left(slashIdx);
             QString filename = QUrl::fromPercentEncoding(remainder.mid(slashIdx + 1).toUtf8());
@@ -1833,7 +1833,7 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
     else if (path.startsWith("/api/ai-conversation/")) {
         // /api/ai-conversation/<key>/download?format=json|text
         QString remainder = path.mid(QString("/api/ai-conversation/").length());
-        int slashIdx = remainder.indexOf('/');
+        qsizetype slashIdx = remainder.indexOf('/');
         QString key = (slashIdx >= 0) ? remainder.left(slashIdx) : remainder;
         // Parse format from query string
         QString format = "json";

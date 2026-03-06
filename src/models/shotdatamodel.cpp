@@ -357,7 +357,7 @@ void ShotDataModel::markStopAt(double time) {
 
     // Find the weight at or just before the stop time
     m_weightAtStop = 0.0;
-    for (int i = m_weightPoints.size() - 1; i >= 0; --i) {
+    for (qsizetype i = m_weightPoints.size() - 1; i >= 0; --i) {
         if (m_weightPoints[i].x() <= time) {
             m_weightAtStop = m_weightPoints[i].y();
             break;
@@ -377,7 +377,7 @@ void ShotDataModel::markStopAt(double time) {
 }
 
 void ShotDataModel::smoothWeightFlowRate(int window) {
-    int n = m_weightFlowRatePoints.size();
+    qsizetype n = m_weightFlowRatePoints.size();
     if (n < 3) return;
 
     // Centered moving average: each point averages with `window` neighbors on each side.
@@ -385,11 +385,11 @@ void ShotDataModel::smoothWeightFlowRate(int window) {
     // and the real-time EMA smoothing. X values (timestamps) are preserved.
     QVector<QPointF> smoothed;
     smoothed.reserve(n);
-    for (int i = 0; i < n; i++) {
-        int lo = qMax(0, i - window);
-        int hi = qMin(n - 1, i + window);
+    for (qsizetype i = 0; i < n; i++) {
+        qsizetype lo = qMax(qsizetype(0), i - window);
+        qsizetype hi = qMin(n - 1, i + window);
         double sum = 0;
-        for (int j = lo; j <= hi; j++) {
+        for (qsizetype j = lo; j <= hi; j++) {
             sum += m_weightFlowRatePoints[j].y();
         }
         smoothed.append(QPointF(m_weightFlowRatePoints[i].x(), sum / (hi - lo + 1)));
@@ -417,32 +417,32 @@ void ShotDataModel::onFlushTimerTick() {
 
     // Incrementally append new points to fast renderers (pre-allocated VBO, no rebuild)
     if (m_fastPressure) {
-        for (int i = m_lastFlushedPressure; i < m_pressurePoints.size(); ++i)
+        for (qsizetype i = m_lastFlushedPressure; i < m_pressurePoints.size(); ++i)
             m_fastPressure->appendPoint(m_pressurePoints[i].x(), m_pressurePoints[i].y());
         m_lastFlushedPressure = m_pressurePoints.size();
     }
     if (m_fastFlow) {
-        for (int i = m_lastFlushedFlow; i < m_flowPoints.size(); ++i)
+        for (qsizetype i = m_lastFlushedFlow; i < m_flowPoints.size(); ++i)
             m_fastFlow->appendPoint(m_flowPoints[i].x(), m_flowPoints[i].y());
         m_lastFlushedFlow = m_flowPoints.size();
     }
     if (m_fastTemperature) {
-        for (int i = m_lastFlushedTemp; i < m_temperaturePoints.size(); ++i)
+        for (qsizetype i = m_lastFlushedTemp; i < m_temperaturePoints.size(); ++i)
             m_fastTemperature->appendPoint(m_temperaturePoints[i].x(), m_temperaturePoints[i].y());
         m_lastFlushedTemp = m_temperaturePoints.size();
     }
     if (m_fastWeight) {
-        for (int i = m_lastFlushedWeight; i < m_weightPoints.size(); ++i)
+        for (qsizetype i = m_lastFlushedWeight; i < m_weightPoints.size(); ++i)
             m_fastWeight->appendPoint(m_weightPoints[i].x(), m_weightPoints[i].y());
         m_lastFlushedWeight = m_weightPoints.size();
     }
     if (m_fastWeightFlow) {
-        for (int i = m_lastFlushedWeightFlow; i < m_weightFlowRatePoints.size(); ++i)
+        for (qsizetype i = m_lastFlushedWeightFlow; i < m_weightFlowRatePoints.size(); ++i)
             m_fastWeightFlow->appendPoint(m_weightFlowRatePoints[i].x(), m_weightFlowRatePoints[i].y());
         m_lastFlushedWeightFlow = m_weightFlowRatePoints.size();
     }
     if (m_fastResistance) {
-        for (int i = m_lastFlushedResistance; i < m_resistancePoints.size(); ++i)
+        for (qsizetype i = m_lastFlushedResistance; i < m_resistancePoints.size(); ++i)
             m_fastResistance->appendPoint(m_resistancePoints[i].x(), m_resistancePoints[i].y());
         m_lastFlushedResistance = m_resistancePoints.size();
     }

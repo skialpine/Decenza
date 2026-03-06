@@ -232,7 +232,7 @@ void BleTransport::disconnect() {
 }
 
 void BleTransport::clearQueue() {
-    int cleared = m_commandQueue.size();
+    qsizetype cleared = m_commandQueue.size();
     m_commandQueue.clear();
     m_writePending = false;
     m_writeTimeoutTimer.stop();

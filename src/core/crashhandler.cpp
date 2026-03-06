@@ -359,7 +359,7 @@ QString CrashHandler::getDebugLogTail(int lines)
     file.close();
 
     // Get last N lines
-    int startIndex = qMax(0, allLines.size() - lines);
+    qsizetype startIndex = qMax(qsizetype(0), allLines.size() - lines);
     QStringList tailLines = allLines.mid(startIndex);
 
     return tailLines.join("\n");

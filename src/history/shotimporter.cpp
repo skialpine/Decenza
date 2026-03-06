@@ -458,7 +458,7 @@ void ShotImporter::startImport(const QStringList& files, bool overwriteExisting)
 {
     m_pendingFiles = files;
     m_overwriteExisting = overwriteExisting;
-    m_totalFiles = files.size();
+    m_totalFiles = static_cast<int>(files.size());
     m_processedFiles = 0;
     m_importedFiles = 0;
     m_skippedFiles = 0;

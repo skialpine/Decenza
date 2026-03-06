@@ -217,7 +217,7 @@ void LibrarySharing::browseCommunity(const QString& type,
     if (unfiltered && page == 1 && !m_cachedEntries.isEmpty()) {
         m_communityEntries = m_cachedEntries;
         emit communityEntriesChanged();
-        setTotalCommunityResults(m_cachedEntries.size());
+        setTotalCommunityResults(static_cast<int>(m_cachedEntries.size()));
     }
 
     m_browseIsUnfiltered = unfiltered && page == 1;
@@ -348,7 +348,7 @@ void LibrarySharing::onBrowseFinished()
     }
 
     emit communityEntriesChanged();
-    int total = obj["total"].toInt(m_communityEntries.size());
+    int total = obj["total"].toInt(static_cast<int>(m_communityEntries.size()));
     setTotalCommunityResults(total);
 
     qDebug() << "LibrarySharing: Browse total:" << total << "displayed:" << m_communityEntries.size();

@@ -279,17 +279,17 @@ QString ShotFileParser::extractValue(const QString& content, const QString& key)
 QString ShotFileParser::extractBracedBlock(const QString& content, const QString& key)
 {
     // Find the key followed by a brace block
-    int keyPos = content.indexOf(QRegularExpression(QString("^%1\\s+\\{").arg(QRegularExpression::escape(key)),
+    qsizetype keyPos = content.indexOf(QRegularExpression(QString("^%1\\s+\\{").arg(QRegularExpression::escape(key)),
                                                      QRegularExpression::MultilineOption));
     if (keyPos < 0) return QString();
 
     // Find the opening brace
-    int braceStart = content.indexOf('{', keyPos);
+    qsizetype braceStart = content.indexOf('{', keyPos);
     if (braceStart < 0) return QString();
 
     // Find matching closing brace
     int braceCount = 1;
-    int pos = braceStart + 1;
+    qsizetype pos = braceStart + 1;
     while (pos < content.length() && braceCount > 0) {
         if (content[pos] == '{') braceCount++;
         else if (content[pos] == '}') braceCount--;
@@ -302,10 +302,10 @@ QString ShotFileParser::extractBracedBlock(const QString& content, const QString
 QVector<QPointF> ShotFileParser::toPointVector(const QVector<double>& times, const QVector<double>& values)
 {
     QVector<QPointF> result;
-    int count = qMin(times.size(), values.size());
+    qsizetype count = qMin(times.size(), values.size());
     result.reserve(count);
 
-    for (int i = 0; i < count; ++i) {
+    for (qsizetype i = 0; i < count; ++i) {
         // Filter out invalid goal values (-1 means "no goal for this mode")
         if (values[i] >= 0) {
             result.append(QPointF(times[i], values[i]));
@@ -321,12 +321,12 @@ QString ShotFileParser::extractProfileJson(const QString& content)
     qsizetype profileStart = content.indexOf(QRegularExpression("^profile\\s+\\{", QRegularExpression::MultilineOption));
     if (profileStart < 0) return QString();
 
-    int jsonStart = content.indexOf('{', profileStart);
+    qsizetype jsonStart = content.indexOf('{', profileStart);
     if (jsonStart < 0) return QString();
 
     // Find matching closing brace
     int braceCount = 1;
-    int pos = jsonStart + 1;
+    qsizetype pos = jsonStart + 1;
     while (pos < content.length() && braceCount > 0) {
         if (content[pos] == '{') braceCount++;
         else if (content[pos] == '}') braceCount--;

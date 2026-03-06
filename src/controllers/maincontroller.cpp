@@ -1984,7 +1984,7 @@ QVariantMap MainController::getFrameAt(int index) const {
 }
 
 int MainController::frameCount() const {
-    return m_currentProfile.steps().size();
+    return static_cast<int>(m_currentProfile.steps().size());
 }
 
 void MainController::createNewProfile(const QString& title) {

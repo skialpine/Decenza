@@ -592,8 +592,8 @@ void WeatherManager::fetchSunTimes(double lat, double lon)
         QJsonArray sunsets = daily["sunset"].toArray();
 
         m_sunTimes.clear();
-        int count = qMin(sunrises.size(), sunsets.size());
-        for (int i = 0; i < count; ++i) {
+        qsizetype count = qMin(sunrises.size(), sunsets.size());
+        for (qsizetype i = 0; i < count; ++i) {
             QDateTime rise = QDateTime::fromString(sunrises[i].toString(), Qt::ISODate);
             QDateTime set = QDateTime::fromString(sunsets[i].toString(), Qt::ISODate);
             m_sunTimes.append({rise, set});

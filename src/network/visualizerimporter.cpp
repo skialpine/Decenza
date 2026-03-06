@@ -629,7 +629,7 @@ Profile VisualizerImporter::parseVisualizerProfile(const QJsonObject& json) {
 }
 
 void VisualizerImporter::fetchProfileDetailsForShots() {
-    m_pendingProfileFetches = m_pendingShots.size();
+    m_pendingProfileFetches = static_cast<int>(m_pendingShots.size());
 
     for (int i = 0; i < m_pendingShots.size(); i++) {
         QVariantMap shot = m_pendingShots[i].toMap();

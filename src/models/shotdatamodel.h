@@ -119,12 +119,12 @@ private:
     QPointer<FastLineRenderer> m_fastResistance;
 
     // Last-flushed index per fast series (for incremental appends)
-    int m_lastFlushedPressure = 0;
-    int m_lastFlushedFlow = 0;
-    int m_lastFlushedTemp = 0;
-    int m_lastFlushedWeight = 0;
-    int m_lastFlushedWeightFlow = 0;
-    int m_lastFlushedResistance = 0;
+    qsizetype m_lastFlushedPressure = 0;
+    qsizetype m_lastFlushedFlow = 0;
+    qsizetype m_lastFlushedTemp = 0;
+    qsizetype m_lastFlushedWeight = 0;
+    qsizetype m_lastFlushedWeightFlow = 0;
+    qsizetype m_lastFlushedResistance = 0;
 
     // Chart series for goals/markers (QPointer auto-nulls when QML destroys them)
     QList<QPointer<QLineSeries>> m_pressureGoalSeriesList;  // One per segment

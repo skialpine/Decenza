@@ -432,17 +432,17 @@ bool ShotHistoryStorage::runMigrations()
                 QJsonObject wfrObj = root["weightFlowRate"].toObject();
                 QJsonArray timeArr = wfrObj["t"].toArray();
                 QJsonArray valueArr = wfrObj["v"].toArray();
-                int n = qMin(timeArr.size(), valueArr.size());
+                qsizetype n = qMin(timeArr.size(), valueArr.size());
                 if (n < 3) continue;
 
                 // Centered moving average with window=5 (11-point, ~2.2s at 5Hz)
                 constexpr int window = 5;
                 QJsonArray smoothedArr;
-                for (int i = 0; i < n; i++) {
-                    int lo = qMax(0, i - window);
-                    int hi = qMin(n - 1, i + window);
+                for (qsizetype i = 0; i < n; i++) {
+                    qsizetype lo = qMax(qsizetype(0), i - window);
+                    qsizetype hi = qMin(n - 1, i + window);
                     double sum = 0;
-                    for (int j = lo; j <= hi; j++) {
+                    for (qsizetype j = lo; j <= hi; j++) {
                         sum += valueArr[j].toDouble();
                     }
                     smoothedArr.append(sum / (hi - lo + 1));
@@ -695,9 +695,9 @@ void ShotHistoryStorage::decompressSampleData(const QByteArray& blob, ShotRecord
         QVector<QPointF> points;
         QJsonArray timeArr = obj["t"].toArray();
         QJsonArray valueArr = obj["v"].toArray();
-        int count = qMin(timeArr.size(), valueArr.size());
+        qsizetype count = qMin(timeArr.size(), valueArr.size());
         points.reserve(count);
-        for (int i = 0; i < count; ++i) {
+        for (qsizetype i = 0; i < count; ++i) {
             points.append(QPointF(timeArr[i].toDouble(), valueArr[i].toDouble()));
         }
         return points;
@@ -766,7 +766,7 @@ qint64 ShotHistoryStorage::saveShot(ShotDataModel* shotData,
 
     // Compress sample data on main thread (reads QObject data vectors)
     data.compressedSamples = compressSampleData(shotData);
-    data.sampleCount = shotData->pressureData().size();
+    data.sampleCount = static_cast<int>(shotData->pressureData().size());
 
     // Extract phase markers on main thread
     QVariantList markers = shotData->phaseMarkersVariant();
@@ -791,7 +791,7 @@ qint64 ShotHistoryStorage::saveShot(ShotDataModel* shotData,
         QString profileName = data.profileName;
         double duration = data.duration;
         int sampleCount = data.sampleCount;
-        int compressedSize = data.compressedSamples.size();
+        qsizetype compressedSize = data.compressedSamples.size();
 
         QMetaObject::invokeMethod(this, [this, shotId, destroyed,
                                          profileName, duration, sampleCount, compressedSize]() {
@@ -3712,7 +3712,7 @@ qint64 ShotHistoryStorage::importShotRecord(const ShotRecord& record, bool overw
 
     QByteArray json = QJsonDocument(root).toJson(QJsonDocument::Compact);
     QByteArray compressedData = qCompress(json, 9);
-    int sampleCount = record.pressure.size();
+    qsizetype sampleCount = record.pressure.size();
 
     query.prepare("INSERT INTO shot_samples (shot_id, sample_count, data_blob) VALUES (:id, :count, :blob)");
     query.bindValue(":id", shotId);

@@ -75,7 +75,7 @@ void FastLineRenderer::clear() {
 }
 
 void FastLineRenderer::setPoints(const QVector<QPointF>& points) {
-    m_pointCount = qMin(points.size(), MAX_POINTS);
+    m_pointCount = static_cast<int>(qMin(points.size(), qsizetype(MAX_POINTS)));
     m_points = points;
     if (m_points.size() > MAX_POINTS)
         m_points.resize(MAX_POINTS);

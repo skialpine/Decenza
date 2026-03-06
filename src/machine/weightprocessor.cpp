@@ -273,12 +273,12 @@ double WeightProcessor::computeLSLR(int windowMs) const
     qint64 cutoff = now - windowMs;
 
     // Find start of window
-    int startIdx = m_weightSamples.size() - 1;
+    qsizetype startIdx = m_weightSamples.size() - 1;
     while (startIdx > 0 && m_weightSamples[startIdx - 1].timestamp >= cutoff) {
         --startIdx;
     }
 
-    int n = m_weightSamples.size() - startIdx;
+    qsizetype n = m_weightSamples.size() - startIdx;
     if (n < 2) return 0.0;
 
     double dt = (m_weightSamples.last().timestamp - m_weightSamples[startIdx].timestamp) / 1000.0;
@@ -289,7 +289,7 @@ double WeightProcessor::computeLSLR(int windowMs) const
     // out noise from scale quantization and BLE timing jitter.
     qint64 t0 = m_weightSamples[startIdx].timestamp;
     double sumT = 0, sumW = 0, sumTW = 0, sumTT = 0;
-    for (int i = startIdx; i < m_weightSamples.size(); ++i) {
+    for (qsizetype i = startIdx; i < m_weightSamples.size(); ++i) {
         double t = (m_weightSamples[i].timestamp - t0) / 1000.0;
         sumT += t;
         sumW += m_weightSamples[i].weight;
@@ -317,16 +317,16 @@ double WeightProcessor::getExpectedDrip(double currentFlowRate) const
     double recencyMax = 10.0;
     double recencyMin = m_sawConverged ? 3.0 : 1.0;
 
-    int count = qMin(m_learningDrips.size(), maxEntries);
+    qsizetype count = qMin(m_learningDrips.size(), static_cast<qsizetype>(maxEntries));
     double weightedDripSum = 0;
     double totalWeight = 0;
 
-    for (int i = 0; i < count; ++i) {
+    for (qsizetype i = 0; i < count; ++i) {
         double drip = m_learningDrips[i];
         double flow = m_learningFlows[i];
 
         // Recency weight: linear interpolation from max to min
-        double recencyWeight = recencyMax - i * (recencyMax - recencyMin) / qMax(1, count - 1);
+        double recencyWeight = recencyMax - i * (recencyMax - recencyMin) / qMax(qsizetype(1), count - 1);
 
         // Flow similarity: gaussian with sigma=1.5 ml/s
         double flowDiff = qAbs(flow - currentFlowRate);

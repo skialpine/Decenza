@@ -151,7 +151,7 @@ inline LookupResult lookup(const QString& rawGrinderString)
     const auto& grinders = allGrinders();
 
     // First pass: exact alias match (case-insensitive)
-    int bestLen = 0;
+    qsizetype bestLen = 0;
     const GrinderEntry* bestMatch = nullptr;
 
     for (const auto& entry : grinders) {

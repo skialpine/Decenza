@@ -243,10 +243,10 @@ QString AIConversation::getConversationText() const
                 // The shot summary contains structured data with lines like "Key: Value"
                 // Find where the shot data ends and user's question begins
                 // Look for the last double newline that separates shot data from question
-                int shotStart = content.indexOf("Here's my latest shot:");
+                qsizetype shotStart = content.indexOf("Here's my latest shot:");
                 if (shotStart >= 0) {
                     // Skip past "Here's my latest shot:\n\n"
-                    int dataStart = content.indexOf("\n\n", shotStart);
+                    qsizetype dataStart = content.indexOf("\n\n", shotStart);
                     if (dataStart >= 0) {
                         dataStart += 2;
                         // Find the end of shot data (look for pattern break)
@@ -255,7 +255,7 @@ QString AIConversation::getConversationText() const
 
                         // Simple heuristic: find last "\n\n" and check if what follows
                         // looks like a question (doesn't contain ":" in typical key: value pattern)
-                        int lastBreak = content.lastIndexOf("\n\n");
+                        qsizetype lastBreak = content.lastIndexOf("\n\n");
                         if (lastBreak > dataStart) {
                             QString afterBreak = content.mid(lastBreak + 2).trimmed();
                             // If it doesn't look like shot data (no "Key:" pattern at start)
@@ -393,7 +393,7 @@ AIConversation::PreviousShotInfo AIConversation::findPreviousShot(const QString&
 {
     // Walk backwards to find the most recent user message containing shot data,
     // excluding the shot with the given label to avoid self-comparison
-    for (int i = m_messages.size() - 1; i >= 0; i--) {
+    for (qsizetype i = m_messages.size() - 1; i >= 0; i--) {
         QJsonObject msg = m_messages[i].toObject();
         if (msg["role"].toString() == "user") {
             QString content = msg["content"].toString();
@@ -462,7 +462,7 @@ void AIConversation::loadFromStorage()
 
     // Update last response from the last assistant message
     m_lastResponse.clear();
-    for (int i = m_messages.size() - 1; i >= 0; i--) {
+    for (qsizetype i = m_messages.size() - 1; i >= 0; i--) {
         QJsonObject msg = m_messages[i].toObject();
         if (msg["role"].toString() == "assistant") {
             m_lastResponse = msg["content"].toString();
