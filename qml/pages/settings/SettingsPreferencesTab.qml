@@ -10,6 +10,7 @@ KeyboardAwareContainer {
 
     // Local properties
     property int autoSleepMinutes: Settings.value("autoSleepMinutes", 60)
+    property int postShotReviewTimeout: Settings.value("postShotReviewTimeout", 31)
     property bool configurePageScaleEnabled: Theme.configurePageScaleEnabled
 
     Flickable {
@@ -74,6 +75,60 @@ KeyboardAwareContainer {
                             onValueModified: function(newValue) {
                                 preferencesTab.autoSleepMinutes = newValue
                                 Settings.setValue("autoSleepMinutes", newValue)
+                            }
+                        }
+
+                        Item { Layout.fillHeight: true }
+                    }
+                }
+
+                // Post-shot review auto-close
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Theme.scaled(160)
+                    color: Theme.surfaceColor
+                    radius: Theme.cardRadius
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: Theme.scaled(15)
+                        spacing: Theme.scaled(10)
+
+                        Tr {
+                            key: "settings.preferences.postShotReviewClose"
+                            fallback: "Close Shot Review Screen"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(16)
+                            font.bold: true
+                        }
+
+                        Tr {
+                            key: "settings.preferences.postShotReviewCloseDesc"
+                            fallback: "Return to idle after reviewing shot"
+                            color: Theme.textSecondaryColor
+                            font.pixelSize: Theme.scaled(12)
+                        }
+
+                        Item { Layout.fillHeight: true }
+
+                        ValueInput {
+                            id: postShotReviewInput
+                            Layout.fillWidth: true
+                            from: 0
+                            to: 31
+                            stepSize: 1
+                            decimals: 0
+                            value: preferencesTab.postShotReviewTimeout
+                            displayText: value === 0
+                                ? TranslationManager.translate("settings.preferences.instant", "Instant")
+                                : value === 31
+                                    ? TranslationManager.translate("settings.preferences.never", "Never")
+                                    : (value + " " + TranslationManager.translate("settings.preferences.min", "min"))
+                            accessibleName: TranslationManager.translate("settings.preferences.postShotReviewClose", "Close Shot Review Screen")
+
+                            onValueModified: function(newValue) {
+                                preferencesTab.postShotReviewTimeout = newValue
+                                Settings.setValue("postShotReviewTimeout", newValue)
                             }
                         }
 

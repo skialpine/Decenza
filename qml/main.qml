@@ -2524,6 +2524,15 @@ ApplicationWindow {
             console.log("Shot ended, showing metadata page with shotId:", MainController.lastSavedShotId)
             // Restart timer to ensure overlay survives page change
             stopOverlayTimer.restart()
+
+            // Post-shot review timeout: 0 = instant (skip review, go to idle)
+            var timeout = Settings.value("postShotReviewTimeout", 31)
+            if (timeout === 0) {
+                console.log("Post-shot review timeout is Instant, skipping review page")
+                goToIdle()
+                return
+            }
+
             goToShotMetadata(MainController.lastSavedShotId)
         }
     }

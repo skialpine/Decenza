@@ -24,8 +24,9 @@ Page {
         root.goBack()
     }
 
-    // Intercept Android system back button / Escape key
+    // Intercept Android system back button / Escape key; reset auto-close on any key
     focus: true
+    Keys.onPressed: function(event) { resetAutoCloseTimer() }
     Keys.onReleased: function(event) {
         if (event.key === Qt.Key_Back || event.key === Qt.Key_Escape) {
             event.accepted = true
@@ -36,6 +37,32 @@ Page {
     property int editShotId: 0  // Shot ID to edit (always use edit mode now)
     property var editShotData: ({})  // Loaded shot data when editing
     property bool isEditMode: editShotId > 0
+
+    // Auto-close timer: return to idle after configured timeout
+    // 0 = instant (handled in main.qml, never reaches this page)
+    // 1-30 = minutes, 31 = never
+    property int autoCloseTimeout: Settings.value("postShotReviewTimeout", 31)
+
+    Timer {
+        id: autoCloseTimer
+        interval: postShotReviewPage.autoCloseTimeout * 60000
+        running: postShotReviewPage.autoCloseTimeout > 0
+                 && postShotReviewPage.autoCloseTimeout < 31
+                 && postShotReviewPage.StackView.status === StackView.Active
+        onTriggered: postShotReviewPage.handleBack()
+    }
+
+    // Reset timer on user interaction
+    function resetAutoCloseTimer() {
+        if (autoCloseTimer.running) {
+            autoCloseTimer.restart()
+        }
+    }
+
+    // Detect taps anywhere on the page
+    TapHandler {
+        onTapped: resetAutoCloseTimer()
+    }
     // Incremented when async distinct cache refreshes; referenced in suggestion bindings
     // to force QML re-evaluation (the >= 0 condition is always true by design)
     property int _distinctCacheVersion: 0
@@ -227,6 +254,8 @@ Page {
         contentHeight: mainColumn.height
         clip: true
         boundsBehavior: Flickable.StopAtBounds
+        onMovementStarted: resetAutoCloseTimer()
+        onContentYChanged: resetAutoCloseTimer()
 
         ColumnLayout {
             id: mainColumn
