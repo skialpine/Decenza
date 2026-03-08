@@ -2526,7 +2526,9 @@ ApplicationWindow {
             stopOverlayTimer.restart()
 
             // Post-shot review timeout: 0 = instant (skip review, go to idle)
-            var timeout = Settings.value("postShotReviewTimeout", 31)
+            // Note: Settings.value() may return a string on Windows (REG_SZ),
+            // so coerce to Number to avoid "0" === 0 being false
+            var timeout = Number(Settings.value("postShotReviewTimeout", 31))
             if (timeout === 0) {
                 console.log("Post-shot review timeout is Instant, skipping review page")
                 goToIdle()
