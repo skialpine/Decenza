@@ -111,10 +111,11 @@ Page {
         function onDistinctCacheReady() {
             _distinctCacheVersion++
             if (_pendingBeanAutoFill.length > 0) {
-                var brand = _pendingBeanAutoFill
-                _pendingBeanAutoFill = ""
-                var types = MainController.shotHistory.getDistinctBeanTypesForBrand(brand)
-                if (types.length === 1) editBeanType = types[0]
+                var types = MainController.shotHistory.getDistinctBeanTypesForBrand(_pendingBeanAutoFill)
+                if (types.length > 0) {
+                    _pendingBeanAutoFill = ""
+                    if (types.length === 1) editBeanType = types[0]
+                }
             }
         }
     }
