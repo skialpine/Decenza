@@ -1136,6 +1136,118 @@ KeyboardAwareContainer {
                 Layout.alignment: Qt.AlignTop
                 spacing: Theme.scaled(15)
 
+                // Extraction View Mode
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: extractionViewContent.implicitHeight + Theme.scaled(30)
+                    color: Theme.surfaceColor
+                    radius: Theme.cardRadius
+
+                    ColumnLayout {
+                        id: extractionViewContent
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: Theme.scaled(15)
+                        spacing: Theme.scaled(10)
+
+                        property string currentMode: Settings.value("espresso/extractionView", "chart")
+
+                        Tr {
+                            key: "settings.preferences.extractionView"
+                            fallback: "Extraction View"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(16)
+                            font.bold: true
+                        }
+
+                        Tr {
+                            key: "settings.preferences.extractionViewDesc"
+                            fallback: "Visualization during espresso extraction"
+                            color: Theme.textSecondaryColor
+                            font.pixelSize: Theme.scaled(12)
+                        }
+
+                        Repeater {
+                            model: ListModel {
+                                ListElement { mode: "chart"; icon: "qrc:/icons/Graph.svg"; labelKey: "settings.preferences.viewChart"; labelFallback: "Shot Chart" }
+                                ListElement { mode: "cupFill"; icon: "qrc:/icons/espresso.svg"; labelKey: "settings.preferences.viewCupFill"; labelFallback: "Cup Fill" }
+                                ListElement { mode: "phaseTimeline"; icon: "qrc:/icons/list.svg"; labelKey: "settings.preferences.viewTimeline"; labelFallback: "Phase Timeline" }
+                            }
+
+                            delegate: Rectangle {
+                                id: viewOptionCard
+                                Layout.fillWidth: true
+                                height: Theme.scaled(44)
+                                radius: Theme.scaled(8)
+                                color: extractionViewContent.currentMode === model.mode
+                                    ? Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.15)
+                                    : Theme.backgroundColor
+                                border.color: extractionViewContent.currentMode === model.mode
+                                    ? Theme.primaryColor : Theme.borderColor
+                                border.width: extractionViewContent.currentMode === model.mode
+                                    ? Theme.scaled(2) : Theme.scaled(1)
+
+                                Accessible.ignored: true
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: Theme.scaled(12)
+                                    anchors.rightMargin: Theme.scaled(12)
+                                    spacing: Theme.scaled(10)
+
+                                    Image {
+                                        source: model.icon
+                                        sourceSize.width: Theme.scaled(20)
+                                        sourceSize.height: Theme.scaled(20)
+                                        Layout.alignment: Qt.AlignVCenter
+                                    }
+
+                                    Text {
+                                        text: TranslationManager.translate(model.labelKey, model.labelFallback)
+                                        color: Theme.textColor
+                                        font.family: Theme.bodyFont.family
+                                        font.pixelSize: Theme.bodyFont.pixelSize
+                                        Layout.fillWidth: true
+                                        Accessible.ignored: true
+                                    }
+
+                                    // Radio indicator
+                                    Rectangle {
+                                        width: Theme.scaled(18)
+                                        height: Theme.scaled(18)
+                                        radius: Theme.scaled(9)
+                                        border.color: extractionViewContent.currentMode === model.mode
+                                            ? Theme.primaryColor : Theme.textSecondaryColor
+                                        border.width: Theme.scaled(2)
+                                        color: "transparent"
+                                        Layout.alignment: Qt.AlignVCenter
+
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: Theme.scaled(8)
+                                            height: Theme.scaled(8)
+                                            radius: Theme.scaled(4)
+                                            color: Theme.primaryColor
+                                            visible: extractionViewContent.currentMode === model.mode
+                                        }
+                                    }
+                                }
+
+                                AccessibleMouseArea {
+                                    anchors.fill: parent
+                                    accessibleName: TranslationManager.translate(model.labelKey, model.labelFallback)
+                                    accessibleItem: viewOptionCard
+                                    onAccessibleClicked: {
+                                        extractionViewContent.currentMode = model.mode
+                                        Settings.setValue("espresso/extractionView", model.mode)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Steam Heater Settings
                 Rectangle {
                     Layout.fillWidth: true

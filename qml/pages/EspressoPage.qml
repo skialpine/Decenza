@@ -288,40 +288,177 @@ Page {
         }
     }
 
-    // Full-screen shot graph
-    ShotGraph {
-        id: shotGraph
+    // Extraction view mode setting
+    property string extractionViewMode: Settings.value("espresso/extractionView", "chart")
+
+    // Extraction view switcher (Loader swaps between ShotGraph, CupFill, PhaseTimeline)
+    Loader {
+        id: extractionViewLoader
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: graphLegend.top
+        anchors.bottom: graphLegend.visible ? graphLegend.top
+                      : (espressoStopButton.visible ? espressoStopButton.top : infoBar.top)
         anchors.topMargin: Theme.scaled(50)
+        sourceComponent: {
+            switch (espressoPage.extractionViewMode) {
+                case "cupFill": return cupFillComponent
+                case "phaseTimeline": return phaseTimelineComponent
+                default: return shotGraphComponent
+            }
+        }
     }
 
-    // Status indicator for preheating
+    Component {
+        id: shotGraphComponent
+        ShotGraph { }
+    }
+
+    Component {
+        id: cupFillComponent
+        CupFillView {
+            currentWeight: espressoPage.currentWeight
+            targetWeight: MainController.targetWeight
+            currentFlow: DE1Device.flow
+            currentPressure: DE1Device.pressure
+            goalPressure: DE1Device.goalPressure
+            goalFlow: DE1Device.goalFlow
+            shotTime: MachineState.shotTime
+            phase: MachineState.phase
+        }
+    }
+
+    Component {
+        id: phaseTimelineComponent
+        PhaseTimelineView {
+            phase: MachineState.phase
+            shotTime: MachineState.shotTime
+            currentFrame: MainController.currentFrameName
+            currentWeight: espressoPage.currentWeight
+            targetWeight: MainController.targetWeight
+            currentFlow: DE1Device.flow
+            currentPressure: DE1Device.pressure
+            doseWeight: MainController.brewByRatioDose
+            weightFlowRate: MachineState.smoothedScaleFlowRate
+            goalPressure: DE1Device.goalPressure
+            goalFlow: DE1Device.goalFlow
+        }
+    }
+
+    // View mode selector button (top-right)
+    Rectangle {
+        id: viewModeButton
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.topMargin: Theme.pageTopMargin + Theme.scaled(16)
+        anchors.rightMargin: Theme.spacingMedium
+        z: 10
+        width: Theme.scaled(44)
+        height: Theme.scaled(44)
+        radius: Theme.scaled(22)
+        color: Theme.surfaceColor
+        border.color: Theme.borderColor
+        border.width: Theme.scaled(1)
+
+        Accessible.ignored: true
+
+        Image {
+            anchors.centerIn: parent
+            source: "qrc:/icons/Graph.svg"
+            sourceSize.width: Theme.scaled(22)
+            sourceSize.height: Theme.scaled(22)
+        }
+
+        AccessibleMouseArea {
+            anchors.fill: parent
+            accessibleName: TranslationManager.translate("espresso.viewMode.button", "Change extraction view")
+            accessibleItem: viewModeButton
+            onAccessibleClicked: viewSelectorDialog.open()
+        }
+    }
+
+    // View selector dialog
+    ExtractionViewSelector {
+        id: viewSelectorDialog
+        currentMode: espressoPage.extractionViewMode
+        onModeSelected: function(mode) {
+            espressoPage.extractionViewMode = mode
+            Settings.setValue("espresso/extractionView", mode)
+        }
+    }
+
+    // Phase indicator (top-left, shows current espresso phase)
     Rectangle {
         id: statusBanner
         anchors.top: parent.top
         anchors.topMargin: Theme.pageTopMargin + Theme.scaled(20)
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: statusText.width + Theme.spacingLarge * 2
+        anchors.left: parent.left
+        anchors.leftMargin: Theme.spacingMedium
+        z: 10
+        width: phaseRow.width + Theme.spacingMedium * 2
         height: Theme.scaled(36)
         radius: Theme.scaled(18)
-        color: MachineState.phase === MachineStateType.Phase.EspressoPreheating ?
-               Theme.accentColor : "transparent"
-        visible: MachineState.phase === MachineStateType.Phase.EspressoPreheating
+        color: {
+            switch (MachineState.phase) {
+                case MachineStateType.Phase.EspressoPreheating: return Theme.accentColor
+                case MachineStateType.Phase.Preinfusion: return Theme.pressureColor
+                case MachineStateType.Phase.Pouring: return Theme.flowColor
+                case MachineStateType.Phase.Ending: return Theme.successColor
+                default: return "transparent"
+            }
+        }
+        opacity: 0.85
+        visible: MachineState.phase === MachineStateType.Phase.EspressoPreheating ||
+                 MachineState.phase === MachineStateType.Phase.Preinfusion ||
+                 MachineState.phase === MachineStateType.Phase.Pouring ||
+                 MachineState.phase === MachineStateType.Phase.Ending
 
         Accessible.role: Accessible.Alert
-        Accessible.name: TranslationManager.translate("espresso.accessible.preheating", "Preheating")
+        Accessible.name: phaseLabelText.text
 
-        Tr {
-            id: statusText
+        Row {
+            id: phaseRow
             anchors.centerIn: parent
-            key: "espresso.status.preheating"
-            fallback: "PREHEATING..."
-            color: Theme.textColor
-            font: Theme.bodyFont
-            Accessible.ignored: true
+            spacing: Theme.scaled(6)
+
+            // Phase dot
+            Rectangle {
+                width: Theme.scaled(8)
+                height: Theme.scaled(8)
+                radius: Theme.scaled(4)
+                color: "white"
+                anchors.verticalCenter: parent.verticalCenter
+
+                SequentialAnimation on opacity {
+                    running: MachineState.phase === MachineStateType.Phase.EspressoPreheating ||
+                             MachineState.phase === MachineStateType.Phase.Pouring
+                    loops: Animation.Infinite
+                    NumberAnimation { to: 0.3; duration: 600 }
+                    NumberAnimation { to: 1.0; duration: 600 }
+                }
+            }
+
+            Text {
+                id: phaseLabelText
+                text: {
+                    switch (MachineState.phase) {
+                        case MachineStateType.Phase.EspressoPreheating:
+                            return TranslationManager.translate("espresso.phase.preheating", "Preheating")
+                        case MachineStateType.Phase.Preinfusion:
+                            return TranslationManager.translate("espresso.phase.preinfusion", "Pre-infusion")
+                        case MachineStateType.Phase.Pouring:
+                            return TranslationManager.translate("espresso.phase.pouring", "Pouring")
+                        case MachineStateType.Phase.Ending:
+                            return TranslationManager.translate("espresso.phase.ending", "Ending")
+                        default: return ""
+                    }
+                }
+                color: "white"
+                font.family: Theme.bodyFont.family
+                font.pixelSize: Theme.bodyFont.pixelSize
+                font.weight: Font.Bold
+                Accessible.ignored: true
+            }
         }
     }
 
@@ -419,10 +556,11 @@ Page {
         }
     }
 
-    // Tappable legend to toggle graph lines
+    // Tappable legend to toggle graph lines (only visible in chart mode)
     GraphLegend {
         id: graphLegend
-        graph: shotGraph
+        graph: extractionViewLoader.item || {}
+        visible: espressoPage.extractionViewMode === "chart"
         width: parent.width
         anchors.bottom: espressoStopButton.visible ? espressoStopButton.top : infoBar.top
         anchors.bottomMargin: Theme.spacingSmall
@@ -511,6 +649,11 @@ Page {
                 Layout.preferredWidth: Theme.scaled(80)
                 spacing: Theme.scaled(2)
 
+                property real goal: DE1Device.goalPressure
+                property bool trackReady: goal > 0 && MachineState.phase !== MachineStateType.Phase.EspressoPreheating
+                property real delta: trackReady ? Math.abs(DE1Device.pressure - goal) : 0
+                property color trackColor: trackReady ? (delta < 0.5 ? Theme.trackOnTargetColor : (delta < 1.5 ? Theme.trackDriftingColor : Theme.trackOffTargetColor)) : Theme.textSecondaryColor
+
                 Accessible.role: Accessible.StaticText
                 Accessible.name: TranslationManager.translate("espresso.accessible.pressure", "Pressure:") + " " + DE1Device.pressure.toFixed(1) + " " + TranslationManager.translate("espresso.accessible.bar", "bar")
 
@@ -521,12 +664,25 @@ Page {
                     font.weight: Font.Medium
                     Accessible.ignored: true
                 }
-                Tr {
-                    key: "espresso.unit.bar"
-                    fallback: "bar"
-                    color: Theme.textSecondaryColor
-                    font: Theme.captionFont
-                    Accessible.ignored: true
+                RowLayout {
+                    spacing: Theme.scaled(4)
+                    // Tracking dot
+                    Rectangle {
+                        width: Theme.scaled(6)
+                        height: Theme.scaled(6)
+                        radius: Theme.scaled(3)
+                        color: parent.parent.trackColor
+                        visible: parent.parent.trackReady
+                        Layout.alignment: Qt.AlignVCenter
+                    }
+                    Text {
+                        text: parent.parent.trackReady
+                            ? "→" + parent.parent.goal.toFixed(1) + " bar"
+                            : TranslationManager.translate("espresso.unit.bar", "bar")
+                        color: parent.parent.trackReady ? parent.parent.trackColor : Theme.textSecondaryColor
+                        font: Theme.captionFont
+                        Accessible.ignored: true
+                    }
                 }
             }
 
@@ -534,6 +690,11 @@ Page {
             ColumnLayout {
                 Layout.preferredWidth: Theme.scaled(80)
                 spacing: Theme.scaled(2)
+
+                property real goal: DE1Device.goalFlow
+                property bool trackReady: goal > 0 && MachineState.phase !== MachineStateType.Phase.EspressoPreheating
+                property real delta: trackReady ? Math.abs(DE1Device.flow - goal) : 0
+                property color trackColor: trackReady ? (delta < 0.3 ? Theme.trackOnTargetColor : (delta < 0.8 ? Theme.trackDriftingColor : Theme.trackOffTargetColor)) : Theme.textSecondaryColor
 
                 Accessible.role: Accessible.StaticText
                 Accessible.name: TranslationManager.translate("espresso.accessible.flow", "Flow:") + " " + DE1Device.flow.toFixed(1) + " " + TranslationManager.translate("espresso.accessible.mlPerSec", "milliliters per second")
@@ -545,12 +706,24 @@ Page {
                     font.weight: Font.Medium
                     Accessible.ignored: true
                 }
-                Tr {
-                    key: "espresso.unit.flowRate"
-                    fallback: "mL/s"
-                    color: Theme.textSecondaryColor
-                    font: Theme.captionFont
-                    Accessible.ignored: true
+                RowLayout {
+                    spacing: Theme.scaled(4)
+                    Rectangle {
+                        width: Theme.scaled(6)
+                        height: Theme.scaled(6)
+                        radius: Theme.scaled(3)
+                        color: parent.parent.trackColor
+                        visible: parent.parent.trackReady
+                        Layout.alignment: Qt.AlignVCenter
+                    }
+                    Text {
+                        text: parent.parent.trackReady
+                            ? "→" + parent.parent.goal.toFixed(1) + " ml/s"
+                            : TranslationManager.translate("espresso.unit.flowRate", "mL/s")
+                        color: parent.parent.trackReady ? parent.parent.trackColor : Theme.textSecondaryColor
+                        font: Theme.captionFont
+                        Accessible.ignored: true
+                    }
                 }
             }
 
@@ -772,7 +945,7 @@ Page {
     // Swipe gestures on chart for accessibility (swipe left/right to navigate values)
     MouseArea {
         id: chartTapArea
-        anchors.fill: shotGraph
+        anchors.fill: extractionViewLoader
         enabled: typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled
 
         property real startX: 0
@@ -801,7 +974,7 @@ Page {
 
     // Two-finger tap on chart for full status announcement
     MultiPointTouchArea {
-        anchors.fill: shotGraph
+        anchors.fill: extractionViewLoader
         enabled: typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled
         minimumTouchPoints: 2
         maximumTouchPoints: 2

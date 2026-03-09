@@ -2516,26 +2516,29 @@ ApplicationWindow {
         }
     }
 
-    // DYE: Navigate to shot metadata page after shot ends
-    Connections {
-        target: MainController
-
-        function onShotEndedShowMetadata() {
-            console.log("Shot ended, showing metadata page with shotId:", MainController.lastSavedShotId)
-            // Restart timer to ensure overlay survives page change
-            stopOverlayTimer.restart()
-
-            // Post-shot review timeout: 0 = instant (skip review, go to idle)
-            // Note: Settings.value() may return a string on Windows (REG_SZ),
-            // so coerce to Number to avoid "0" === 0 being false
+    // DYE: Navigate to shot metadata page after shot ends (with brief pause to show final state)
+    Timer {
+        id: postShotNavigationTimer
+        interval: 3000
+        onTriggered: {
             var timeout = Number(Settings.value("postShotReviewTimeout", 31))
             if (timeout === 0) {
                 console.log("Post-shot review timeout is Instant, skipping review page")
                 goToIdle()
                 return
             }
-
             goToShotMetadata(MainController.lastSavedShotId)
+        }
+    }
+
+    Connections {
+        target: MainController
+
+        function onShotEndedShowMetadata() {
+            console.log("Shot ended, pausing before metadata page. shotId:", MainController.lastSavedShotId)
+            // Restart stop overlay timer to ensure it survives the delay + page change
+            stopOverlayTimer.restart()
+            postShotNavigationTimer.restart()
         }
     }
 

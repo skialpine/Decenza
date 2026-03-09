@@ -82,6 +82,11 @@ QtObject {
     property color weightFlowColor: _c("weightFlowColor", Settings.customThemeColors.weightFlowColor || "#d4a574")
     property color resistanceColor: _c("resistanceColor", Settings.customThemeColors.resistanceColor || "#eae83d")
 
+    // Tracking status colors (profile goal vs actual)
+    property color trackOnTargetColor: _c("trackOnTargetColor", Settings.customThemeColors.trackOnTargetColor || "#00cc6d")
+    property color trackDriftingColor: _c("trackDriftingColor", Settings.customThemeColors.trackDriftingColor || "#f0ad4e")
+    property color trackOffTargetColor: _c("trackOffTargetColor", Settings.customThemeColors.trackOffTargetColor || "#e94560")
+
     // DYE measurement colors (Shot Info page)
     property color dyeDoseColor: _c("dyeDoseColor", Settings.customThemeColors.dyeDoseColor || "#6F4E37")
     property color dyeOutputColor: _c("dyeOutputColor", Settings.customThemeColors.dyeOutputColor || "#9C27B0")
