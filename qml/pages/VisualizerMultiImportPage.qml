@@ -436,21 +436,22 @@ Page {
                                         }
 
                                         // Checkmark for identical or already imported
-                                        Text {
+                                        ColoredIcon {
                                             anchors.centerIn: parent
-                                            text: "\u2713"
-                                            color: Theme.successColor
-                                            font.pixelSize: Theme.scaled(20)
-                                            font.bold: true
+                                            source: "qrc:/icons/tick.svg"
+                                            iconWidth: Theme.scaled(18)
+                                            iconHeight: Theme.scaled(18)
+                                            iconColor: Theme.successColor
                                             visible: !parent.isInvalid && !parent.canImport
                                         }
 
                                         // Star for importable profiles
-                                        Text {
+                                        ColoredIcon {
                                             anchors.centerIn: parent
-                                            text: "\u2606"
-                                            color: Theme.textSecondaryColor
-                                            font.pixelSize: Theme.scaled(24)
+                                            source: "qrc:/icons/star-outline.svg"
+                                            iconWidth: Theme.scaled(20)
+                                            iconHeight: Theme.scaled(20)
+                                            iconColor: Theme.textSecondaryColor
                                             visible: parent.canImport && !MainController.visualizerImporter.importing
                                         }
 
@@ -747,16 +748,16 @@ Page {
 
                             Row {
                                 spacing: Theme.spacingSmall
-                                Text {
-                                    text: "\u2713"
-                                    color: Theme.successColor
-                                    font.pixelSize: Theme.scaled(20)
-                                    font.bold: true
+                                ColoredIcon {
+                                    source: "qrc:/icons/tick.svg"
+                                    iconWidth: Theme.scaled(18)
+                                    iconHeight: Theme.scaled(18)
+                                    iconColor: Theme.successColor
                                     width: Theme.scaled(24)
-                                    horizontalAlignment: Text.AlignHCenter
+                                    anchors.verticalCenter: parent.verticalCenter
                                 }
                                 Text {
-                                    text: "Already imported (same frames)"
+                                    text: TranslationManager.translate("visualizer.legend.alreadyimported", "Already imported (same frames)")
                                     color: Theme.textSecondaryColor
                                     font: Theme.captionFont
                                     anchors.verticalCenter: parent.verticalCenter
@@ -765,15 +766,16 @@ Page {
 
                             Row {
                                 spacing: Theme.spacingSmall
-                                Text {
-                                    text: "\u2606"
-                                    color: Theme.textSecondaryColor
-                                    font.pixelSize: Theme.scaled(24)
+                                ColoredIcon {
+                                    source: "qrc:/icons/star-outline.svg"
+                                    iconWidth: Theme.scaled(18)
+                                    iconHeight: Theme.scaled(18)
+                                    iconColor: Theme.textSecondaryColor
                                     width: Theme.scaled(24)
-                                    horizontalAlignment: Text.AlignHCenter
+                                    anchors.verticalCenter: parent.verticalCenter
                                 }
                                 Text {
-                                    text: "Tap to import"
+                                    text: TranslationManager.translate("visualizer.legend.taptoimport", "Tap to import")
                                     color: Theme.textSecondaryColor
                                     font: Theme.captionFont
                                     anchors.verticalCenter: parent.verticalCenter

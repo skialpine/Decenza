@@ -631,17 +631,22 @@ Page {
                         }
 
                         // Clear AI translation button
-                        Text {
+                        Item {
                             id: aiClearButton
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.rightMargin: Theme.scaled(4)
                             width: model.aiTranslation ? Theme.scaled(20) : 0
+                            height: Theme.scaled(20)
                             visible: model.aiTranslation && model.aiTranslation !== ""
-                            text: "\u2715"
-                            font.pixelSize: Theme.scaled(14)
-                            color: aiClearArea.pressed ? Theme.warningColor : Theme.textSecondaryColor
-                            horizontalAlignment: Text.AlignHCenter
+
+                            ColoredIcon {
+                                anchors.centerIn: parent
+                                source: "qrc:/icons/cross.svg"
+                                iconWidth: Theme.scaled(12)
+                                iconHeight: Theme.scaled(12)
+                                iconColor: aiClearArea.pressed ? Theme.warningColor : Theme.textSecondaryColor
+                            }
 
                             Accessible.role: Accessible.Button
                             Accessible.name: "Clear AI translation"

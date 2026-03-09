@@ -360,15 +360,22 @@ Page {
                 }
 
                 // Clear button (inline, hidden in accessibility mode to avoid overlapping elements)
-                Text {
+                Item {
                     id: searchClearButton
+                    width: Theme.scaled(20)
+                    height: Theme.scaled(20)
                     visible: searchField.text.length > 0 && !(typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled)
                     anchors.right: parent.right
                     anchors.rightMargin: Theme.scaled(10)
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "\u2715"
-                    font.pixelSize: Theme.scaled(16)
-                    color: Theme.textSecondaryColor
+
+                    ColoredIcon {
+                        anchors.centerIn: parent
+                        source: "qrc:/icons/cross.svg"
+                        iconWidth: Theme.scaled(14)
+                        iconHeight: Theme.scaled(14)
+                        iconColor: Theme.textSecondaryColor
+                    }
 
                     MouseArea {
                         anchors.fill: parent
@@ -384,8 +391,8 @@ Page {
             // Accessible clear button (outside TextField bounds for TalkBack discoverability)
             AccessibleButton {
                 visible: searchField.text.length > 0 && typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled
-                text: "\u2715"
                 accessibleName: TranslationManager.translate("shothistory.clearsearch", "Clear search")
+                icon.source: "qrc:/icons/cross.svg"
                 onClicked: {
                     searchField.text = ""
                     searchField.focus = false
@@ -407,8 +414,9 @@ Page {
             }
 
             AccessibleButton {
-                text: "\u2630 " + TranslationManager.translate("shothistory.saved", "Saved")
+                text: TranslationManager.translate("shothistory.saved", "Saved")
                 accessibleName: TranslationManager.translate("shothistory.openSavedSearches", "Open saved searches")
+                icon.source: "qrc:/icons/list.svg"
                 enabled: Settings.savedSearches.length > 0
                 onClicked: savedSearchesDialog.open()
             }
@@ -477,8 +485,9 @@ Page {
                 }
 
                 AccessibleButton {
-                    text: "\u2715 " + TranslationManager.translate("shothistory.clearFilter", "Clear")
+                    text: TranslationManager.translate("shothistory.clearFilter", "Clear")
                     accessibleName: TranslationManager.translate("shothistory.clearFilterAccessible", "Clear favorites filter")
+                    icon.source: "qrc:/icons/cross.svg"
                     onClicked: clearInitialFilter()
                 }
             }
@@ -591,13 +600,13 @@ Page {
                             border.color: parent.checked ? Theme.primaryColor : Theme.borderColor
                             border.width: 2
 
-                            Text {
+                            ColoredIcon {
                                 anchors.centerIn: parent
-                                text: "\u2713"
-                                font.pixelSize: Theme.scaled(16)
-                                color: Theme.textColor
+                                source: "qrc:/icons/tick.svg"
+                                iconWidth: Theme.scaled(16)
+                                iconHeight: Theme.scaled(16)
+                                iconColor: Theme.primaryColor
                                 visible: parent.parent.checked
-                                Accessible.ignored: true
                             }
                         }
                     }
@@ -995,12 +1004,11 @@ Page {
                                 radius: Theme.scaled(14)
                                 color: deleteArea.pressed ? Qt.darker(Theme.errorColor, 1.2) : Theme.errorColor
 
-                                Text {
+                                Image {
                                     anchors.centerIn: parent
-                                    text: "\u2715"
-                                    font.pixelSize: Theme.scaled(14)
-                                    font.bold: true
-                                    color: "white"
+                                    source: "qrc:/icons/cross.svg"
+                                    sourceSize.width: Theme.scaled(12)
+                                    sourceSize.height: Theme.scaled(12)
                                     Accessible.ignored: true
                                 }
 
@@ -1127,12 +1135,12 @@ Page {
                             Accessible.ignored: true
                         }
 
-                        Text {
-                            text: "\u2713"
-                            font.pixelSize: Theme.scaled(18)
-                            color: Theme.primaryColor
+                        ColoredIcon {
+                            source: "qrc:/icons/tick.svg"
+                            iconWidth: Theme.scaled(16)
+                            iconHeight: Theme.scaled(16)
+                            iconColor: Theme.primaryColor
                             visible: sortField === modelData
-                            Accessible.ignored: true
                         }
                     }
 

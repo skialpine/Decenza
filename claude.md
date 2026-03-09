@@ -201,6 +201,8 @@ Also: Steaming, HotWater, Flushing, Refill, Descaling, Cleaning
 - Use `StyledTextField` instead of `TextField` to avoid Material floating label
 - `ActionButton` dims icon (50% opacity) and text (secondary color) when disabled
 - `native` is a reserved JavaScript keyword - use `nativeName` instead
+- **Never use Unicode symbols as icons in text** (e.g., `"\u270E"`, `"\u2717"`, `"\u2630"`). These render as tofu squares on devices without the right font glyphs. Use SVG icons from `qrc:/icons/` with `Image` instead. For buttons/menu items, use a `Row { Image {} Text {} }` contentItem. Safe Unicode characters (°, ·, —, →, ×) that are in standard fonts are OK.
+- **Never override FINAL properties on Qt types.** Qt 6.10+ marks some `Popup`/`Dialog` properties as FINAL (e.g., `message`). Declaring `property string message` on a Dialog will prevent the component from loading. Use a different name (e.g., `resultMessage`).
 
 ### QML Gotchas
 
@@ -440,12 +442,14 @@ Each operation page (Steam, HotWater, Flush) has:
 - **Display version** (versionName): Set in `CMakeLists.txt` line 2: `project(Decenza VERSION x.y.z)`
 - **Version code** (versionCode): Stored in `versioncode.txt`. Does **not** auto-increment during local builds. CI workflows bump it on tag push, and the Android workflow commits the new value back to `main`.
 - **version.h**: Auto-generated from `src/version.h.in` with VERSION_STRING macro
+- **AndroidManifest.xml**: Auto-generated from `android/AndroidManifest.xml.in` by CMake at build time (gitignored). Both `versionCode` and `versionName` come from `versioncode.txt` and `CMakeLists.txt` respectively.
+- **installer/version.iss**: Auto-generated from `installer/version.iss.in` by CMake at build time (gitignored).
 - To release a new version: Update VERSION in CMakeLists.txt, commit, then follow the "Publishing Releases" process (create release first, then push tag)
 
 ## Git Workflow
 
 - **Version codes are managed by CI** — local builds use `versioncode.txt` as-is (no auto-increment). All 6 CI workflows bump the code identically on tag push. The Android workflow commits the bumped value back to `main`.
-- You do **not** need to manually commit version code files (`versioncode.txt`, `android/AndroidManifest.xml`) — CI handles this automatically. `installer/version.iss` is generated locally from `installer/version.iss.in` by CMake at build time and is gitignored.
+- You do **not** need to manually commit version code files — only `versioncode.txt` is tracked. `android/AndroidManifest.xml` and `installer/version.iss` are generated from `.in` templates by CMake at build time and are gitignored.
 
 ## Accessibility (TalkBack/VoiceOver)
 

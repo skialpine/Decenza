@@ -225,18 +225,19 @@ Page {
                         anchors.margins: Theme.scaled(10)
                         spacing: Theme.scaled(10)
 
-                        // Status icon
-                        Text {
+                        // Status icon with semantic color
+                        ColoredIcon {
                             Layout.preferredWidth: Theme.scaled(24)
+                            Layout.preferredHeight: Theme.scaled(24)
                             Layout.alignment: Qt.AlignVCenter
-                            text: profileDelegate.isNew ? "\u2606" :      // Hollow star - new
-                                  profileDelegate.isIdentical ? "\u2713" : // Checkmark - identical
-                                  "\u26A0"                                  // Warning - different
-                            font.pixelSize: Theme.scaled(18)
-                            color: profileDelegate.isNew ? Theme.primaryColor :
-                                   profileDelegate.isIdentical ? Theme.successColor :
-                                   Theme.warningButtonColor  // Orange for different
-                            horizontalAlignment: Text.AlignHCenter
+                            source: profileDelegate.isNew ? "qrc:/icons/star-outline.svg" :
+                                    profileDelegate.isIdentical ? "qrc:/icons/tick.svg" :
+                                    "qrc:/icons/warning.svg"
+                            iconWidth: Theme.scaled(18)
+                            iconHeight: Theme.scaled(18)
+                            iconColor: profileDelegate.isNew ? Theme.primaryColor :
+                                       profileDelegate.isIdentical ? Theme.successColor :
+                                       Theme.warningButtonColor
                         }
 
                         // Format badge (TCL/JSON)
@@ -305,11 +306,12 @@ Page {
                         }
 
                         // Already imported indicator
-                        Text {
+                        ColoredIcon {
                             visible: profileDelegate.isIdentical
-                            text: "\u2713"
-                            font.pixelSize: Theme.scaled(20)
-                            color: Theme.successColor
+                            source: "qrc:/icons/tick.svg"
+                            iconWidth: Theme.scaled(18)
+                            iconHeight: Theme.scaled(18)
+                            iconColor: Theme.successColor
                         }
                     }
                 }

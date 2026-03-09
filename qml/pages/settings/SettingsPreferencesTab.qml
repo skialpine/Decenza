@@ -933,12 +933,12 @@ KeyboardAwareContainer {
                                 color: Theme.successColor + "30"
                                 visible: waterLevelCard.refillKitActive
 
-                                Text {
+                                ColoredIcon {
                                     anchors.centerIn: parent
-                                    text: "\u2713"  // Checkmark
-                                    color: Theme.successColor
-                                    font.pixelSize: Theme.scaled(12)
-                                    font.bold: true
+                                    source: "qrc:/icons/tick.svg"
+                                    iconWidth: Theme.scaled(12)
+                                    iconHeight: Theme.scaled(12)
+                                    iconColor: Theme.successColor
                                 }
                             }
 
