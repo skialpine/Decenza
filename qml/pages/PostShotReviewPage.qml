@@ -108,8 +108,18 @@ Page {
             else
                 console.warn("PostShotReviewPage: Failed to save visualizer info for shot", shotId)
         }
-        function onDistinctCacheReady() { _distinctCacheVersion++ }
+        function onDistinctCacheReady() {
+            _distinctCacheVersion++
+            if (_pendingBeanAutoFill.length > 0) {
+                var brand = _pendingBeanAutoFill
+                _pendingBeanAutoFill = ""
+                var types = MainController.shotHistory.getDistinctBeanTypesForBrand(brand)
+                if (types.length === 1) editBeanType = types[0]
+            }
+        }
     }
+
+    property string _pendingBeanAutoFill: ""
 
     // Editing fields (separate from Settings.dye* to avoid polluting current session)
     property string editBeanBrand: ""
@@ -614,6 +624,7 @@ Page {
                         editRoastDate = ""
                         var types = MainController.shotHistory.getDistinctBeanTypesForBrand(t)
                         if (types.length === 1) editBeanType = types[0]
+                        else if (types.length === 0) _pendingBeanAutoFill = t
                     }
                 }
 

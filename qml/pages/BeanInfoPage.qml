@@ -20,10 +20,21 @@ Page {
     // Incremented when async distinct cache refreshes; referenced in suggestion bindings
     // to force QML re-evaluation (the >= 0 condition is always true by design)
     property int _distinctCacheVersion: 0
+    property string _pendingBeanAutoFill: ""  // Brand awaiting async bean-type fetch for auto-fill
 
     Connections {
         target: MainController.shotHistory
-        function onDistinctCacheReady() { _distinctCacheVersion++ }
+        function onDistinctCacheReady() {
+            _distinctCacheVersion++
+            if (_pendingBeanAutoFill.length > 0) {
+                var brand = _pendingBeanAutoFill
+                _pendingBeanAutoFill = ""
+                var types = MainController.shotHistory.getDistinctBeanTypesForBrand(brand)
+                if (types.length === 1) {
+                    if (isEditMode) editBeanType = types[0]; else Settings.dyeBeanType = types[0];
+                }
+            }
+        }
     }
 
     // Snapshot of DYE values at page open (for Discard in unsaved-changes dialog)
@@ -630,6 +641,8 @@ Page {
                         var types = MainController.shotHistory.getDistinctBeanTypesForBrand(t)
                         if (types.length === 1) {
                             if (isEditMode) editBeanType = types[0]; else Settings.dyeBeanType = types[0];
+                        } else if (types.length === 0) {
+                            _pendingBeanAutoFill = t  // Cache miss — retry when async fetch completes
                         }
                     }
                     onInputFocused: function(field) { focusedField = field; focusResetTimer.stop() }
