@@ -160,5 +160,7 @@ private:
     static QMap<QString, ProfileKnowledge> s_profileKnowledge;
     static bool s_knowledgeLoaded;
     static void loadProfileKnowledge();
+    static QString matchProfileKey(const QMap<QString, ProfileKnowledge>& knowledge,
+                                   const QString& profileTitle, const QString& editorTypeHint);
     static QString findProfileSection(const QString& profileTitle, const QString& profileType = QString());
 };

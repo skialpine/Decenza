@@ -723,8 +723,8 @@ void ShotSummarizer::loadProfileKnowledge()
 // profileTitle: the profile's display name (e.g. "D-Flow / my recipe")
 // editorTypeHint: either the raw editorType string ("dflow", "aflow") or the
 //   profileType description string ("D-Flow (lever-style...)") — both are handled.
-static QString matchProfileKey(const QMap<QString, ShotSummarizer::ProfileKnowledge>& knowledge,
-                               const QString& profileTitle, const QString& editorTypeHint)
+QString ShotSummarizer::matchProfileKey(const QMap<QString, ShotSummarizer::ProfileKnowledge>& knowledge,
+                                        const QString& profileTitle, const QString& editorTypeHint)
 {
     if (knowledge.isEmpty()) return QString();
 
