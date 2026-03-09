@@ -577,6 +577,7 @@ set(QML_FILES
     qml/components/UnsavedChangesDialog.qml
     qml/components/SwipeableArea.qml
     qml/components/CrashReportDialog.qml
+    qml/components/ColoredIcon.qml
     qml/components/CrtOverlay.qml
     qml/components/CrtShaderEffect.qml
     qml/components/QrCode.qml
