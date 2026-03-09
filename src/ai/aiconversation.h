@@ -83,7 +83,10 @@ public:
      * This appends shot data as a new user message without clearing history.
      * shotLabel is a human-readable date/time string (e.g. "Feb 15, 14:30") identifying the shot.
      */
-    Q_INVOKABLE void addShotContext(const QString& shotSummary, const QString& shotLabel, const QString& beverageType = "espresso");
+    Q_INVOKABLE void addShotContext(const QString& shotSummary, const QString& shotLabel,
+                                     const QString& beverageType = "espresso",
+                                     const QString& profileTitle = QString(),
+                                     const QString& profileType = QString());
 
     /**
      * Process a shot summary for conversation: prepends a "changes from previous" section.
@@ -96,7 +99,9 @@ public:
      * Get the full system prompt for multi-shot conversations.
      * Uses the rich single-shot system prompt plus multi-shot guidance.
      */
-    Q_INVOKABLE QString multiShotSystemPrompt(const QString& beverageType = "espresso");
+    Q_INVOKABLE QString multiShotSystemPrompt(const QString& beverageType = "espresso",
+                                               const QString& profileTitle = QString(),
+                                               const QString& profileType = QString());
 
     /**
      * Save conversation history to persistent storage

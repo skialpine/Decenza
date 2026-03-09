@@ -9,6 +9,27 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QDebug>
+#include <QFile>
+#include <QTextStream>
+
+// Static members for profile knowledge cache
+QMap<QString, ShotSummarizer::ProfileKnowledge> ShotSummarizer::s_profileKnowledge;
+bool ShotSummarizer::s_knowledgeLoaded = false;
+
+// Normalize a profile key: lowercase, strip diacritics, normalize punctuation
+static QString normalizeProfileKey(const QString& key)
+{
+    QString normalized = key.toLower().trimmed();
+    // Normalize common diacritics (é→e, è→e, ê→e, ë→e, etc.)
+    normalized.replace(QChar(0x00E9), 'e');  // é
+    normalized.replace(QChar(0x00E8), 'e');  // è
+    normalized.replace(QChar(0x00EA), 'e');  // ê
+    normalized.replace(QChar(0x00EB), 'e');  // ë
+    // Normalize & ↔ and
+    normalized.replace(QStringLiteral(" & "), QStringLiteral(" and "));
+    return normalized;
+}
 
 ShotSummarizer::ShotSummarizer(QObject* parent)
     : QObject(parent)
@@ -585,6 +606,159 @@ QString ShotSummarizer::systemPrompt(const QString& beverageType)
         return filterSystemPrompt();
     }
     return espressoSystemPrompt();
+}
+
+QString ShotSummarizer::shotAnalysisSystemPrompt(const QString& beverageType, const QString& profileTitle,
+                                                   const QString& profileType)
+{
+    QString base = systemPrompt(beverageType);
+
+    // Look up profile-specific knowledge (title match first, then editorType fallback)
+    QString profileSection = findProfileSection(profileTitle, profileType);
+    if (!profileSection.isEmpty()) {
+        base += QStringLiteral("\n\n## Current Profile Knowledge\n\n"
+            "The following is curated knowledge about the specific profile used in this shot. "
+            "Use this to understand what is INTENTIONAL behavior vs. what indicates a problem.\n\n")
+            + profileSection;
+    }
+
+    return base;
+}
+
+void ShotSummarizer::loadProfileKnowledge()
+{
+    if (s_knowledgeLoaded) return;
+    s_knowledgeLoaded = true;
+
+    QFile file(QStringLiteral(":/ai/profile_knowledge.md"));
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "ShotSummarizer: Failed to load profile knowledge resource";
+        return;
+    }
+
+    QString content = QTextStream(&file).readAll();
+    file.close();
+
+    // Parse markdown sections: each "## Title" starts a new profile
+    // Build a map from lowercase key → ProfileKnowledge
+    const QStringList lines = content.split('\n');
+    QString currentTitle;
+    QString currentContent;
+
+    auto commitSection = [&]() {
+        if (currentTitle.isEmpty() || currentContent.isEmpty()) return;
+
+        ProfileKnowledge pk;
+        pk.name = currentTitle;
+        pk.content = currentContent.trimmed();
+
+        // Extract the main name and any aliases from "Also matches:" line
+        QStringList keys;
+
+        // Primary title may have " / " separators (e.g. "D-Flow / Damian's D-Flow / D-Flow/Q")
+        const QStringList titleParts = currentTitle.split(QStringLiteral(" / "));
+        for (const QString& part : titleParts) {
+            keys << part.trimmed().toLower();
+        }
+
+        // Check for "Also matches:" line in content
+        for (const QString& line : currentContent.split('\n')) {
+            if (line.startsWith(QStringLiteral("Also matches:"))) {
+                QString aliases = line.mid(14).trimmed();
+                // Remove surrounding quotes and split by comma
+                const QStringList aliasParts = aliases.split(',');
+                for (const QString& alias : aliasParts) {
+                    QString clean = alias.trimmed();
+                    clean.remove('"');
+                    if (!clean.isEmpty()) {
+                        keys << clean.toLower();
+                    }
+                }
+                break;
+            }
+        }
+
+        // Register all keys (normalized for accent/punctuation matching)
+        for (const QString& key : keys) {
+            s_profileKnowledge.insert(normalizeProfileKey(key), pk);
+        }
+    };
+
+    for (const QString& line : lines) {
+        if (line.startsWith(QStringLiteral("## ")) && !line.startsWith(QStringLiteral("### "))) {
+            // Commit previous section
+            commitSection();
+            currentTitle = line.mid(3).trimmed();
+            currentContent.clear();
+        } else if (!currentTitle.isEmpty()) {
+            currentContent += line + '\n';
+        }
+    }
+    // Commit last section
+    commitSection();
+
+    qDebug() << "ShotSummarizer: Loaded" << s_profileKnowledge.size()
+             << "profile knowledge entries";
+}
+
+QString ShotSummarizer::findProfileSection(const QString& profileTitle, const QString& profileType)
+{
+    if (profileTitle.isEmpty() && profileType.isEmpty()) return QString();
+
+    loadProfileKnowledge();
+
+    if (s_profileKnowledge.isEmpty()) return QString();
+
+    // Try title-based matching first
+    if (!profileTitle.isEmpty()) {
+        QString key = normalizeProfileKey(profileTitle);
+
+        // Direct match
+        if (s_profileKnowledge.contains(key)) {
+            return s_profileKnowledge.value(key).content;
+        }
+
+        // Try without version suffixes (e.g., "Adaptive v2.1" → "adaptive v2")
+        // Try progressively shorter prefixes
+        for (const auto& knownKey : s_profileKnowledge.keys()) {
+            // Check if the profile title starts with a known key
+            if (key.startsWith(knownKey)) {
+                return s_profileKnowledge.value(knownKey).content;
+            }
+            // Check if a known key starts with the profile title
+            if (knownKey.startsWith(key)) {
+                return s_profileKnowledge.value(knownKey).content;
+            }
+        }
+
+        // Fuzzy: check if any known key is contained within the profile title
+        for (const auto& knownKey : s_profileKnowledge.keys()) {
+            if (knownKey.length() >= 4 && key.contains(knownKey)) {
+                return s_profileKnowledge.value(knownKey).content;
+            }
+        }
+    }
+
+    // Fallback: match by editor type (profileType description string)
+    // This handles user-created profiles from the D-Flow/A-Flow editors
+    // that may have completely custom titles
+    if (!profileType.isEmpty()) {
+        // Map profileType description to knowledge base keys
+        static const QMap<QString, QString> editorTypeToKey = {
+            { QStringLiteral("D-Flow"), QStringLiteral("d-flow / default") },
+            { QStringLiteral("A-Flow"), QStringLiteral("a-flow") },
+        };
+
+        for (auto it = editorTypeToKey.constBegin(); it != editorTypeToKey.constEnd(); ++it) {
+            if (profileType.startsWith(it.key())) {
+                if (s_profileKnowledge.contains(it.value())) {
+                    return s_profileKnowledge.value(it.value()).content;
+                }
+            }
+        }
+    }
+
+    return QString();
 }
 
 QString ShotSummarizer::espressoSystemPrompt()

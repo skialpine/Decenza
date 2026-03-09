@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QString>
 #include <QList>
+#include <QMap>
 #include <QVector>
 #include <QPointF>
 #include <QVariant>
@@ -122,6 +123,10 @@ public:
     static QString espressoSystemPrompt();
     static QString filterSystemPrompt();
 
+    // Profile-aware system prompt: base prompt + per-profile knowledge section
+    static QString shotAnalysisSystemPrompt(const QString& beverageType, const QString& profileTitle,
+                                               const QString& profileType = QString());
+
 private:
     // Helper methods
     double findValueAtTime(const QVector<QPointF>& data, double time) const;
@@ -136,4 +141,14 @@ private:
     void detectChannelingInPhases(ShotSummary& summary, const QVector<QPointF>& flowData) const;
     void calculateTemperatureStability(ShotSummary& summary,
         const QVector<QPointF>& tempData, const QVector<QPointF>& tempGoalData) const;
+
+    // Profile knowledge base
+    struct ProfileKnowledge {
+        QString name;       // Display name (e.g. "D-Flow")
+        QString content;    // Full markdown section for this profile
+    };
+    static QMap<QString, ProfileKnowledge> s_profileKnowledge;
+    static bool s_knowledgeLoaded;
+    static void loadProfileKnowledge();
+    static QString findProfileSection(const QString& profileTitle, const QString& profileType = QString());
 };
