@@ -345,6 +345,34 @@ For non-swappable grinders (e.g. Eureka Mignon, Comandante), the field auto-fill
 
 **Status**: Implemented in PR #368.
 
+### 10. Espresso Dial-In Reference Tables in System Prompt
+
+**Problem**: The current system prompt has only 3 lines for roast considerations and generic common patterns (gusher, choker, sour, bitter). It lacks structured multi-variable relationships — e.g., "what does higher flow rate do to clarity vs body?" or "how should infusion length change for different roast levels?"
+
+**Source**: Åbn Coffee "Espresso tabel oversigt" — a community reference mapping 7 espresso variables against taste/texture outcomes. See [`docs/ESPRESSO_DIAL_IN_REFERENCE.md`](ESPRESSO_DIAL_IN_REFERENCE.md).
+
+**What it adds beyond the current system prompt**:
+1. **5-tier roast level matrix** — maps light→dark against acidity, clarity, extractability, mouthfeel, puck risk, puck prep importance, and specific flavor notes (fruits → caramel → choc+fruit → milk choc → dark choc). Current prompt only has 3 tiers with rough temp ranges.
+2. **Grind→flow→pressure dynamics** — how grind affects channelling risk, the body/sweetness curve (less → more → less), clarity, flow limit behavior, and pressure decline patterns. Directly relevant to DE1 curve interpretation.
+3. **Preinfusion tuning** — drip weight targets (4-10g vs 0.5g), move-on timing (30s vs 5s), and texture/body/clarity tradeoffs. Current prompt has nothing on preinfusion dialing.
+4. **Pressure sweet spot** — 6-9 bar range with taste descriptions (thin/watery → clear delicate → rich traditional → muddy). Current prompt says "don't assume 9 bar" but doesn't explain what different pressures taste like.
+5. **Flow rate → flavor pairing** — high flow favors florals/fruits with clarity; low flow favors chocolate/nuts with body. Plus flow rate recommendations per roast level and use-case ranges (milk drinks vs straight espresso).
+6. **Gagné's ratio-flow formula** — `Flow = 4.867 - (6.6 × ratio)` — a concrete relationship between ratio and recommended flow rate.
+7. **Flavor targeting & correction tables** — full matrix of "want more X → adjust Y in direction Z" for acidity, sweetness, body, clarity, wine-like texture. Plus correction tables for sourness, bitterness, burnt taste, thin taste, muddiness.
+8. **TDS vs EY% taste mapping** — bitterness increases with both, sourness increases with high TDS + low EY, dark chocolate at high EY + low TDS. Useful when user provides refractometer data.
+
+**Approach**: Add a "Dial-In Reference" section to `espressoSystemPrompt()` in `shotsummarizer.cpp`, between "Roast Considerations" and "Forbidden Simplifications". Compact representation (~800-1000 tokens) would be cacheable with Anthropic's 90% discount.
+
+**Key sections to add**:
+- Roast level → temperature + expected flavor profile (5 tiers)
+- Flow rate → flavor affinity by roast level
+- Preinfusion tuning (drip weight, move-on time, tradeoffs)
+- Pressure sweet spot with taste descriptions
+- Flavor correction quick-reference (sour→do X, bitter→do Y)
+- TDS/EY interpretation guidelines
+
+**Status**: Reference data collected in [`docs/ESPRESSO_DIAL_IN_REFERENCE.md`](ESPRESSO_DIAL_IN_REFERENCE.md). Not yet integrated into system prompt.
+
 ### 9. Conversation Context Layers
 
 Summary of the layered context approach:
@@ -352,6 +380,7 @@ Summary of the layered context approach:
 | Layer | Content | Size | Changes | Caching | Status |
 |-------|---------|------|---------|---------|--------|
 | Static knowledge | System prompt + curated profile knowledge base | ~2-2.5K tokens | Per app release | System prompt caching (Anthropic/OpenAI/Gemini) | **Done** |
+| Dial-in reference | Roast/grind/flow/pressure/ratio → taste tables, flavor correction guide | ~0.8-1K tokens | Per app release | System prompt caching | Data collected ([`ESPRESSO_DIAL_IN_REFERENCE.md`](ESPRESSO_DIAL_IN_REFERENCE.md)), not yet in prompt |
 | Profile catalog | Compact one-liner per profile for cross-profile awareness | ~2-3K tokens | Per app release | System prompt caching | Not implemented |
 | Bean enrichment | Origin, processing, variety, tasting notes from Bean Base/visualizer | ~0.5-1K tokens | Per bean preset | Included in user prompt | Not implemented |
 | Dial-in history | Last 5 shots with same profile family (recipe, grind, temp, score, notes) | ~1-2.5K tokens | Every request | Not cacheable | **Done** |
@@ -369,6 +398,7 @@ Total context today: ~5-7K tokens. With all layers: ~12-16K tokens, with ~50-70%
 2. **Profile catalog** (idea #1) — Generate compact profile summaries at build time, include in system prompt. Enables basic cross-profile awareness.
 3. **Grinder knowledge base** — Curated database of ~150 grinders with burr size, type, material, adjustment sensitivity, and espresso suitability. See [`docs/GRINDER_DATABASE.md`](GRINDER_DATABASE.md). When user enters grinder model, AI can provide grind-setting guidance and explain grind characteristics for their specific burr geometry.
 4. **Structured grinder + burr fields** (idea #8) — Split single "Grinder" field into Manufacturer / Model / Burrs with cascading autocomplete from history. Enables AI to look up exact grinder specs and burr flavor profile. See idea #8 for full design.
+5. **Espresso dial-in reference tables** (idea #10) — Add multi-variable dial-in knowledge (roast→temp→flavor, flow→clarity/body, pressure sweet spot, preinfusion tuning, flavor correction guide, TDS/EY interpretation) to system prompt. Data collected from Åbn Coffee reference in [`docs/ESPRESSO_DIAL_IN_REFERENCE.md`](ESPRESSO_DIAL_IN_REFERENCE.md). ~800-1000 additional tokens, fully cacheable.
 
 ### Phase 2: Bean enrichment
 3. **Visualizer coffee_bags lookup** (idea #4 tier 1) — Query user's own visualizer data for bean details. No new API keys needed, uses existing auth. Avoids double-entry for visualizer users.
@@ -394,3 +424,4 @@ Total context today: ~5-7K tokens. With all layers: ~12-16K tokens, with ~50-70%
 - **Profile Knowledge Base**: [`docs/PROFILE_KNOWLEDGE_BASE.md`](PROFILE_KNOWLEDGE_BASE.md) — 18 profiles with source-attributed guidance on roast suitability, temperature, ratio, grind, expected curve behavior, and dial-in tips. Enriched from three Decent video tutorials (light/medium/dark roast profiles).
 - **AI Profile Knowledge Resource**: [`resources/ai/profile_knowledge.md`](../resources/ai/profile_knowledge.md) — AI-optimized extract loaded as Qt resource. Injected into system prompt per-profile via `ShotSummarizer::shotAnalysisSystemPrompt()`.
 - **Grinder Database**: [`docs/GRINDER_DATABASE.md`](GRINDER_DATABASE.md) — ~150 grinders across premium, mid-range, budget, commercial, and hand grinder categories with burr specs, plus aftermarket burr sets and grind-setting guidance
+- **Espresso Dial-In Reference Tables**: [`docs/ESPRESSO_DIAL_IN_REFERENCE.md`](ESPRESSO_DIAL_IN_REFERENCE.md) — Structured multi-variable reference from Åbn Coffee mapping roast level, temperature, grind size, infusion, peak pressure, flow rate, and ratio to their effects on taste, texture, and extraction. Includes flavor targeting tables ("how to get more acidity/sweetness/body/clarity"), flavor correction tables ("how to fix sourness/bitterness/thin taste"), TDS vs EY% taste relationships, Gagné's ratio-flow formula, flow rate recommendations by roast level, and preinfusion tuning guidance. Source: Åbn Coffee "Espresso tabel oversigt" (work in progress community reference).
