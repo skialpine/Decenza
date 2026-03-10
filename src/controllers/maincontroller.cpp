@@ -2814,6 +2814,7 @@ void MainController::onEspressoCycleStarted() {
     m_lastShotTime = 0;
     m_extractionStarted = false;
     m_lastFrameNumber = -1;
+    m_trackLogCounter = 0;
     m_frameWeightSkipSent = -1;
     m_frameStartTime = 0;
     m_lastPressure = 0;
@@ -3463,6 +3464,25 @@ void MainController::onShotSampleReceived(const ShotSample& sample) {
                                sample.mixTemp,
                                pressureGoal, flowGoal, sample.setTempGoal,
                                sample.frameNumber, isFlowMode);
+
+    // Log cup tracking delta (every ~2s during extraction for debug)
+    if (isExtracting && m_trackLogCounter++ % 10 == 0) {
+        double goal = isFlowMode ? flowGoal : pressureGoal;
+        double actual = isFlowMode ? sample.groupFlow : sample.groupPressure;
+        double delta = qAbs(actual - goal);
+        double floorGood = isFlowMode ? 0.4 : 0.8;
+        double floorWarn = isFlowMode ? 0.8 : 1.8;
+        double threshGood = qMax(floorGood, goal * 0.25);
+        double threshWarn = qMax(floorWarn, goal * 0.50);
+        QString color = delta < threshGood ? "GREEN" : (delta < threshWarn ? "YELLOW" : "RED");
+        qDebug() << "[CupTrack]" << (isFlowMode ? "flow" : "pressure")
+                 << "actual=" << QString::number(actual, 'f', 2)
+                 << "goal=" << QString::number(goal, 'f', 2)
+                 << "delta=" << QString::number(delta, 'f', 2)
+                 << "threshG=" << QString::number(threshGood, 'f', 2)
+                 << "threshW=" << QString::number(threshWarn, 'f', 2)
+                 << color;
+    }
 }
 
 void MainController::onScaleWeightChanged(double weight) {

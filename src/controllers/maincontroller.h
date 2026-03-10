@@ -324,6 +324,7 @@ private:
     double m_lastShotTime = 0;    // Last shot sample time relative to shot start (for weight sync)
     bool m_extractionStarted = false;
     int m_lastFrameNumber = -1;
+    int m_trackLogCounter = 0;
     int m_frameWeightSkipSent = -1;  // Frame number for which we've sent a weight-based skip command
     double m_frameStartTime = 0;     // Shot-relative time when current frame started
     double m_lastPressure = 0;       // Last sample pressure (for transition reason inference)

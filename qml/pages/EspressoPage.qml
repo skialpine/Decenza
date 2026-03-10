@@ -12,6 +12,20 @@ Page {
     // Local weight property - updated directly in signal handler for immediate display
     property real currentWeight: 0.0
 
+    // Debounced frame name — holds each value for at least 1 second
+    property string displayedFrameName: ""
+    property string pendingFrameName: ""
+
+    Timer {
+        id: frameNameDebounce
+        interval: 1000
+        onTriggered: {
+            if (espressoPage.pendingFrameName !== espressoPage.displayedFrameName) {
+                espressoPage.displayedFrameName = espressoPage.pendingFrameName
+            }
+        }
+    }
+
     // Accessibility: value announcement cycling (swipe left/right)
     property int accessibilityValueIndex: 0
     readonly property var accessibilityValueNames: ["Frame", "Time", "Pressure", "Flow", "Temperature", "Weight"]
@@ -254,6 +268,15 @@ Page {
     Connections {
         target: MainController
         function onFrameChanged(frameIndex, frameName, transitionReason) {
+            // Debounced frame name for phase pill (hold each name at least 1s)
+            if (frameName !== "") {
+                espressoPage.pendingFrameName = frameName
+                if (!frameNameDebounce.running) {
+                    espressoPage.displayedFrameName = frameName
+                    frameNameDebounce.restart()
+                }
+            }
+
             if (transitionReason === "" || frameName === "") return
             var text = _transitionText(transitionReason)
             frameTransitionLifecycle.stop()
@@ -445,10 +468,17 @@ Page {
                         case MachineStateType.Phase.EspressoPreheating:
                             return TranslationManager.translate("espresso.phase.preheating", "Preheating")
                         case MachineStateType.Phase.Preinfusion:
-                            return TranslationManager.translate("espresso.phase.preinfusion", "Pre-infusion")
                         case MachineStateType.Phase.Pouring:
-                            return TranslationManager.translate("espresso.phase.pouring", "Pouring")
                         case MachineStateType.Phase.Ending:
+                            // Show frame name if available (advanced/flow profiles),
+                            // fall back to generic phase name
+                            var frameName = espressoPage.displayedFrameName
+                            if (frameName)
+                                return frameName
+                            if (MachineState.phase === MachineStateType.Phase.Preinfusion)
+                                return TranslationManager.translate("espresso.phase.preinfusion", "Pre-infusion")
+                            if (MachineState.phase === MachineStateType.Phase.Pouring)
+                                return TranslationManager.translate("espresso.phase.pouring", "Pouring")
                             return TranslationManager.translate("espresso.phase.ending", "Ending")
                         default: return ""
                     }
@@ -462,13 +492,13 @@ Page {
         }
     }
 
-    // Frame transition notification (same position as preheating banner)
+    // Frame transition notification (anchored next to phase pill)
     Rectangle {
         id: frameTransitionPill
         Accessible.ignored: true
-        anchors.top: parent.top
-        anchors.topMargin: Theme.pageTopMargin + Theme.scaled(20)
-        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: statusBanner.verticalCenter
+        anchors.left: statusBanner.right
+        anchors.leftMargin: Theme.scaled(8)
         z: 10
 
         width: frameTransitionLabel.width + Theme.spacingLarge * 2
