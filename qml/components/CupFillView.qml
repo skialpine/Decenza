@@ -1010,7 +1010,7 @@ Item {
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: root.currentWeight.toFixed(1) + "g"
+            text: root.currentWeight.toFixed(1) + TranslationManager.translate("common.unit.grams", "g")
             color: Theme.textColor
             font.pixelSize: Theme.scaled(38)
             font.weight: Font.Bold
@@ -1019,7 +1019,7 @@ Item {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: root.targetWeight > 0
-                ? TranslationManager.translate("espresso.cupFill.target", "target") + " " + root.targetWeight.toFixed(0) + "g"
+                ? TranslationManager.translate("espresso.cupFill.target", "target") + " " + root.targetWeight.toFixed(0) + TranslationManager.translate("common.unit.grams", "g")
                 : ""
             color: Theme.textSecondaryColor
             font.pixelSize: Theme.scaled(16)

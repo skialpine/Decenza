@@ -55,6 +55,7 @@ KeyboardAwareContainer {
                         Text {
                             text: TranslationManager.translate("settings.preferences.autoSleepDesc", "Put the machine to sleep after inactivity")
                             color: Theme.textSecondaryColor
+                            font.family: Theme.bodyFont.family
                             font.pixelSize: Theme.scaled(12)
                         }
 
@@ -104,6 +105,7 @@ KeyboardAwareContainer {
                         Text {
                             text: TranslationManager.translate("settings.preferences.postShotReviewCloseDesc", "Return to idle after reviewing shot")
                             color: Theme.textSecondaryColor
+                            font.family: Theme.bodyFont.family
                             font.pixelSize: Theme.scaled(12)
                         }
 
@@ -164,6 +166,7 @@ KeyboardAwareContainer {
                             Layout.fillWidth: true
                             text: TranslationManager.translate("settings.preferences.refillKitDesc", "Control whether the machine uses an automatic water refill kit")
                             color: Theme.textSecondaryColor
+                            font.family: Theme.bodyFont.family
                             font.pixelSize: Theme.scaled(12)
                             wrapMode: Text.WordWrap
                         }
@@ -176,6 +179,7 @@ KeyboardAwareContainer {
                                 return TranslationManager.translate("settings.preferences.refillKitUnknown", "Status: Unknown")
                             }
                             color: DE1Device.refillKitDetected === 1 ? Theme.successColor : Theme.textSecondaryColor
+                            font.family: Theme.bodyFont.family
                             font.pixelSize: Theme.scaled(12)
                         }
 
@@ -467,6 +471,7 @@ KeyboardAwareContainer {
                                 return prefix + city + (country ? ", " + country : "") + " (" + lat + ", " + lon + ")"
                             }
                             color: Theme.textColor
+                            font.family: Theme.bodyFont.family
                             font.pixelSize: Theme.scaled(12)
                             wrapMode: Text.WordWrap
                         }
@@ -480,6 +485,7 @@ KeyboardAwareContainer {
                                   ? "GPS disabled - tap to open Settings"
                                   : "No location - tap to enable"
                             color: Theme.primaryColor
+                            font.family: Theme.bodyFont.family
                             font.pixelSize: Theme.scaled(12)
                             font.underline: true
                             wrapMode: Text.WordWrap
@@ -1060,6 +1066,7 @@ KeyboardAwareContainer {
                             Layout.fillWidth: true
                             text: TranslationManager.translate("settings.options.waterRefillLevelDesc", "Water level at which the machine warns you to refill")
                             color: Theme.textSecondaryColor
+                            font.family: Theme.bodyFont.family
                             font.pixelSize: Theme.scaled(12)
                             wrapMode: Text.WordWrap
                         }
@@ -1152,6 +1159,15 @@ KeyboardAwareContainer {
 
                         property string currentMode: Settings.value("espresso/extractionView", "chart")
 
+                        Connections {
+                            target: Settings
+                            function onValueChanged(key) {
+                                if (key === "espresso/extractionView") {
+                                    extractionViewContent.currentMode = Settings.value("espresso/extractionView", "chart")
+                                }
+                            }
+                        }
+
                         Text {
                             text: TranslationManager.translate("settings.preferences.extractionView", "Extraction View")
                             color: Theme.textColor
@@ -1163,6 +1179,7 @@ KeyboardAwareContainer {
                         Text {
                             text: TranslationManager.translate("settings.preferences.extractionViewDesc", "Visualization during espresso extraction")
                             color: Theme.textSecondaryColor
+                            font.family: Theme.bodyFont.family
                             font.pixelSize: Theme.scaled(12)
                         }
 
@@ -1279,6 +1296,7 @@ KeyboardAwareContainer {
                             property real temp: typeof DE1Device.steamTemperature === 'number' ? DE1Device.steamTemperature : 0
                             text: TranslationManager.translate("settings.preferences.current", "Current:") + " " + temp.toFixed(0) + "°C"
                             color: Theme.textSecondaryColor
+                            font.family: Theme.bodyFont.family
                             font.pixelSize: Theme.scaled(12)
                         }
 
@@ -1364,6 +1382,7 @@ KeyboardAwareContainer {
                             text: TranslationManager.translate("settings.preferences.virtualScaleDesc",
                                   "Estimate cup weight from the machine's flow sensor when no Bluetooth scale is connected. Accuracy depends on dose weight being set correctly.")
                             color: Theme.textSecondaryColor
+                            font.family: Theme.bodyFont.family
                             font.pixelSize: Theme.scaled(12)
                             wrapMode: Text.WordWrap
                         }
@@ -1696,6 +1715,7 @@ KeyboardAwareContainer {
                         Text {
                             text: TranslationManager.translate("settings.calibration.description", "Idle temp, warmup flow rates, timeout")
                             color: Theme.textSecondaryColor
+                            font.family: Theme.bodyFont.family
                             font.pixelSize: Theme.scaled(12)
                         }
                     }

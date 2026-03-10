@@ -2864,6 +2864,13 @@ void MainController::onEspressoCycleStarted() {
 }
 
 void MainController::onShotEnded() {
+    // Clear filtered goals so CupFillView doesn't show stale tracking colors
+    if (m_filteredGoalPressure != 0 || m_filteredGoalFlow != 0) {
+        m_filteredGoalPressure = 0;
+        m_filteredGoalFlow = 0;
+        emit goalsChanged();
+    }
+
     // Capture brew overrides before clearing temperature (used later when saving shot)
     // These ALWAYS have values - either user override or profile default
     double shotTemperatureOverride = 0.0;

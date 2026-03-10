@@ -12,20 +12,11 @@ Page {
     // Local weight property - updated directly in signal handler for immediate display
     property real currentWeight: 0.0
 
-    // Debounced frame name — holds each value for at least 1 second to prevent
-    // rapid flickering when the profile has short transitional frames.
+    // Frame name display — only updates when the same frame name is seen on
+    // consecutive frame-change events, filtering out short transitional frames.
     property string displayedFrameName: ""
     property string pendingFrameName: ""
-
-    Timer {
-        id: frameNameDebounce
-        interval: 1000
-        onTriggered: {
-            if (espressoPage.pendingFrameName !== espressoPage.displayedFrameName) {
-                espressoPage.displayedFrameName = espressoPage.pendingFrameName
-            }
-        }
-    }
+    property int pendingFrameCount: 0
 
     // Accessibility: value announcement cycling (swipe left/right)
     property int accessibilityValueIndex: 0
@@ -183,10 +174,10 @@ Page {
     Connections {
         target: MachineState
         function onShotStarted() {
-            // Reset debounced frame name so previous shot's last frame doesn't linger
+            // Reset frame name so previous shot's last frame doesn't linger
             espressoPage.displayedFrameName = ""
             espressoPage.pendingFrameName = ""
-            frameNameDebounce.stop()
+            espressoPage.pendingFrameCount = 0
 
             if (!accessibilityEnabled()) return
             lastAnnouncedWeight = 0
@@ -274,12 +265,22 @@ Page {
     Connections {
         target: MainController
         function onFrameChanged(frameIndex, frameName, transitionReason) {
-            // Debounced frame name for phase pill (hold each name at least 1s)
+            // Frame name filtering: show immediately if it matches the pending name
+            // (confirming it's a real phase, not a brief transition), or queue it.
             if (frameName !== "") {
-                espressoPage.pendingFrameName = frameName
-                if (!frameNameDebounce.running) {
-                    espressoPage.displayedFrameName = frameName
-                    frameNameDebounce.restart()
+                if (frameName === espressoPage.pendingFrameName) {
+                    espressoPage.pendingFrameCount++
+                    // Second consecutive event with same name — it's stable, show it
+                    if (espressoPage.pendingFrameCount >= 2 && espressoPage.displayedFrameName !== frameName) {
+                        espressoPage.displayedFrameName = frameName
+                    }
+                } else {
+                    // New frame name — if it's the first frame or display is empty, show immediately
+                    espressoPage.pendingFrameName = frameName
+                    espressoPage.pendingFrameCount = 1
+                    if (espressoPage.displayedFrameName === "") {
+                        espressoPage.displayedFrameName = frameName
+                    }
                 }
             }
 
@@ -461,15 +462,23 @@ Page {
 
             // Phase dot
             Rectangle {
+                id: phaseDot
                 width: Theme.scaled(8)
                 height: Theme.scaled(8)
                 radius: Theme.scaled(4)
-                color: "white"
+                color: Theme.textColor
                 anchors.verticalCenter: parent.verticalCenter
+                opacity: 1.0
+
+                property bool animating: MachineState.phase === MachineStateType.Phase.EspressoPreheating ||
+                                         MachineState.phase === MachineStateType.Phase.Pouring
+
+                onAnimatingChanged: {
+                    if (!animating) phaseDot.opacity = 1.0
+                }
 
                 SequentialAnimation on opacity {
-                    running: MachineState.phase === MachineStateType.Phase.EspressoPreheating ||
-                             MachineState.phase === MachineStateType.Phase.Pouring
+                    running: phaseDot.animating
                     loops: Animation.Infinite
                     NumberAnimation { to: 0.3; duration: 600 }
                     NumberAnimation { to: 1.0; duration: 600 }
@@ -498,7 +507,7 @@ Page {
                         default: return ""
                     }
                 }
-                color: "white"
+                color: Theme.textColor
                 font.family: Theme.bodyFont.family
                 font.pixelSize: Theme.bodyFont.pixelSize
                 font.weight: Font.Bold
