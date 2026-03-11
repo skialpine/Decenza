@@ -18,7 +18,7 @@
 #include <cxxabi.h>
 #endif
 
-#if (defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)) || defined(Q_OS_MACOS)
+#if (defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)) || defined(Q_OS_MACOS) || defined(Q_OS_IOS)
 #include <execinfo.h>
 #endif
 
@@ -144,7 +144,7 @@ static void writeBacktraceToFile(FILE* f)
 }
 #endif
 
-#ifdef Q_OS_MACOS
+#if defined(Q_OS_MACOS) || defined(Q_OS_IOS)
 static void writeBacktraceToFile(FILE* f)
 {
     void* buffer[64];
@@ -180,7 +180,7 @@ void CrashHandler::writeCrashLog(int signal, const char* signalName)
     }
 
     // Write backtrace
-#if defined(Q_OS_ANDROID) || defined(Q_OS_LINUX) || defined(Q_OS_WIN) || defined(Q_OS_MACOS)
+#if defined(Q_OS_ANDROID) || defined(Q_OS_LINUX) || defined(Q_OS_WIN) || defined(Q_OS_MACOS) || defined(Q_OS_IOS)
     writeBacktraceToFile(f);
 #else
     fprintf(f, "\nBacktrace: not available on this platform\n");
@@ -200,7 +200,7 @@ void CrashHandler::writeCrashLog(int signal, const char* signalName)
             if (s_lastDebugMessage[0] != '\0') {
                 fprintf(debugLog, "\nLast debug message:\n  %s\n", s_lastDebugMessage);
             }
-#if defined(Q_OS_ANDROID) || defined(Q_OS_LINUX) || defined(Q_OS_WIN) || defined(Q_OS_MACOS)
+#if defined(Q_OS_ANDROID) || defined(Q_OS_LINUX) || defined(Q_OS_WIN) || defined(Q_OS_MACOS) || defined(Q_OS_IOS)
             writeBacktraceToFile(debugLog);
 #endif
             fprintf(debugLog, "\n=== END CRASH REPORT ===\n");
