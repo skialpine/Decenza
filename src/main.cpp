@@ -15,7 +15,6 @@
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
-#include <QOperatingSystemVersion>
 #include <QSet>
 #include <QStandardPaths>
 #include <memory>
@@ -307,20 +306,17 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
 
 #ifdef Q_OS_MACOS
-    // Workaround for macOS Tahoe (26.x) beta crash in Apple Color Emoji rendering.
-    // PNGReadPlugin::InitializePluginData crashes at 0x0bad4007 when CoreText tries
-    // to decode color emoji bitmaps from the sbix font table via CTFontDrawGlyphs →
-    // CopyEmojiImage. NativeTextRendering calls QCoreTextFontEngine::imageForGlyph
-    // which triggers this path. QtTextRendering uses distance fields instead, which
-    // gets glyph outlines (not bitmaps) from CoreText, completely avoiding the crash.
-    // This app renders emoji as SVG images (Theme.emojiToImage), so bitmap emoji
-    // glyphs are not needed.
-    // Apply on macOS 16+ (Tahoe). The version may be reported as 16 or 26
-    // depending on the beta build, so check >= 16 to cover both cases.
-    if (QOperatingSystemVersion::current() >= QOperatingSystemVersion(QOperatingSystemVersion::MacOS, 16, 0)) {
-        QQuickWindow::setTextRenderType(QQuickWindow::QtTextRendering);
-        qInfo() << "macOS 16+ detected: using QtTextRendering to workaround PNGReadPlugin crash";
-    }
+    // Workaround for macOS crash in Apple Color Emoji bitmap rendering.
+    // PNGReadPlugin::InitializePluginData crashes on QSGRenderThread when CoreText
+    // tries to decode emoji bitmaps from the sbix font table via CTFontDrawGlyphs →
+    // CopyEmojiImage → CGImageSourceCreateImageAtIndex.
+    // QtTextRendering uses distance fields (glyph outlines) instead of
+    // NativeTextRendering (which calls imageForGlyph → bitmap path), avoiding the
+    // crash entirely. This app renders emoji as SVG images (Theme.emojiToImage),
+    // so bitmap emoji glyphs are not needed.
+    // Applied unconditionally — the version check (>= macOS 16) was unreliable
+    // across the 15→26 version jump, and QtTextRendering works fine on all macOS.
+    QQuickWindow::setTextRenderType(QQuickWindow::QtTextRendering);
 #endif
 
     // Set application metadata
