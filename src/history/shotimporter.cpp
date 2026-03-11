@@ -3,13 +3,13 @@
 #include "shotfileparser.h"
 #include <QDir>
 #include <QDirIterator>
-#include <QProcess>
 #include <QTimer>
 #include <QCoreApplication>
 #include <QDebug>
 #include <QFile>
 #include <QFileInfo>
 #include <QUrl>
+#include <zlib.h>
 
 #ifdef Q_OS_ANDROID
 #include <QJniObject>
@@ -263,73 +263,125 @@ bool ShotImporter::extractZip(const QString& zipPath, const QString& destDir)
     qDebug() << "ShotImporter: Extracted" << extractedCount << "files";
     return extractedCount > 0;
 
-#elif defined(Q_OS_IOS)
-    // QProcess is not available on iOS - zip extraction not supported
-    Q_UNUSED(zipPath)
-    Q_UNUSED(destDir)
-    qWarning() << "ShotImporter: Zip extraction not supported on iOS (no QProcess)";
-    return false;
-
-#elif defined(Q_OS_WIN)
-    QProcess process;
-    process.setWorkingDirectory(destDir);
-
-    // Convert file:// URL to path if needed
-    QString path = zipPath;
-    if (path.startsWith("file:///")) {
-        path = QUrl(path).toLocalFile();
-    }
-
-    // Try PowerShell first (always available on Windows)
-    QString psPath = path;
-    QString psDestDir = destDir;
-    process.start("powershell", QStringList()
-        << "-NoProfile"
-        << "-Command"
-        << QString("Expand-Archive -Path '%1' -DestinationPath '%2' -Force")
-            .arg(psPath.replace("'", "''"))
-            .arg(psDestDir.replace("'", "''")));
-
-    if (!process.waitForFinished(300000)) {  // 5 minute timeout for large archives
-        qWarning() << "PowerShell extraction timeout";
-
-        // Try unzip as fallback (available in Git Bash)
-        process.start("unzip", QStringList() << "-o" << "-q" << path << "-d" << destDir);
-        if (!process.waitForFinished(300000)) {
-            qWarning() << "unzip extraction timeout";
-            return false;
-        }
-    }
-
-    if (process.exitCode() != 0) {
-        qWarning() << "Extraction failed:" << process.readAllStandardError();
-        return false;
-    }
-
-    return true;
 #else
-    QProcess process;
-    process.setWorkingDirectory(destDir);
+    // All non-Android platforms: extract zip using zlib (no QProcess dependency).
+    // Parses the zip central directory and inflates each entry.
 
-    // Convert file:// URL to path if needed
     QString path = zipPath;
     if (path.startsWith("file://")) {
         path = QUrl(path).toLocalFile();
     }
 
-    // Unix-like systems: use unzip
-    process.start("unzip", QStringList() << "-o" << "-q" << path << "-d" << destDir);
-    if (!process.waitForFinished(300000)) {
-        qWarning() << "unzip extraction timeout";
+    qDebug() << "ShotImporter: Extracting" << path << "to" << destDir;
+
+    QFile zipFile(path);
+    if (!zipFile.open(QIODevice::ReadOnly)) {
+        qWarning() << "ShotImporter: Failed to open zip file:" << path;
         return false;
     }
 
-    if (process.exitCode() != 0) {
-        qWarning() << "Extraction failed:" << process.readAllStandardError();
-        return false;
+    QByteArray zipData = zipFile.readAll();
+    zipFile.close();
+
+    const char* data = zipData.constData();
+    const qint64 size = zipData.size();
+    int extractedCount = 0;
+
+    // Walk zip local file headers (signature 0x04034b50 = "PK\3\4")
+    qint64 offset = 0;
+    while (offset + 30 <= size) {
+        // Check local file header signature
+        auto read16 = [&](qint64 pos) -> quint16 {
+            return static_cast<quint8>(data[pos]) |
+                   (static_cast<quint8>(data[pos + 1]) << 8);
+        };
+        auto read32 = [&](qint64 pos) -> quint32 {
+            return static_cast<quint8>(data[pos]) |
+                   (static_cast<quint8>(data[pos + 1]) << 8) |
+                   (static_cast<quint8>(data[pos + 2]) << 16) |
+                   (static_cast<quint8>(data[pos + 3]) << 24);
+        };
+
+        quint32 sig = read32(offset);
+        if (sig != 0x04034b50)
+            break;  // No more local file headers (hit central directory or end)
+
+        quint16 method       = read16(offset + 8);
+        quint32 compSize     = read32(offset + 18);
+        quint32 uncompSize   = read32(offset + 22);
+        quint16 nameLen      = read16(offset + 26);
+        quint16 extraLen     = read16(offset + 28);
+
+        qint64 headerEnd = offset + 30 + nameLen + extraLen;
+        if (headerEnd + compSize > size) {
+            qWarning() << "ShotImporter: Truncated zip entry at offset" << offset;
+            break;
+        }
+
+        QString entryName = QString::fromUtf8(data + offset + 30, nameLen);
+        const char* entryData = data + headerEnd;
+
+        // Skip directory entries and entries with path traversal
+        if (entryName.endsWith('/') || entryName.contains("..")) {
+            if (!entryName.contains("..")) {
+                QDir().mkpath(destDir + "/" + entryName);
+            }
+            offset = headerEnd + compSize;
+            continue;
+        }
+
+        // Ensure parent directory exists
+        QString outPath = destDir + "/" + entryName;
+        QDir().mkpath(QFileInfo(outPath).absolutePath());
+
+        QByteArray fileContent;
+        if (method == 0) {
+            // Stored (no compression)
+            fileContent = QByteArray(entryData, compSize);
+        } else if (method == 8) {
+            // Deflated — use zlib raw inflate (wbits = -MAX_WBITS for raw deflate)
+            fileContent.resize(uncompSize);
+            z_stream strm = {};
+            strm.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(entryData));
+            strm.avail_in = compSize;
+            strm.next_out = reinterpret_cast<Bytef*>(fileContent.data());
+            strm.avail_out = uncompSize;
+
+            if (inflateInit2(&strm, -MAX_WBITS) != Z_OK) {
+                qWarning() << "ShotImporter: inflateInit2 failed for" << entryName;
+                offset = headerEnd + compSize;
+                continue;
+            }
+
+            int ret = inflate(&strm, Z_FINISH);
+            inflateEnd(&strm);
+
+            if (ret != Z_STREAM_END) {
+                qWarning() << "ShotImporter: inflate failed for" << entryName << "ret=" << ret;
+                offset = headerEnd + compSize;
+                continue;
+            }
+        } else {
+            qWarning() << "ShotImporter: Unsupported compression method" << method
+                       << "for" << entryName;
+            offset = headerEnd + compSize;
+            continue;
+        }
+
+        QFile outFile(outPath);
+        if (outFile.open(QIODevice::WriteOnly)) {
+            outFile.write(fileContent);
+            outFile.close();
+            extractedCount++;
+        } else {
+            qWarning() << "ShotImporter: Failed to write" << outPath;
+        }
+
+        offset = headerEnd + compSize;
     }
 
-    return true;
+    qDebug() << "ShotImporter: Extracted" << extractedCount << "files";
+    return extractedCount > 0;
 #endif
 }
 
