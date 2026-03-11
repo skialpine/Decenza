@@ -98,7 +98,7 @@ signals:
     void isChargingChanged();
     void chargingModeChanged();
 
-    // Emitted when we have commanded the DE1 USB port ON but Android has reported
+    // Emitted when we have commanded the DE1 USB port ON but the OS has reported
     // DISCHARGING (port not delivering power) for 5 consecutive 60-second checks (~5 min).
     // Connect in QML to show the user a visible warning.
     void chargingMismatchDetected();

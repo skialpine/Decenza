@@ -1382,8 +1382,11 @@ int main(int argc, char *argv[])
 
             // IMPORTANT: Ensure charger is ON when app goes to background
             // This prevents tablet from dying if user doesn't return to the app.
-            // On iOS with bluetooth-central background mode, CoreBluetooth stays valid
-            // during suspension so BLE writes are safe here.
+            // Previously skipped on iOS because the 50ms BLE command queue raced with
+            // CoreBluetooth suspension, causing SIGSEGV. Now safe because ensureChargerOn
+            // uses setUsbChargerOnUrgent() which bypasses the queue and writes synchronously
+            // before iOS can tear down CoreBluetooth. The bluetooth-central background mode
+            // also helps by keeping CoreBluetooth alive longer during backgrounding.
             batteryManager.ensureChargerOn();
         }
         else if (state == Qt::ApplicationActive && wasSuspended) {
