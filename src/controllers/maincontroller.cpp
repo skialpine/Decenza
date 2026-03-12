@@ -165,6 +165,17 @@ MainController::MainController(QNetworkAccessManager* networkManager,
                 uploadCurrentProfile();
             }
         });
+
+        // Clear temporary steam disable when machine goes to sleep or disconnects
+        // so it resets to normal behavior on next wake/reconnect
+        connect(m_machineState, &MachineState::phaseChanged, this, [this]() {
+            auto phase = m_machineState->phase();
+            if ((phase == MachineState::Phase::Sleep || phase == MachineState::Phase::Disconnected)
+                && m_settings && m_settings->steamDisabled()) {
+                qDebug() << "Machine entering" << m_machineState->phaseString() << "- clearing temporary steamDisabled flag";
+                m_settings->setSteamDisabled(false);
+            }
+        });
     }
 
     // Create visualizer uploader and importer
