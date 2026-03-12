@@ -192,6 +192,7 @@ KeyboardAwareContainer {
                     spacing: Theme.scaled(15)
 
                     ColumnLayout {
+                        Layout.fillWidth: true
                         spacing: Theme.scaled(2)
 
                         Tr {
@@ -202,10 +203,12 @@ KeyboardAwareContainer {
                         }
 
                         Tr {
+                            Layout.fillWidth: true
                             key: "settings.visualizer.autoUploadDesc"
                             fallback: "Automatically upload espresso shots after completion"
                             color: Theme.textSecondaryColor
                             font.pixelSize: Theme.scaled(12)
+                            wrapMode: Text.WordWrap
                         }
                     }
 
@@ -224,6 +227,7 @@ KeyboardAwareContainer {
                     spacing: Theme.scaled(15)
 
                     ColumnLayout {
+                        Layout.fillWidth: true
                         spacing: Theme.scaled(2)
 
                         Tr {
@@ -234,10 +238,12 @@ KeyboardAwareContainer {
                         }
 
                         Tr {
+                            Layout.fillWidth: true
                             key: "settings.visualizer.minDurationDesc"
                             fallback: "Only upload shots longer than this (skip aborted shots)"
                             color: Theme.textSecondaryColor
                             font.pixelSize: Theme.scaled(12)
+                            wrapMode: Text.WordWrap
                         }
                     }
 
@@ -266,6 +272,7 @@ KeyboardAwareContainer {
                     spacing: Theme.scaled(15)
 
                     ColumnLayout {
+                        Layout.fillWidth: true
                         spacing: Theme.scaled(2)
 
                         Tr {
@@ -276,10 +283,12 @@ KeyboardAwareContainer {
                         }
 
                         Tr {
+                            Layout.fillWidth: true
                             key: "settings.visualizer.editAfterShotDesc"
                             fallback: "Open Shot Info page after each espresso extraction"
                             color: Theme.textSecondaryColor
                             font.pixelSize: Theme.scaled(12)
+                            wrapMode: Text.WordWrap
                         }
                     }
 
@@ -298,6 +307,7 @@ KeyboardAwareContainer {
                     spacing: Theme.scaled(15)
 
                     ColumnLayout {
+                        Layout.fillWidth: true
                         spacing: Theme.scaled(2)
 
                         Tr {
@@ -308,10 +318,12 @@ KeyboardAwareContainer {
                         }
 
                         Tr {
+                            Layout.fillWidth: true
                             key: "settings.visualizer.clearNotesOnStartDesc"
                             fallback: "Clear shot notes when starting a new shot"
                             color: Theme.textSecondaryColor
                             font.pixelSize: Theme.scaled(12)
+                            wrapMode: Text.WordWrap
                         }
                     }
 

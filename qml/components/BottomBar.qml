@@ -92,6 +92,8 @@ Rectangle {
             color: root.contentColor
             font.pixelSize: Theme.scaled(20)
             font.bold: true
+            Layout.maximumWidth: root.width * 0.5
+            elide: Text.ElideRight
         }
 
         Item { Layout.fillWidth: true }
@@ -108,6 +110,8 @@ Rectangle {
             text: root.rightText
             color: root.contentColor
             font: Theme.bodyFont
+            elide: Text.ElideRight
+            Layout.maximumWidth: root.width * 0.4
         }
     }
 }

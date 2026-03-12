@@ -274,9 +274,11 @@ KeyboardAwareContainer {
                     }
 
                     Text {
+                        Layout.fillWidth: true
                         text: TranslationManager.translate("settings.ai.ollamainstall", "Install: ollama.ai -> run: ollama pull llama3.2")
                         color: Theme.textSecondaryColor
                         font.pixelSize: Theme.scaled(11)
+                        wrapMode: Text.WordWrap
                     }
                 }
 
@@ -315,6 +317,8 @@ KeyboardAwareContainer {
                     text: TranslationManager.translate("settings.ai.cost.ollama", "Free — runs locally on your computer")
                     color: Theme.textSecondaryColor
                     font.pixelSize: Theme.scaled(12)
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
                 }
 
                 // Test connection row

@@ -398,6 +398,7 @@ KeyboardAwareContainer {
                         color: Theme.textSecondaryColor
                         font.pixelSize: Theme.scaled(12)
                         horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
                     }
                 }
             }
@@ -970,9 +971,11 @@ KeyboardAwareContainer {
                     }
 
                     Text {
+                        Layout.fillWidth: true
                         text: TranslationManager.translate("settings.calibration.description", "Idle temp, warmup flow rates, timeout")
                         color: Theme.textSecondaryColor
                         font.pixelSize: Theme.scaled(12)
+                        wrapMode: Text.WordWrap
                     }
                 }
             }

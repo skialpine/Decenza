@@ -35,11 +35,12 @@ KeyboardAwareContainer {
                 // Auto-sleep settings
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Theme.scaled(160)
+                    implicitHeight: autoSleepContent.implicitHeight + Theme.scaled(30)
                     color: Theme.surfaceColor
                     radius: Theme.cardRadius
 
                     ColumnLayout {
+                        id: autoSleepContent
                         anchors.fill: parent
                         anchors.margins: Theme.scaled(15)
                         spacing: Theme.scaled(10)
@@ -53,10 +54,12 @@ KeyboardAwareContainer {
                         }
 
                         Text {
+                            Layout.fillWidth: true
                             text: TranslationManager.translate("settings.preferences.autoSleepDesc", "Put the machine to sleep after inactivity")
                             color: Theme.textSecondaryColor
                             font.family: Theme.bodyFont.family
                             font.pixelSize: Theme.scaled(12)
+                            wrapMode: Text.WordWrap
                         }
 
                         Item { Layout.fillHeight: true }
@@ -85,11 +88,12 @@ KeyboardAwareContainer {
                 // Post-shot review auto-close
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Theme.scaled(160)
+                    implicitHeight: postShotContent.implicitHeight + Theme.scaled(30)
                     color: Theme.surfaceColor
                     radius: Theme.cardRadius
 
                     ColumnLayout {
+                        id: postShotContent
                         anchors.fill: parent
                         anchors.margins: Theme.scaled(15)
                         spacing: Theme.scaled(10)
@@ -103,10 +107,12 @@ KeyboardAwareContainer {
                         }
 
                         Text {
+                            Layout.fillWidth: true
                             text: TranslationManager.translate("settings.preferences.postShotReviewCloseDesc", "Return to idle after reviewing shot")
                             color: Theme.textSecondaryColor
                             font.family: Theme.bodyFont.family
                             font.pixelSize: Theme.scaled(12)
+                            wrapMode: Text.WordWrap
                         }
 
                         Item { Layout.fillHeight: true }
@@ -1196,10 +1202,12 @@ KeyboardAwareContainer {
                         }
 
                         Text {
+                            Layout.fillWidth: true
                             text: TranslationManager.translate("settings.preferences.extractionViewDesc", "Visualization during espresso extraction")
                             color: Theme.textSecondaryColor
                             font.family: Theme.bodyFont.family
                             font.pixelSize: Theme.scaled(12)
+                            wrapMode: Text.WordWrap
                         }
 
                         Repeater {
@@ -1305,10 +1313,12 @@ KeyboardAwareContainer {
                         }
 
                         Text {
+                            Layout.fillWidth: true
                             text: TranslationManager.translate("settings.preferences.steamHeaterDesc", "Pre-heat for faster steaming")
                             color: Theme.textSecondaryColor
                             font.family: Theme.bodyFont.family
                             font.pixelSize: Theme.scaled(12)
+                            wrapMode: Text.WordWrap
                         }
 
                         Text {
@@ -1732,10 +1742,12 @@ KeyboardAwareContainer {
                         }
 
                         Text {
+                            Layout.fillWidth: true
                             text: TranslationManager.translate("settings.calibration.description", "Idle temp, warmup flow rates, timeout")
                             color: Theme.textSecondaryColor
                             font.family: Theme.bodyFont.family
                             font.pixelSize: Theme.scaled(12)
+                            wrapMode: Text.WordWrap
                         }
                     }
                 }
@@ -1868,6 +1880,7 @@ KeyboardAwareContainer {
                 color: Theme.textSecondaryColor
                 font.pixelSize: Theme.scaled(12)
                 horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
             }
         }
     }
