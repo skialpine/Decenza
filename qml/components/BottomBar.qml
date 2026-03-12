@@ -92,9 +92,9 @@ Rectangle {
             color: root.contentColor
             font.pixelSize: Theme.scaled(20)
             font.bold: true
+            Layout.fillWidth: true
+            elide: Text.ElideRight
         }
-
-        Item { Layout.fillWidth: true }
 
         // Custom content area
         RowLayout {
@@ -108,6 +108,8 @@ Rectangle {
             text: root.rightText
             color: root.contentColor
             font: Theme.bodyFont
+            elide: Text.ElideRight
+            Layout.maximumWidth: root.width * 0.4
         }
     }
 }

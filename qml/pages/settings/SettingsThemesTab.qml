@@ -228,7 +228,7 @@ KeyboardAwareContainer {
                     "For CRT shaders, live preview, and more — use the web version (enable web server, then visit /themes)")
                 color: Theme.textColor
                 font: Theme.captionFont
-                wrapMode: Text.Wrap
+                wrapMode: Text.WordWrap
                 lineHeight: 1.3
             }
         }

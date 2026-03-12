@@ -305,10 +305,14 @@ Item {
 
                     Text {
                         anchors.centerIn: parent
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.margins: Theme.scaled(8)
                         text: "English is the base language.\nYou can customize the default text below."
                         font: Theme.bodyFont
                         color: Theme.textSecondaryColor
                         horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
                     }
                 }
 
@@ -515,7 +519,7 @@ Item {
                 text: TranslationManager.retryStatus
                 font: Theme.bodyFont
                 color: Theme.textColor
-                wrapMode: Text.Wrap
+                wrapMode: Text.WordWrap
                 horizontalAlignment: Text.AlignHCenter
             }
 

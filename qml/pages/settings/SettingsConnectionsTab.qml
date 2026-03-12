@@ -471,10 +471,11 @@ Item {
                             Accessible.ignored: true
                         }
                         Text {
+                            Layout.fillWidth: true
                             text: "Poll for USB-connected DE1. Disable to save battery."
                             color: Theme.textSecondaryColor
                             font.pixelSize: Theme.scaled(12)
-                            wrapMode: Text.Wrap
+                            wrapMode: Text.WordWrap
                             Accessible.ignored: true
                         }
                     }
@@ -802,10 +803,12 @@ Item {
                                 Accessible.ignored: true
                             }
                             Tr {
+                                Layout.fillWidth: true
                                 key: "settings.bluetooth.scaleDialogsDesc"
                                 fallback: "Show popup when scale disconnects or is not found"
                                 color: Theme.textSecondaryColor
                                 font.pixelSize: Theme.scaled(12)
+                                wrapMode: Text.WordWrap
                                 Accessible.ignored: true
                             }
                         }
