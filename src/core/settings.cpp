@@ -1462,7 +1462,8 @@ const QVariantMap& Settings::darkDefaults() {
         {"sourceBadgeOrangeColor", "#d9a04a"},
         {"trackOnTargetColor", "#00cc6d"},
         {"trackDriftingColor", "#f0ad4e"},
-        {"trackOffTargetColor", "#e94560"}
+        {"trackOffTargetColor", "#e94560"},
+        {"primaryContrastColor", "#ffffff"}
     };
     return defaults;
 }
@@ -1516,7 +1517,8 @@ const QVariantMap& Settings::lightDefaults() {
         // Tracking indicators
         {"trackOnTargetColor", "#00a856"},
         {"trackDriftingColor", "#d99a00"},
-        {"trackOffTargetColor", "#d93050"}
+        {"trackOffTargetColor", "#d93050"},
+        {"primaryContrastColor", "#ffffff"}
     };
     return defaults;
 }
@@ -1569,10 +1571,10 @@ void Settings::updateResolvedMode() {
     if (wasDark != m_isDarkMode) {
         emit isDarkModeChanged();
         emit customThemeColorsChanged();  // Active palette changed
-#ifdef Q_OS_IOS
-        ios_setStatusBarStyle(m_isDarkMode);
-#endif
     }
+#ifdef Q_OS_IOS
+    ios_setStatusBarStyle(m_isDarkMode);
+#endif
 }
 
 void Settings::setEditingPalette(const QString& palette) {

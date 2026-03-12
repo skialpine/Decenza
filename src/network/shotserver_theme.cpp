@@ -221,14 +221,17 @@ void ShotServer::handleThemeApi(QTcpSocket* socket, const QString& method,
         return;
     }
 
-    // POST /api/theme/palette - generate and apply random palette
+    // POST /api/theme/palette - generate and apply random palette to editing palette
     if (path == "/api/theme/palette" && method == "POST") {
         QJsonObject obj = QJsonDocument::fromJson(body).object();
         double hue = obj["hue"].toDouble();
         double saturation = obj["saturation"].toDouble();
         double lightness = obj["lightness"].toDouble();
         QVariantMap palette = m_settings->generatePalette(hue, saturation, lightness);
-        m_settings->setCustomThemeColors(palette);
+        // Write each color to the editing palette (not the active palette)
+        for (auto it = palette.constBegin(); it != palette.constEnd(); ++it) {
+            m_settings->setEditingPaletteColor(it.key(), it.value().toString());
+        }
         m_settings->setActiveThemeName("Custom");
         QJsonDocument doc(buildThemeJson());
         sendJson(socket, doc.toJson(QJsonDocument::Compact));

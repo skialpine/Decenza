@@ -30,12 +30,12 @@ Button {
     icon.height: Theme.scaled(16)
     icon.color: {
         if (!root.enabled) {
-            // Disabled primary/colored buttons: use semi-transparent white for contrast
-            if (root.primary || root.destructive || root.warning) return Qt.rgba(1, 1, 1, 0.5)
-            if (root.subtle) return Qt.rgba(1, 1, 1, 0.4)
+            // Disabled primary/colored buttons: use semi-transparent contrast color
+            if (root.primary || root.destructive || root.warning) return Qt.rgba(Theme.primaryContrastColor.r, Theme.primaryContrastColor.g, Theme.primaryContrastColor.b, 0.5)
+            if (root.subtle) return Qt.rgba(Theme.primaryContrastColor.r, Theme.primaryContrastColor.g, Theme.primaryContrastColor.b, 0.4)
             return Theme.textSecondaryColor
         }
-        if (root.primary || root.subtle || root.destructive || root.warning) return "white"
+        if (root.primary || root.subtle || root.destructive || root.warning) return Theme.primaryContrastColor
         return Theme.textColor
     }
 

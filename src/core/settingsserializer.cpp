@@ -590,14 +590,10 @@ bool SettingsSerializer::importFromJson(Settings* settings, const QJsonObject& j
             settings->setValue("theme/customColorsLight",
                 QJsonDocument(theme["customColorsLight"].toObject()).toJson());
         }
-        // Backward compat: old single-palette backup
+        // Backward compat: old single-palette backup (always dark — light mode didn't exist)
         if (theme.contains("customColors") && !theme.contains("customColorsDark")) {
-            QVariantMap colors;
-            QJsonObject customColors = theme["customColors"].toObject();
-            for (auto it = customColors.begin(); it != customColors.end(); ++it) {
-                colors[it.key()] = it.value().toString();
-            }
-            settings->setCustomThemeColors(colors);
+            settings->setValue("theme/customColorsDark",
+                QJsonDocument(theme["customColors"].toObject()).toJson());
         }
 
         if (theme.contains("colorGroups")) {

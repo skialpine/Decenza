@@ -66,7 +66,7 @@ Item {
                 key: "idle.button.sleep"
                 fallback: "Sleep"
                 font: Theme.bodyFont
-                color: Theme.isDarkMode ? "white" : Theme.textColor
+                color: Theme.textColor
                 verticalAlignment: Text.AlignVCenter
                 Accessible.ignored: true
             }

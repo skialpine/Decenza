@@ -14,9 +14,9 @@ Rectangle {
 
     signal backClicked()
 
-    // Light mode: transparent bar with colored text (matches idle page layout)
-    // Dark mode: solid colored bar with white text
-    readonly property color contentColor: !Theme.isDarkMode ? Theme.textColor : "white"
+    // Light mode: surface-colored bar with theme text color
+    // Dark mode: solid colored bar with theme text color
+    readonly property color contentColor: Theme.textColor
 
     anchors.left: parent.left
     anchors.right: parent.right

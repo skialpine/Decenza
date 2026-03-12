@@ -116,9 +116,6 @@ KeyboardAwareContainer {
                             width: modeLabel.implicitWidth + Theme.scaled(24)
                             height: parent.height
                             color: Settings.themeMode === modelData.value ? Theme.primaryColor : Theme.surfaceColor
-                            border.color: index > 0 ? Theme.borderColor : "transparent"
-                            border.width: index > 0 ? 1 : 0
-
                             // Only left border as separator between segments
                             Rectangle {
                                 visible: index > 0
@@ -131,7 +128,7 @@ KeyboardAwareContainer {
                             Text {
                                 id: modeLabel
                                 text: modelData.label
-                                color: Settings.themeMode === modelData.value ? "white" : Theme.textColor
+                                color: Settings.themeMode === modelData.value ? Theme.primaryContrastColor : Theme.textColor
                                 font: Theme.labelFont
                                 anchors.centerIn: parent
                                 Accessible.ignored: true
@@ -190,7 +187,7 @@ KeyboardAwareContainer {
                             Text {
                                 id: palLabel
                                 text: modelData.label
-                                color: Settings.editingPalette === modelData.value ? "white" : Theme.textColor
+                                color: Settings.editingPalette === modelData.value ? Theme.primaryContrastColor : Theme.textColor
                                 font: Theme.labelFont
                                 anchors.centerIn: parent
                                 Accessible.ignored: true
