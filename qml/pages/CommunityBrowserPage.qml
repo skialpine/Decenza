@@ -255,7 +255,7 @@ Item {
                 id: downloadLabel
                 anchors.centerIn: parent
                 text: LibrarySharing.downloading ? "Downloading..." : "Add to Library"
-                color: parent.downloadEnabled ? communityBottomBar._effectiveBarColor : Qt.rgba(communityBottomBar.contentColor.r, communityBottomBar.contentColor.g, communityBottomBar.contentColor.b, 0.5)
+                color: parent.downloadEnabled ? communityBottomBar.color : Qt.rgba(communityBottomBar.contentColor.r, communityBottomBar.contentColor.g, communityBottomBar.contentColor.b, 0.5)
                 font.family: Theme.bodyFont.family
                 font.pixelSize: Theme.bodyFont.pixelSize
                 font.bold: true

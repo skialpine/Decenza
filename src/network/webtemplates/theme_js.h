@@ -182,15 +182,21 @@ function renderPaletteToggle(editingPalette) {
 }
 
 async function setThemeMode(mode) {
-    var res = await postJson('/api/theme/mode', { mode: mode });
-    var data = await res.json();
-    renderAll(data);
+    try {
+        var res = await postJson('/api/theme/mode', { mode: mode });
+        if (!res.ok) { showStatus('Server error (' + res.status + ')', true); return; }
+        var data = await res.json();
+        renderAll(data);
+    } catch(e) { showStatus('Network error: ' + e.message, true); }
 }
 
 async function setEditingPalette(palette) {
-    var res = await postJson('/api/theme/editing-palette', { palette: palette });
-    var data = await res.json();
-    renderAll(data);
+    try {
+        var res = await postJson('/api/theme/editing-palette', { palette: palette });
+        if (!res.ok) { showStatus('Server error (' + res.status + ')', true); return; }
+        var data = await res.json();
+        renderAll(data);
+    } catch(e) { showStatus('Network error: ' + e.message, true); }
 }
 
 function renderAll(data) {
