@@ -3,13 +3,13 @@
 #include "shotfileparser.h"
 #include <QDir>
 #include <QDirIterator>
-#include <QProcess>
 #include <QTimer>
 #include <QCoreApplication>
 #include <QDebug>
 #include <QFile>
 #include <QFileInfo>
 #include <QUrl>
+#include <private/qzipreader_p.h>
 
 #ifdef Q_OS_ANDROID
 #include <QJniObject>
@@ -30,7 +30,7 @@ ShotImporter::~ShotImporter()
 void ShotImporter::importFromZip(const QString& zipPath, bool overwriteExisting)
 {
     if (m_importing) {
-        emit importError("Import already in progress");
+        emit importError("shotimporter.error.alreadyInProgress", "Import already in progress");
         return;
     }
 
@@ -39,7 +39,7 @@ void ShotImporter::importFromZip(const QString& zipPath, bool overwriteExisting)
     m_tempDir = new QTemporaryDir();
 
     if (!m_tempDir->isValid()) {
-        emit importError("Failed to create temporary directory");
+        emit importError("shotimporter.error.tempDir", "Failed to create temporary directory");
         return;
     }
 
@@ -69,7 +69,7 @@ void ShotImporter::performZipExtraction()
     if (!extractSuccess) {
         m_importing = false;
         emit isImportingChanged();
-        emit importError("Failed to extract ZIP archive. Make sure 'unzip' is available or extract manually.");
+        emit importError("shotimporter.error.zipExtract", "Failed to extract ZIP archive. The file may be corrupted or not a valid ZIP.");
         return;
     }
 
@@ -79,7 +79,7 @@ void ShotImporter::performZipExtraction()
     if (shotFiles.isEmpty()) {
         m_importing = false;
         emit isImportingChanged();
-        emit importError("No .shot files found in archive");
+        emit importError("shotimporter.error.noShotsInArchive", "No .shot files found in archive");
         return;
     }
 
@@ -89,14 +89,14 @@ void ShotImporter::performZipExtraction()
 void ShotImporter::importFromDirectory(const QString& dirPath, bool overwriteExisting)
 {
     if (m_importing) {
-        emit importError("Import already in progress");
+        emit importError("shotimporter.error.alreadyInProgress", "Import already in progress");
         return;
     }
 
     QStringList shotFiles = findShotFiles(dirPath);
 
     if (shotFiles.isEmpty()) {
-        emit importError("No .shot files found in directory");
+        emit importError("shotimporter.error.noShotsInDir", "No .shot files found in directory");
         return;
     }
 
@@ -110,12 +110,12 @@ void ShotImporter::importFromDirectory(const QString& dirPath, bool overwriteExi
 void ShotImporter::importSingleFile(const QString& filePath, bool overwriteExisting)
 {
     if (m_importing) {
-        emit importError("Import already in progress");
+        emit importError("shotimporter.error.alreadyInProgress", "Import already in progress");
         return;
     }
 
     if (!filePath.endsWith(".shot", Qt::CaseInsensitive)) {
-        emit importError("File must be a .shot file");
+        emit importError("shotimporter.error.notShotFile", "File must be a .shot file");
         return;
     }
 
@@ -159,7 +159,7 @@ void ShotImporter::importFromDE1App(bool overwriteExisting)
 {
     QString historyPath = detectDE1AppHistoryPath();
     if (historyPath.isEmpty()) {
-        emit importError("DE1 app history folder not found. Make sure the DE1 tablet app has been used on this device.");
+        emit importError("shotimporter.error.de1AppNotFound", "DE1 app history folder not found. Make sure the DE1 tablet app has been used on this device.");
         return;
     }
 
@@ -263,73 +263,66 @@ bool ShotImporter::extractZip(const QString& zipPath, const QString& destDir)
     qDebug() << "ShotImporter: Extracted" << extractedCount << "files";
     return extractedCount > 0;
 
-#elif defined(Q_OS_IOS)
-    // QProcess is not available on iOS - zip extraction not supported
-    Q_UNUSED(zipPath)
-    Q_UNUSED(destDir)
-    qWarning() << "ShotImporter: Zip extraction not supported on iOS (no QProcess)";
-    return false;
-
-#elif defined(Q_OS_WIN)
-    QProcess process;
-    process.setWorkingDirectory(destDir);
-
-    // Convert file:// URL to path if needed
-    QString path = zipPath;
-    if (path.startsWith("file:///")) {
-        path = QUrl(path).toLocalFile();
-    }
-
-    // Try PowerShell first (always available on Windows)
-    QString psPath = path;
-    QString psDestDir = destDir;
-    process.start("powershell", QStringList()
-        << "-NoProfile"
-        << "-Command"
-        << QString("Expand-Archive -Path '%1' -DestinationPath '%2' -Force")
-            .arg(psPath.replace("'", "''"))
-            .arg(psDestDir.replace("'", "''")));
-
-    if (!process.waitForFinished(300000)) {  // 5 minute timeout for large archives
-        qWarning() << "PowerShell extraction timeout";
-
-        // Try unzip as fallback (available in Git Bash)
-        process.start("unzip", QStringList() << "-o" << "-q" << path << "-d" << destDir);
-        if (!process.waitForFinished(300000)) {
-            qWarning() << "unzip extraction timeout";
-            return false;
-        }
-    }
-
-    if (process.exitCode() != 0) {
-        qWarning() << "Extraction failed:" << process.readAllStandardError();
-        return false;
-    }
-
-    return true;
 #else
-    QProcess process;
-    process.setWorkingDirectory(destDir);
+    // All non-Android platforms: use Qt's QZipReader (same as DatabaseBackupManager).
 
-    // Convert file:// URL to path if needed
     QString path = zipPath;
     if (path.startsWith("file://")) {
         path = QUrl(path).toLocalFile();
     }
 
-    // Unix-like systems: use unzip
-    process.start("unzip", QStringList() << "-o" << "-q" << path << "-d" << destDir);
-    if (!process.waitForFinished(300000)) {
-        qWarning() << "unzip extraction timeout";
+    qDebug() << "ShotImporter: Extracting" << path << "to" << destDir;
+
+    QZipReader reader(path);
+    if (!reader.isReadable()) {
+        qWarning() << "ShotImporter: Cannot read ZIP file:" << path;
         return false;
     }
 
-    if (process.exitCode() != 0) {
-        qWarning() << "Extraction failed:" << process.readAllStandardError();
-        return false;
+    QDir baseDir(destDir);
+    const QString basePrefix = baseDir.absolutePath() + "/";
+    const auto entries = reader.fileInfoList();
+    int extractedCount = 0;
+
+    for (const QZipReader::FileInfo& entry : entries) {
+        QString filePath = QDir::cleanPath(baseDir.absoluteFilePath(entry.filePath));
+
+        // Guard against ZIP Slip path traversal
+        if (!filePath.startsWith(basePrefix) && filePath != baseDir.absolutePath()) {
+            qWarning() << "ShotImporter: Skipping ZIP entry with path traversal:" << entry.filePath;
+            continue;
+        }
+
+        if (entry.isDir) {
+            baseDir.mkpath(entry.filePath);
+        } else {
+            // Ensure parent directory exists
+            QFileInfo fi(filePath);
+            baseDir.mkpath(fi.path().mid(baseDir.absolutePath().length() + 1));
+
+            QFile outFile(filePath);
+            if (!outFile.open(QIODevice::WriteOnly)) {
+                qWarning() << "ShotImporter: Failed to create file:" << filePath;
+                continue;
+            }
+            {
+                QByteArray data = reader.fileData(entry.filePath);
+                if (data.isEmpty() && entry.size > 0) {
+                    qWarning() << "ShotImporter: Failed to read ZIP entry:" << entry.filePath
+                               << "(expected" << entry.size << "bytes)";
+                    outFile.close();
+                    continue;
+                }
+                outFile.write(data);
+            }
+            outFile.close();
+            extractedCount++;
+        }
     }
 
-    return true;
+    reader.close();
+    qDebug() << "ShotImporter: Extracted" << extractedCount << "files";
+    return extractedCount > 0;
 #endif
 }
 

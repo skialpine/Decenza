@@ -193,6 +193,39 @@ int BatteryManager::readPlatformBatteryPercent() {
     float level = [[UIDevice currentDevice] batteryLevel];
     if (level < 0)
         return 100;  // level unknown
+
+    // Read the actual charging state from iOS so mismatch detection works cross-platform.
+    // UIDeviceBatteryState values:
+    //   0 = UIDeviceBatteryStateUnknown
+    //   1 = UIDeviceBatteryStateUnplugged
+    //   2 = UIDeviceBatteryStateCharging
+    //   3 = UIDeviceBatteryStateFull
+    //
+    // We map these to the same m_androidBatteryStatus constants used by applySmartCharging():
+    //   2=CHARGING  3=DISCHARGING  5=FULL
+    // and to m_androidPlugged:
+    //   0=UNPLUGGED  2=USB
+    // This enables the mismatch detection and log output that was previously Android-only.
+    UIDeviceBatteryState iosState = [[UIDevice currentDevice] batteryState];
+    switch (iosState) {
+    case UIDeviceBatteryStateCharging:
+        m_androidBatteryStatus = 2;  // CHARGING
+        m_androidPlugged = 2;        // USB (best guess — iOS doesn't distinguish source)
+        break;
+    case UIDeviceBatteryStateFull:
+        m_androidBatteryStatus = 5;  // FULL
+        m_androidPlugged = 2;        // USB
+        break;
+    case UIDeviceBatteryStateUnplugged:
+        m_androidBatteryStatus = 3;  // DISCHARGING
+        m_androidPlugged = 0;        // UNPLUGGED
+        break;
+    default:  // UIDeviceBatteryStateUnknown
+        m_androidBatteryStatus = 1;  // UNKNOWN
+        m_androidPlugged = -1;
+        break;
+    }
+
     return static_cast<int>(level * 100);
 
 #else
@@ -297,24 +330,30 @@ void BatteryManager::applySmartCharging() {
     const char* modeName = (m_chargingMode >= 0 && m_chargingMode <= 2)
         ? modeNames[m_chargingMode] : "Unknown";
 
-    // Human-readable Android status for the log.
-    const char* androidStatus = "n/a";
+    // Human-readable OS-reported battery status for the log.
+    // Populated on both Android (from sticky intent) and iOS (from UIDevice.batteryState).
+    const char* osStatus = "n/a";
     switch (m_androidBatteryStatus) {
-    case 1: androidStatus = "UNKNOWN";      break;
-    case 2: androidStatus = "CHARGING";     break;
-    case 3: androidStatus = "DISCHARGING";  break;
-    case 4: androidStatus = "NOT-CHARGING"; break;
-    case 5: androidStatus = "FULL";         break;
+    case 1: osStatus = "UNKNOWN";      break;
+    case 2: osStatus = "CHARGING";     break;
+    case 3: osStatus = "DISCHARGING";  break;
+    case 4: osStatus = "NOT-CHARGING"; break;
+    case 5: osStatus = "FULL";         break;
     }
 
     // Human-readable plugged source for the log.
-    // "USB(DE1)" confirms the DE1 port is electrically active; "UNPLUGGED" means it isn't.
-    const char* androidPlugged = "n/a";
+    // On Android, USB confirms the DE1 port is electrically active.
+    // On iOS, USB just means "some wired source" — iOS can't distinguish DE1 from wall.
+    const char* osPlugged = "n/a";
     switch (m_androidPlugged) {
-    case 0: androidPlugged = "UNPLUGGED"; break;
-    case 1: androidPlugged = "AC";        break;
-    case 2: androidPlugged = "USB(DE1)";  break;
-    case 4: androidPlugged = "WIRELESS";  break;
+    case 0: osPlugged = "UNPLUGGED"; break;
+    case 1: osPlugged = "AC";        break;
+#ifdef Q_OS_IOS
+    case 2: osPlugged = "USB";       break;
+#else
+    case 2: osPlugged = "USB(DE1)";  break;
+#endif
+    case 4: osPlugged = "WIRELESS";  break;
     }
 
     // Log every 5th cycle (~5 min) to reduce noise. State-change logs above
@@ -325,8 +364,8 @@ void BatteryManager::applySmartCharging() {
                  << "% mode=" << modeName
                  << "charger=" << (shouldChargerBeOn ? "ON" : "OFF")
                  << "discharging=" << m_discharging
-                 << "android=" << androidStatus
-                 << "plugged=" << androidPlugged;
+                 << "status=" << osStatus
+                 << "plugged=" << osPlugged;
     }
 
     // ── Step 3: send the command to the DE1 ──────────────────────────────────
@@ -342,8 +381,8 @@ void BatteryManager::applySmartCharging() {
     // That caused the UI to show "Charging" even when the DE1 USB port wasn't
     // actually delivering power — misleading the user while the battery drained.
     //
-    // On Android we now use the OS-reported status instead. CHARGING(2) or FULL(5)
-    // means current is actually flowing into the battery. On non-Android platforms
+    // On Android and iOS we now use the OS-reported status instead. CHARGING(2) or FULL(5)
+    // means current is actually flowing into the battery. On desktop platforms
     // m_androidBatteryStatus stays -1, so we fall back to the commanded state.
     bool actuallyCharging = (m_androidBatteryStatus != -1)
         ? (m_androidBatteryStatus == 2 || m_androidBatteryStatus == 5)
@@ -356,7 +395,7 @@ void BatteryManager::applySmartCharging() {
 
     // ── Step 5: mismatch detection ───────────────────────────────────────────
     //
-    // If we commanded the port ON but Android reports DISCHARGING, the DE1 USB port
+    // If we commanded the port ON but the OS reports DISCHARGING, the DE1 USB port
     // is not delivering power despite our instruction. Possible causes:
     //   • The DE1 went to sleep and cut the USB port (most common overnight)
     //   • The DE1 temporarily cut USB power to prioritise its own hardware (heater, etc.)
@@ -368,13 +407,16 @@ void BatteryManager::applySmartCharging() {
     // cut USB power for short periods (e.g. during preheating), so a single transient
     // DISCHARGING reading is not worth a popup. Five minutes of sustained no-power is.
     //
-    // This block is Android-only; m_androidBatteryStatus stays -1 on other platforms.
+    // This block runs on Android and iOS; m_androidBatteryStatus stays -1 on desktop.
     if (m_androidBatteryStatus != -1) {
-        // Port is confirmed electrically off if Android reports DISCHARGING or UNPLUGGED.
+        // Port is confirmed electrically off if the OS reports DISCHARGING or UNPLUGGED.
         // Using m_androidPlugged as a second signal catches NOT_CHARGING(4) edge cases
         // where the cable is physically connected but the DE1 cut its USB output.
-        const bool androidDischarging = (m_androidBatteryStatus == 3);
-        const bool portActuallyOff = androidDischarging || (m_androidPlugged == 0);
+        // Note: on iOS, mismatch detection works for the primary case (Unplugged maps
+        // to DISCHARGING + UNPLUGGED). However, iOS cannot report NOT_CHARGING(4), so
+        // the edge case where a cable is connected but delivering no current is not detected.
+        const bool osDischarging = (m_androidBatteryStatus == 3);
+        const bool portActuallyOff = osDischarging || (m_androidPlugged == 0);
 
         constexpr int kMismatchAlertThreshold = 5;  // ~5 min at 60s intervals
 
@@ -426,7 +468,10 @@ void BatteryManager::ensureChargerOn() {
     // drain unnecessarily. Matches de1app's app_exit behaviour.
     if (m_device && m_device->isConnected()) {
         qDebug() << "BatteryManager: Ensuring charger is ON (app exit/suspend safety)";
-        m_device->setUsbChargerOn(true, true);
+        // Use the urgent (queue-bypassing) path so the BLE write goes out immediately.
+        // On iOS, the normal 50ms command queue could race with app suspension — by the
+        // time the queued write fires, CoreBluetooth may have already been suspended.
+        m_device->setUsbChargerOnUrgent(true);
     }
 }
 

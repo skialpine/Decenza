@@ -729,6 +729,7 @@ if(IOS)
         XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT[variant=MinSizeRel] "dwarf-with-dsym"
         XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT[variant=RelWithDebInfo] "dwarf-with-dsym"
         XCODE_ATTRIBUTE_DWARF_DSYM_FOLDER_PATH "$(CONFIGURATION_BUILD_DIR)"
+        XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/ios/Decenza.entitlements"
     )
     # Add iOS asset catalog for app icon
     target_sources(Decenza PRIVATE
@@ -736,6 +737,14 @@ if(IOS)
     )
     set_source_files_properties(
         "${CMAKE_CURRENT_SOURCE_DIR}/ios/Assets.xcassets"
+        PROPERTIES MACOSX_PACKAGE_LOCATION Resources
+    )
+    # Add privacy manifest (required for App Store since spring 2024)
+    target_sources(Decenza PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/ios/PrivacyInfo.xcprivacy"
+    )
+    set_source_files_properties(
+        "${CMAKE_CURRENT_SOURCE_DIR}/ios/PrivacyInfo.xcprivacy"
         PROPERTIES MACOSX_PACKAGE_LOCATION Resources
     )
     # Link iOS frameworks required for multimedia (AVFoundation backend)

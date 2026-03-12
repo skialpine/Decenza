@@ -622,8 +622,13 @@ void BLEManager::openBluetoothSettings()
         activity.callMethod<void>("startActivity", "(Landroid/content/Intent;)V", intent.object());
     }
 #elif defined(Q_OS_IOS)
-    // iOS: Open Settings app (can't deep-link to Bluetooth directly)
-    qDebug() << "On iOS, please open Settings > Bluetooth manually";
+    // iOS: Open the app's Settings page. iOS doesn't allow deep-linking directly to
+    // the Bluetooth settings screen, but UIApplicationOpenSettingsURLString takes the
+    // user to Settings > Decenza where they can see Bluetooth permission status.
+    NSURL* url = [NSURL URLWithString:UIApplicationOpenSettingsURLString];
+    if (url && [[UIApplication sharedApplication] canOpenURL:url]) {
+        [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
+    }
 #elif defined(Q_OS_MACOS)
     // macOS: Open System Settings to Bluetooth privacy pane
     QDesktopServices::openUrl(QUrl("x-apple.systempreferences:com.apple.preference.security?Privacy_Bluetooth"));

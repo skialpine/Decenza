@@ -761,8 +761,7 @@ void DE1Device::writeFrame(const QByteArray& frameData) {
     m_transport->write(DE1::Characteristic::FRAME_WRITE, frameData);
 }
 
-void DE1Device::writeMMR(uint32_t address, uint32_t value) {
-    if (!m_transport) return;
+QByteArray DE1Device::buildMMRPayload(uint32_t address, uint32_t value) {
     // MMR Write format (20 bytes):
     // Byte 0: Length (0x04 for 4-byte value)
     // Bytes 1-3: Address (big endian)
@@ -777,8 +776,17 @@ void DE1Device::writeMMR(uint32_t address, uint32_t value) {
     data[5] = (value >> 8) & 0xFF;
     data[6] = (value >> 16) & 0xFF;
     data[7] = (value >> 24) & 0xFF;
+    return data;
+}
 
-    m_transport->write(DE1::Characteristic::WRITE_TO_MMR, data);
+void DE1Device::writeMMR(uint32_t address, uint32_t value) {
+    if (!m_transport) return;
+    m_transport->write(DE1::Characteristic::WRITE_TO_MMR, buildMMRPayload(address, value));
+}
+
+void DE1Device::writeMMRUrgent(uint32_t address, uint32_t value) {
+    if (!m_transport) return;
+    m_transport->writeUrgent(DE1::Characteristic::WRITE_TO_MMR, buildMMRPayload(address, value));
 }
 
 void DE1Device::setUsbChargerOn(bool on, bool force) {
@@ -794,6 +802,21 @@ void DE1Device::setUsbChargerOn(bool on, bool force) {
 
     writeMMR(DE1::MMR::USB_CHARGER, on ? 1 : 0);
 
+    if (stateChanged) {
+        emit usbChargerOnChanged();
+    }
+}
+
+void DE1Device::setUsbChargerOnUrgent(bool on) {
+    if (!m_transport) {
+        qWarning() << "DE1Device::setUsbChargerOnUrgent: no transport, cannot set charger" << (on ? "ON" : "OFF");
+        return;
+    }
+    bool stateChanged = (m_usbChargerOn != on);
+    if (stateChanged) {
+        m_usbChargerOn = on;
+    }
+    writeMMRUrgent(DE1::MMR::USB_CHARGER, on ? 1 : 0);
     if (stateChanged) {
         emit usbChargerOnChanged();
     }
