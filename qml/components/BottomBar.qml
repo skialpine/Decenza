@@ -50,11 +50,10 @@ Rectangle {
                 radius: Theme.scaled(4)
             }
 
-            Image {
+            ThemedIcon {
                 anchors.centerIn: parent
                 source: "qrc:/icons/back.svg"
-                sourceSize.width: Theme.scaled(28)
-                sourceSize.height: Theme.scaled(28)
+                iconSize: Theme.scaled(28)
                 // Decorative - accessibility handled by AccessibleTapHandler
                 Accessible.ignored: true
             }

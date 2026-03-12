@@ -56,6 +56,9 @@ QtObject {
         return value
     }
 
+    // Whether the active theme is dark mode (for conditional styling in QML)
+    readonly property bool isDarkMode: Settings.isDarkMode
+
     // Dynamic colors - bind to Settings with fallback defaults
     // Wrapped in _c() for flash-to-identify from web theme editor
     property color backgroundColor: _c("backgroundColor", Settings.customThemeColors.backgroundColor || "#1a1a2e")

@@ -198,14 +198,25 @@ QJsonObject SettingsSerializer::exportToJson(Settings* settings, bool includeSen
     // Theme settings
     QJsonObject theme;
     theme["activeThemeName"] = settings->activeThemeName();
+    theme["themeMode"] = settings->themeMode();
 
-    // Custom theme colors
+    // Export active palette as customColors (backward compat) plus both palettes
     QJsonObject customColors;
     QVariantMap colors = settings->customThemeColors();
     for (auto it = colors.begin(); it != colors.end(); ++it) {
         customColors[it.key()] = it.value().toString();
     }
     theme["customColors"] = customColors;
+
+    // Also export raw dark/light storage for full dual-palette backup
+    QByteArray darkData = settings->value("theme/customColorsDark").toByteArray();
+    if (!darkData.isEmpty()) {
+        theme["customColorsDark"] = QJsonDocument::fromJson(darkData).object();
+    }
+    QByteArray lightData = settings->value("theme/customColorsLight").toByteArray();
+    if (!lightData.isEmpty()) {
+        theme["customColorsLight"] = QJsonDocument::fromJson(lightData).object();
+    }
 
     // Color groups
     QJsonArray colorGroups;
@@ -568,8 +579,19 @@ bool SettingsSerializer::importFromJson(Settings* settings, const QJsonObject& j
     if (json.contains("theme") && !excludeKeys.contains("theme")) {
         QJsonObject theme = json["theme"].toObject();
         if (theme.contains("activeThemeName")) settings->setActiveThemeName(theme["activeThemeName"].toString());
+        if (theme.contains("themeMode")) settings->setThemeMode(theme["themeMode"].toString());
 
-        if (theme.contains("customColors")) {
+        // Restore dual palettes if present (new format)
+        if (theme.contains("customColorsDark")) {
+            settings->setValue("theme/customColorsDark",
+                QJsonDocument(theme["customColorsDark"].toObject()).toJson());
+        }
+        if (theme.contains("customColorsLight")) {
+            settings->setValue("theme/customColorsLight",
+                QJsonDocument(theme["customColorsLight"].toObject()).toJson());
+        }
+        // Backward compat: old single-palette backup
+        if (theme.contains("customColors") && !theme.contains("customColorsDark")) {
             QVariantMap colors;
             QJsonObject customColors = theme["customColors"].toObject();
             for (auto it = customColors.begin(); it != customColors.end(); ++it) {

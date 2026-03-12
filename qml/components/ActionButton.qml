@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Effects
 import Decenza
 
 Button {
@@ -74,6 +75,14 @@ Button {
                 opacity: control.enabled ? 1.0 : 0.5
                 // Decorative - accessibility handled by Button itself
                 Accessible.ignored: true
+
+                // Tint white SVG icons for light mode visibility
+                layer.enabled: !Theme.isDarkMode
+                layer.smooth: true
+                layer.effect: MultiEffect {
+                    colorization: 1.0
+                    colorizationColor: Theme.textColor
+                }
             }
         }
 

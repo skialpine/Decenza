@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Effects
 import Decenza
 import "../components"
 
@@ -290,6 +291,13 @@ Page {
                                     Layout.alignment: Qt.AlignVCenter
                                     opacity: 0.6
                                     Accessible.ignored: true
+
+                                    layer.enabled: !Theme.isDarkMode
+                                    layer.smooth: true
+                                    layer.effect: MultiEffect {
+                                        colorization: 1.0
+                                        colorizationColor: Theme.textSecondaryColor
+                                    }
                                 }
                             }
 
@@ -688,6 +696,13 @@ Page {
                                     sourceSize.width: Theme.scaled(18)
                                     sourceSize.height: Theme.scaled(18)
                                     opacity: index === Settings.selectedFavoriteProfile ? 1.0 : 0.5
+
+                                    layer.enabled: !Theme.isDarkMode && index !== Settings.selectedFavoriteProfile
+                                    layer.smooth: true
+                                    layer.effect: MultiEffect {
+                                        colorization: 1.0
+                                        colorizationColor: Theme.textSecondaryColor
+                                    }
 
                                     MouseArea {
                                         id: dragArea
