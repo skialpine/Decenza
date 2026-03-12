@@ -1468,44 +1468,52 @@ const QVariantMap& Settings::darkDefaults() {
 }
 
 const QVariantMap& Settings::lightDefaults() {
+    // Light palette carries the dark theme's blue-purple DNA as subtle tints
+    // rather than going neutral gray — same family, different brightness.
     static const QVariantMap defaults = {
-        {"backgroundColor", "#f5f5f7"},
+        // Core UI — blue-gray tinted backgrounds echo the navy dark theme
+        {"backgroundColor", "#eef0f6"},
         {"surfaceColor", "#ffffff"},
         {"primaryColor", "#3a75e0"},
-        {"secondaryColor", "#5a6070"},
+        {"secondaryColor", "#8890a8"},
         {"textColor", "#1a1a2e"},
-        {"textSecondaryColor", "#6b7280"},
+        {"textSecondaryColor", "#5d6478"},
         {"accentColor", "#d93050"},
         {"successColor", "#00a856"},
         {"warningColor", "#e69500"},
         {"highlightColor", "#e69500"},
         {"errorColor", "#d93030"},
-        {"borderColor", "#d1d5db"},
-        {"pressureColor", "#18c37e"},
-        {"pressureGoalColor", "#69fdb3"},
-        {"flowColor", "#4e85f4"},
-        {"flowGoalColor", "#7aaaff"},
-        {"temperatureColor", "#e73249"},
-        {"temperatureGoalColor", "#ffa5a6"},
-        {"weightColor", "#a2693d"},
-        {"weightFlowColor", "#d4a574"},
-        {"resistanceColor", "#b8a800"},
+        {"borderColor", "#c4c9d6"},
+        // Chart — slightly deeper than dark-mode goal colors for white-background contrast
+        {"pressureColor", "#12a86b"},
+        {"pressureGoalColor", "#40d898"},
+        {"flowColor", "#3a6fd0"},
+        {"flowGoalColor", "#6898e8"},
+        {"temperatureColor", "#d42840"},
+        {"temperatureGoalColor", "#f07080"},
+        {"weightColor", "#8a5830"},
+        {"weightFlowColor", "#c08858"},
+        {"resistanceColor", "#a89800"},
+        // DYE metadata — same across modes (strong hues work on both)
         {"dyeDoseColor", "#6F4E37"},
         {"dyeOutputColor", "#9C27B0"},
         {"dyeTdsColor", "#FF9800"},
         {"dyeEyColor", "#a2693d"},
-        {"buttonDisabled", "#c0c0c0"},
-        {"stopMarkerColor", "#FF6B6B"},
-        {"frameMarkerColor", "#66000000"},
+        // UI indicators — blue-gray tinted where neutral before
+        {"buttonDisabled", "#b0b5c2"},
+        {"stopMarkerColor", "#e85050"},
+        {"frameMarkerColor", "#40303048"},
         {"modifiedIndicatorColor", "#CC9900"},
         {"simulationIndicatorColor", "#E65100"},
         {"warningButtonColor", "#e69500"},
         {"successButtonColor", "#2E7D32"},
-        {"rowAlternateColor", "#f0f0f2"},
-        {"rowAlternateLightColor", "#e8e8ea"},
-        {"sourceBadgeBlueColor", "#4a90d9"},
-        {"sourceBadgeGreenColor", "#4ad94a"},
-        {"sourceBadgeOrangeColor", "#d9a04a"},
+        // Lists — subtle blue-gray alternation
+        {"rowAlternateColor", "#e8eaf2"},
+        {"rowAlternateLightColor", "#e0e3ed"},
+        {"sourceBadgeBlueColor", "#3a78c0"},
+        {"sourceBadgeGreenColor", "#38b038"},
+        {"sourceBadgeOrangeColor", "#c89030"},
+        // Tracking indicators
         {"trackOnTargetColor", "#00a856"},
         {"trackDriftingColor", "#d99a00"},
         {"trackOffTargetColor", "#d93050"}
