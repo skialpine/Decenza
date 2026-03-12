@@ -1288,8 +1288,8 @@ Dialog {
                             default: return TranslationManager.translate("customeditor.dialog.action", "Action")
                         }
                     }
-                    font.pixelSize: Theme.scaled(18)
-                    font.family: Theme.bodyFont.family
+                    font.pixelSize: Theme.subtitleFont.pixelSize
+                    font.family: Theme.subtitleFont.family
                     font.bold: true
                     color: Theme.textColor
                     Accessible.ignored: true
@@ -1367,7 +1367,7 @@ Dialog {
 
                             Text {
                                 text: modelData.label
-                                font.pixelSize: Theme.scaled(16)
+                                font.pixelSize: Theme.bodyFont.pixelSize
                                 font.family: Theme.bodyFont.family
                                 color: Theme.textColor
                                 verticalAlignment: Text.AlignVCenter
@@ -1431,7 +1431,7 @@ Dialog {
                 Text {
                     anchors.centerIn: parent
                     text: TranslationManager.translate("combobox.cancel", "Cancel")
-                    font.pixelSize: Theme.scaled(16)
+                    font.pixelSize: Theme.bodyFont.pixelSize
                     font.family: Theme.bodyFont.family
                     color: Theme.textSecondaryColor
                     Accessible.ignored: true
@@ -1480,8 +1480,8 @@ Dialog {
                 Text {
                     anchors.centerIn: parent
                     text: TranslationManager.translate("customaction.command.loadProfile", "Load Profile")
-                    font.pixelSize: Theme.scaled(18)
-                    font.family: Theme.bodyFont.family
+                    font.pixelSize: Theme.subtitleFont.pixelSize
+                    font.family: Theme.subtitleFont.family
                     font.bold: true
                     color: Theme.textColor
                     Accessible.ignored: true
@@ -1553,7 +1553,7 @@ Dialog {
 
                             Text {
                                 text: modelData.title
-                                font.pixelSize: Theme.scaled(16)
+                                font.pixelSize: Theme.bodyFont.pixelSize
                                 font.family: Theme.bodyFont.family
                                 color: Theme.textColor
                                 verticalAlignment: Text.AlignVCenter
@@ -1610,7 +1610,7 @@ Dialog {
                 Text {
                     anchors.centerIn: parent
                     text: TranslationManager.translate("combobox.cancel", "Cancel")
-                    font.pixelSize: Theme.scaled(16)
+                    font.pixelSize: Theme.bodyFont.pixelSize
                     font.family: Theme.bodyFont.family
                     color: Theme.textSecondaryColor
                     Accessible.ignored: true

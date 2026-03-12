@@ -205,7 +205,7 @@ Window {
                 }
             }
             color: "#ccc"
-            font.pixelSize: 12
+            font.pixelSize: Theme.scaled(12)
         }
     }
 }

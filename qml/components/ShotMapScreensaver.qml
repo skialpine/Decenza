@@ -287,7 +287,7 @@ Item {
                     anchors.centerIn: parent
                     text: "YOU"
                     color: "#ffffff"
-                    font.pixelSize: 10
+                    font.pixelSize: Theme.scaled(10)
                     font.bold: true
                     font.family: Theme.bodyFont.family
                 }
@@ -324,7 +324,7 @@ Item {
         anchors.topMargin: 30
         text: Qt.formatTime(currentTime, Settings.use12HourTime ? "h:mmap" : "HH:mm")
         color: mapTexture === "bright" ? "#ffffff" : "#aabbcc"
-        font.pixelSize: 48
+        font.pixelSize: Theme.scaled(48)
         font.bold: true
         font.family: Theme.bodyFont.family
         opacity: 0.9
@@ -352,7 +352,7 @@ Item {
         Text {
             text: "Top Profiles"
             color: mapTexture === "bright" ? "#ffffff" : "#8899aa"
-            font.pixelSize: 14
+            font.pixelSize: Theme.scaled(14)
             font.bold: true
             font.family: Theme.bodyFont.family
         }
@@ -366,7 +366,7 @@ Item {
                 Text {
                     text: modelData.name || "Unknown"
                     color: mapTexture === "bright" ? "#dddddd" : "#667788"
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.scaled(12)
                     font.family: Theme.bodyFont.family
                     width: 150
                     elide: Text.ElideRight
@@ -375,7 +375,7 @@ Item {
                 Text {
                     text: "(" + (modelData.count || 0) + ")"
                     color: mapTexture === "bright" ? "#aaaaaa" : "#556677"
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.scaled(11)
                     font.family: Theme.bodyFont.family
                 }
             }
@@ -394,14 +394,14 @@ Item {
         Text {
             text: shotCount + " shots in the last 24 hours"
             color: mapTexture === "bright" ? "#ffffff" : "#8899aa"
-            font.pixelSize: 16
+            font.pixelSize: Theme.scaled(16)
             font.family: Theme.bodyFont.family
         }
 
         Text {
             text: "decenza.coffee"
             color: mapTexture === "bright" ? "#aaaaaa" : "#556677"
-            font.pixelSize: 12
+            font.pixelSize: Theme.scaled(12)
             font.family: Theme.bodyFont.family
         }
     }
@@ -413,7 +413,7 @@ Item {
         anchors.margins: 30
         text: "Touch to exit"
         color: "#444455"
-        font.pixelSize: 11
+        font.pixelSize: Theme.scaled(11)
         font.family: Theme.bodyFont.family
         visible: !testMode && !widgetMode
     }
