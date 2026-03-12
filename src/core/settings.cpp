@@ -1474,7 +1474,7 @@ const QVariantMap& Settings::lightDefaults() {
         // Core UI — blue-gray tinted backgrounds echo the navy dark theme
         {"backgroundColor", "#eef0f6"},
         {"surfaceColor", "#ffffff"},
-        {"primaryColor", "#3a75e0"},
+        {"primaryColor", "#2c5fc0"},
         {"secondaryColor", "#8890a8"},
         {"textColor", "#1a1a2e"},
         {"textSecondaryColor", "#5d6478"},
