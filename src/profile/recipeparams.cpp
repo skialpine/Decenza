@@ -49,7 +49,9 @@ bool RecipeParams::frameAffectingFieldsEqual(const RecipeParams& other) const {
         && eq(tempStart, other.tempStart)
         && eq(tempPreinfuse, other.tempPreinfuse)
         && eq(tempHold, other.tempHold)
-        && eq(tempDecline, other.tempDecline);
+        && eq(tempDecline, other.tempDecline)
+        // BLE header
+        && preinfuseFrameCount == other.preinfuseFrameCount;
 }
 
 // Shared legacy migration for old pourStyle/flowLimit/pressureLimit fields
@@ -86,6 +88,7 @@ void RecipeParams::applyEditorDefaults() {
         pourPressure = 8.5;
         pourFlow = 1.7;
         targetWeight = 50.0;
+        preinfuseFrameCount = 2;  // D_Flow/code.tcl line 182
         break;
     case EditorType::AFlow:
         // From A-Flow____default-medium.tcl stock profile (de1app)
@@ -100,6 +103,7 @@ void RecipeParams::applyEditorDefaults() {
         pourFlow = 2.0;
         rampTime = 10.0;
         targetWeight = 36.0;
+        preinfuseFrameCount = 2;  // All A-Flow stock profiles use 2
         break;
     case EditorType::Pressure:
     case EditorType::Flow:
@@ -172,6 +176,10 @@ QStringList RecipeParams::validate() const {
         issues << "limiterValue out of range [0, 12]";
     if (limiterRange < 0 || limiterRange > 10)
         issues << "limiterRange out of range [0, 10]";
+
+    // BLE header bounds (-1 sentinel is valid, means "use countPreinfuseFrames()")
+    if (preinfuseFrameCount < -1 || preinfuseFrameCount > 20)
+        issues << "preinfuseFrameCount out of range [-1, 20]";
 
     return issues;
 }
@@ -266,6 +274,10 @@ QJsonObject RecipeParams::toJson() const {
     // Editor type
     obj["editorType"] = editorTypeToString(editorType);
 
+    // BLE header
+    if (preinfuseFrameCount >= 0)
+        obj["preinfuseFrameCount"] = preinfuseFrameCount;
+
     return obj;
 }
 
@@ -354,6 +366,10 @@ RecipeParams RecipeParams::fromJson(const QJsonObject& json) {
     // Editor type
     params.editorType = editorTypeFromString(json["editorType"].toString("dflow"));
 
+    // BLE header
+    if (json.contains("preinfuseFrameCount"))
+        params.preinfuseFrameCount = json["preinfuseFrameCount"].toInt(-1);
+
     return params;
 }
 
@@ -418,6 +434,10 @@ QVariantMap RecipeParams::toVariantMap() const {
 
     // Editor type
     map["editorType"] = editorTypeToString(editorType);
+
+    // BLE header
+    if (preinfuseFrameCount >= 0)
+        map["preinfuseFrameCount"] = preinfuseFrameCount;
 
     return map;
 }
@@ -507,6 +527,10 @@ RecipeParams RecipeParams::fromVariantMap(const QVariantMap& map) {
 
     // Editor type
     params.editorType = editorTypeFromString(map.value("editorType", "dflow").toString());
+
+    // BLE header
+    if (map.contains("preinfuseFrameCount"))
+        params.preinfuseFrameCount = map.value("preinfuseFrameCount", -1).toInt();
 
     return params;
 }
