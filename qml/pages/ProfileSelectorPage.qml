@@ -97,6 +97,7 @@ Page {
                         visible: viewFilter.currentIndex === 1  // Cleaning/Descale view
                         text: TranslationManager.translate("profileselector.button.descaling_wizard", "Descaling Wizard")
                         accessibleName: TranslationManager.translate("profileSelector.openDescalingWizard", "Open descaling wizard to clean your machine")
+                        primary: true
                         Layout.preferredHeight: Theme.scaled(44)
                         onClicked: root.goToDescaling()
                     }
