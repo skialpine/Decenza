@@ -210,6 +210,7 @@ void ShotDataModel::clearWeightData() {
     m_weightPoints.clear();
     m_cumulativeWeightPoints.clear();
     m_weightFlowRatePoints.clear();
+    m_weightFlowRateRawPoints.clear();
     if (m_fastWeight) m_fastWeight->clear();
     if (m_fastWeightFlow) m_fastWeightFlow->clear();
     m_lastFlushedWeight = 0;

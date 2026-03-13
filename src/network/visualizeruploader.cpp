@@ -482,15 +482,17 @@ QByteArray VisualizerUploader::buildShotJson(ShotDataModel* shotData,
     // Used by Visualizer to draw vertical frame markers on the shot graph
     const auto& markers = shotData->phaseMarkersList();
     if (!markers.isEmpty() && !pressureData.isEmpty()) {
+        // Collect times of real frame transitions only (skip Start/End markers)
+        QVector<double> transitionTimes;
+        for (const auto& m : markers) {
+            if (m.frameNumber >= 0 && m.label != "Start")
+                transitionTimes.append(m.time);
+        }
         QJsonArray stateChange;
         double stateVal = 10000000.0;
         qsizetype markerIdx = 0;
-        // Skip "Start" marker (index 0) — first frame change draws the line
-        if (!markers.isEmpty() && markers[0].label == "Start")
-            markerIdx = 1;
         for (const auto& pt : pressureData) {
-            // Flip sign at each phase marker (matching de1app convention)
-            while (markerIdx < markers.size() && pt.x() >= markers[markerIdx].time) {
+            while (markerIdx < transitionTimes.size() && pt.x() >= transitionTimes[markerIdx]) {
                 stateVal *= -1.0;
                 markerIdx++;
             }
@@ -989,11 +991,13 @@ QByteArray VisualizerUploader::buildHistoryShotJson(const QVariantMap& shotData)
     // State change array from history phase markers
     QVariantList phases = shotData["phases"].toList();
     if (!phases.isEmpty() && !pressureData.isEmpty()) {
-        // Convert phases to time list (skip "Start" marker)
+        // Collect times of real frame transitions only (skip Start/End markers)
         QVector<double> markerTimes;
         for (const auto& p : phases) {
             QVariantMap pm = p.toMap();
-            if (pm["label"].toString() != "Start")
+            int frameNum = pm["frameNumber"].toInt(-1);
+            QString label = pm["label"].toString();
+            if (frameNum >= 0 && label != "Start")
                 markerTimes.append(pm["time"].toDouble());
         }
         QJsonArray stateChange;
