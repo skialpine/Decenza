@@ -19,17 +19,25 @@ Page {
     }
 
     property bool isDescaling: MachineState.phase === MachineStateType.Phase.Descaling
+    property bool wasDescaling: false
     property bool showRinseInstructions: false
+
+    onIsDescalingChanged: {
+        if (isDescaling) {
+            wasDescaling = true
+        }
+    }
 
     // Track when descaling completes to show rinse instructions
     Connections {
         target: MachineState
         function onPhaseChanged() {
-            if (!isDescaling && descalingPage.visible) {
+            if (wasDescaling && !isDescaling && descalingPage.visible) {
                 // Descaling just finished, show rinse instructions
                 if (MachineState.phase === MachineStateType.Phase.Idle ||
                     MachineState.phase === MachineStateType.Phase.Ready) {
                     showRinseInstructions = true
+                    wasDescaling = false
                 }
             }
         }
@@ -168,6 +176,7 @@ Page {
                             color: "white"
                             font.pixelSize: Theme.scaled(18)
                             font.weight: Font.Bold
+                            Accessible.ignored: true
                         }
 
                         AccessibleTapHandler {
@@ -243,7 +252,7 @@ Page {
                         Tr {
                             Layout.fillWidth: true
                             key: "descaling.rinse.step1.title"
-                            fallback: "1. Clean the water tank"
+                            fallback: "1. Drain remaining acid solution"
                             font: Theme.subtitleFont
                             color: Theme.textColor
                             wrapMode: Text.WordWrap
@@ -253,7 +262,7 @@ Page {
                         Tr {
                             Layout.fillWidth: true
                             key: "descaling.rinse.step1.desc"
-                            fallback: "Empty and rinse the water tank thoroughly. Fill with fresh filtered water."
+                            fallback: "Empty the water tank of any remaining acid solution. Rinse the tank thoroughly, then fill with fresh filtered water."
                             font: Theme.bodyFont
                             color: Theme.textSecondaryColor
                             wrapMode: Text.WordWrap
@@ -273,7 +282,7 @@ Page {
                         Tr {
                             Layout.fillWidth: true
                             key: "descaling.rinse.step2.desc"
-                            fallback: "Run flush cycles until the app shows 'refill'. Refill and repeat. Taste the water - if it tastes acidic or smells like vitamin C, flush more. Expect to use 4+ liters."
+                            fallback: "Run flush cycles until the app shows 'refill'. Refill and repeat. Taste the water - if it tastes acidic or smells like vitamin C, flush more. Citric acid smells like vitamin C capsules, so if you smell it but it's not sour, flush more anyway. Expect to use 4+ liters."
                             font: Theme.bodyFont
                             color: Theme.textSecondaryColor
                             wrapMode: Text.WordWrap
@@ -306,6 +315,33 @@ Page {
                             fallback: "Total water needed: approximately 7-8 liters for thorough rinsing."
                             font.pixelSize: Theme.captionFont.pixelSize
                             font.italic: true
+                            color: Theme.textSecondaryColor
+                            wrapMode: Text.WordWrap
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: Theme.scaled(1)
+                            color: Theme.textSecondaryColor
+                            opacity: 0.3
+                        }
+
+                        Tr {
+                            Layout.fillWidth: true
+                            key: "descaling.rinse.residual.title"
+                            fallback: "Next-day follow-up"
+                            font: Theme.subtitleFont
+                            color: Theme.warningColor
+                            wrapMode: Text.WordWrap
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+
+                        Tr {
+                            Layout.fillWidth: true
+                            key: "descaling.rinse.residual.desc"
+                            fallback: "Even after thorough rinsing, residual acid may leach out overnight. Run a few flush cycles the next morning and taste the water. If it tastes acidic or appears yellow, flush more. This can continue for 2-3 days."
+                            font: Theme.bodyFont
                             color: Theme.textSecondaryColor
                             wrapMode: Text.WordWrap
                             horizontalAlignment: Text.AlignHCenter
@@ -389,7 +425,7 @@ Page {
                         Tr {
                             Layout.fillWidth: true
                             key: "descaling.warning.steam"
-                            fallback: "• Disable steam heater and wait until steam temp is below 60°C (can take 1 hour)"
+                            fallback: "\u2022 Disable steam heater and wait until steam temp is below 60\u00B0C (can take 1 hour). Tip: disable it right after waking the machine, before preheating, to save time"
                             font: Theme.bodyFont
                             color: Theme.textColor
                             wrapMode: Text.WordWrap
@@ -407,7 +443,16 @@ Page {
                         Tr {
                             Layout.fillWidth: true
                             key: "descaling.warning.notneeded"
-                            fallback: "\u2022 If your water TDS is below 120ppm, you may not need to descale at all"
+                            fallback: "\u2022 If your water TDS is below 120ppm, you likely don't need to descale at all. Measure your water TDS to be sure"
+                            font: Theme.bodyFont
+                            color: Theme.textColor
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Tr {
+                            Layout.fillWidth: true
+                            key: "descaling.warning.noportafilter"
+                            fallback: "\u2022 No portafilter needed - descaling cleans the internal water path, not the group head externals"
                             font: Theme.bodyFont
                             color: Theme.textColor
                             wrapMode: Text.WordWrap
@@ -452,9 +497,10 @@ Page {
 
                                     Column {
                                         spacing: Theme.scaled(4)
-                                        Text {
+                                        Tr {
                                             anchors.horizontalCenter: parent.horizontalCenter
-                                            text: "1540 ml"
+                                            key: "descaling.solution.waterAmount"
+                                            fallback: "1540 ml"
                                             font: Theme.titleFont
                                             color: Theme.flowColor
                                         }
@@ -467,17 +513,19 @@ Page {
                                         }
                                     }
 
-                                    Text {
-                                        text: "+"
+                                    Tr {
+                                        key: "descaling.solution.plus"
+                                        fallback: "+"
                                         font: Theme.titleFont
                                         color: Theme.textSecondaryColor
                                     }
 
                                     Column {
                                         spacing: Theme.scaled(4)
-                                        Text {
+                                        Tr {
                                             anchors.horizontalCenter: parent.horizontalCenter
-                                            text: "80 g"
+                                            key: "descaling.solution.citricAmount"
+                                            fallback: "80 g"
                                             font: Theme.titleFont
                                             color: Theme.pressureColor
                                         }
@@ -504,7 +552,7 @@ Page {
                             Tr {
                                 Layout.fillWidth: true
                                 key: "descaling.solution.oldmachine"
-                                fallback: "For v1.0/v1.1 machines: Never exceed 5% concentration (can damage old pressure sensor)."
+                                fallback: "For v1.0/v1.1 machines: Never exceed 5% concentration (can damage old pressure sensor). If you've replaced the pressure sensor or manifold assembly, higher concentrations are safe."
                                 font.pixelSize: Theme.captionFont.pixelSize
                                 font.italic: true
                                 color: Theme.warningColor
@@ -616,7 +664,7 @@ Page {
                         Tr {
                             Layout.fillWidth: true
                             key: "descaling.steps.1"
-                            fallback: "1. Disable steam heater and wait for steam temp to drop below 60°C"
+                            fallback: "1. Disable steam heater (use the button to the right) and wait for steam temp to drop below 60\u00B0C. Disable it right after waking the machine to save time"
                             font: Theme.bodyFont
                             color: Theme.textColor
                             wrapMode: Text.WordWrap
