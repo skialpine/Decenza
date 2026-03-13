@@ -424,20 +424,25 @@ bool MainController::isCurrentProfileRecipe() const {
 }
 
 QString MainController::currentEditorType() const {
-    if (m_currentProfile.isRecipeMode()) {
-        return editorTypeToString(m_currentProfile.recipeParams().editorType);
-    }
-    // Detect by profile type for non-recipe-mode profiles
-    QString profileType = m_currentProfile.profileType();
-    if (profileType == "settings_2a") {
-        return QStringLiteral("pressure");
-    }
-    if (profileType == "settings_2b") {
-        return QStringLiteral("flow");
-    }
-    // Detect by title prefix
+    // Title is the authority for D-Flow/A-Flow selection
     if (isDFlowTitle(m_currentProfile.title())) return QStringLiteral("dflow");
     if (isAFlowTitle(m_currentProfile.title())) return QStringLiteral("aflow");
+
+    // Simple profile types (from profileType field)
+    QString profileType = m_currentProfile.profileType();
+    if (profileType == "settings_2a") return QStringLiteral("pressure");
+    if (profileType == "settings_2b") return QStringLiteral("flow");
+
+    // Recipe-mode profiles: use stored editor type for Pressure/Flow.
+    // D-Flow/A-Flow already handled by title check above, so this won't
+    // re-introduce the #421 bug where non-D-Flow profiles got the D-Flow editor.
+    if (m_currentProfile.isRecipeMode()) {
+        EditorType et = m_currentProfile.recipeParams().editorType;
+        if (et == EditorType::Pressure) return QStringLiteral("pressure");
+        if (et == EditorType::Flow) return QStringLiteral("flow");
+    }
+
+    // Everything else → Advanced (never default to D-Flow for unknown profiles)
     return QStringLiteral("advanced");
 }
 
@@ -1669,10 +1674,26 @@ void MainController::uploadRecipeProfile(const QVariantMap& recipeParams) {
     }
     recipe.clamp();  // Ensure values are within hardware limits
 
-    // Update current profile's recipe params and regenerate frames
+    // Check if frame-affecting params actually changed. When only metadata changes
+    // (targetWeight, targetVolume, dose), skip frame regeneration to preserve
+    // hand-tuned frame values. Matches de1app behavior where changing weight
+    // doesn't recompute frames through the D-Flow editor.
+    RecipeParams oldRecipe = m_currentProfile.recipeParams();
+    bool needFrameRegen = !m_currentProfile.isRecipeMode()
+                       || m_currentProfile.steps().isEmpty()
+                       || !oldRecipe.frameAffectingFieldsEqual(recipe);
+
+    // Update current profile's recipe params
     m_currentProfile.setRecipeMode(true);
     m_currentProfile.setRecipeParams(recipe);
-    m_currentProfile.regenerateFromRecipe();
+
+    if (needFrameRegen) {
+        m_currentProfile.regenerateFromRecipe();
+    } else {
+        // Only metadata changed — update target weight/volume without touching frames
+        m_currentProfile.setTargetWeight(recipe.targetWeight);
+        m_currentProfile.setTargetVolume(recipe.targetVolume > 0 ? recipe.targetVolume : 100.0);
+    }
 
     // Sync overrides so uploadCurrentProfile doesn't apply wrong delta
     // and shot plan text shows correct values (not stale overrides)
@@ -1743,6 +1764,7 @@ void MainController::createNewFlowProfile(const QString& title) {
 void MainController::createNewProfileWithEditorType(EditorType type, const QString& title) {
     RecipeParams recipe;
     recipe.editorType = type;
+    recipe.applyEditorDefaults();
     recipe.clamp();  // Ensure values are within hardware limits
 
     m_currentProfile = RecipeGenerator::createProfile(recipe, title);
