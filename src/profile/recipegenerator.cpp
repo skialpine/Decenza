@@ -92,8 +92,13 @@ Profile RecipeGenerator::createProfile(const RecipeParams& recipe, const QString
         qWarning() << "RecipeGenerator::createProfile: recipe produced fallback empty frame for" << title;
     }
 
-    // Count preinfuse frames from actual generated frames (authoritative)
-    profile.setPreinfuseFrameCount(Profile::countPreinfuseFrames(profile.steps()));
+    // Use recipe's preinfuseFrameCount if set (D-Flow/A-Flow templates provide this via
+    // applyEditorDefaults), otherwise fall back to counting for simple profiles.
+    if (recipe.preinfuseFrameCount >= 0) {
+        profile.setPreinfuseFrameCount(recipe.preinfuseFrameCount);
+    } else {
+        profile.setPreinfuseFrameCount(Profile::countPreinfuseFrames(profile.steps()));
+    }
 
     // Store recipe params for re-editing
     profile.setRecipeMode(true);

@@ -106,6 +106,9 @@ struct RecipeParams {
     // === Editor Type ===
     EditorType editorType = EditorType::DFlow;  // Determines frame generation strategy
 
+    // === BLE Header ===
+    int preinfuseFrameCount = -1;  // NumberOfPreinfuseFrames for BLE header (-1 = use countPreinfuseFrames())
+
     // Apply de1app-matching defaults for the current editorType.
     // Call after setting editorType but before clamp().
     void applyEditorDefaults();
