@@ -140,6 +140,7 @@ void ShotDataModel::clear() {
     m_weightPoints.clear();
     m_cumulativeWeightPoints.clear();
     m_weightFlowRatePoints.clear();
+    m_weightFlowRateRawPoints.clear();
     m_pendingMarkers.clear();
 
     // Reset goal segments - keep first segment with capacity
@@ -377,6 +378,9 @@ void ShotDataModel::markStopAt(double time) {
 }
 
 void ShotDataModel::smoothWeightFlowRate(int window) {
+    // Save raw copy before smoothing (for by_weight_raw export)
+    m_weightFlowRateRawPoints = m_weightFlowRatePoints;
+
     qsizetype n = m_weightFlowRatePoints.size();
     if (n < 3) return;
 

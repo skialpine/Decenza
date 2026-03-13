@@ -180,6 +180,7 @@ MainController::MainController(QNetworkAccessManager* networkManager,
 
     // Create visualizer uploader and importer
     m_visualizer = new VisualizerUploader(m_networkManager, m_settings, this);
+    m_visualizer->setDevice(m_device);
     m_visualizerImporter = new VisualizerImporter(m_networkManager, this, m_settings, this);
 
     // Create shot history storage and comparison model
