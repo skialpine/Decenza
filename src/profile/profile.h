@@ -94,6 +94,20 @@ public:
     double minimumPressure() const { return m_minimumPressure; }
     void setMinimumPressure(double pressure) { m_minimumPressure = pressure; }
 
+    // === Simple Profile Parameters (settings_2a/2b) ===
+    // Used by Visualizer to reconstruct simple profiles
+    double preinfusionTime() const { return m_preinfusionTime; }
+    double preinfusionFlowRate() const { return m_preinfusionFlowRate; }
+    double preinfusionStopPressure() const { return m_preinfusionStopPressure; }
+    double espressoPressure() const { return m_espressoPressure; }
+    double espressoHoldTime() const { return m_espressoHoldTime; }
+    double espressoDeclineTime() const { return m_espressoDeclineTime; }
+    double pressureEnd() const { return m_pressureEnd; }
+    double flowProfileHold() const { return m_flowProfileHold; }
+    double flowProfileDecline() const { return m_flowProfileDecline; }
+    double maximumFlowRangeDefault() const { return m_maximumFlowRangeDefault; }
+    double maximumPressureRangeDefault() const { return m_maximumPressureRangeDefault; }
+
     // === Advanced Limits (de1app settings_2c2) ===
     double tankDesiredWaterTemperature() const { return m_tankDesiredWaterTemperature; }
     void setTankDesiredWaterTemperature(double temp) { m_tankDesiredWaterTemperature = temp; }
