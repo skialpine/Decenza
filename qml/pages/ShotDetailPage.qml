@@ -136,6 +136,8 @@ Page {
                     }
                     font: Theme.titleFont
                     color: Theme.textColor
+                    Layout.fillWidth: true
+                    elide: Text.ElideRight
                 }
 
                 Text {
@@ -485,6 +487,8 @@ Page {
                         }
                         font: Theme.subtitleFont
                         color: Theme.textColor
+                        Layout.fillWidth: true
+                        elide: Text.ElideRight
                     }
 
                     GridLayout {
@@ -494,16 +498,16 @@ Page {
                         Layout.fillWidth: true
 
                         Tr { key: "shotdetail.roaster"; fallback: "Roaster:"; font: Theme.labelFont; color: Theme.textSecondaryColor; visible: !!(shotData.beanBrand) }
-                        Text { text: shotData.beanBrand || ""; font: Theme.labelFont; color: Theme.textColor; visible: !!(shotData.beanBrand) }
+                        Text { text: shotData.beanBrand || ""; font: Theme.labelFont; color: Theme.textColor; visible: !!(shotData.beanBrand); Layout.fillWidth: true; elide: Text.ElideRight }
 
                         Tr { key: "shotdetail.coffee"; fallback: "Coffee:"; font: Theme.labelFont; color: Theme.textSecondaryColor; visible: !!(shotData.beanType) }
-                        Text { text: shotData.beanType || ""; font: Theme.labelFont; color: Theme.textColor; visible: !!(shotData.beanType) }
+                        Text { text: shotData.beanType || ""; font: Theme.labelFont; color: Theme.textColor; visible: !!(shotData.beanType); Layout.fillWidth: true; elide: Text.ElideRight }
 
                         Tr { key: "shotdetail.roastdate"; fallback: "Roast Date:"; font: Theme.labelFont; color: Theme.textSecondaryColor; visible: !!(shotData.roastDate) }
-                        Text { text: shotData.roastDate || ""; font: Theme.labelFont; color: Theme.textColor; visible: !!(shotData.roastDate) }
+                        Text { text: shotData.roastDate || ""; font: Theme.labelFont; color: Theme.textColor; visible: !!(shotData.roastDate); Layout.fillWidth: true; elide: Text.ElideRight }
 
                         Tr { key: "shotdetail.roastlevel"; fallback: "Roast Level:"; font: Theme.labelFont; color: Theme.textSecondaryColor; visible: !!(shotData.roastLevel) }
-                        Text { text: shotData.roastLevel || ""; font: Theme.labelFont; color: Theme.textColor; visible: !!(shotData.roastLevel) }
+                        Text { text: shotData.roastLevel || ""; font: Theme.labelFont; color: Theme.textColor; visible: !!(shotData.roastLevel); Layout.fillWidth: true; elide: Text.ElideRight }
                     }
                 }
             }
@@ -540,16 +544,16 @@ Page {
                         Layout.fillWidth: true
 
                         Tr { key: "shotdetail.brand"; fallback: "Brand:"; font: Theme.labelFont; color: Theme.textSecondaryColor; visible: !!(shotData.grinderBrand) }
-                        Text { text: shotData.grinderBrand || ""; font: Theme.labelFont; color: Theme.textColor; visible: !!(shotData.grinderBrand) }
+                        Text { text: shotData.grinderBrand || ""; font: Theme.labelFont; color: Theme.textColor; visible: !!(shotData.grinderBrand); Layout.fillWidth: true; elide: Text.ElideRight }
 
                         Tr { key: "shotdetail.model"; fallback: "Model:"; font: Theme.labelFont; color: Theme.textSecondaryColor; visible: !!(shotData.grinderModel) }
-                        Text { text: shotData.grinderModel || ""; font: Theme.labelFont; color: Theme.textColor; visible: !!(shotData.grinderModel) }
+                        Text { text: shotData.grinderModel || ""; font: Theme.labelFont; color: Theme.textColor; visible: !!(shotData.grinderModel); Layout.fillWidth: true; elide: Text.ElideRight }
 
                         Tr { key: "shotdetail.burrs"; fallback: "Burrs:"; font: Theme.labelFont; color: Theme.textSecondaryColor; visible: !!(shotData.grinderBurrs) }
-                        Text { text: shotData.grinderBurrs || ""; font: Theme.labelFont; color: Theme.textColor; visible: !!(shotData.grinderBurrs) }
+                        Text { text: shotData.grinderBurrs || ""; font: Theme.labelFont; color: Theme.textColor; visible: !!(shotData.grinderBurrs); Layout.fillWidth: true; elide: Text.ElideRight }
 
                         Tr { key: "shotdetail.setting"; fallback: "Setting:"; font: Theme.labelFont; color: Theme.textSecondaryColor; visible: !!(shotData.grinderSetting) }
-                        Text { text: shotData.grinderSetting || ""; font: Theme.labelFont; color: Theme.textColor; visible: !!(shotData.grinderSetting) }
+                        Text { text: shotData.grinderSetting || ""; font: Theme.labelFont; color: Theme.textColor; visible: !!(shotData.grinderSetting); Layout.fillWidth: true; elide: Text.ElideRight }
                     }
                 }
             }
@@ -626,6 +630,8 @@ Page {
                         text: shotData.barista || ""
                         font: Theme.labelFont
                         color: Theme.textColor
+                        Layout.fillWidth: true
+                        elide: Text.ElideRight
                     }
                 }
             }
@@ -702,6 +708,8 @@ Page {
                         text: shotData.visualizerId || ""
                         font: Theme.captionFont
                         color: Theme.textSecondaryColor
+                        Layout.fillWidth: true
+                        elide: Text.ElideRight
                     }
                 }
             }
