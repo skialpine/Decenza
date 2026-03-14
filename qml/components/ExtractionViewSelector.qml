@@ -201,6 +201,7 @@ Dialog {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: Theme.scaled(48)
+            Layout.topMargin: Theme.spacingSmall
             radius: Theme.cardRadius
             color: Theme.backgroundColor
 

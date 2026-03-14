@@ -960,11 +960,12 @@ Page {
                 Accessible.role: Accessible.Button
                 Accessible.name: TranslationManager.translate("espresso.accessible.skipFrame", "Skip to next frame")
                 Accessible.focusable: true
+                Accessible.onPressAction: skipFrameTapHandler.tapped(null)
 
                 Text {
                     anchors.centerIn: parent
                     text: TranslationManager.translate("espresso.button.skip", "Skip")
-                    color: "white"
+                    color: Theme.textColor
                     font.pixelSize: Theme.scaled(11)
                     font.weight: Font.Medium
                     Accessible.ignored: true
