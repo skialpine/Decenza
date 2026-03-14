@@ -656,6 +656,13 @@ if(Qt6ShaderTools_FOUND)
         FILES
             shaders/crt.frag
     )
+    qt_add_shaders(Decenza "cup_shaders"
+        BATCHABLE
+        PREFIX "/"
+        FILES
+            shaders/cup_mask.frag
+            shaders/cup_lighten.frag
+    )
 endif()
 
 # Apply version code on every build (reads versioncode.txt as-is, no increment).
