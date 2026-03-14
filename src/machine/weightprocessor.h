@@ -46,6 +46,7 @@ signals:
     void sawTriggered(double weightAtStop, double flowRateAtStop, double targetWeight);
     void skipFrame(int frameNumber);
     void flowRatesReady(double weight, double flowRate, double flowRateShort);
+    void untaredCupDetected();
 
 private:
     double computeLSLR(int windowMs) const;
@@ -79,6 +80,7 @@ private:
     qint64 m_lastTareWarnMs = 0;
     qint64 m_lastLowFlowLogMs = 0;
     bool m_flowBecameValidLogged = false;  // Log once when flowShort transitions 0→valid
+    bool m_untaredCupSignalled = false;   // Fire untaredCupDetected only once per extraction
 
     // Configuration (set once at shot start, read-only during extraction)
     double m_targetWeight = 0;

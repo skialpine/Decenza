@@ -157,6 +157,10 @@ void WeightProcessor::processWeight(double weight)
         if (extractionTime < 3.0 && weight > 50.0) {
             qWarning() << "[SAW-Worker] Sanity check: weight" << weight
                        << "g at" << extractionTime << "s into extraction — skipping SAW (likely untared cup)";
+            if (!m_untaredCupSignalled) {
+                m_untaredCupSignalled = true;
+                emit untaredCupDetected();
+            }
             return;
         }
     }
@@ -262,6 +266,7 @@ void WeightProcessor::startExtraction()
     m_lastTareWarnMs = 0;
     m_lastLowFlowLogMs = 0;
     m_flowBecameValidLogged = false;
+    m_untaredCupSignalled = false;
     m_lastWallClockMs = 0;
     m_lastSampleTs = 0;
     m_uncalibratedBatchWarned = false;

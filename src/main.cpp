@@ -467,6 +467,12 @@ int main(int argc, char *argv[])
                          emit machineState.targetWeightReached();
                      });
 
+    // WeightProcessor → MachineState: notify QML when SAW is bypassed (untared cup)
+    QObject::connect(&weightProcessor, &WeightProcessor::untaredCupDetected,
+                     &machineState, [&machineState]() {
+                         emit machineState.sawBypassed();
+                     });
+
     // WeightProcessor → ShotDataModel: mark stop time on graph.
     // Using &shotDataModel as context ensures lambda runs on the main thread.
     QObject::connect(&weightProcessor, &WeightProcessor::stopNow,
