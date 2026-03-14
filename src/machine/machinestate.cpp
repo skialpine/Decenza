@@ -758,8 +758,6 @@ void MachineState::tareScale() {
                     emit tareCompleted();
                 }
             });
-        } else if (m_tareTimeoutTimer->isActive()) {
-            qDebug() << "=== TARE: Cancelling previous tare timeout (re-tare requested) ===";
         }
         m_tareTimeoutTimer->start();
     }
