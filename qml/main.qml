@@ -1631,6 +1631,64 @@ ApplicationWindow {
         z: 950  // Above statusBar (600), below touch capture (1000)
     }
 
+    // SAW bypassed warning (untared cup detected during extraction)
+    property bool sawBypassedVisible: false
+
+    Rectangle {
+        id: sawBypassedOverlay
+        anchors.top: parent.top
+        anchors.topMargin: Theme.scaled(80)
+        anchors.horizontalCenter: parent.horizontalCenter
+        z: 500
+
+        width: sawBypassedText.width + Theme.spacingLarge * 2
+        height: Theme.scaled(44)
+        radius: Theme.scaled(22)
+        color: Theme.errorColor
+
+        visible: sawBypassedVisible || sawBypassedFadeOut.running
+        opacity: sawBypassedVisible ? 1 : 0
+        scale: 1.0
+
+        SequentialAnimation {
+            id: sawBypassedPopIn
+            NumberAnimation {
+                target: sawBypassedOverlay; property: "scale"
+                from: 1.0; to: 1.10; duration: 150
+                easing.type: Easing.OutBack; easing.overshoot: 1.5
+            }
+            NumberAnimation {
+                target: sawBypassedOverlay; property: "scale"
+                from: 1.10; to: 1.0; duration: 350
+                easing.type: Easing.OutBack; easing.overshoot: 1.5
+            }
+        }
+
+        Behavior on opacity {
+            enabled: sawBypassedVisible
+            NumberAnimation { id: sawBypassedFadeOut; duration: 2000 }
+        }
+
+        Text {
+            id: sawBypassedText
+            anchors.centerIn: parent
+            text: TranslationManager.translate("espresso.sawBypassed", "Scale not tared — auto-stop disabled")
+            color: Theme.primaryContrastColor
+            font: Theme.bodyFont
+            Accessible.ignored: true
+        }
+
+        Accessible.role: Accessible.AlertMessage
+        Accessible.name: sawBypassedText.text
+        Accessible.focusable: true
+    }
+
+    Timer {
+        id: sawBypassedTimer
+        interval: 5000
+        onTriggered: sawBypassedVisible = false
+    }
+
     // Espresso stop reason overlay (shown on top of any page)
     property string stopReason: ""  // "manual", "weight", "machine", ""
     property bool stopOverlayVisible: false
@@ -1690,12 +1748,17 @@ ApplicationWindow {
             NumberAnimation { id: fadeOutAnim; duration: 2000 }
         }
 
+        Accessible.role: Accessible.AlertMessage
+        Accessible.name: stopReasonText.text
+        Accessible.focusable: true
+
         Text {
             id: stopReasonText
             anchors.centerIn: parent
             text: getStopReasonText()
             color: "black"
             font: Theme.bodyFont
+            Accessible.ignored: true
         }
     }
 
@@ -1728,6 +1791,14 @@ ApplicationWindow {
         function onTargetWeightReached() {
             root.stopReason = "weight"
         }
+        function onSawBypassed() {
+            root.sawBypassedVisible = true
+            sawBypassedPopIn.start()
+            sawBypassedTimer.start()
+            if (typeof AccessibilityManager !== "undefined") {
+                AccessibilityManager.announce(sawBypassedText.text, true)
+            }
+        }
         function onShotStarted() {
             // Track if this is an espresso operation (check current phase)
             var phase = MachineState.phase
@@ -1736,6 +1807,8 @@ ApplicationWindow {
                                          phase === MachineStateType.Phase.Pouring)
             root.stopReason = ""
             root.stopOverlayVisible = false
+            root.sawBypassedVisible = false
+            sawBypassedTimer.stop()
             root.pendingMetadataNavigation = false
             stopOverlayTimer.stop()
         }

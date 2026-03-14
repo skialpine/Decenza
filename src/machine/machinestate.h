@@ -113,6 +113,7 @@ signals:
     void targetVolumeReached();
     void tareCompleted();         // Emitted when scale reports ~0g after tare command
     void flowBeforeAutoTare();    // Emitted when auto-tare fires during preheat (tells WeightProcessor to reset)
+    void sawBypassed();           // Emitted when SAW is skipped due to untared cup
 
 private slots:
     void onDE1StateChanged();
