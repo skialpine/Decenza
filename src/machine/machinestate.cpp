@@ -721,6 +721,16 @@ void MachineState::tareScale() {
 
     // Fallback to legacy implementation
     if (m_scale && m_scale->isConnected()) {
+        // Skip if a tare is already in progress — sending another BLE tare command
+        // while waiting for the scale to respond confuses the scale and can cause it
+        // to never report ~0g, eventually triggering a 6s timeout (issue #430).
+        // m_waitingForTare is cleared by onScaleWeightChanged (weight < 1g) or by
+        // the 6s timeout fallback, so retries are possible after the scale responds.
+        if (m_waitingForTare) {
+            qDebug() << "=== TARE: Skipped (already waiting for scale response) ===";
+            return;
+        }
+
         // Immediately disable stop-at-weight until tare completes
         // This prevents early stop if m_tareCompleted was true from a previous operation
         m_tareCompleted = false;
@@ -748,8 +758,6 @@ void MachineState::tareScale() {
                     emit tareCompleted();
                 }
             });
-        } else {
-            qDebug() << "=== TARE: Cancelling previous tare timeout (re-tare requested) ===";
         }
         m_tareTimeoutTimer->start();
     }
