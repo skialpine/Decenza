@@ -169,9 +169,6 @@ private:
     // Auto-tare during "flow before" phase (cup placed during preheat)
     qint64 m_lastAutoTareTime = 0;
 
-    // Debounce rapid tare requests (issue #430: BLE scales confused by rapid tare commands)
-    qint64 m_lastTareRequestTime = 0;
-
     // Throttle scaleWeightChanged / scaleFlowRateChanged to QML (10Hz cap).
     // Trailing-edge timers ensure the last update is never dropped.
     QElapsedTimer m_weightEmitTimer;                 // Throttle gate for scaleWeightChanged
