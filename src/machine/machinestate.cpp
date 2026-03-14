@@ -708,6 +708,16 @@ void MachineState::updateCachedFlowRates(double flowRate, double flowRateShort) 
 }
 
 void MachineState::tareScale() {
+    // Debounce: ignore tare requests within 500ms of the last one.
+    // Rapid successive tare commands confuse BLE scales, causing them to
+    // never report ~0g and eventually triggering a 6s timeout (issue #430).
+    qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (now - m_lastTareRequestTime < 500) {
+        qDebug() << "=== TARE: Debounced (last tare" << (now - m_lastTareRequestTime) << "ms ago) ===";
+        return;
+    }
+    m_lastTareRequestTime = now;
+
     // Delegate to timing controller if available (new centralized timing)
     // Exception: Hot water uses legacy tare that waits for scale response.
     // ShotTimingController::tare() is fire-and-forget (sets m_tareCompleted immediately),
@@ -748,7 +758,7 @@ void MachineState::tareScale() {
                     emit tareCompleted();
                 }
             });
-        } else {
+        } else if (m_tareTimeoutTimer->isActive()) {
             qDebug() << "=== TARE: Cancelling previous tare timeout (re-tare requested) ===";
         }
         m_tareTimeoutTimer->start();
