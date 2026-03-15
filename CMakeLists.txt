@@ -114,10 +114,12 @@ if(IOS)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "17.0")
     # Fix Qt/Foundation header conflict by compiling all C++ as Objective-C++
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -x objective-c++")
+
 endif()
 
 # OpenSSL for HTTPS/TLS and self-signed certificate generation
-# Android uses KDAB android_openssl (fetched above), iOS doesn't need it (no web server)
+# Android uses KDAB android_openssl (fetched above)
+# iOS uses Apple Security.framework instead (no OpenSSL needed)
 if(NOT ANDROID AND NOT IOS)
     find_package(OpenSSL REQUIRED)
 endif()
@@ -140,7 +142,8 @@ if(NOT ANDROID AND NOT IOS)
     # Desktop: use OpenSSL's SHA1 to avoid duplicate symbols with libcrypto.a
     set(PAHO_WITH_SSL ON CACHE BOOL "" FORCE)
 else()
-    # Android: KDAB provides OpenSSL separately; iOS: no OpenSSL at all
+    # Android/iOS: no OpenSSL linked with Paho (Android uses KDAB separately,
+    # iOS uses Apple Security.framework for TLS cert generation)
     set(PAHO_WITH_SSL OFF CACHE BOOL "" FORCE)
 endif()
 set(PAHO_HIGH_PERFORMANCE OFF CACHE BOOL "" FORCE)
@@ -432,14 +435,15 @@ if(NOT ANDROID AND NOT IOS)
 endif()
 
 # Link Paho MQTT - use SSL variant (paho-mqtt3as) on desktop where OpenSSL is
-# statically linked (avoids duplicate SHA1 symbols), non-SSL on mobile
+# statically linked (avoids duplicate SHA1 symbols), non-SSL on Android/iOS
 if(NOT ANDROID AND NOT IOS)
     target_link_libraries(Decenza PRIVATE paho-mqtt3as-static)
 else()
     target_link_libraries(Decenza PRIVATE paho-mqtt3a-static)
 endif()
 
-# Link OpenSSL (non-Android, non-iOS; Android uses add_android_openssl_libraries below)
+# Link OpenSSL on desktop only (Android uses KDAB add_android_openssl_libraries,
+# iOS uses Apple Security.framework for cert generation)
 if(NOT ANDROID AND NOT IOS)
     target_link_libraries(Decenza PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 endif()
@@ -723,12 +727,17 @@ endif()
 
 # iOS deployment
 if(IOS)
+    # Bundle ID and team can be overridden for local dev builds:
+    #   cmake ... -DIOS_BUNDLE_ID=com.yourname.decenza -DIOS_DEVELOPMENT_TEAM=YOURTEAMID
+    if(NOT IOS_BUNDLE_ID)
+        set(IOS_BUNDLE_ID "io.github.kulitorum.decenza")
+    endif()
     set_target_properties(Decenza PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/ios/Info.plist"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${CMAKE_PROJECT_VERSION}"
         MACOSX_BUNDLE_BUNDLE_VERSION "${CURRENT_VERSION_CODE}"
-        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "io.github.kulitorum.decenza"
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${IOS_BUNDLE_ID}"
         XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
         XCODE_ATTRIBUTE_MARKETING_VERSION "${CMAKE_PROJECT_VERSION}"
         XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION "${CURRENT_VERSION_CODE}"
@@ -740,6 +749,12 @@ if(IOS)
         XCODE_ATTRIBUTE_DWARF_DSYM_FOLDER_PATH "$(CONFIGURATION_BUILD_DIR)"
         XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/ios/Decenza.entitlements"
     )
+    # Only override Xcode's signing team when explicitly provided
+    if(IOS_DEVELOPMENT_TEAM)
+        set_target_properties(Decenza PROPERTIES
+            XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "${IOS_DEVELOPMENT_TEAM}"
+        )
+    endif()
     # Add iOS asset catalog for app icon
     target_sources(Decenza PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/ios/Assets.xcassets"
@@ -767,6 +782,10 @@ if(IOS)
     # Link CoreBluetooth for native scale BLE transport
     target_link_libraries(Decenza PRIVATE
         "-framework CoreBluetooth"
+    )
+    # Link Security.framework for self-signed TLS certificate generation
+    target_link_libraries(Decenza PRIVATE
+        "-framework Security"
     )
 endif()
 
