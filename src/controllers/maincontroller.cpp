@@ -2277,6 +2277,8 @@ void MainController::applySteamSettings() {
 
 void MainController::applyHotWaterSettings() {
     sendMachineSettings();
+    if (m_device && m_device->isConnected())
+        m_device->writeMMR(DE1::MMR::HOT_WATER_FLOW_RATE, m_settings->hotWaterFlowRate());
 }
 
 void MainController::applyFlushSettings() {
@@ -2759,6 +2761,16 @@ void MainController::turnOffSteamHeater() {
     );
 
     qDebug() << "Turned off steam heater (steamDisabled=true)";
+}
+
+void MainController::setHotWaterFlowRateImmediate(int flow) {
+    if (!m_device || !m_device->isConnected() || !m_settings) return;
+
+    m_settings->setHotWaterFlowRate(flow);
+
+    m_device->writeMMR(DE1::MMR::HOT_WATER_FLOW_RATE, flow);
+
+    qDebug() << "Hot water flow rate set to:" << flow;
 }
 
 void MainController::setSteamFlowImmediate(int flow) {
