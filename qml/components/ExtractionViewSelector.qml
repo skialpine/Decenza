@@ -38,7 +38,11 @@ Dialog {
         }
     }
 
+    // Ensure dialog sizes to fit all content (prevents clipping on smaller screens)
+    contentHeight: contentColumn.implicitHeight
+
     contentItem: ColumnLayout {
+        id: contentColumn
         spacing: Theme.spacingSmall
 
         Repeater {
@@ -204,13 +208,19 @@ Dialog {
                         border.color: phaseIndicatorCheck.checked ? Theme.primaryColor : Theme.textSecondaryColor
                         border.width: Theme.scaled(2)
 
-                        Text {
+                        Image {
                             anchors.centerIn: parent
-                            text: "\u2713"
-                            color: Theme.surfaceColor
-                            font.pixelSize: Theme.scaled(14)
-                            font.bold: true
+                            source: "qrc:/icons/tick.svg"
+                            sourceSize.width: Theme.scaled(14)
+                            sourceSize.height: Theme.scaled(14)
                             visible: phaseIndicatorCheck.checked
+                            Accessible.ignored: true
+
+                            layer.enabled: true
+                            layer.effect: MultiEffect {
+                                colorization: 1.0
+                                colorizationColor: Theme.surfaceColor
+                            }
                         }
                     }
                 }
@@ -259,13 +269,19 @@ Dialog {
                         border.color: statsCheck.checked ? Theme.primaryColor : Theme.textSecondaryColor
                         border.width: Theme.scaled(2)
 
-                        Text {
+                        Image {
                             anchors.centerIn: parent
-                            text: "\u2713"
-                            color: Theme.surfaceColor
-                            font.pixelSize: Theme.scaled(14)
-                            font.bold: true
+                            source: "qrc:/icons/tick.svg"
+                            sourceSize.width: Theme.scaled(14)
+                            sourceSize.height: Theme.scaled(14)
                             visible: statsCheck.checked
+                            Accessible.ignored: true
+
+                            layer.enabled: true
+                            layer.effect: MultiEffect {
+                                colorization: 1.0
+                                colorizationColor: Theme.surfaceColor
+                            }
                         }
                     }
                 }
