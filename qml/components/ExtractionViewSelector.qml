@@ -20,6 +20,10 @@ Dialog {
     modal: true
     anchors.centerIn: parent
     width: Math.min(parent.width * 0.85, Theme.scaled(360))
+    // Let the Dialog auto-size vertically from content
+    padding: 0
+    topPadding: 0
+    bottomPadding: 0
 
     background: Rectangle {
         color: Theme.surfaceColor
@@ -28,22 +32,21 @@ Dialog {
         border.width: 1
     }
 
-    header: Item {
-        height: Theme.scaled(48)
-        Text {
-            anchors.centerIn: parent
-            text: selectorDialog.title
-            color: Theme.textColor
-            font: Theme.subtitleFont
-        }
-    }
-
-    // Ensure dialog sizes to fit all content (prevents clipping on smaller screens)
-    contentHeight: contentColumn.implicitHeight
+    header: null
+    footer: null
 
     contentItem: ColumnLayout {
         id: contentColumn
         spacing: Theme.spacingSmall
+
+        // Title (moved from header to content so it's part of the measured layout)
+        Text {
+            Layout.alignment: Qt.AlignHCenter
+            Layout.topMargin: Theme.spacingMedium
+            text: selectorDialog.title
+            color: Theme.textColor
+            font: Theme.subtitleFont
+        }
 
         Repeater {
             model: ListModel {
@@ -232,6 +235,7 @@ Dialog {
             Layout.fillWidth: true
             Layout.preferredHeight: Theme.scaled(48)
             Layout.topMargin: Theme.spacingSmall
+            Layout.bottomMargin: Theme.spacingMedium
             radius: Theme.cardRadius
             color: Theme.backgroundColor
 
@@ -288,6 +292,4 @@ Dialog {
             }
         }
     }
-
-    footer: null
 }
