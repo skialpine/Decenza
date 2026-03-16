@@ -409,7 +409,7 @@ Page {
             sourceSize.width: Theme.scaled(22)
             sourceSize.height: Theme.scaled(22)
 
-            layer.enabled: !Theme.isDarkMode
+            layer.enabled: true
             layer.smooth: true
             layer.effect: MultiEffect {
                 colorization: 1.0
@@ -671,7 +671,7 @@ Page {
                     sourceSize.width: Theme.scaled(28)
                     sourceSize.height: Theme.scaled(28)
 
-                    layer.enabled: !Theme.isDarkMode
+                    layer.enabled: true
                     layer.smooth: true
                     layer.effect: MultiEffect {
                         colorization: 1.0

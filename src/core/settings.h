@@ -101,6 +101,9 @@ class Settings : public QObject {
     Q_PROPERTY(QVariantMap customThemeColors READ customThemeColors WRITE setCustomThemeColors NOTIFY customThemeColorsChanged)
     Q_PROPERTY(QVariantList colorGroups READ colorGroups WRITE setColorGroups NOTIFY colorGroupsChanged)
     Q_PROPERTY(QString activeThemeName READ activeThemeName WRITE setActiveThemeName NOTIFY activeThemeNameChanged)
+    Q_PROPERTY(QString darkThemeName READ darkThemeName WRITE setDarkThemeName NOTIFY darkThemeNameChanged)
+    Q_PROPERTY(QString lightThemeName READ lightThemeName WRITE setLightThemeName NOTIFY lightThemeNameChanged)
+    Q_PROPERTY(QStringList themeNames READ themeNames NOTIFY themeNamesChanged)
     Q_PROPERTY(double screenBrightness READ screenBrightness WRITE setScreenBrightness NOTIFY screenBrightnessChanged)
     Q_PROPERTY(QVariantMap customFontSizes READ customFontSizes WRITE setCustomFontSizes NOTIFY customFontSizesChanged)
 
@@ -447,6 +450,15 @@ public:
 
     QString activeThemeName() const;
     void setActiveThemeName(const QString& name);
+
+    // Per-mode theme selection
+    QString darkThemeName() const;
+    void setDarkThemeName(const QString& name);
+    QString lightThemeName() const;
+    void setLightThemeName(const QString& name);
+    QStringList themeNames() const;
+    Q_INVOKABLE void applyDarkTheme(const QString& name);
+    Q_INVOKABLE void applyLightTheme(const QString& name);
 
     // Theme mode (light/dark/system)
     QString themeMode() const;
@@ -822,6 +834,9 @@ signals:
     void customThemeColorsChanged();
     void colorGroupsChanged();
     void activeThemeNameChanged();
+    void darkThemeNameChanged();
+    void lightThemeNameChanged();
+    void themeNamesChanged();
     void themeModeChanged();
     void isDarkModeChanged();
     void editingPaletteChanged();

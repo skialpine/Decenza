@@ -1616,7 +1616,10 @@ const QVariantMap& Settings::darkDefaults() {
         {"trackOnTargetColor", "#00cc6d"},
         {"trackDriftingColor", "#f0ad4e"},
         {"trackOffTargetColor", "#e94560"},
-        {"primaryContrastColor", "#ffffff"}
+        {"primaryContrastColor", "#ffffff"},
+        {"iconColor", "#ffffff"},
+        {"bottomBarColor", "#4e85f4"},
+        {"actionButtonContentColor", "#ffffff"}
     };
     return defaults;
 }
@@ -1672,7 +1675,10 @@ const QVariantMap& Settings::lightDefaults() {
         {"trackOnTargetColor", "#00a856"},
         {"trackDriftingColor", "#d99a00"},
         {"trackOffTargetColor", "#d93050"},
-        {"primaryContrastColor", "#4e85f4"}
+        {"primaryContrastColor", "#4e85f4"},
+        {"iconColor", "#1a1a2e"},
+        {"bottomBarColor", "#ffffff"},
+        {"actionButtonContentColor", "#ffffff"}
     };
     return defaults;
 }
@@ -1725,6 +1731,7 @@ void Settings::updateResolvedMode() {
     if (wasDark != m_isDarkMode) {
         emit isDarkModeChanged();
         emit customThemeColorsChanged();  // Active palette changed
+        emit activeThemeNameChanged();    // Derived from dark/lightThemeName
     }
 #ifdef Q_OS_IOS
     ios_setStatusBarStyle(m_isDarkMode);
@@ -1773,9 +1780,13 @@ void Settings::setEditingPaletteColor(const QString& colorName, const QString& c
         emit customThemeColorsChanged();
     }
 
-    // Mark as custom theme
-    if (activeThemeName() != "Custom") {
-        setActiveThemeName("Custom");
+    // Mark the edited palette's mode as custom
+    if (m_editingPalette == "dark") {
+        if (darkThemeName() != "Custom")
+            setDarkThemeName("Custom");
+    } else {
+        if (lightThemeName() != "Custom")
+            setLightThemeName("Custom");
     }
 }
 
@@ -1830,14 +1841,117 @@ void Settings::setColorGroups(const QVariantList& groups) {
 }
 
 QString Settings::activeThemeName() const {
-    return m_settings.value("theme/activeName", "Default").toString();
+    return m_isDarkMode ? darkThemeName() : lightThemeName();
 }
 
 void Settings::setActiveThemeName(const QString& name) {
-    if (activeThemeName() != name) {
-        m_settings.setValue("theme/activeName", name);
-        emit activeThemeNameChanged();
+    if (m_isDarkMode)
+        setDarkThemeName(name);
+    else
+        setLightThemeName(name);
+}
+
+QString Settings::darkThemeName() const {
+    // Migrate from old single activeThemeName if per-mode names not set
+    if (!m_settings.contains("theme/darkThemeName")) {
+        QString old = m_settings.value("theme/activeName", "Default Dark").toString();
+        return (old == "Default") ? "Default Dark" : old;
     }
+    return m_settings.value("theme/darkThemeName", "Default Dark").toString();
+}
+
+void Settings::setDarkThemeName(const QString& name) {
+    if (darkThemeName() != name) {
+        m_settings.setValue("theme/darkThemeName", name);
+        emit darkThemeNameChanged();
+        if (m_isDarkMode)
+            emit activeThemeNameChanged();
+    }
+}
+
+QString Settings::lightThemeName() const {
+    return m_settings.value("theme/lightThemeName", "Default Light").toString();
+}
+
+void Settings::setLightThemeName(const QString& name) {
+    if (lightThemeName() != name) {
+        m_settings.setValue("theme/lightThemeName", name);
+        emit lightThemeNameChanged();
+        if (!m_isDarkMode)
+            emit activeThemeNameChanged();
+    }
+}
+
+QStringList Settings::themeNames() const {
+    QStringList names;
+    names << "Default Dark" << "Default Light";
+
+    QJsonArray userThemes = QJsonDocument::fromJson(
+        m_settings.value("theme/userThemes", "[]").toByteArray()
+    ).array();
+
+    for (const QJsonValue& val : userThemes) {
+        QString name = val.toObject()["name"].toString();
+        if (!name.isEmpty())
+            names << name;
+    }
+    return names;
+}
+
+void Settings::applyDarkTheme(const QString& name) {
+    if (name == "Default Dark") {
+        m_settings.remove("theme/customColorsDark");
+    } else if (name == "Default Light") {
+        m_settings.setValue("theme/customColorsDark",
+            QJsonDocument(QJsonObject::fromVariantMap(lightDefaults())).toJson());
+    } else {
+        // Look for user theme
+        QJsonArray userThemes = QJsonDocument::fromJson(
+            m_settings.value("theme/userThemes", "[]").toByteArray()
+        ).array();
+        for (const QJsonValue& val : userThemes) {
+            QJsonObject obj = val.toObject();
+            if (obj["name"].toString() == name) {
+                if (obj.contains("colorsDark"))
+                    m_settings.setValue("theme/customColorsDark",
+                        QJsonDocument(obj["colorsDark"].toObject()).toJson());
+                else
+                    m_settings.remove("theme/customColorsDark");
+                break;
+            }
+        }
+    }
+    setDarkThemeName(name);
+    if (m_isDarkMode)
+        emit customThemeColorsChanged();
+}
+
+void Settings::applyLightTheme(const QString& name) {
+    if (name == "Default Light") {
+        m_settings.remove("theme/customColorsLight");
+    } else if (name == "Default Dark") {
+        m_settings.setValue("theme/customColorsLight",
+            QJsonDocument(QJsonObject::fromVariantMap(darkDefaults())).toJson());
+    } else {
+        // Look for user theme
+        QJsonArray userThemes = QJsonDocument::fromJson(
+            m_settings.value("theme/userThemes", "[]").toByteArray()
+        ).array();
+        for (const QJsonValue& val : userThemes) {
+            QJsonObject obj = val.toObject();
+            if (obj["name"].toString() == name) {
+                if (obj.contains("colorsLight"))
+                    m_settings.setValue("theme/customColorsLight",
+                        QJsonDocument(obj["colorsLight"].toObject()).toJson());
+                else
+                    m_settings.remove("theme/customColorsLight");
+                break;
+            }
+        }
+    }
+    setLightThemeName(name);
+    if (!m_isDarkMode)
+        emit customThemeColorsChanged();
 }
 
 QString Settings::activeShader() const {
@@ -1978,7 +2092,8 @@ void Settings::resetThemeToDefault() {
     m_settings.remove("theme/customColorsDark");
     m_settings.remove("theme/customColorsLight");
     m_settings.remove("theme/colorGroups");
-    setActiveThemeName("Default");
+    setDarkThemeName("Default Dark");
+    setLightThemeName("Default Light");
     emit customThemeColorsChanged();
     emit colorGroupsChanged();
 }
@@ -2055,12 +2170,19 @@ void Settings::flashThemeColor(const QString& colorName) {
 QVariantList Settings::getPresetThemes() const {
     QVariantList themes;
 
-    // Default theme (built-in, always first)
-    QVariantMap defaultTheme;
-    defaultTheme["name"] = "Default";
-    defaultTheme["primaryColor"] = "#4e85f4";
-    defaultTheme["isBuiltIn"] = true;
-    themes.append(defaultTheme);
+    // Default Dark theme (built-in)
+    QVariantMap defaultDark;
+    defaultDark["name"] = "Default Dark";
+    defaultDark["primaryColor"] = "#4e85f4";
+    defaultDark["isBuiltIn"] = true;
+    themes.append(defaultDark);
+
+    // Default Light theme (built-in)
+    QVariantMap defaultLight;
+    defaultLight["name"] = "Default Light";
+    defaultLight["primaryColor"] = "#d1daee";
+    defaultLight["isBuiltIn"] = true;
+    themes.append(defaultLight);
 
     // Load user-saved themes
     QJsonArray userThemes = QJsonDocument::fromJson(
@@ -2082,12 +2204,24 @@ QVariantList Settings::getPresetThemes() const {
 }
 
 void Settings::applyPresetTheme(const QString& name) {
-    if (name == "Default") {
+    if (name == "Default" || name == "Default Dark") {
         // Clear both palettes — darkDefaults()/lightDefaults() will provide values
         m_settings.remove("theme/customColorsDark");
         m_settings.remove("theme/customColorsLight");
-        setActiveShader("");  // Default theme has no screen effect
-        setActiveThemeName(name);
+        setActiveShader("");
+        setDarkThemeName("Default Dark");
+        setLightThemeName("Default Light");
+        emit customThemeColorsChanged();
+        return;
+    }
+    if (name == "Default Light") {
+        m_settings.setValue("theme/customColorsDark",
+            QJsonDocument(QJsonObject::fromVariantMap(lightDefaults())).toJson());
+        m_settings.setValue("theme/customColorsLight",
+            QJsonDocument(QJsonObject::fromVariantMap(lightDefaults())).toJson());
+        setActiveShader("");
+        setDarkThemeName("Default Light");
+        setLightThemeName("Default Light");
         emit customThemeColorsChanged();
         return;
     }
@@ -2119,7 +2253,8 @@ void Settings::applyPresetTheme(const QString& name) {
                 applyScreenEffect(obj["screenEffect"].toObject());
             else
                 setActiveShader("");
-            setActiveThemeName(name);
+            setDarkThemeName(name);
+            setLightThemeName(name);
             emit customThemeColorsChanged();
             return;
         }
@@ -2127,8 +2262,8 @@ void Settings::applyPresetTheme(const QString& name) {
 }
 
 void Settings::saveCurrentTheme(const QString& name) {
-    if (name.isEmpty() || name == "Default") {
-        return; // Can't save with empty name or overwrite Default
+    if (name.isEmpty() || name == "Default" || name == "Default Dark" || name == "Default Light") {
+        return; // Can't save with empty name or overwrite built-in themes
     }
 
     // Load existing user themes
@@ -2166,12 +2301,14 @@ void Settings::saveCurrentTheme(const QString& name) {
 
     // Save to settings
     m_settings.setValue("theme/userThemes", QJsonDocument(userThemes).toJson(QJsonDocument::Compact));
-    setActiveThemeName(name);
+    setDarkThemeName(name);
+    setLightThemeName(name);
+    emit themeNamesChanged();
 }
 
 void Settings::deleteUserTheme(const QString& name) {
-    if (name == "Default") {
-        return; // Can't delete Default
+    if (name == "Default Dark" || name == "Default Light") {
+        return; // Can't delete built-in themes
     }
 
     QJsonArray userThemes = QJsonDocument::fromJson(
@@ -2185,11 +2322,13 @@ void Settings::deleteUserTheme(const QString& name) {
     }
 
     m_settings.setValue("theme/userThemes", QJsonDocument(userThemes).toJson(QJsonDocument::Compact));
+    emit themeNamesChanged();
 
-    // If we deleted the active theme, switch to Default
-    if (activeThemeName() == name) {
-        applyPresetTheme("Default");
-    }
+    // If we deleted a theme that was active for either mode, reset that mode
+    if (darkThemeName() == name)
+        applyDarkTheme("Default Dark");
+    if (lightThemeName() == name)
+        applyLightTheme("Default Light");
 }
 
 bool Settings::saveThemeToFile(const QString& filePath) {
@@ -2249,7 +2388,9 @@ bool Settings::loadThemeFromFile(const QString& filePath) {
 
     QJsonObject root = doc.object();
     if (root.contains("name")) {
-        setActiveThemeName(root["name"].toString());
+        QString themeName = root["name"].toString();
+        setDarkThemeName(themeName);
+        setLightThemeName(themeName);
     }
     // New dual-palette format
     if (root.contains("colorsDark")) {

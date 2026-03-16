@@ -36,7 +36,7 @@ Item {
                 sourceSize.height: Theme.scaled(20)
                 fillMode: Image.PreserveAspectFit
                 Accessible.ignored: true
-                layer.enabled: !Theme.isDarkMode
+                layer.enabled: true
                 layer.smooth: true
                 layer.effect: MultiEffect {
                     colorization: 1.0

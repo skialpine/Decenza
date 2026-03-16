@@ -127,7 +127,7 @@ Rectangle {
                     sourceSize.height: Theme.scaled(14)
                     opacity: displayMode === 1 ? 1.0 : 0.4
 
-                    layer.enabled: !Theme.isDarkMode
+                    layer.enabled: true
                     layer.smooth: true
                     layer.effect: MultiEffect {
                         colorization: 1.0
@@ -244,7 +244,7 @@ Rectangle {
                     sourceSize.width: Theme.scaled(16)
                     sourceSize.height: Theme.scaled(16)
 
-                    layer.enabled: !Theme.isDarkMode
+                    layer.enabled: true
                     layer.smooth: true
                     layer.effect: MultiEffect {
                         colorization: 1.0
@@ -358,7 +358,7 @@ Rectangle {
                     sourceSize.width: Theme.scaled(16)
                     sourceSize.height: Theme.scaled(16)
 
-                    layer.enabled: !Theme.isDarkMode
+                    layer.enabled: true
                     layer.smooth: true
                     layer.effect: MultiEffect {
                         colorization: 1.0
@@ -395,7 +395,7 @@ Rectangle {
                     sourceSize.width: Theme.scaled(14)
                     sourceSize.height: Theme.scaled(14)
 
-                    layer.enabled: !Theme.isDarkMode
+                    layer.enabled: true
                     layer.smooth: true
                     layer.effect: MultiEffect {
                         colorization: 1.0
@@ -433,7 +433,7 @@ Rectangle {
                     sourceSize.width: Theme.scaled(16)
                     sourceSize.height: Theme.scaled(16)
 
-                    layer.enabled: !Theme.isDarkMode
+                    layer.enabled: true
                     layer.smooth: true
                     layer.effect: MultiEffect {
                         colorization: 1.0

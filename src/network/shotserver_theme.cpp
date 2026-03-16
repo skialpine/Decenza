@@ -24,7 +24,8 @@ QJsonObject ShotServer::buildThemeJson() const
 
     // Theme mode
     result["themeMode"] = m_settings->themeMode();
-    result["isDarkMode"] = m_settings->isDarkMode();
+    result["darkThemeName"] = m_settings->darkThemeName();
+    result["lightThemeName"] = m_settings->lightThemeName();
     result["editingPalette"] = m_settings->editingPalette();
 
     // Active colors (resolved for current mode)

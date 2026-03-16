@@ -26,7 +26,10 @@ KeyboardAwareContainer {
             { name: "textColor", display: "Text" },
             { name: "textSecondaryColor", display: "Text Secondary" },
             { name: "accentColor", display: "Accent" },
-            { name: "borderColor", display: "Border" }
+            { name: "borderColor", display: "Border" },
+            { name: "iconColor", display: "Icon" },
+            { name: "bottomBarColor", display: "Bottom Bar" },
+            { name: "actionButtonContentColor", display: "Action Button Content" }
         ]},
         { category: "Status", colors: [
             { name: "successColor", display: "Success" },
@@ -50,26 +53,41 @@ KeyboardAwareContainer {
     // Bumped when editing palette changes, to force swatch re-evaluation
     property int _paletteVersion: 0
 
+    function colorToHex(c) {
+        var r = Math.round(c.r * 255).toString(16).padStart(2, '0')
+        var g = Math.round(c.g * 255).toString(16).padStart(2, '0')
+        var b = Math.round(c.b * 255).toString(16).padStart(2, '0')
+        return "#" + r + g + b
+    }
+
     function getColorValue(colorName) {
         var _v = _paletteVersion  // reactive dependency
         var editColors = Settings.editingPaletteColors()
         return editColors[colorName] || Theme[colorName] || "#ffffff"
     }
 
+    // Guard to prevent intermediate color changes during selection
+    property bool _selecting: false
+
     function selectColor(colorName) {
+        _selecting = true
         selectedColorName = colorName
         selectedColorValue = getColorValue(colorName)
         colorEditor.setColor(selectedColorValue)
-        hexField.text = selectedColorValue.toString().substring(0, 7)
+        hexField.text = themesTab.colorToHex(selectedColorValue)
+        _selecting = false
     }
 
     // Guard to prevent hex / colorEditor feedback loop
     property bool _updatingFromHex: false
 
     function applyColorChange(newColor) {
-        Settings.setEditingPaletteColor(selectedColorName, newColor.toString())
+        Settings.setEditingPaletteColor(selectedColorName, colorToHex(newColor))
         selectedColorValue = newColor
     }
+
+    // Sync editing palette with active theme mode
+    Component.onCompleted: Settings.editingPalette = Settings.isDarkMode ? "dark" : "light"
 
     // Refresh all swatches and selected color when editing palette changes
     Connections {
@@ -80,136 +98,16 @@ KeyboardAwareContainer {
         }
         function onCustomThemeColorsChanged() {
             themesTab._paletteVersion++
+            themesTab.selectColor(themesTab.selectedColorName)
+        }
+        function onIsDarkModeChanged() {
+            Settings.editingPalette = Settings.isDarkMode ? "dark" : "light"
         }
     }
 
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
-
-        // Theme mode selector + palette toggle
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.bottomMargin: Theme.spacingSmall
-            spacing: Theme.spacingMedium
-
-            // Mode selector: Dark / Light / Follow System
-            Rectangle {
-                implicitWidth: modeRow.implicitWidth
-                implicitHeight: Theme.scaled(36)
-                radius: Theme.buttonRadius
-                color: "transparent"
-                border.color: Theme.borderColor
-                border.width: 1
-                clip: true
-
-                Row {
-                    id: modeRow
-                    anchors.fill: parent
-
-                    Repeater {
-                        model: [
-                            { value: "dark", label: TranslationManager.translate("settings.themes.dark", "Dark") },
-                            { value: "light", label: TranslationManager.translate("settings.themes.light", "Light") },
-                            { value: "system", label: TranslationManager.translate("settings.themes.system", "System") }
-                        ]
-
-                        Rectangle {
-                            width: modeLabel.implicitWidth + Theme.scaled(24)
-                            height: parent.height
-                            color: Settings.themeMode === modelData.value ? Theme.primaryColor : Theme.surfaceColor
-                            // Only left border as separator between segments
-                            Rectangle {
-                                visible: index > 0
-                                anchors.left: parent.left
-                                width: 1
-                                height: parent.height
-                                color: Theme.borderColor
-                            }
-
-                            Text {
-                                id: modeLabel
-                                text: modelData.label
-                                color: Settings.themeMode === modelData.value ? Theme.primaryContrastColor : Theme.textColor
-                                font: Theme.labelFont
-                                anchors.centerIn: parent
-                                Accessible.ignored: true
-                            }
-
-                            Accessible.role: Accessible.Button
-                            Accessible.name: modelData.label
-                            Accessible.focusable: true
-                            Accessible.onPressAction: modeArea.clicked(null)
-
-                            MouseArea {
-                                id: modeArea
-                                anchors.fill: parent
-                                onClicked: Settings.themeMode = modelData.value
-                            }
-                        }
-                    }
-                }
-            }
-
-            Item { Layout.fillWidth: true }
-
-            // Palette toggle: which palette to edit
-            Rectangle {
-                implicitWidth: palRow.implicitWidth
-                implicitHeight: Theme.scaled(36)
-                radius: Theme.buttonRadius
-                color: "transparent"
-                border.color: Theme.borderColor
-                border.width: 1
-                clip: true
-
-                Row {
-                    id: palRow
-                    anchors.fill: parent
-
-                    Repeater {
-                        model: [
-                            { value: "dark", label: TranslationManager.translate("settings.themes.editDark", "Dark Palette") },
-                            { value: "light", label: TranslationManager.translate("settings.themes.editLight", "Light Palette") }
-                        ]
-
-                        Rectangle {
-                            width: palLabel.implicitWidth + Theme.scaled(24)
-                            height: parent.height
-                            color: Settings.editingPalette === modelData.value ? Theme.primaryColor : Theme.surfaceColor
-
-                            Rectangle {
-                                visible: index > 0
-                                anchors.left: parent.left
-                                width: 1
-                                height: parent.height
-                                color: Theme.borderColor
-                            }
-
-                            Text {
-                                id: palLabel
-                                text: modelData.label
-                                color: Settings.editingPalette === modelData.value ? Theme.primaryContrastColor : Theme.textColor
-                                font: Theme.labelFont
-                                anchors.centerIn: parent
-                                Accessible.ignored: true
-                            }
-
-                            Accessible.role: Accessible.Button
-                            Accessible.name: modelData.label
-                            Accessible.focusable: true
-                            Accessible.onPressAction: palArea.clicked(null)
-
-                            MouseArea {
-                                id: palArea
-                                anchors.fill: parent
-                                onClicked: Settings.editingPalette = modelData.value
-                            }
-                        }
-                    }
-                }
-            }
-        }
 
         // Web version banner
         Rectangle {
@@ -355,7 +253,7 @@ KeyboardAwareContainer {
                             StyledTextField {
                                 id: hexField
                                 Layout.preferredWidth: Theme.scaled(120)
-                                text: themesTab.selectedColorValue.toString().substring(0, 7)
+                                text: themesTab.colorToHex(selectedColorValue)
                                 font.family: "monospace"
                                 font.pixelSize: Theme.bodyFont.pixelSize
                                 inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText
@@ -363,10 +261,46 @@ KeyboardAwareContainer {
                                 onTextEdited: {
                                     var hex = text.trim()
                                     if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
-                                        themesTab._updatingFromHex = true
+                                        themesTab._selecting = true
                                         colorEditor.setColor(hex)
+                                        themesTab._selecting = false
                                         themesTab.applyColorChange(colorEditor.color)
-                                        themesTab._updatingFromHex = false
+                                    }
+                                }
+                            }
+
+                            AccessibleButton {
+                                id: copyBtn
+                                text: TranslationManager.translate("colorEditor.copy", "Copy")
+                                accessibleName: TranslationManager.translate("colorEditor.copyAccessible", "Copy color hex to clipboard")
+                                implicitWidth: Theme.scaled(50)
+                                onClicked: {
+                                    MainController.copyToClipboard(hexField.text)
+                                    copyBtn.text = "OK"
+                                    copyResetTimer.restart()
+                                }
+                                Timer {
+                                    id: copyResetTimer
+                                    interval: 1000
+                                    onTriggered: copyBtn.text = TranslationManager.translate("colorEditor.copy", "Copy")
+                                }
+                            }
+
+                            AccessibleButton {
+                                text: TranslationManager.translate("colorEditor.paste", "Paste")
+                                accessibleName: TranslationManager.translate("colorEditor.pasteAccessible", "Paste color hex from clipboard")
+                                implicitWidth: Theme.scaled(50)
+                                onClicked: {
+                                    var raw = MainController.pasteFromClipboard().trim()
+                                    // Accept with or without #
+                                    var hex = raw
+                                    if (/^[0-9a-fA-F]{6}$/.test(hex)) hex = "#" + hex
+                                    if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+                                        hexField.text = hex
+                                        themesTab._selecting = true
+                                        colorEditor.setColor(hex)
+                                        themesTab._selecting = false
+                                        themesTab.applyColorChange(colorEditor.color)
                                     }
                                 }
                             }
@@ -386,11 +320,11 @@ KeyboardAwareContainer {
                             }
 
                             onColorChanged: {
-                                if (initialized) {
+                                if (initialized && !themesTab._selecting) {
                                     themesTab.applyColorChange(colorEditor.color)
                                 }
-                                if (!themesTab._updatingFromHex) {
-                                    hexField.text = colorEditor.color.toString().substring(0, 7)
+                                if (!themesTab._updatingFromHex && !themesTab._selecting) {
+                                    hexField.text = themesTab.colorToHex(colorEditor.color)
                                 }
                             }
                         }

@@ -76,8 +76,7 @@ Button {
                 // Decorative - accessibility handled by Button itself
                 Accessible.ignored: true
 
-                // Tint white SVG icons for light mode visibility
-                layer.enabled: !Theme.isDarkMode
+                layer.enabled: true
                 layer.smooth: true
                 layer.effect: MultiEffect {
                     colorization: 1.0
@@ -96,19 +95,8 @@ Button {
         }
     }
 
-    // In light mode, blend button color at 15% over the page background for a soft tint.
-    // Use opaque color (not alpha) so Qt button background composites correctly.
-    function _blendColor(fg, bg, t) {
-        return Qt.rgba(fg.r * t + bg.r * (1 - t),
-                       fg.g * t + bg.g * (1 - t),
-                       fg.b * t + bg.b * (1 - t), 1.0)
-    }
-    readonly property color _effectiveBackground: !Theme.isDarkMode
-        ? _blendColor(control.backgroundColor, Theme.backgroundColor, 0.15)
-        : control.backgroundColor
-
-    // In light mode, icon and text use the button's color; in dark mode, white
-    readonly property color _contentColor: !Theme.isDarkMode ? control.backgroundColor : Theme.textColor
+    readonly property color _effectiveBackground: control.backgroundColor
+    readonly property color _contentColor: Theme.actionButtonContentColor
 
     background: Rectangle {
         radius: Theme.buttonRadius

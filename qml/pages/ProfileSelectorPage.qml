@@ -293,7 +293,7 @@ Page {
                                     opacity: 0.6
                                     Accessible.ignored: true
 
-                                    layer.enabled: !Theme.isDarkMode
+                                    layer.enabled: true
                                     layer.smooth: true
                                     layer.effect: MultiEffect {
                                         colorization: 1.0
@@ -424,7 +424,7 @@ Page {
                                         sourceSize.height: Theme.scaled(16)
                                         anchors.verticalCenter: parent.verticalCenter
 
-                                        layer.enabled: !Theme.isDarkMode
+                                        layer.enabled: true
                                         layer.smooth: true
                                         layer.effect: MultiEffect {
                                             colorization: 1.0
@@ -474,7 +474,7 @@ Page {
                                         sourceSize.height: Theme.scaled(16)
                                         anchors.verticalCenter: parent.verticalCenter
 
-                                        layer.enabled: !Theme.isDarkMode
+                                        layer.enabled: true
                                         layer.smooth: true
                                         layer.effect: MultiEffect {
                                             colorization: 1.0
@@ -515,7 +515,7 @@ Page {
                                         sourceSize.height: Theme.scaled(16)
                                         anchors.verticalCenter: parent.verticalCenter
 
-                                        layer.enabled: !Theme.isDarkMode
+                                        layer.enabled: true
                                         layer.smooth: true
                                         layer.effect: MultiEffect {
                                             colorization: 1.0
@@ -719,7 +719,7 @@ Page {
                                     sourceSize.height: Theme.scaled(18)
                                     opacity: index === Settings.selectedFavoriteProfile ? 1.0 : 0.5
 
-                                    layer.enabled: !Theme.isDarkMode && index !== Settings.selectedFavoriteProfile
+                                    layer.enabled: index !== Settings.selectedFavoriteProfile
                                     layer.smooth: true
                                     layer.effect: MultiEffect {
                                         colorization: 1.0

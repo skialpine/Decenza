@@ -32,6 +32,105 @@ KeyboardAwareContainer {
                 Layout.alignment: Qt.AlignTop
                 spacing: Theme.scaled(15)
 
+                // Theme mode preferences card
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: themeModeColumn.implicitHeight + Theme.scaled(30)
+                    color: Theme.surfaceColor
+                    radius: Theme.cardRadius
+
+                    ColumnLayout {
+                        id: themeModeColumn
+                        anchors.fill: parent
+                        anchors.margins: Theme.scaled(15)
+                        spacing: Theme.scaled(10)
+
+                        Text {
+                            text: TranslationManager.translate("settings.preferences.themeMode", "Theme Mode")
+                            color: Theme.textColor
+                            font.family: Theme.bodyFont.family
+                            font.pixelSize: Theme.scaled(16)
+                            font.bold: true
+                        }
+
+                        // Follow system theme toggle
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.scaled(15)
+
+                            Text {
+                                text: TranslationManager.translate("settings.preferences.followSystem", "Follow system theme")
+                                color: Theme.textColor
+                                font.family: Theme.bodyFont.family
+                                font.pixelSize: Theme.scaled(14)
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            StyledSwitch {
+                                id: followSystemSwitch
+                                checked: Settings.themeMode === "system"
+                                accessibleName: TranslationManager.translate("settings.preferences.followSystem", "Follow system theme")
+                                onCheckedChanged: {
+                                    if (checked) {
+                                        Settings.themeMode = "system"
+                                    } else {
+                                        Settings.themeMode = Settings.isDarkMode ? "dark" : "light"
+                                    }
+                                }
+                            }
+                        }
+
+                        // Dark theme selector
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.scaled(15)
+
+                            Text {
+                                text: TranslationManager.translate("settings.preferences.darkTheme", "Dark theme")
+                                color: Theme.textColor
+                                font.family: Theme.bodyFont.family
+                                font.pixelSize: Theme.scaled(14)
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            StyledComboBox {
+                                id: darkThemeCombo
+                                Layout.preferredWidth: Theme.scaled(180)
+                                accessibleLabel: TranslationManager.translate("settings.preferences.darkTheme", "Dark theme")
+                                model: Settings.themeNames
+                                currentIndex: Math.max(0, Settings.themeNames.indexOf(Settings.darkThemeName))
+                                onActivated: Settings.applyDarkTheme(Settings.themeNames[currentIndex])
+                            }
+                        }
+
+                        // Light theme selector
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.scaled(15)
+
+                            Text {
+                                text: TranslationManager.translate("settings.preferences.lightTheme", "Light theme")
+                                color: Theme.textColor
+                                font.family: Theme.bodyFont.family
+                                font.pixelSize: Theme.scaled(14)
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            StyledComboBox {
+                                id: lightThemeCombo
+                                Layout.preferredWidth: Theme.scaled(180)
+                                accessibleLabel: TranslationManager.translate("settings.preferences.lightTheme", "Light theme")
+                                model: Settings.themeNames
+                                currentIndex: Math.max(0, Settings.themeNames.indexOf(Settings.lightThemeName))
+                                onActivated: Settings.applyLightTheme(Settings.themeNames[currentIndex])
+                            }
+                        }
+                    }
+                }
+
                 // Auto-sleep settings
                 Rectangle {
                     Layout.fillWidth: true

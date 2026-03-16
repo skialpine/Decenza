@@ -85,7 +85,7 @@ Dialog {
                         sourceSize.height: Theme.scaled(28)
                         Layout.alignment: Qt.AlignVCenter
 
-                        layer.enabled: !Theme.isDarkMode
+                        layer.enabled: true
                         layer.smooth: true
                         layer.effect: MultiEffect {
                             colorization: 1.0

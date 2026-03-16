@@ -7,31 +7,28 @@ Rectangle {
     id: root
 
     property string title: ""
-    property color barColor: Theme.primaryColor
+    property color barColor: Theme.bottomBarColor
     property bool showBackButton: true
     property string rightText: ""  // Simple right-aligned text
     default property alias content: contentRow.data  // Custom content goes here
 
     signal backClicked()
 
-    // Light mode: surface-colored bar with theme text color
-    // Dark mode: solid colored bar with theme text color
-    readonly property color contentColor: Theme.textColor
+    readonly property color contentColor: Theme.iconColor
 
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     height: Theme.bottomBarHeight
-    color: !Theme.isDarkMode ? Theme.surfaceColor : barColor
+    color: barColor
 
-    // Subtle top border in light mode for separation
+    // Top border for separation
     Rectangle {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
         height: 1
         color: Theme.borderColor
-        visible: !Theme.isDarkMode
     }
 
     RowLayout {

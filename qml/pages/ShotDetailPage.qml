@@ -1003,7 +1003,7 @@ Page {
                     opacity: 0.6
                     Accessible.ignored: true
 
-                    layer.enabled: !Theme.isDarkMode
+                    layer.enabled: true
                     layer.smooth: true
                     layer.effect: MultiEffect {
                         colorization: 1.0

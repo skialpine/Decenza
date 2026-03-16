@@ -1121,7 +1121,6 @@ Dialog {
                         id: cpEditorInner
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        showBrightnessSlider: false
                     }
 
                     ColumnLayout {

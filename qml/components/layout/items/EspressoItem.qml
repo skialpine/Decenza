@@ -58,7 +58,7 @@ Item {
                 fillMode: Image.PreserveAspectFit
                 opacity: DE1Device.guiEnabled ? 1.0 : 0.5
                 Accessible.ignored: true
-                layer.enabled: !Theme.isDarkMode
+                layer.enabled: true
                 layer.smooth: true
                 layer.effect: MultiEffect {
                     colorization: 1.0

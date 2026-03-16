@@ -21,6 +21,8 @@
 #include "../ble/blemanager.h"
 #include "../ble/scaledevice.h"
 #include "../ble/scales/flowscale.h"
+#include <QGuiApplication>
+#include <QClipboard>
 #include <cmath>
 #include <QDir>
 #include <QFile>
@@ -2162,6 +2164,22 @@ bool MainController::saveProfileAs(const QString& filename, const QString& title
         emit currentProfileChanged();
     }
     return success;
+}
+
+void MainController::copyToClipboard(const QString& text) {
+    auto* cb = QGuiApplication::clipboard();
+    if (cb) {
+        cb->setText(text, QClipboard::Clipboard);
+        qDebug() << "Copied to clipboard:" << text;
+    }
+}
+
+QString MainController::pasteFromClipboard() const {
+    auto* cb = QGuiApplication::clipboard();
+    if (!cb) return {};
+    QString text = cb->text(QClipboard::Clipboard);
+    qDebug() << "Paste from clipboard:" << text;
+    return text;
 }
 
 QString MainController::titleToFilename(const QString& title) const {

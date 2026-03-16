@@ -180,6 +180,10 @@ public:
     Q_INVOKABLE QVariantMap getProfileByFilename(const QString& filename) const;  // Load profile for preview (without setting as current)
     Q_INVOKABLE void loadShotWithMetadata(qint64 shotId);  // Load profile + bean info from history shot
 
+    // Clipboard
+    Q_INVOKABLE void copyToClipboard(const QString& text);
+    Q_INVOKABLE QString pasteFromClipboard() const;
+
     // Recipe Editor methods
     Q_INVOKABLE void uploadRecipeProfile(const QVariantMap& recipeParams);
     Q_INVOKABLE QVariantMap getOrConvertRecipeParams();

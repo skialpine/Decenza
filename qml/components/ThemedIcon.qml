@@ -19,7 +19,7 @@ Item {
 
     property alias source: img.source
     property int iconSize: Theme.scaled(24)
-    property color color: Theme.textColor
+    property color color: Theme.iconColor
 
     implicitWidth: iconSize
     implicitHeight: iconSize
@@ -29,7 +29,7 @@ Item {
         anchors.centerIn: parent
         sourceSize.width: root.iconSize
         sourceSize.height: root.iconSize
-        layer.enabled: !Theme.isDarkMode
+        layer.enabled: true
         layer.smooth: true
         layer.effect: MultiEffect {
             colorization: 1.0

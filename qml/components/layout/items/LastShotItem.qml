@@ -198,7 +198,7 @@ Item {
                 sourceSize.height: Theme.scaled(24)
                 opacity: 0.5
 
-                layer.enabled: !Theme.isDarkMode
+                layer.enabled: true
                 layer.smooth: true
                 layer.effect: MultiEffect {
                     colorization: 1.0
