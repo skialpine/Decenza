@@ -30,18 +30,19 @@ Item {
 
             Repeater {
                 model: [
-                    { icon: "qrc:/icons/espresso.svg", label: "E", action: function() { DE1Device.startEspresso() } },
-                    { icon: "qrc:/icons/steam.svg", label: "S", action: function() { DE1Device.startSteam() } },
-                    { icon: "qrc:/icons/hotwater.svg", label: "W", action: function() { DE1Device.startHotWater() } },
-                    { icon: "qrc:/icons/flush.svg", label: "F", action: function() { DE1Device.startFlush() } },
-                    { icon: "qrc:/icons/stop.svg", label: "X", action: function() { DE1Device.requestIdle() } }
+                    { icon: "qrc:/icons/espresso.svg", name: "Espresso", nameKey: "idle.button.espresso", action: function() { DE1Device.startEspresso() } },
+                    { icon: "qrc:/icons/steam.svg", name: "Steam", nameKey: "idle.button.steam", action: function() { DE1Device.startSteam() } },
+                    { icon: "qrc:/icons/hotwater.svg", name: "Hot Water", nameKey: "idle.button.hotwater", action: function() { DE1Device.startHotWater() } },
+                    { icon: "qrc:/icons/flush.svg", name: "Flush", nameKey: "idle.button.flush", action: function() { DE1Device.startFlush() } },
+                    { icon: "qrc:/icons/stop.svg", name: "Stop", nameKey: "common.button.stop", action: function() { DE1Device.requestIdle() } }
                 ]
 
                 Rectangle {
+                    id: compactBtn
                     width: Theme.scaled(32)
                     height: Theme.scaled(32)
                     radius: Theme.scaled(6)
-                    color: compactArea.pressed ? Qt.darker(Theme.primaryColor, 1.2) : Theme.primaryColor
+                    color: compactArea.isPressed ? Qt.darker(Theme.primaryColor, 1.2) : Theme.primaryColor
                     Accessible.ignored: true
 
                     Image {
@@ -57,10 +58,12 @@ Item {
                         }
                     }
 
-                    MouseArea {
+                    AccessibleMouseArea {
                         id: compactArea
                         anchors.fill: parent
-                        onClicked: modelData.action()
+                        accessibleName: TranslationManager.translate(modelData.nameKey, modelData.name)
+                        accessibleItem: compactBtn
+                        onAccessibleClicked: modelData.action()
                     }
                 }
             }
@@ -87,8 +90,9 @@ Item {
                 anchors.margins: Theme.spacingSmall
                 spacing: Theme.scaled(4)
 
-                Text {
-                    text: "GHC Simulator"
+                Tr {
+                    key: "ghcSimulator.title"
+                    fallback: "GHC Simulator"
                     color: Theme.textColor
                     font: Theme.captionFont
                     Layout.alignment: Qt.AlignHCenter
