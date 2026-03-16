@@ -189,6 +189,7 @@ static int mdnsResolveCallback(int sock, const struct sockaddr* from, size_t add
 {
     Q_UNUSED(sock); Q_UNUSED(from); Q_UNUSED(addrlen);
     Q_UNUSED(query_id); Q_UNUSED(rclass); Q_UNUSED(ttl);
+    Q_UNUSED(name_length);
 
     auto* ctx = static_cast<MdnsResolveContext*>(user_data);
     if (!ctx->resolvedIp.isEmpty())
@@ -260,8 +261,12 @@ static QString resolveMdns(const QString& hostname, int timeoutMs = 2000)
         tv.tv_sec = remaining / 1000;
         tv.tv_usec = (remaining % 1000) * 1000;
 
-        if (select(sock + 1, &readfds, nullptr, nullptr, &tv) <= 0)
+        int ret = select(sock + 1, &readfds, nullptr, nullptr, &tv);
+        if (ret < 0) {
+            if (errno == EINTR) continue;
             break;
+        }
+        if (ret == 0) break;
 
         mdns_query_recv(sock, buffer, sizeof(buffer),
                         mdnsResolveCallback, &ctx, 0);
