@@ -284,12 +284,18 @@ if(NOT IOS)
     )
 endif()
 
-# Simulator files - Windows Debug or macOS
+# Simulator engine - all debug builds
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    list(APPEND SOURCES
+        src/simulator/de1simulator.cpp
+        src/simulator/simulatedscale.cpp
+    )
+endif()
+
+# GHC simulator window - desktop debug only
 if((WIN32 OR APPLE) AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     list(APPEND SOURCES
         src/simulator/ghcsimulator.cpp
-        src/simulator/de1simulator.cpp
-        src/simulator/simulatedscale.cpp
     )
 endif()
 
@@ -392,12 +398,18 @@ if(NOT IOS)
     )
 endif()
 
-# Simulator headers - Windows Debug or macOS
+# Simulator engine headers - all debug builds
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    list(APPEND HEADERS
+        src/simulator/de1simulator.h
+        src/simulator/simulatedscale.h
+    )
+endif()
+
+# GHC simulator window header - desktop debug only
 if((WIN32 OR APPLE) AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     list(APPEND HEADERS
         src/simulator/ghcsimulator.h
-        src/simulator/de1simulator.h
-        src/simulator/simulatedscale.h
     )
 endif()
 
@@ -636,6 +648,7 @@ set(QML_FILES
     qml/components/layout/items/MachineStatusItem.qml
     qml/components/layout/items/BatteryLevelItem.qml
     qml/components/layout/items/ScaleBatteryItem.qml
+    qml/components/layout/items/GHCSimulatorItem.qml
     qml/components/layout/CustomEditorPopup.qml
     qml/components/layout/ScreensaverEditorPopup.qml
     qml/components/layout/EmojiPicker.qml
