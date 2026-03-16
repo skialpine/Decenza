@@ -2982,7 +2982,11 @@ void MainController::onShotEnded() {
         return;
     }
 
-    double duration = m_shotDataModel->rawTime();  // Use rawTime, not maxTime (which is for graph axis)
+    // Use extraction end time (excludes SAW settling phase) for accurate duration.
+    // Falls back to rawTime for non-SAW shots where extractionDuration is 0.
+    double duration = (m_timingController && m_timingController->extractionDuration() > 0)
+        ? m_timingController->extractionDuration()
+        : m_shotDataModel->rawTime();
 
     double doseWeight = m_settings->dyeBeanWeight();
 
