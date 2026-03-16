@@ -133,7 +133,7 @@ include(FetchContent)
 FetchContent_Declare(
     paho_mqtt_c
     GIT_REPOSITORY https://github.com/eclipse/paho.mqtt.c.git
-    GIT_TAG        v1.3.13
+    GIT_TAG        v1.3.16
 )
 set(PAHO_BUILD_STATIC ON CACHE BOOL "" FORCE)
 set(PAHO_BUILD_SHARED OFF CACHE BOOL "" FORCE)
