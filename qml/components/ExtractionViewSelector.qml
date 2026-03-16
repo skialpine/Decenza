@@ -22,8 +22,6 @@ Dialog {
     width: Math.min(parent.width * 0.85, Theme.scaled(360))
     // Let the Dialog auto-size vertically from content
     padding: 0
-    topPadding: 0
-    bottomPadding: 0
 
     background: Rectangle {
         color: Theme.surfaceColor
@@ -46,6 +44,7 @@ Dialog {
             text: selectorDialog.title
             color: Theme.textColor
             font: Theme.subtitleFont
+            Accessible.ignored: true  // Dialog.title already announces this
         }
 
         Repeater {
@@ -177,14 +176,9 @@ Dialog {
             Layout.topMargin: Theme.spacingSmall
             radius: Theme.cardRadius
             color: Theme.backgroundColor
+            Accessible.ignored: true
 
             property bool isChecked: selectorDialog.showPhaseIndicator
-
-            Accessible.role: Accessible.CheckBox
-            Accessible.name: TranslationManager.translate("espresso.viewSelector.showPhaseIndicator", "Show Phase Indicator")
-            Accessible.checked: isChecked
-            Accessible.focusable: true
-            Accessible.onPressAction: phaseToggleArea.clicked(null)
 
             RowLayout {
                 anchors.fill: parent
@@ -227,10 +221,13 @@ Dialog {
                 }
             }
 
-            MouseArea {
-                id: phaseToggleArea
+            AccessibleMouseArea {
                 anchors.fill: parent
-                onClicked: selectorDialog.phaseIndicatorToggled(!phaseToggleCard.isChecked)
+                accessibleName: TranslationManager.translate("espresso.viewSelector.showPhaseIndicator", "Show Phase Indicator")
+                accessibleItem: phaseToggleCard
+                accessibleRole: Accessible.CheckBox
+                accessibleChecked: phaseToggleCard.isChecked
+                onAccessibleClicked: selectorDialog.phaseIndicatorToggled(!phaseToggleCard.isChecked)
             }
         }
 
@@ -243,14 +240,9 @@ Dialog {
             Layout.bottomMargin: Theme.spacingMedium
             radius: Theme.cardRadius
             color: Theme.backgroundColor
+            Accessible.ignored: true
 
             property bool isChecked: selectorDialog.showStats
-
-            Accessible.role: Accessible.CheckBox
-            Accessible.name: TranslationManager.translate("espresso.viewSelector.showStats", "Show Stats")
-            Accessible.checked: isChecked
-            Accessible.focusable: true
-            Accessible.onPressAction: statsToggleArea.clicked(null)
 
             RowLayout {
                 anchors.fill: parent
@@ -293,10 +285,13 @@ Dialog {
                 }
             }
 
-            MouseArea {
-                id: statsToggleArea
+            AccessibleMouseArea {
                 anchors.fill: parent
-                onClicked: selectorDialog.statsToggled(!statsToggleCard.isChecked)
+                accessibleName: TranslationManager.translate("espresso.viewSelector.showStats", "Show Stats")
+                accessibleItem: statsToggleCard
+                accessibleRole: Accessible.CheckBox
+                accessibleChecked: statsToggleCard.isChecked
+                onAccessibleClicked: selectorDialog.statsToggled(!statsToggleCard.isChecked)
             }
         }
     }
