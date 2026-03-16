@@ -51,6 +51,12 @@ Item {
             return
         }
 
+        // Android uses adjustPan which handles keyboard avoidance at the OS level.
+        // Skip our manual shift to avoid double-shifting.
+        if (Qt.platform.os === "android") {
+            keyboardOffset = 0
+            return
+        }
 
         // Use real keyboard height if available; estimate only on mobile
         var kbHeight = Qt.inputMethod.keyboardRectangle.height

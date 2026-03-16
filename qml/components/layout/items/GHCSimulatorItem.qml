@@ -6,11 +6,14 @@ import "../.."
 
 // Layout widget with 5 buttons to control the DE1 simulator:
 // Espresso, Steam, Hot Water, Flush, and Stop.
-// Only functional when simulation mode is active (Settings.simulationMode).
+// Disabled when simulation mode is off to prevent sending real BLE commands.
 Item {
     id: root
     property bool isCompact: false
     property string itemId: ""
+
+    enabled: DE1Device.simulationMode
+    opacity: DE1Device.simulationMode ? 1.0 : 0.4
 
     implicitWidth: isCompact ? compactContent.implicitWidth : fullContent.implicitWidth
     implicitHeight: isCompact ? compactContent.implicitHeight : fullContent.implicitHeight
