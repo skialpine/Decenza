@@ -7,6 +7,7 @@ import "../../components"
 KeyboardAwareContainer {
     id: aiTab
     textFields: [apiKeyField, ollamaEndpointField, openrouterModelField]
+    targetFlickable: aiFlickable
 
     property string testResultMessage: ""
     property bool testResultSuccess: false
@@ -30,6 +31,7 @@ KeyboardAwareContainer {
         radius: Theme.cardRadius
 
         Flickable {
+            id: aiFlickable
             anchors.fill: parent
             anchors.margins: Theme.scaled(12)
             contentHeight: aiTabContent.implicitHeight

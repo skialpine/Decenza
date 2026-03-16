@@ -7,6 +7,7 @@ import "../../components"
 KeyboardAwareContainer {
     id: preferencesTab
     textFields: [manualCityField]
+    targetFlickable: contentFlickable
 
     // Local properties
     property int autoSleepMinutes: Settings.value("autoSleepMinutes", 60)
