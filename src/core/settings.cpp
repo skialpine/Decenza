@@ -2211,6 +2211,9 @@ void Settings::applyPresetTheme(const QString& name) {
         setActiveShader("");
         setDarkThemeName("Default Dark");
         setLightThemeName("Default Light");
+        // Switch to dark mode if not already (user explicitly chose a dark theme)
+        if (themeMode() != "dark")
+            setThemeMode("dark");
         emit customThemeColorsChanged();
         return;
     }
@@ -2222,6 +2225,9 @@ void Settings::applyPresetTheme(const QString& name) {
         setActiveShader("");
         setDarkThemeName("Default Light");
         setLightThemeName("Default Light");
+        // Switch to light mode if not already (user explicitly chose a light theme)
+        if (themeMode() != "light")
+            setThemeMode("light");
         emit customThemeColorsChanged();
         return;
     }
