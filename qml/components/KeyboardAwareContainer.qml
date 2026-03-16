@@ -19,6 +19,9 @@ Item {
     // List of text fields to track
     property var textFields: []
 
+    // Optional Flickable to scroll on Android (adjustPan can't scroll inside Flickables)
+    property Flickable targetFlickable: null
+
     // Current shift amount
     property real keyboardOffset: 0
 
@@ -52,8 +55,11 @@ Item {
         }
 
         // Android uses adjustPan which handles keyboard avoidance at the OS level.
-        // Skip our manual shift to avoid double-shifting.
+        // Skip container shift to avoid double-shifting, but scroll the Flickable
+        // since adjustPan can't scroll inside Qt Flickables.
         if (Qt.platform.os === "android") {
+            if (targetFlickable)
+                ensureFieldVisibleInFlickable(focusedField)
             keyboardOffset = 0
             return
         }
@@ -80,6 +86,32 @@ Item {
         var margin = root.height * 0.05
 
         keyboardOffset = Math.max(0, fieldBottomOriginal - visibleBottom + margin)
+    }
+
+    function ensureFieldVisibleInFlickable(field) {
+        if (!targetFlickable) return
+
+        var fieldPos = field.mapToItem(targetFlickable.contentItem, 0, 0)
+        var fieldBottom = fieldPos.y + field.height
+
+        var kbHeight = Qt.inputMethod.keyboardRectangle.height / Screen.devicePixelRatio
+        if (kbHeight <= 0) kbHeight = root.height * 0.5
+
+        var visibleHeight = targetFlickable.height - kbHeight
+        if (visibleHeight <= 0) visibleHeight = targetFlickable.height * 0.5
+
+        var margin = 20
+        var maxContentY = Math.max(0, targetFlickable.contentHeight - targetFlickable.height)
+
+        // Scroll up if field is above visible area
+        if (fieldPos.y < targetFlickable.contentY + margin) {
+            targetFlickable.contentY = Math.max(0, fieldPos.y - margin)
+        }
+        // Scroll down if field is below visible area
+        else if (fieldBottom + margin > targetFlickable.contentY + visibleHeight) {
+            targetFlickable.contentY = Math.min(
+                fieldBottom + margin - visibleHeight, maxContentY)
+        }
     }
 
     // Connect to each text field's focus signal
