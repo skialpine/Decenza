@@ -599,7 +599,7 @@ QString ShotSummarizer::buildUserPrompt(const ShotSummary& summary) const
         if (summary.channelingDetected)
             out << "- **Flow instability**: Sudden flow spike during flow-controlled extraction phase — verify against profile intent before diagnosing channeling\n";
         if (summary.temperatureUnstable)
-            out << "- **Temperature unstable**: Average deviation from target exceeds 2\u00B0C\n";
+            out << "- **Temperature deviation**: Average temperature deviates from target by more than 2\u00B0C — some profiles intentionally use large temperature steps (check profile notes and profile knowledge for guidance before flagging this as a problem)\n";
         out << "\n";
     }
 
