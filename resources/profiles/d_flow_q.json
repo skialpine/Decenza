@@ -3,7 +3,7 @@
     "knowledge_base_id": "d-flow / default",
     "author": "Damian",
     "beverage_type": "espresso",
-    "notes": "",
+    "notes": "This is the profile Damian currently uses for every day coffee. Grind 10um coarser than other profiles, more berry flavours from \"Xtraction Blend\" than Slayer V3 or La Marzocco KB90, same creaminess. The goal is to grind for a pressure peak between 6 and 9 bar.",
     "legacy_profile_type": "settings_2c",
     "version": "2",
     "number_of_preinfuse_frames": 2,
