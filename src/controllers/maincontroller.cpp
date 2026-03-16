@@ -2983,7 +2983,8 @@ void MainController::onShotEnded() {
     }
 
     // Use extraction end time (excludes SAW settling phase) for accurate duration.
-    // Falls back to rawTime for non-SAW shots where extractionDuration is 0.
+    // extractionDuration() is set for all shots (SAW and non-SAW) in endShot().
+    // Falls back to rawTime only if timing controller is unavailable.
     double duration = (m_timingController && m_timingController->extractionDuration() > 0)
         ? m_timingController->extractionDuration()
         : m_shotDataModel->rawTime();

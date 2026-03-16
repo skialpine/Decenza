@@ -69,17 +69,19 @@ void ShotTimingController::setCurrentProfile(const Profile* profile)
 void ShotTimingController::startShot()
 {
     // Cancel settling timer if running (user started new shot before settling completed)
-    // Emit shotProcessingReady so the previous shot is saved before we reset state
+    // Emit shotProcessingReady so the previous shot is saved before we reset state.
+    // IMPORTANT: m_extractionEndTime must not be reset until after shotProcessingReady
+    // is fully handled, because onShotEnded() reads extractionDuration() synchronously.
     if (m_settlingTimer.isActive()) {
         qWarning() << "[SAW] Cancelling settling timer - new shot started, saving previous shot";
         m_sawTriggeredThisShot = false;
         m_settlingTimer.stop();
         m_displayTimer.stop();
         emit sawSettlingChanged();
-        emit shotProcessingReady();
+        emit shotProcessingReady();  // onShotEnded() reads extractionDuration() here
     }
 
-    // Reset all timing state
+    // Reset all timing state (safe now — previous shot has been saved above)
     m_currentTime = 0;
     m_extractionEndTime = 0;
     m_shotActive = true;
