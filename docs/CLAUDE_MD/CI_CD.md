@@ -122,7 +122,13 @@ EOF
 
 #### Step 3: Push the tag to trigger builds
 ```bash
+# IMPORTANT: Verify local main is synced with origin BEFORE tagging.
+# Stale tracking branches or failed pulls can leave HEAD on the wrong commit.
+git fetch origin && git reset --hard origin/main
+git rev-parse HEAD  # Verify this matches the expected commit
+
 git tag vX.Y.Z
+git rev-parse vX.Y.Z  # Must match HEAD above
 git push origin vX.Y.Z
 ```
 
@@ -137,10 +143,15 @@ This triggers all 6 platform builds simultaneously. Each workflow will:
 #### Updating an existing pre-release
 To rebuild an existing pre-release at the current HEAD:
 ```bash
+# IMPORTANT: Verify local main is synced with origin BEFORE tagging.
+git fetch origin && git reset --hard origin/main
+git rev-parse HEAD  # Verify this matches the expected commit
+
 # Delete old tag and recreate at HEAD
 git tag -d vX.Y.Z
 git push origin :refs/tags/vX.Y.Z
 git tag vX.Y.Z
+git rev-parse vX.Y.Z  # Must match HEAD above
 git push origin vX.Y.Z
 
 # IMPORTANT: Deleting the remote tag automatically converts the release to a draft.
