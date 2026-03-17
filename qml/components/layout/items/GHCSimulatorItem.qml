@@ -35,9 +35,9 @@ Item {
                 model: [
                     { icon: "qrc:/icons/espresso.svg", name: "Espresso", nameKey: "idle.button.espresso", action: function() { DE1Device.startEspresso() } },
                     { icon: "qrc:/icons/steam.svg", name: "Steam", nameKey: "idle.button.steam", action: function() { DE1Device.startSteam() } },
-                    { icon: "qrc:/icons/hotwater.svg", name: "Hot Water", nameKey: "idle.button.hotwater", action: function() { DE1Device.startHotWater() } },
+                    { icon: "qrc:/icons/water.svg", name: "Hot Water", nameKey: "idle.button.hotwater", action: function() { DE1Device.startHotWater() } },
                     { icon: "qrc:/icons/flush.svg", name: "Flush", nameKey: "idle.button.flush", action: function() { DE1Device.startFlush() } },
-                    { icon: "qrc:/icons/stop.svg", name: "Stop", nameKey: "common.button.stop", action: function() { DE1Device.requestIdle() } }
+                    { icon: "qrc:/icons/hand.svg", name: "Stop", nameKey: "common.button.stop", action: function() { DE1Device.requestIdle() } }
                 ]
 
                 Rectangle {
@@ -138,7 +138,7 @@ Item {
                         Layout.fillHeight: true
                         translationKey: "idle.button.hotwater"
                         translationFallback: "Water"
-                        iconSource: "qrc:/icons/hotwater.svg"
+                        iconSource: "qrc:/icons/water.svg"
                         backgroundColor: Theme.primaryColor
                         onClicked: DE1Device.startHotWater()
                     }
@@ -160,7 +160,7 @@ Item {
                     Layout.fillHeight: true
                     translationKey: "common.button.stop"
                     translationFallback: "Stop"
-                    iconSource: "qrc:/icons/stop.svg"
+                    iconSource: "qrc:/icons/hand.svg"
                     backgroundColor: Theme.errorColor
                     onClicked: DE1Device.requestIdle()
                 }
