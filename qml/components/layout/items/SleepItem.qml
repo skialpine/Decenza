@@ -78,6 +78,7 @@ Item {
             supportLongPress: true
             longPressInterval: 1000
             accessibleName: TranslationManager.translate("idle.accessible.sleep", "Sleep") + ". " + TranslationManager.translate("idle.accessible.sleep.description", "Put the machine to sleep")
+            accessibleDescription: TranslationManager.translate("idle.accessible.sleep.hint", "Long-press to quit the app.")
             onAccessibleClicked: root.doSleep()
             onAccessibleLongPressed: Qt.quit()
         }
@@ -99,6 +100,8 @@ Item {
             backgroundColor: Theme.buttonDisabled
             onClicked: root.doSleep()
             onPressAndHold: Qt.quit()
+
+            Accessible.description: TranslationManager.translate("idle.accessible.sleep.hint", "Long-press to quit the app.")
         }
     }
 }
