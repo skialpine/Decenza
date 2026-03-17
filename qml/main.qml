@@ -2868,11 +2868,23 @@ ApplicationWindow {
     // ============ GLOBAL HIDE KEYBOARD BUTTON ============
     // Appears when a text input has focus (= keyboard should be showing).
     // Qt.inputMethod.visible is unreliable on Android (goes false after 1s),
-    // so we check if the active focus item has a text property instead.
+    // so we check if the active focus item has a cursorPosition property
+    // (present on TextInput/TextArea but not on Text or Button).
     property bool _textInputFocused: {
         var item = root.activeFocusItem
         if (!item) return false
-        return "cursorPosition" in item
+        if (!("cursorPosition" in item)) return false
+        // Suppress when focus is inside a popup/dialog — the global button sits
+        // behind the modal overlay and can't be tapped. Dialogs with text inputs
+        // should provide their own hide-keyboard button (see HideKeyboardButton.qml).
+        // Walk the visual parent chain: popup content goes through the Overlay item,
+        // regular page content does not.
+        var overlay = root.Overlay.overlay
+        for (var p = item; p; p = p.parent) {
+            if (p === overlay)
+                return false
+        }
+        return true
     }
     Rectangle {
         id: globalHideKeyboardButton
@@ -2898,6 +2910,7 @@ ApplicationWindow {
             height: Theme.scaled(20)
             source: "qrc:/icons/hide-keyboard.svg"
             sourceSize: Qt.size(width, height)
+            Accessible.ignored: true
         }
 
         MouseArea {
