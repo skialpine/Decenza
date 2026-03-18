@@ -436,7 +436,7 @@ void MachineState::onScaleWeightChanged(double weight) {
 
     // Hot water fire-and-forget: if the BLE tare actually worked (scale zeroed),
     // clear the baseline so SAW uses absolute weight from now on.
-    if (m_phase == Phase::HotWater && m_hotWaterTareBaseline != 0.0 && qAbs(weight) < 1.0) {
+    if (m_phase == Phase::HotWater && m_hotWaterTareBaseline != 0.0 && m_hotWaterTareTimeMs > 0 && qAbs(weight) < 1.0) {
         qDebug() << "=== TARE: Scale zeroed, clearing hot water baseline ===";
         m_hotWaterTareBaseline = 0.0;
     }
@@ -448,8 +448,8 @@ void MachineState::onScaleWeightChanged(double weight) {
             qDebug() << "[HW-Tare+" << sinceMs << "ms] scale=" << weight
                      << "effective=" << (weight - m_hotWaterTareBaseline)
                      << "baseline=" << m_hotWaterTareBaseline;
-        } else if (sinceMs < 2100) {
-            // One final log indicating whether tare succeeded
+        } else {
+            // First sample past 2s — log whether tare succeeded
             qDebug() << "[HW-Tare] 2s summary: baseline="
                      << (m_hotWaterTareBaseline == 0.0 ? "cleared (tare OK)" : QString::number(m_hotWaterTareBaseline, 'f', 1) + "g (tare FAILED, using baseline)");
             m_hotWaterTareTimeMs = 0;  // Stop burst logging
