@@ -63,6 +63,7 @@ jobs:
           target: 'android'
           arch: 'android_arm64_v8a'
           modules: 'qtquick3d qtshadertools qtcharts qtconnectivity qtmultimedia qtpositioning qtspeech qtwebsockets'
+          install-deps: false  # Skip apt-get of desktop X11/GL libs — not needed for Android cross-compilation
           cache: true
           cache-key-prefix: 'qt-android-v1'
 
