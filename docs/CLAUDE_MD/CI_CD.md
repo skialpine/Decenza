@@ -79,7 +79,7 @@ git push origin vX.Y.Z
 
 ### Release Process
 
-**IMPORTANT**: CI builds are triggered by the `release: released` event — they only run when a release is promoted from pre-release to full release (or published as a non-prerelease). Tag pushes alone do NOT trigger builds. The `workflow_dispatch` trigger is only for test builds that don't upload anywhere.
+**IMPORTANT: Always use tag pushes to build releases.** Never use `workflow_dispatch` for release builds — it skips version code bumps and causes duplicate upload errors (especially iOS App Store). The `workflow_dispatch` trigger is only for test builds that don't upload anywhere.
 
 **IMPORTANT**: Release notes should only include **user-experience changes** (new features, UI changes, bug fixes users would notice). Skip internal changes like code refactoring, developer tools, translation system improvements, or debug logging changes. Use sectioned format: `### New Features`, `### Improvements`, `### Bug Fixes`.
 
@@ -89,10 +89,12 @@ gh release list --limit 5
 git log <previous-tag>..HEAD --oneline
 ```
 
-#### Step 2: Create a pre-release with tag
-Create the GitHub Release as a pre-release first. This lets you accumulate changes and update release notes before triggering builds.
+#### Step 2: Create the GitHub Release FIRST (before pushing the tag)
+**You must create the release before pushing the tag.** If the release doesn't exist when CI runs, behavior varies: Android and Linux workflows auto-create a non-prerelease with auto-generated notes (losing your custom notes and prerelease flag), while macOS and Windows silently skip the upload (artifacts lost). Creating it first ensures all platforms upload correctly with your release notes and prerelease flag.
 
 The `Build: XXXX` line is injected automatically by CI after the Android build completes. Do NOT add it manually.
+
+For beta/prerelease builds, add `--prerelease` flag. Users with "Beta updates" enabled in Settings will get these. Omit `--prerelease` for stable releases.
 
 ```bash
 gh release create vX.Y.Z \
@@ -121,7 +123,7 @@ EOF
 )"
 ```
 
-#### Step 3: Push the tag
+#### Step 3: Push the tag to trigger builds
 ```bash
 # IMPORTANT: Verify local main is synced with origin BEFORE tagging.
 # Stale tracking branches or failed pulls can leave HEAD on the wrong commit.
@@ -133,16 +135,7 @@ git rev-parse vX.Y.Z  # Must match HEAD above
 git push origin vX.Y.Z
 ```
 
-**Note:** Pushing the tag does NOT trigger builds. The tag is just a marker for the commit.
-
-#### Step 4: Promote to full release (triggers builds)
-When ready to build and ship, promote the pre-release to a full release. **This is the step that triggers all 6 platform CI builds.**
-
-```bash
-gh release edit vX.Y.Z --prerelease=false --latest
-```
-
-This triggers all 6 platform builds simultaneously via the `release: released` event. Each workflow will:
+This triggers all 6 platform builds simultaneously. Each workflow will:
 - Bump the version code
 - Build the binary
 - Upload the artifact to the existing GitHub Release
@@ -150,10 +143,10 @@ This triggers all 6 platform builds simultaneously via the `release: released` e
 - Android workflow injects `Build: XXXX` into the release notes
 - iOS workflow uploads to App Store Connect
 
-Without `--latest`, the previous stable release remains the "latest" and the auto-update system won't see the new version.
+**Cache warming:** When the tag points to a full release (not a pre-release), each workflow also dispatches a `workflow_dispatch` build on `main` after success. This populates ccache for the next version's pre-release builds. Pre-release tag pushes skip this step.
 
 #### Updating an existing pre-release
-To update a pre-release tag to the current HEAD (no builds triggered):
+To rebuild an existing pre-release at the current HEAD:
 ```bash
 # IMPORTANT: Verify local main is synced with origin BEFORE tagging.
 git fetch origin && git reset --hard origin/main
@@ -170,7 +163,7 @@ git push origin vX.Y.Z
 # You MUST run this after pushing the new tag to restore it as a visible pre-release:
 gh release edit vX.Y.Z --draft=false --prerelease
 ```
-**Note:** Do NOT delete the GitHub Release — only the tag. The release persists. Draft releases are invisible to users and the auto-update system, so the `--draft=false` step is mandatory.
+**Note:** Do NOT delete the GitHub Release — only the tag. The release persists and CI will upload new artifacts to it. Draft releases are invisible to users and the auto-update system, so the `--draft=false` step is mandatory.
 
 ### Updating Release Notes
 ```bash
@@ -187,9 +180,15 @@ EOF
 - **Beta channel**: Users opt-in via Settings → Updates → "Beta updates". Prereleases are only shown to opted-in users.
 - **Platforms**: Android auto-downloads APK; iOS directs to App Store; desktop shows release page
 
+### Promoting a pre-release to stable
+When promoting a pre-release to a full release, you must also set it as "latest" — GitHub does not do this automatically:
+```bash
+gh release edit vX.Y.Z --prerelease=false --latest
+```
+Without `--latest`, the previous stable release remains the "latest" and the auto-update system won't see the new version. Note: promoting does NOT re-trigger builds — the artifacts from the pre-release tag push are already attached.
+
 ### Notes
-- **Builds are triggered by promoting a pre-release to full release** (`gh release edit --prerelease=false --latest`), not by tag pushes
-- **Never use `workflow_dispatch` for release builds** — it skips version code bumps and causes duplicate upload errors
+- **Always use tag pushes** — never `workflow_dispatch` — for release builds
 - **Always review `git log <prev-release>..HEAD`** to include all changes in release notes
 - `Build: XXXX` is injected automatically by CI — do not add manually
 - Always include direct APK link in release notes (old browsers can't see Assets section)

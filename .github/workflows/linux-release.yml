@@ -10,9 +10,10 @@ on:
         default: 'false'
         type: boolean
 
-  # Trigger on full releases only (not pre-releases)
-  release:
-    types: [released]
+  # Trigger on version tags (pre-release and release)
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
@@ -189,4 +190,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh workflow run "$GITHUB_WORKFLOW" --ref main || echo "Cache warm dispatch failed (non-fatal)"
+          TAG="${GITHUB_REF#refs/tags/}"
+          IS_PRERELEASE=$(gh release view "$TAG" --json isPrerelease --jq '.isPrerelease')
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            echo "Skipping cache warm for pre-release $TAG"
+          else
+            gh workflow run "$GITHUB_WORKFLOW" --ref main || echo "Cache warm dispatch failed (non-fatal)"
+          fi
