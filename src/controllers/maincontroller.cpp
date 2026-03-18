@@ -768,7 +768,6 @@ QVariantMap MainController::getCurrentProfile() const {
     profile["profile_notes"] = m_currentProfile.profileNotes();
     profile["target_weight"] = m_currentProfile.targetWeight();
     profile["target_volume"] = m_currentProfile.targetVolume();
-    profile["stop_at_type"] = m_currentProfile.stopAtType() == Profile::StopAtType::Volume ? "volume" : "weight";
     profile["espresso_temperature"] = m_currentProfile.espressoTemperature();
     profile["mode"] = m_currentProfile.mode() == Profile::Mode::FrameBased ? "frame_based" : "direct";
     profile["has_recommended_dose"] = m_currentProfile.hasRecommendedDose();
@@ -871,7 +870,6 @@ QVariantMap MainController::getProfileByFilename(const QString& filename) const 
     result["profile_notes"] = profile.profileNotes();
     result["target_weight"] = profile.targetWeight();
     result["target_volume"] = profile.targetVolume();
-    result["stop_at_type"] = profile.stopAtType() == Profile::StopAtType::Volume ? "volume" : "weight";
     result["espresso_temperature"] = profile.espressoTemperature();
     result["mode"] = profile.mode() == Profile::Mode::FrameBased ? "frame_based" : "direct";
     result["has_recommended_dose"] = profile.hasRecommendedDose();
@@ -1035,10 +1033,6 @@ void MainController::loadProfile(const QString& profileName) {
     if (m_machineState) {
         m_machineState->setTargetWeight(m_currentProfile.targetWeight());
         m_machineState->setTargetVolume(m_currentProfile.targetVolume());
-        m_machineState->setStopAtType(
-            m_currentProfile.stopAtType() == Profile::StopAtType::Volume
-                ? MachineState::StopAtType::Volume
-                : MachineState::StopAtType::Weight);
     }
 
     // Upload to machine if connected (for frame-based mode)
@@ -1087,10 +1081,6 @@ bool MainController::loadProfileFromJson(const QString& jsonContent) {
     if (m_machineState) {
         m_machineState->setTargetWeight(m_currentProfile.targetWeight());
         m_machineState->setTargetVolume(m_currentProfile.targetVolume());
-        m_machineState->setStopAtType(
-            m_currentProfile.stopAtType() == Profile::StopAtType::Volume
-                ? MachineState::StopAtType::Volume
-                : MachineState::StopAtType::Weight);
     }
 
     // Upload to machine if connected (for frame-based mode)
@@ -1516,15 +1506,6 @@ void MainController::uploadProfile(const QVariantMap& profileData) {
             m_machineState->setTargetVolume(m_currentProfile.targetVolume());
         }
     }
-    if (profileData.contains("stop_at_type")) {
-        QString typeStr = profileData["stop_at_type"].toString();
-        Profile::StopAtType type = (typeStr == "volume") ? Profile::StopAtType::Volume : Profile::StopAtType::Weight;
-        m_currentProfile.setStopAtType(type);
-        if (m_machineState) {
-            m_machineState->setStopAtType(type == Profile::StopAtType::Volume ? MachineState::StopAtType::Volume : MachineState::StopAtType::Weight);
-        }
-    }
-
     if (profileData.contains("has_recommended_dose")) {
         m_currentProfile.setHasRecommendedDose(profileData["has_recommended_dose"].toBool());
     }
@@ -1695,7 +1676,7 @@ void MainController::uploadRecipeProfile(const QVariantMap& recipeParams) {
     } else {
         // Only metadata changed — update target weight/volume without touching frames
         m_currentProfile.setTargetWeight(recipe.targetWeight);
-        m_currentProfile.setTargetVolume(recipe.targetVolume > 0 ? recipe.targetVolume : 100.0);
+        m_currentProfile.setTargetVolume(recipe.targetVolume);
     }
 
     // Sync overrides so uploadCurrentProfile doesn't apply wrong delta
@@ -2070,7 +2051,7 @@ void MainController::createNewProfile(const QString& title) {
     m_currentProfile.setBeverageType("espresso");
     m_currentProfile.setProfileType("settings_2c");
     m_currentProfile.setTargetWeight(36.0);
-    m_currentProfile.setTargetVolume(36.0);
+    m_currentProfile.setTargetVolume(0.0);
     m_currentProfile.setEspressoTemperature(93.0);
     m_currentProfile.setRecipeMode(false);
 
@@ -2897,7 +2878,7 @@ void MainController::onEspressoCycleStarted() {
                             && activeScale->type() != QStringLiteral("flow");
         if (!hasRealScale) {
             // Check if the profile actually needs a scale
-            bool profileNeedsScale = (m_currentProfile.stopAtType() == Profile::StopAtType::Weight);
+            bool profileNeedsScale = (m_currentProfile.targetWeight() > 0);
             if (!profileNeedsScale) {
                 // Also check per-frame exit weights
                 for (const auto& step : m_currentProfile.steps()) {
@@ -3020,21 +3001,20 @@ void MainController::onShotEnded() {
 
     double doseWeight = m_settings->dyeBeanWeight();
 
-    // Get final weight from shot data (cumulative weight, not flow rate)
-    // In volume mode, estimate weight from ml: ml - 5 - dose*0.5
-    // (5g waste tray loss + 50% of dose retained in wet puck)
+    // Get final weight — use actual scale data if available, estimate from volume only
+    // when no scale data was recorded at all (no scale connected)
     double finalWeight = 0;
-    if (m_machineState && m_machineState->stopAtType() == MachineState::StopAtType::Volume) {
+    const auto& cumulativeWeight = m_shotDataModel->cumulativeWeightData();
+    if (!cumulativeWeight.isEmpty()) {
+        finalWeight = cumulativeWeight.last().y();
+    } else if (m_machineState) {
+        // No scale data at all — estimate weight from volume: ml - 5 - dose*0.5
+        // (5g waste tray loss + 50% of dose retained in wet puck)
         double cumulativeVolume = m_machineState->cumulativeVolume();
         double puckRetention = doseWeight > 0 ? doseWeight * 0.5 : 9.0;  // fallback 9g if no dose
         finalWeight = cumulativeVolume - 5.0 - puckRetention;
         if (finalWeight < 0) finalWeight = 0;
-        qDebug() << "Volume mode: estimated weight from" << cumulativeVolume << "ml ->" << finalWeight << "g";
-    } else {
-        const auto& cumulativeWeight = m_shotDataModel->cumulativeWeightData();
-        if (!cumulativeWeight.isEmpty()) {
-            finalWeight = cumulativeWeight.last().y();
-        }
+        qDebug() << "No scale: estimated weight from" << cumulativeVolume << "ml ->" << finalWeight << "g";
     }
 
     // Smooth weight flow rate before saving (centered moving average over 7 points ≈ 1.4s at 5Hz).

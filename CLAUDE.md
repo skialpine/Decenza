@@ -386,6 +386,10 @@ The procedural coffee rendering uses proportional coordinates relative to the cu
 - **DirectControl mode**: App sends setpoints frame-by-frame
 - Formats: JSON (unified with de1app v2), TCL (de1app import)
 - Tare happens when frame 0 starts (after machine preheat)
+- **Stop limits**: Both `target_weight` and `target_volume` are checked independently during espresso — whichever target is reached first stops the shot (matching de1app). A value of 0 means that limit is disabled. There is no `stop_at_type` selector.
+- **Profile comparison**: Run `python scripts/compare_profiles.py [de1app_profiles_dir]` to compare built-in profiles against de1app TCL sources. Checks frame data, exit conditions, and classifies differences by severity.
+- **Profile sync**: Run `python scripts/sync_profiles.py [de1app_profiles_dir]` to update built-in profile JSON files to match de1app TCL sources. **Modifies `resources/profiles/` in-place** — review changes before committing.
+- **Profile import test**: Run `python scripts/test_profile_import.py [de1app_profiles_dir]` to build a C++ test app that loads all profiles through `Profile::fromJson()` and `Profile::loadFromTclString()` and verifies parsed weight/volume values match de1app.
 
 ### JSON Format (unified with de1app)
 
@@ -393,7 +397,7 @@ Decenza and de1app share the same JSON profile format. The writer (`toJson()`) o
 
 - **Writer keys**: `notes` (not `profile_notes`), `legacy_profile_type` (not `profile_type`), `number_of_preinfuse_frames` (not `preinfuse_frame_count`), nested `exit`/`limiter`/`weight` (no flat exit fields)
 - **Reader fallbacks**: Accepts old flat fields (`exit_if`, `exit_type`, `exit_pressure_over`, `max_flow_or_pressure`, `profile_notes`, `profile_type`, `preinfuse_frame_count`) for backward compat with shot history snapshots
-- **Decenza extensions**: `is_recipe_mode`, `recipe`, `mode`, `stop_at_type`, `has_recommended_dose`, `temperature_presets`, simple profile params — de1app ignores these
+- **Decenza extensions**: `is_recipe_mode`, `recipe`, `mode`, `has_recommended_dose`, `temperature_presets`, simple profile params — de1app ignores these
 - **No separate reader**: There is no `loadFromDE1AppJson()` — `fromJson()` handles all variants
 
 ### Exit Conditions

@@ -351,7 +351,6 @@ QJsonDocument Profile::toJson() const {
     obj["legacy_profile_type"] = m_profileType;
     obj["target_weight"] = m_targetWeight;
     obj["target_volume"] = m_targetVolume;
-    obj["stop_at_type"] = (m_stopAtType == StopAtType::Volume) ? "volume" : "weight";
     obj["espresso_temperature"] = m_espressoTemperature;
     obj["maximum_pressure"] = m_maximumPressure;
     obj["maximum_flow"] = m_maximumFlow;
@@ -426,8 +425,6 @@ Profile Profile::fromJson(const QJsonDocument& doc) {
 
     profile.m_targetWeight = jsonToDouble(obj["target_weight"], 36.0);
     profile.m_targetVolume = jsonToDouble(obj["target_volume"], 0.0);
-    QString stopAtStr = obj["stop_at_type"].toString("weight");
-    profile.m_stopAtType = (stopAtStr == "volume") ? StopAtType::Volume : StopAtType::Weight;
     profile.m_espressoTemperature = jsonToDouble(obj["espresso_temperature"], 93.0);
     profile.m_maximumPressure = jsonToDouble(obj["maximum_pressure"], 12.0);
     profile.m_maximumFlow = jsonToDouble(obj["maximum_flow"], 6.0);
@@ -669,35 +666,21 @@ Profile Profile::loadFromTclString(const QString& content) {
     // Determine if this is an advanced profile (settings_2c or settings_2c2)
     bool isAdvancedProfile = profile.m_profileType.startsWith("settings_2c");
 
-    // Extract target weight - use _advanced value for advanced profiles
+    // Extract target weight/volume — always use _advanced keys since de1app's
+    // SAW/SAV runtime reads from those regardless of profile type.
+    // Fall back to non-advanced keys only if _advanced is absent (old profiles).
     QString val;
-    if (isAdvancedProfile) {
-        val = extractValue("final_desired_shot_weight_advanced");
-        if (val.isEmpty() || val.toDouble() == 0) {
-            val = extractValue("final_desired_shot_weight");
-        }
-    } else {
+    val = extractValue("final_desired_shot_weight_advanced");
+    if (val.isEmpty()) {
         val = extractValue("final_desired_shot_weight");
     }
     if (!val.isEmpty()) profile.m_targetWeight = val.toDouble();
 
-    // Extract target volume - use _advanced value for advanced profiles
-    if (isAdvancedProfile) {
-        val = extractValue("final_desired_shot_volume_advanced");
-        if (val.isEmpty() || val.toDouble() == 0) {
-            val = extractValue("final_desired_shot_volume");
-        }
-    } else {
+    val = extractValue("final_desired_shot_volume_advanced");
+    if (val.isEmpty()) {
         val = extractValue("final_desired_shot_volume");
     }
     if (!val.isEmpty()) profile.m_targetVolume = val.toDouble();
-
-    // Infer stop-at type from which value is set
-    if (profile.m_targetVolume > 0 && profile.m_targetWeight <= 0) {
-        profile.m_stopAtType = StopAtType::Volume;
-    } else {
-        profile.m_stopAtType = StopAtType::Weight;
-    }
 
     val = extractValue("espresso_temperature");
     if (!val.isEmpty()) profile.m_espressoTemperature = val.toDouble();
@@ -1134,7 +1117,7 @@ void Profile::regenerateFromRecipe() {
 
     // Update profile metadata from recipe
     m_targetWeight = m_recipeParams.targetWeight;
-    m_targetVolume = m_recipeParams.targetVolume > 0 ? m_recipeParams.targetVolume : 100.0;
+    m_targetVolume = m_recipeParams.targetVolume;
     // Use first frame temperature (matches de1app behavior)
     if (!m_steps.isEmpty()) {
         m_espressoTemperature = m_steps.first().temperature;
