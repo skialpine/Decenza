@@ -382,6 +382,8 @@ The procedural coffee rendering uses proportional coordinates relative to the cu
 
 ## Profile System
 
+See `docs/CLAUDE_MD/RECIPE_PROFILES.md` for the Recipe Editor, D-Flow/A-Flow/Pressure/Flow editor types, frame generation details, and recipe parameters.
+
 - **FrameBased mode**: Upload to machine, executes autonomously
 - **DirectControl mode**: App sends setpoints frame-by-frame
 - Formats: JSON (unified with de1app v2), TCL (de1app import)
