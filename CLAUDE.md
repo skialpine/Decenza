@@ -402,35 +402,6 @@ Decenza and de1app share the same JSON profile format. The writer (`toJson()`) o
 - **Decenza extensions**: `is_recipe_mode`, `recipe`, `mode`, `has_recommended_dose`, `temperature_presets`, simple profile params — de1app ignores these
 - **No separate reader**: There is no `loadFromDE1AppJson()` — `fromJson()` handles all variants
 
-### Exit Conditions
-
-There are two types of exit conditions:
-
-1. **Machine-side exits** (pressure/flow): Controlled by `exit_if` flag and `exit_type`
-   - Encoded in BLE frame flags (DoCompare, DC_GT, DC_CompF)
-   - Machine autonomously checks and advances frames
-   - Types: `pressure_over`, `pressure_under`, `flow_over`, `flow_under`
-
-2. **App-side exits** (weight): Controlled by `weight` field INDEPENDENTLY (legacy `exit_weight` also accepted when reading)
-   - App monitors scale weight and sends `SkipToNext` (0x0E) command
-   - **CRITICAL**: Weight exit is independent of `exit_if` flag!
-   - A frame can have no `exit` object (no machine exit) with `"weight": 3.6` (app exit)
-   - Both can coexist: machine checks pressure/flow, app checks weight
-
-### Weight Exit Implementation
-
-```cpp
-// CORRECT - weight is independent of exitIf
-if (frame.exitWeight > 0) {
-    if (weight >= frame.exitWeight) {
-        m_device->skipToNextFrame();
-    }
-}
-
-// WRONG - don't require exitIf for weight!
-if (frame.exitIf && frame.exitType == "weight" ...) // BUG!
-```
-
 ## Data Migration (Device-to-Device Transfer)
 
 See `docs/CLAUDE_MD/DATA_MIGRATION.md` for architecture, REST endpoints, and import options.

@@ -403,16 +403,36 @@ There are two independent exit condition systems:
 
 ### Machine-side exits (pressure/flow)
 
-Controlled by `exit_if` flag and `exit_type` in the BLE frame. The machine autonomously checks and advances frames. Types: `pressure_over`, `pressure_under`, `flow_over`, `flow_under`.
+Controlled by `exit_if` flag and `exit_type` in the BLE frame:
+- Encoded in BLE frame flags (DoCompare, DC_GT, DC_CompF)
+- Machine autonomously checks and advances frames
+- Types: `pressure_over`, `pressure_under`, `flow_over`, `flow_under`
 
 ### App-side exits (weight)
 
-Controlled by `weight` field on the frame, INDEPENDENTLY of `exit_if`. The app monitors scale weight and sends `SkipToNext` (0x0E) command. A frame can have no machine exit (`exit_if=false`) with a weight exit (`weight > 0`), or both, or neither.
+Controlled by `weight` field on the frame, INDEPENDENTLY of `exit_if`. The app monitors scale weight and sends `SkipToNext` (0x0E) command.
+- **CRITICAL**: Weight exit is independent of `exit_if` flag!
+- A frame can have no `exit` object (no machine exit) with `"weight": 3.6` (app exit)
+- Both can coexist: machine checks pressure/flow, app checks weight
 
 D-Flow uses weight exits on:
 - Filling frame: `weight=5.0` (exit fill early if scale reads 5g)
 - Infusing frame: `weight=infuseWeight` (exit infuse at target weight)
 - Profile-level `targetWeight`: stops the shot via the app
+
+### Weight Exit Implementation
+
+```cpp
+// CORRECT - weight is independent of exitIf
+if (frame.exitWeight > 0) {
+    if (weight >= frame.exitWeight) {
+        m_device->skipToNextFrame();
+    }
+}
+
+// WRONG - don't require exitIf for weight!
+if (frame.exitIf && frame.exitType == "weight" ...) // BUG!
+```
 
 ---
 
