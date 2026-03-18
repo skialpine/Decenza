@@ -304,8 +304,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git fetch origin main
+          # Preserve .ccache before stash (stash --include-untracked would wipe it)
+          [ -d .ccache ] && mv .ccache /tmp/.ccache-preserve
           git stash --include-untracked
           git checkout origin/main
+          [ -d /tmp/.ccache-preserve ] && mv /tmp/.ccache-preserve .ccache
           echo "$BUILD_CODE" > versioncode.txt
           git add versioncode.txt
           # Only commit if there are changes
