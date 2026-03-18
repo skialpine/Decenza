@@ -329,6 +329,7 @@ void MachineState::updatePhase() {
                 // WriteWithoutResponse can silently drop packets when sent in rapid succession.
                 if (m_phase == Phase::HotWater) {
                     QTimer::singleShot(200, this, [this]() {
+                        if (m_phase != Phase::HotWater) return;  // Operation ended before timer fired
                         tareScale();
                         qDebug() << "=== TARE: Hot Water started (200ms after timer cmds) ===";
                     });
