@@ -3463,6 +3463,21 @@ void Settings::setMcpConfirmationLevel(int level) {
     }
 }
 
+QString Settings::mcpApiKey() const {
+    QString key = m_settings.value("mcp/apiKey", "").toString();
+    if (key.isEmpty()) {
+        // Generate on first access
+        key = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        const_cast<QSettings&>(m_settings).setValue("mcp/apiKey", key);
+    }
+    return key;
+}
+
+void Settings::regenerateMcpApiKey() {
+    m_settings.setValue("mcp/apiKey", QUuid::createUuid().toString(QUuid::WithoutBraces));
+    emit mcpApiKeyChanged();
+}
+
 // Discuss Shot settings
 int Settings::discussShotApp() const {
     return m_settings.value("ai/discussShotApp", 0).toInt();

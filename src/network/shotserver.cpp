@@ -14,6 +14,7 @@
 #include "../core/batterymanager.h"
 #include "../core/memorymonitor.h"
 #include "../mcp/mcpserver.h"
+#include "../mcp/mcptoolregistry.h"
 #include "version.h"
 
 #include <QThread>
@@ -939,6 +940,23 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
         bool isAuthRoute = path.startsWith("/auth/") || path.startsWith("/api/auth/");
         bool exempt = isAuthRoute || path == "/favicon.ico";
 
+        // MCP routes can authenticate via API key (Bearer token) instead of TOTP
+        if (!exempt && (path == "/mcp" || path.startsWith("/mcp/")) && m_settings) {
+            QString authHeader;
+            for (const auto& line : requestStr.split("\r\n")) {
+                if (line.startsWith("Authorization:", Qt::CaseInsensitive)) {
+                    authHeader = line.mid(line.indexOf(':') + 1).trimmed();
+                    break;
+                }
+            }
+            if (authHeader.startsWith("Bearer ", Qt::CaseInsensitive)) {
+                QString token = authHeader.mid(7).trimmed();
+                if (!token.isEmpty() && token == m_settings->mcpApiKey()) {
+                    exempt = true;  // Valid API key — skip TOTP check
+                }
+            }
+        }
+
         if (!exempt && !checkSession(request)) {
             if (hasStoredTotpSecret()) {
                 sendResponse(socket, 401, "text/html; charset=utf-8", QByteArray(WEB_AUTH_LOGIN_PAGE));
@@ -965,6 +983,79 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
 
     // MCP Server routes
     if (path == "/mcp" || path.startsWith("/mcp/")) {
+        // Setup guide page (available even when MCP is disabled)
+        if (path == "/mcp/setup") {
+            QString serverUrl = url();
+            QString mcpUrl = serverUrl + "/mcp";
+            QString html = QString::fromUtf8(R"HTML(<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>Decenza MCP Setup</title>
+<style>
+body{font-family:-apple-system,system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 20px;
+background:#1a1a2e;color:#e0e0e0;line-height:1.6}
+h1{color:#6c8cff}h2{color:#8ca0ff;margin-top:32px}
+pre{background:#0d0d1a;padding:16px;border-radius:8px;overflow-x:auto;border:1px solid #333;
+font-size:14px;position:relative}
+code{color:#a0cfff}
+.copy-btn{position:absolute;top:8px;right:8px;background:#6c8cff;color:white;border:none;
+padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px}
+.copy-btn:hover{background:#8ca0ff}
+.step{background:#0d0d1a;padding:16px;border-radius:8px;margin:12px 0;border-left:3px solid #6c8cff}
+.step-num{color:#6c8cff;font-weight:bold;font-size:18px}
+.status{padding:12px;border-radius:8px;margin:16px 0;font-weight:bold}
+.enabled{background:rgba(46,125,50,0.2);border:1px solid #2e7d32;color:#81c784}
+.disabled{background:rgba(198,40,40,0.2);border:1px solid #c62828;color:#ef9a9a}
+a{color:#6c8cff}
+</style></head><body>
+<h1>Decenza MCP Server Setup</h1>
+<div class="status %1">MCP Server: %2</div>
+<p>Connect Claude Desktop to your DE1 espresso machine for AI-powered shot analysis, dial-in advice, and remote control.</p>
+
+<h2>Setup Steps</h2>
+<div class="step"><span class="step-num">1.</span> Enable MCP in Decenza: Settings &gt; AI &gt; MCP Server &gt; toggle ON</div>
+<div class="step"><span class="step-num">2.</span> Open Claude Desktop config file:
+<pre><code>~/Library/Application Support/Claude/claude_desktop_config.json</code></pre>
+<small>On Windows: <code>%%APPDATA%%\Claude\claude_desktop_config.json</code></small></div>
+<div class="step"><span class="step-num">3.</span> Add (or merge) this configuration:
+<pre id="config"><code>%3</code><button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('configText').textContent)">Copy</button></pre>
+<span id="configText" style="display:none">%3</span></div>
+<div class="step"><span class="step-num">4.</span> Restart Claude Desktop (Quit &amp; reopen)</div>
+<div class="step"><span class="step-num">5.</span> Ask Claude: <em>"What's the current state of my espresso machine?"</em></div>
+
+<h2>Available Tools (%4)</h2>
+<p>At <strong>Full Automation</strong> access level, Claude can:</p>
+<ul>
+<li>Read machine state, telemetry, water level</li>
+<li>Browse and analyze shot history</li>
+<li>Get dial-in context and suggest improvements</li>
+<li>Start/stop espresso, steam, hot water, flush</li>
+<li>Change profiles, settings, and grinder parameters</li>
+</ul>
+
+<h2>Access Levels</h2>
+<ul>
+<li><strong>Monitor Only</strong> &mdash; read state, history, profiles (no control)</li>
+<li><strong>Control</strong> &mdash; + start/stop operations, wake/sleep</li>
+<li><strong>Full Automation</strong> &mdash; + change profiles, settings, parameters</li>
+</ul>
+
+<script>document.querySelector('.copy-btn').addEventListener('click',function(){this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000)})</script>
+</body></html>)HTML");
+
+            bool mcpOn = m_settings && m_settings->mcpEnabled();
+            QString apiKey = m_settings ? m_settings->mcpApiKey() : "";
+            QString configJson = QString("{\n  \"mcpServers\": {\n    \"decenza\": {\n      \"url\": \"%1\",\n      \"headers\": {\n        \"Authorization\": \"Bearer %2\"\n      }\n    }\n  }\n}").arg(mcpUrl, apiKey);
+            int toolCount = m_mcpServer ? m_mcpServer->toolRegistry()->listTools(2).size() : 0;
+
+            html = html.arg(mcpOn ? "enabled" : "disabled",
+                           mcpOn ? "Enabled" : "Disabled",
+                           configJson,
+                           QString::number(toolCount));
+
+            sendHtml(socket, html);
+            return;
+        }
+
         if (!m_mcpServer || !m_settings || !m_settings->mcpEnabled()) {
             sendResponse(socket, 404, "text/plain", "Not Found");
             return;

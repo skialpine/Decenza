@@ -233,6 +233,7 @@ class Settings : public QObject {
     Q_PROPERTY(bool mcpEnabled READ mcpEnabled WRITE setMcpEnabled NOTIFY mcpEnabledChanged)
     Q_PROPERTY(int mcpAccessLevel READ mcpAccessLevel WRITE setMcpAccessLevel NOTIFY mcpAccessLevelChanged)
     Q_PROPERTY(int mcpConfirmationLevel READ mcpConfirmationLevel WRITE setMcpConfirmationLevel NOTIFY mcpConfirmationLevelChanged)
+    Q_PROPERTY(QString mcpApiKey READ mcpApiKey NOTIFY mcpApiKeyChanged)
 
     // Discuss Shot settings
     Q_PROPERTY(int discussShotApp READ discussShotApp WRITE setDiscussShotApp NOTIFY discussShotAppChanged)
@@ -729,6 +730,8 @@ public:
     void setMcpAccessLevel(int level);
     int mcpConfirmationLevel() const;
     void setMcpConfirmationLevel(int level);
+    QString mcpApiKey() const;
+    Q_INVOKABLE void regenerateMcpApiKey();
 
     // Discuss Shot settings
     int discussShotApp() const;
@@ -933,6 +936,7 @@ signals:
     void mcpEnabledChanged();
     void mcpAccessLevelChanged();
     void mcpConfirmationLevelChanged();
+    void mcpApiKeyChanged();
     void discussShotAppChanged();
     void discussShotCustomUrlChanged();
     void mqttEnabledChanged();

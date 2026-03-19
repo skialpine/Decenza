@@ -391,12 +391,25 @@ KeyboardAwareContainer {
                 // ═══════════════════════════════════════════
                 Item { height: Theme.scaled(8) }
 
-                Text {
-                    text: TranslationManager.translate("settings.ai.section.mcp", "MCP Server (AI Remote Control)")
-                    font.family: Theme.subtitleFont.family
-                    font.pixelSize: Theme.subtitleFont.pixelSize
-                    font.bold: true
-                    color: Theme.textColor
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text {
+                        text: TranslationManager.translate("settings.ai.section.mcp", "MCP Server (AI Remote Control)")
+                        font.family: Theme.subtitleFont.family
+                        font.pixelSize: Theme.subtitleFont.pixelSize
+                        font.bold: true
+                        color: Theme.textColor
+                        Layout.fillWidth: true
+                    }
+                    AccessibleButton {
+                        text: "?"
+                        accessibleName: TranslationManager.translate("settings.ai.mcp.helpAccessible", "Help: What is MCP and how to set it up")
+                        _customFontSize: Theme.scaled(14)
+                        _customFontWeight: Font.Bold
+                        Layout.preferredWidth: Theme.scaled(32)
+                        Layout.preferredHeight: Theme.scaled(32)
+                        onClicked: mcpHelpDialog.open()
+                    }
                 }
                 Rectangle {
                     Layout.fillWidth: true
@@ -622,6 +635,54 @@ KeyboardAwareContainer {
                     font.pixelSize: Theme.scaled(12)
                 }
 
+                // Connect Claude Desktop button
+                RowLayout {
+                    visible: Settings.mcpEnabled
+                    Layout.fillWidth: true
+                    spacing: Theme.scaled(8)
+
+                    AccessibleButton {
+                        text: TranslationManager.translate("settings.ai.mcp.copyConfig", "Copy Claude Desktop Config")
+                        accessibleName: TranslationManager.translate("settings.ai.mcp.copyConfigAccessible", "Copy MCP configuration for Claude Desktop to clipboard")
+                        onClicked: {
+                            var serverUrl = MainController.shotServer ? MainController.shotServer.url : "http://localhost:8888"
+                            var config = JSON.stringify({
+                                "mcpServers": {
+                                    "decenza": {
+                                        "url": serverUrl + "/mcp",
+                                        "headers": {
+                                            "Authorization": "Bearer " + Settings.mcpApiKey
+                                        }
+                                    }
+                                }
+                            }, null, 2)
+                            MainController.copyToClipboard(config)
+                            mcpConfigCopiedText.visible = true
+                        }
+                    }
+
+                    Text {
+                        id: mcpConfigCopiedText
+                        visible: false
+                        text: TranslationManager.translate("settings.ai.mcp.configCopied", "Copied! Paste into ~/Library/Application Support/Claude/claude_desktop_config.json")
+                        color: Theme.successColor
+                        font.pixelSize: Theme.scaled(11)
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+                }
+
+                // Web setup link
+                Text {
+                    visible: Settings.mcpEnabled && MainController.shotServer
+                    text: TranslationManager.translate("settings.ai.mcp.webSetup", "Or open setup guide in browser:")
+                        + " " + (MainController.shotServer ? MainController.shotServer.url : "") + "/mcp/setup"
+                    color: Theme.textSecondaryColor
+                    font.pixelSize: Theme.scaled(11)
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
+
                 // ─── Discuss Shot subsection ───
                 Item { height: Theme.scaled(4) }
 
@@ -697,6 +758,174 @@ KeyboardAwareContainer {
     }
 
     // Discuss Shot app selector
+    // MCP Help Dialog
+    Dialog {
+        id: mcpHelpDialog
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(parent ? parent.width - Theme.scaled(32) : Theme.scaled(400), Theme.scaled(500))
+        modal: true
+        padding: 0
+        topPadding: 0
+        bottomPadding: 0
+        header: null
+        closePolicy: Dialog.CloseOnEscape | Dialog.CloseOnPressOutside
+
+        onOpened: AccessibilityManager.announce(mcpHelpTitle.text)
+
+        background: Rectangle {
+            color: Theme.surfaceColor
+            radius: Theme.scaled(12)
+            border.color: Theme.borderColor
+            border.width: 1
+        }
+
+        contentItem: Flickable {
+            width: parent ? parent.width : mcpHelpDialog.width
+            implicitHeight: Math.min(helpContent.implicitHeight, mcpHelpDialog.parent ? mcpHelpDialog.parent.height - Theme.scaled(100) : Theme.scaled(500))
+            contentHeight: helpContent.implicitHeight
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+
+            ColumnLayout {
+                id: helpContent
+                width: parent.width
+                spacing: Theme.scaled(12)
+
+                // Header
+                Item {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Theme.scaled(48)
+
+                    Text {
+                        id: mcpHelpTitle
+                        anchors.centerIn: parent
+                        text: TranslationManager.translate("settings.ai.mcp.help.title", "What is MCP?")
+                        font.pixelSize: Theme.scaled(18)
+                        font.family: Theme.bodyFont.family
+                        font.bold: true
+                        color: Theme.textColor
+                    }
+
+                    Rectangle {
+                        anchors.bottom: parent.bottom
+                        width: parent.width
+                        height: 1
+                        color: Theme.borderColor
+                    }
+                }
+
+                // Content
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: Theme.scaled(16)
+                    Layout.rightMargin: Theme.scaled(16)
+                    spacing: Theme.scaled(12)
+
+                    Text {
+                        text: TranslationManager.translate("settings.ai.mcp.help.intro",
+                            "MCP (Model Context Protocol) lets AI assistants like Claude Desktop connect directly to your DE1 espresso machine. Instead of copy-pasting shot data, the AI can read your machine state, analyze shots, and suggest dial-in changes in real time.")
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(13)
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+
+                    Text {
+                        text: TranslationManager.translate("settings.ai.mcp.help.whatCanDo", "What can it do?")
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(14)
+                        font.bold: true
+                    }
+
+                    Text {
+                        text: TranslationManager.translate("settings.ai.mcp.help.capabilities",
+                            "- Monitor machine state, temperature, water level\n- Browse and analyze your shot history\n- Get AI-powered dial-in advice after each shot\n- Start/stop espresso, steam, hot water, flush\n- Change profiles, grinder settings, brew parameters")
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: Theme.scaled(12)
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+
+                    Text {
+                        text: TranslationManager.translate("settings.ai.mcp.help.howToSetup", "How to set up")
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(14)
+                        font.bold: true
+                    }
+
+                    Text {
+                        text: TranslationManager.translate("settings.ai.mcp.help.steps",
+                            "1. Enable MCP Server (toggle above)\n2. Install Claude Desktop from claude.ai/download\n3. Tap 'Copy Claude Desktop Config' below\n4. Open the Claude Desktop config file and paste:\n   macOS: ~/Library/Application Support/Claude/claude_desktop_config.json\n   Windows: %APPDATA%\\Claude\\claude_desktop_config.json\n5. Restart Claude Desktop\n6. Ask Claude about your espresso!")
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: Theme.scaled(12)
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+
+                    Text {
+                        text: TranslationManager.translate("settings.ai.mcp.help.accessLevels", "Access Levels")
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(14)
+                        font.bold: true
+                    }
+
+                    Text {
+                        text: TranslationManager.translate("settings.ai.mcp.help.accessDesc",
+                            "Monitor Only — The AI can read data but cannot control the machine.\nControl — The AI can also start/stop operations.\nFull Automation — The AI can also change profiles and settings.")
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: Theme.scaled(12)
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+
+                    Text {
+                        text: TranslationManager.translate("settings.ai.mcp.help.security", "Security")
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(14)
+                        font.bold: true
+                    }
+
+                    Text {
+                        text: TranslationManager.translate("settings.ai.mcp.help.securityDesc",
+                            "MCP uses an API key (included in the config) to authenticate requests. The server only listens on your local network. Enable web security (TOTP) in Connections settings for additional protection.")
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: Theme.scaled(12)
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+                }
+
+                // Buttons
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.margins: Theme.scaled(16)
+                    spacing: Theme.scaled(8)
+
+                    AccessibleButton {
+                        visible: Settings.mcpEnabled && MainController.shotServer
+                        text: TranslationManager.translate("settings.ai.mcp.help.openGuide", "Open Web Guide")
+                        accessibleName: TranslationManager.translate("settings.ai.mcp.help.openGuideAccessible", "Open MCP setup guide in browser")
+                        onClicked: {
+                            Qt.openUrlExternally(MainController.shotServer.url + "/mcp/setup")
+                            mcpHelpDialog.close()
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    AccessibleButton {
+                        text: TranslationManager.translate("common.close", "Close")
+                        accessibleName: TranslationManager.translate("common.accessibility.dismissDialog", "Close dialog")
+                        onClicked: mcpHelpDialog.close()
+                    }
+                }
+
+                Item { height: Theme.scaled(4) }
+            }
+        }
+    }
+
     SelectionDialog {
         id: discussAppDialog
         title: TranslationManager.translate("settings.ai.discuss.selectAppTitle", "Select AI App")
