@@ -7,6 +7,7 @@
 #include "../machine/machinestate.h"
 #include "../controllers/maincontroller.h"
 #include "../history/shothistorystorage.h"
+#include "../ble/blemanager.h"
 
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -26,6 +27,8 @@ void registerDialingTools(McpToolRegistry* registry, MainController* mainControl
 void registerControlTools(McpToolRegistry* registry, DE1Device* device, MachineState* machineState);
 void registerWriteTools(McpToolRegistry* registry, MainController* mainController,
                         ShotHistoryStorage* shotHistory, Settings* settings);
+void registerScaleTools(McpToolRegistry* registry, MachineState* machineState);
+void registerDeviceTools(McpToolRegistry* registry, BLEManager* bleManager, DE1Device* device);
 void registerMcpResources(McpResourceRegistry* registry, DE1Device* device,
                           MachineState* machineState, MainController* mainController,
                           ShotHistoryStorage* shotHistory);
@@ -60,6 +63,8 @@ void McpServer::registerAllTools()
     registerDialingTools(m_toolRegistry, m_mainController, m_shotHistory, m_settings);
     registerControlTools(m_toolRegistry, m_device, m_machineState);
     registerWriteTools(m_toolRegistry, m_mainController, m_shotHistory, m_settings);
+    registerScaleTools(m_toolRegistry, m_machineState);
+    registerDeviceTools(m_toolRegistry, m_bleManager, m_device);
     qDebug() << "McpServer: Registered" << m_toolRegistry->listTools(2).size() << "tools";
 }
 

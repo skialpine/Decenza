@@ -145,7 +145,7 @@ print(json.dumps([t['name'] for t in tools]))
 assert_ok "tools/list returns array" "$TOOLS_RESP" \
     "isinstance(d.get('result',{}).get('tools'), list)"
 
-EXPECTED_TOOLS="machine_get_state machine_get_telemetry shots_list shots_get_detail shots_compare profiles_list profiles_get_active profiles_get_detail settings_get dialing_get_context machine_wake machine_sleep machine_start_espresso machine_start_steam machine_start_hot_water machine_start_flush machine_stop machine_skip_frame shots_set_feedback profiles_set_active settings_set dialing_suggest_change dialing_apply_change"
+EXPECTED_TOOLS="machine_get_state machine_get_telemetry shots_list shots_get_detail shots_compare profiles_list profiles_get_active profiles_get_detail settings_get dialing_get_context machine_wake machine_sleep machine_start_espresso machine_start_steam machine_start_hot_water machine_start_flush machine_stop machine_skip_frame shots_set_feedback profiles_set_active settings_set dialing_suggest_change dialing_apply_change scale_tare scale_timer_start scale_timer_stop scale_timer_reset scale_get_weight devices_list devices_scan devices_connect_scale devices_connection_status"
 for tool in $EXPECTED_TOOLS; do
     assert_ok "tool '$tool' registered" "$TOOLS_JSON" \
         "'$tool' in d"
@@ -426,7 +426,46 @@ assert_ok "unknown resource returns error" "$UNK_RES_RAW" \
 
 echo
 
-# ─── 10. Write Tools ───
+# ─── 10. Scale Tools ───
+echo -e "${CYAN}10. Scale Tools${NC}"
+
+WEIGHT_RAW=$(rpc 94 "tools/call" '{"name":"scale_get_weight","arguments":{}}')
+WEIGHT=$(echo "$WEIGHT_RAW" | parse_tool_result)
+assert_ok "scale_get_weight returns weight or error" "$WEIGHT" \
+    "'weight' in d or 'error' in d"
+
+TARE_RAW=$(rpc 95 "tools/call" '{"name":"scale_tare","arguments":{}}')
+TARE=$(echo "$TARE_RAW" | parse_tool_result)
+assert_ok "scale_tare responds" "$TARE" \
+    "'success' in d or 'error' in d"
+
+echo
+
+# ─── 11. Device Tools ───
+echo -e "${CYAN}11. Device Tools${NC}"
+
+DEV_LIST_RAW=$(rpc 96 "tools/call" '{"name":"devices_list","arguments":{}}')
+DEV_LIST=$(echo "$DEV_LIST_RAW" | parse_tool_result)
+assert_ok "devices_list returns devices array" "$DEV_LIST" \
+    "'devices' in d or 'error' in d"
+
+DEV_STATUS_RAW=$(rpc 97 "tools/call" '{"name":"devices_connection_status","arguments":{}}')
+DEV_STATUS=$(echo "$DEV_STATUS_RAW" | parse_tool_result)
+assert_ok "devices_connection_status returns machineConnected" "$DEV_STATUS" \
+    "'machineConnected' in d"
+
+# Don't actually trigger scan in automated tests (side effects)
+# Just verify the tool exists (already checked in discovery)
+
+# devices_connect_scale without address
+DEV_CONNECT_RAW=$(rpc 98 "tools/call" '{"name":"devices_connect_scale","arguments":{}}')
+DEV_CONNECT=$(echo "$DEV_CONNECT_RAW" | parse_tool_result)
+assert_ok "devices_connect_scale requires address" "$DEV_CONNECT" \
+    "'error' in d"
+
+echo
+
+# ─── 12. Write Tools ───
 # Write tools require access level 2 (Full Automation).
 # Detect current access level from settings_get.
 ACCESS_LEVEL_RAW=$(rpc 99 "tools/call" '{"name":"machine_get_state","arguments":{}}')
@@ -440,9 +479,15 @@ print('1' if 'settings_set' in tools else '0')
 " 2>/dev/null)
 
 if [ "$HAS_SETTINGS_SET" = "1" ]; then
-    echo -e "${CYAN}10. Write Tools (Full Automation)${NC}"
+    echo -e "${CYAN}12. Write Tools (Full Automation)${NC}"
+
+    # Fresh session to avoid rate limit from earlier control tool calls
+    curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION" > /dev/null 2>&1
+    WRITE_INIT=$(curl -s -D /tmp/mcp_headers -X POST "$BASE" -H "Content-Type: application/json" \
+        -d '{"jsonrpc":"2.0","id":99,"method":"initialize","params":{"capabilities":{}}}')
+    SESSION=$(grep -i 'Mcp-Session' /tmp/mcp_headers 2>/dev/null | awk '{print $2}' | tr -d '\r\n')
 else
-    echo -e "${CYAN}10. Write Tools (SKIPPED — access level < 2, set to Full Automation to test)${NC}"
+    echo -e "${CYAN}12. Write Tools (SKIPPED — access level < 2, set to Full Automation to test)${NC}"
     SKIP=$((SKIP + 7))
 fi
 
@@ -497,9 +542,9 @@ fi
 
 echo
 
-# ─── 11. Access Level Gating (interactive) ───
+# ─── 13. Access Level Gating (interactive) ───
 if [ "${SKIP_INTERACTIVE:-}" != "1" ]; then
-    echo -e "${CYAN}11. Access Level Gating (requires manual setting changes)${NC}"
+    echo -e "${CYAN}13. Access Level Gating (requires manual setting changes)${NC}"
 
     # Helper: create fresh session and test tool access
     test_access_level() {
@@ -571,12 +616,12 @@ print(json.dumps(tools))
 
     echo
 else
-    echo -e "${CYAN}11. Access Level Gating (SKIPPED — set SKIP_INTERACTIVE=1)${NC}"
+    echo -e "${CYAN}13. Access Level Gating (SKIPPED — set SKIP_INTERACTIVE=1)${NC}"
     echo
 fi
 
-# ─── 12. Input Validation & Edge Cases ───
-echo -e "${CYAN}12. Input Validation & Edge Cases${NC}"
+# ─── 14. Input Validation & Edge Cases ───
+echo -e "${CYAN}14. Input Validation & Edge Cases${NC}"
 
 # Missing required params
 MISSING_RAW=$(rpc 80 "tools/call" '{"name":"shots_get_detail","arguments":{}}')
@@ -632,8 +677,8 @@ assert_ok "unknown tool returns error" "$UNKNOWN_TOOL_RAW" \
 
 echo
 
-# ─── 13. Rate Limiting ───
-echo -e "${CYAN}13. Rate Limiting${NC}"
+# ─── 15. Rate Limiting ───
+echo -e "${CYAN}15. Rate Limiting${NC}"
 
 # Use a fresh session so previous control calls don't affect the count
 curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION" > /dev/null 2>&1
@@ -681,8 +726,8 @@ assert_ok "read calls not rate limited" "$READ12" "'phase' in d"
 
 echo
 
-# ─── 14. Session Limits ───
-echo -e "${CYAN}14. Session Limits${NC}"
+# ─── 16. Session Limits ───
+echo -e "${CYAN}16. Session Limits${NC}"
 
 # Delete current session
 curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION" > /dev/null 2>&1
@@ -721,8 +766,8 @@ SESSION=$(grep -i 'Mcp-Session' /tmp/mcp_headers 2>/dev/null | awk '{print $2}' 
 
 echo
 
-# ─── 15. Session Management ───
-echo -e "${CYAN}15. Session Management${NC}"
+# ─── 17. Session Management ───
+echo -e "${CYAN}17. Session Management${NC}"
 
 # DELETE session
 DEL_RESP=$(curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION")

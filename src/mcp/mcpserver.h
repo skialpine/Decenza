@@ -16,6 +16,7 @@ class DE1Device;
 class MachineState;
 class MainController;
 class ShotHistoryStorage;
+class BLEManager;
 class Settings;
 
 class McpServer : public QObject {
@@ -31,6 +32,7 @@ public:
     void setMachineState(MachineState* state) { m_machineState = state; }
     void setMainController(MainController* controller) { m_mainController = controller; }
     void setShotHistoryStorage(ShotHistoryStorage* storage) { m_shotHistory = storage; }
+    void setBLEManager(BLEManager* ble) { m_bleManager = ble; }
     void setSettings(Settings* settings) { m_settings = settings; }
 
     // Called by ShotServer for /mcp routes
@@ -85,6 +87,7 @@ private:
     MachineState* m_machineState = nullptr;
     MainController* m_mainController = nullptr;
     ShotHistoryStorage* m_shotHistory = nullptr;
+    BLEManager* m_bleManager = nullptr;
     Settings* m_settings = nullptr;
 
     // Registries
