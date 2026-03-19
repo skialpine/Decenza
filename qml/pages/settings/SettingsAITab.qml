@@ -6,7 +6,7 @@ import "../../components"
 
 KeyboardAwareContainer {
     id: aiTab
-    textFields: [apiKeyField, ollamaEndpointField, openrouterModelField]
+    textFields: [apiKeyField, ollamaEndpointField, openrouterModelField, customUrlField]
     targetFlickable: aiFlickable
 
     property string testResultMessage: ""
@@ -23,6 +23,12 @@ KeyboardAwareContainer {
             default: return false
         }
     }
+
+    // Discuss Shot app display names (index matches Settings.discussShotApp)
+    readonly property var discussAppNames: [
+        "Claude", "ChatGPT", "Gemini", "Grok",
+        TranslationManager.translate("settings.ai.discuss.customUrl", "Custom URL")
+    ]
 
     // Full-width card
     Rectangle {
@@ -42,6 +48,22 @@ KeyboardAwareContainer {
                 id: aiTabContent
                 width: parent.width
                 spacing: Theme.scaled(16)
+
+                // ═══════════════════════════════════════════
+                // SECTION 1: AI Provider
+                // ═══════════════════════════════════════════
+                Text {
+                    text: TranslationManager.translate("settings.ai.section.provider", "AI Provider")
+                    font.family: Theme.subtitleFont.family
+                    font.pixelSize: Theme.subtitleFont.pixelSize
+                    font.bold: true
+                    color: Theme.textColor
+                }
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: Theme.borderColor
+                }
 
                 // Provider selection - centered row of fixed-size buttons
                 Item {
@@ -118,13 +140,6 @@ KeyboardAwareContainer {
                             }
                         }
                     }
-                }
-
-                // Divider
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 1
-                    color: Theme.borderColor
                 }
 
                 // Claude recommendation note
@@ -371,10 +386,359 @@ KeyboardAwareContainer {
                     }
                 }
 
+                // ═══════════════════════════════════════════
+                // SECTION 2: MCP Server (AI Remote Control)
+                // ═══════════════════════════════════════════
+                Item { height: Theme.scaled(8) }
+
+                Text {
+                    text: TranslationManager.translate("settings.ai.section.mcp", "MCP Server (AI Remote Control)")
+                    font.family: Theme.subtitleFont.family
+                    font.pixelSize: Theme.subtitleFont.pixelSize
+                    font.bold: true
+                    color: Theme.textColor
+                }
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: Theme.borderColor
+                }
+
+                // Enable MCP toggle
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.scaled(12)
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.scaled(4)
+
+                        Tr {
+                            key: "settings.ai.mcp.enable"
+                            fallback: "Enable MCP Server"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(14)
+                            font.bold: true
+                        }
+
+                        Tr {
+                            key: "settings.ai.mcp.description"
+                            fallback: "Allows AI assistants like Claude Desktop to monitor and control your DE1 remotely."
+                            color: Theme.textSecondaryColor
+                            font.pixelSize: Theme.scaled(12)
+                            wrapMode: Text.WordWrap
+                            Layout.fillWidth: true
+                        }
+                    }
+
+                    StyledSwitch {
+                        checked: Settings.mcpEnabled
+                        accessibleName: TranslationManager.translate("settings.ai.mcp.enableAccessible", "Enable MCP server for AI remote control")
+                        onCheckedChanged: Settings.mcpEnabled = checked
+                    }
+                }
+
+                // Access Level
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.scaled(8)
+                    enabled: Settings.mcpEnabled
+                    opacity: Settings.mcpEnabled ? 1.0 : 0.5
+
+                    Tr {
+                        key: "settings.ai.mcp.accessLevel"
+                        fallback: "Access Level"
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(14)
+                        font.bold: true
+                    }
+
+                    ButtonGroup { id: accessLevelGroup }
+
+                    Repeater {
+                        model: [
+                            {
+                                value: 0,
+                                name: TranslationManager.translate("settings.ai.mcp.access.monitor", "Monitor Only"),
+                                desc: TranslationManager.translate("settings.ai.mcp.access.monitorDesc", "Read state, telemetry, shot history, profiles")
+                            },
+                            {
+                                value: 1,
+                                name: TranslationManager.translate("settings.ai.mcp.access.control", "Control"),
+                                desc: TranslationManager.translate("settings.ai.mcp.access.controlDesc", "Monitor + start/stop operations, wake/sleep")
+                            },
+                            {
+                                value: 2,
+                                name: TranslationManager.translate("settings.ai.mcp.access.full", "Full Automation"),
+                                desc: TranslationManager.translate("settings.ai.mcp.access.fullDesc", "Control + upload profiles, change settings")
+                            }
+                        ]
+
+                        delegate: Rectangle {
+                            id: accessDelegate
+                            Layout.fillWidth: true
+                            height: accessDelegateContent.implicitHeight + Theme.scaled(16)
+                            radius: Theme.scaled(6)
+                            color: Settings.mcpAccessLevel === modelData.value ? Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.15) : "transparent"
+                            border.color: Settings.mcpAccessLevel === modelData.value ? Theme.primaryColor : Theme.borderColor
+                            border.width: 1
+
+                            Accessible.ignored: true
+
+                            RowLayout {
+                                id: accessDelegateContent
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.margins: Theme.scaled(12)
+                                spacing: Theme.scaled(8)
+
+                                RadioButton {
+                                    id: accessRadio
+                                    checked: Settings.mcpAccessLevel === modelData.value
+                                    ButtonGroup.group: accessLevelGroup
+                                    onClicked: Settings.mcpAccessLevel = modelData.value
+                                    Accessible.ignored: true
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Theme.scaled(2)
+
+                                    Text {
+                                        text: modelData.name
+                                        color: Theme.textColor
+                                        font.pixelSize: Theme.scaled(13)
+                                        font.bold: true
+                                        Accessible.ignored: true
+                                    }
+                                    Text {
+                                        text: modelData.desc
+                                        color: Theme.textSecondaryColor
+                                        font.pixelSize: Theme.scaled(11)
+                                        wrapMode: Text.WordWrap
+                                        Layout.fillWidth: true
+                                        Accessible.ignored: true
+                                    }
+                                }
+                            }
+
+                            AccessibleMouseArea {
+                                anchors.fill: parent
+                                accessibleName: modelData.name + ". " + modelData.desc
+                                accessibleItem: accessDelegate
+                                onAccessibleClicked: Settings.mcpAccessLevel = modelData.value
+                            }
+                        }
+                    }
+                }
+
+                // Confirmation Level
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.scaled(8)
+                    enabled: Settings.mcpEnabled && Settings.mcpAccessLevel > 0
+                    opacity: (Settings.mcpEnabled && Settings.mcpAccessLevel > 0) ? 1.0 : 0.5
+
+                    Tr {
+                        key: "settings.ai.mcp.confirmationLevel"
+                        fallback: "Confirmation"
+                        color: Theme.textColor
+                        font.pixelSize: Theme.scaled(14)
+                        font.bold: true
+                    }
+
+                    ButtonGroup { id: confirmLevelGroup }
+
+                    Repeater {
+                        model: [
+                            {
+                                value: 0,
+                                name: TranslationManager.translate("settings.ai.mcp.confirm.none", "None"),
+                                desc: TranslationManager.translate("settings.ai.mcp.confirm.noneDesc", "Commands execute immediately")
+                            },
+                            {
+                                value: 1,
+                                name: TranslationManager.translate("settings.ai.mcp.confirm.dangerous", "Dangerous Only"),
+                                desc: TranslationManager.translate("settings.ai.mcp.confirm.dangerousDesc", "Confirm start operations, profile uploads, settings changes")
+                            },
+                            {
+                                value: 2,
+                                name: TranslationManager.translate("settings.ai.mcp.confirm.all", "All Control"),
+                                desc: TranslationManager.translate("settings.ai.mcp.confirm.allDesc", "Confirm every machine control and write operation")
+                            }
+                        ]
+
+                        delegate: Rectangle {
+                            id: confirmDelegate
+                            Layout.fillWidth: true
+                            height: confirmDelegateContent.implicitHeight + Theme.scaled(16)
+                            radius: Theme.scaled(6)
+                            color: Settings.mcpConfirmationLevel === modelData.value ? Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.15) : "transparent"
+                            border.color: Settings.mcpConfirmationLevel === modelData.value ? Theme.primaryColor : Theme.borderColor
+                            border.width: 1
+
+                            Accessible.ignored: true
+
+                            RowLayout {
+                                id: confirmDelegateContent
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.margins: Theme.scaled(12)
+                                spacing: Theme.scaled(8)
+
+                                RadioButton {
+                                    id: confirmRadio
+                                    checked: Settings.mcpConfirmationLevel === modelData.value
+                                    ButtonGroup.group: confirmLevelGroup
+                                    onClicked: Settings.mcpConfirmationLevel = modelData.value
+                                    Accessible.ignored: true
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Theme.scaled(2)
+
+                                    Text {
+                                        text: modelData.name
+                                        color: Theme.textColor
+                                        font.pixelSize: Theme.scaled(13)
+                                        font.bold: true
+                                        Accessible.ignored: true
+                                    }
+                                    Text {
+                                        text: modelData.desc
+                                        color: Theme.textSecondaryColor
+                                        font.pixelSize: Theme.scaled(11)
+                                        wrapMode: Text.WordWrap
+                                        Layout.fillWidth: true
+                                        Accessible.ignored: true
+                                    }
+                                }
+                            }
+
+                            AccessibleMouseArea {
+                                anchors.fill: parent
+                                accessibleName: modelData.name + ". " + modelData.desc
+                                accessibleItem: confirmDelegate
+                                onAccessibleClicked: Settings.mcpConfirmationLevel = modelData.value
+                            }
+                        }
+                    }
+                }
+
+                // MCP Status line
+                Text {
+                    visible: Settings.mcpEnabled
+                    text: {
+                        var status = TranslationManager.translate("settings.ai.mcp.status.listening", "Listening on port %1").arg(Settings.shotServerPort)
+                        if (typeof McpServer !== "undefined" && McpServer) {
+                            var sessions = McpServer.activeSessionCount
+                            if (sessions > 0)
+                                status += " · " + TranslationManager.translate("settings.ai.mcp.status.sessions", "%1 active session(s)").arg(sessions)
+                        }
+                        return status
+                    }
+                    color: Theme.textSecondaryColor
+                    font.pixelSize: Theme.scaled(12)
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
+                Text {
+                    visible: !Settings.mcpEnabled
+                    text: TranslationManager.translate("settings.ai.mcp.status.disabled", "MCP server is disabled")
+                    color: Theme.textSecondaryColor
+                    font.pixelSize: Theme.scaled(12)
+                }
+
+                // ─── Discuss Shot subsection ───
+                Item { height: Theme.scaled(4) }
+
+                Tr {
+                    key: "settings.ai.discuss.title"
+                    fallback: "Discuss Shot"
+                    color: Theme.textColor
+                    font.pixelSize: Theme.scaled(14)
+                    font.bold: true
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.scaled(12)
+
+                    Tr {
+                        key: "settings.ai.discuss.openIn"
+                        fallback: "Open in:"
+                        color: Theme.textSecondaryColor
+                        font.pixelSize: Theme.scaled(13)
+                    }
+
+                    Rectangle {
+                        id: discussAppButton
+                        Layout.fillWidth: true
+                        height: Theme.scaled(36)
+                        radius: Theme.scaled(6)
+                        color: Theme.backgroundColor
+                        border.color: Theme.borderColor
+                        border.width: 1
+
+                        Accessible.ignored: true
+
+                        Text {
+                            anchors.left: parent.left
+                            anchors.leftMargin: Theme.scaled(12)
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: aiTab.discussAppNames[Settings.discussShotApp] ?? "Claude"
+                            color: Theme.textColor
+                            font.pixelSize: Theme.scaled(13)
+                            Accessible.ignored: true
+                        }
+
+                        AccessibleMouseArea {
+                            anchors.fill: parent
+                            accessibleName: TranslationManager.translate("settings.ai.discuss.selectApp", "Select AI app for discussing shots") + ". " + (aiTab.discussAppNames[Settings.discussShotApp] ?? "Claude")
+                            accessibleItem: discussAppButton
+                            onAccessibleClicked: discussAppDialog.open()
+                        }
+                    }
+                }
+
+                // Custom URL field (only when Custom URL is selected)
+                ColumnLayout {
+                    visible: Settings.discussShotApp === 4
+                    Layout.fillWidth: true
+                    spacing: Theme.scaled(4)
+
+                    StyledTextField {
+                        id: customUrlField
+                        Layout.fillWidth: true
+                        placeholder: "https://localhost:8080"
+                        text: Settings.discussShotCustomUrl
+                        inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase | Qt.ImhUrlCharactersOnly
+                        onTextChanged: Settings.discussShotCustomUrl = text
+                    }
+                }
+
                 // Spacer to push content up
                 Item { Layout.fillHeight: true }
             }
         }
+    }
+
+    // Discuss Shot app selector
+    SelectionDialog {
+        id: discussAppDialog
+        title: TranslationManager.translate("settings.ai.discuss.selectAppTitle", "Select AI App")
+        options: [
+            "Claude",
+            "ChatGPT",
+            "Gemini",
+            "Grok",
+            TranslationManager.translate("settings.ai.discuss.customUrl", "Custom URL")
+        ]
+        currentIndex: Settings.discussShotApp
+        onSelected: function(index) { Settings.discussShotApp = index }
     }
 
     // Conversation overlay panel

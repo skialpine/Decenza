@@ -3429,6 +3429,63 @@ void Settings::setAutoWakeStayAwakeMinutes(int minutes) {
     }
 }
 
+// MCP Server settings
+bool Settings::mcpEnabled() const {
+    return m_settings.value("mcp/enabled", false).toBool();
+}
+
+void Settings::setMcpEnabled(bool enabled) {
+    if (mcpEnabled() != enabled) {
+        m_settings.setValue("mcp/enabled", enabled);
+        emit mcpEnabledChanged();
+    }
+}
+
+int Settings::mcpAccessLevel() const {
+    return m_settings.value("mcp/accessLevel", 1).toInt();
+}
+
+void Settings::setMcpAccessLevel(int level) {
+    if (mcpAccessLevel() != level) {
+        m_settings.setValue("mcp/accessLevel", level);
+        emit mcpAccessLevelChanged();
+    }
+}
+
+int Settings::mcpConfirmationLevel() const {
+    return m_settings.value("mcp/confirmationLevel", 1).toInt();
+}
+
+void Settings::setMcpConfirmationLevel(int level) {
+    if (mcpConfirmationLevel() != level) {
+        m_settings.setValue("mcp/confirmationLevel", level);
+        emit mcpConfirmationLevelChanged();
+    }
+}
+
+// Discuss Shot settings
+int Settings::discussShotApp() const {
+    return m_settings.value("ai/discussShotApp", 0).toInt();
+}
+
+void Settings::setDiscussShotApp(int app) {
+    if (discussShotApp() != app) {
+        m_settings.setValue("ai/discussShotApp", app);
+        emit discussShotAppChanged();
+    }
+}
+
+QString Settings::discussShotCustomUrl() const {
+    return m_settings.value("ai/discussShotCustomUrl", "").toString();
+}
+
+void Settings::setDiscussShotCustomUrl(const QString& url) {
+    if (discussShotCustomUrl() != url) {
+        m_settings.setValue("ai/discussShotCustomUrl", url);
+        emit discussShotCustomUrlChanged();
+    }
+}
+
 // MQTT settings (Home Automation)
 bool Settings::mqttEnabled() const {
     return m_settings.value("mqtt/enabled", false).toBool();

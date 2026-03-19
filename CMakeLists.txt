@@ -611,6 +611,7 @@ set(QML_FILES
     qml/components/ExtractionViewSelector.qml
     qml/components/StyledSwitch.qml
     qml/components/StyledComboBox.qml
+    qml/components/SelectionDialog.qml
     qml/components/StyledIconButton.qml
     qml/components/StyledTabButton.qml
     qml/components/FlipClockScreensaver.qml

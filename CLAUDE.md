@@ -234,6 +234,25 @@ Text {
 }
 ```
 
+**Reserved property names in JS model data**: `name` is a reserved QML property (`QObject::objectName`). When a JS array of objects is used as a Repeater model, `modelData.name` resolves to the QML object name (empty string), not the JS property. Use a different key like `label`.
+```qml
+// BAD - modelData.name resolves to empty string
+readonly property var items: [{ name: "Foo" }]
+Repeater {
+    model: items
+    delegate: Text { text: modelData.name }  // Shows nothing!
+}
+
+// GOOD - use a non-reserved key
+readonly property var items: [{ label: "Foo" }]
+Repeater {
+    model: items
+    delegate: Text { text: modelData.label }  // Works correctly
+}
+```
+
+Other reserved names to avoid in model data: `parent`, `children`, `data`, `state`, `enabled`, `visible`, `width`, `height`, `x`, `y`, `z`, `focus`, `clip`.
+
 **Keyboard handling for text inputs**: Always wrap pages with text input fields in `KeyboardAwareContainer` to shift content above the keyboard on mobile:
 ```qml
 KeyboardAwareContainer {
