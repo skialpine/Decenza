@@ -145,7 +145,7 @@ print(json.dumps([t['name'] for t in tools]))
 assert_ok "tools/list returns array" "$TOOLS_RESP" \
     "isinstance(d.get('result',{}).get('tools'), list)"
 
-EXPECTED_TOOLS="machine_get_state machine_get_telemetry shots_list shots_get_detail shots_compare profiles_list profiles_get_active profiles_get_detail settings_get dialing_get_context machine_wake machine_sleep machine_start_espresso machine_start_steam machine_start_hot_water machine_start_flush machine_stop machine_skip_frame"
+EXPECTED_TOOLS="machine_get_state machine_get_telemetry shots_list shots_get_detail shots_compare profiles_list profiles_get_active profiles_get_detail settings_get dialing_get_context machine_wake machine_sleep machine_start_espresso machine_start_steam machine_start_hot_water machine_start_flush machine_stop machine_skip_frame shots_set_feedback profiles_set_active settings_set dialing_suggest_change dialing_apply_change"
 for tool in $EXPECTED_TOOLS; do
     assert_ok "tool '$tool' registered" "$TOOLS_JSON" \
         "'$tool' in d"
@@ -426,8 +426,79 @@ assert_ok "unknown resource returns error" "$UNK_RES_RAW" \
 
 echo
 
-# ─── 10. Input Validation & Edge Cases ───
-echo -e "${CYAN}10. Input Validation & Edge Cases${NC}"
+# ─── 10. Write Tools ───
+# Write tools require access level 2 (Full Automation).
+# Detect current access level from settings_get.
+ACCESS_LEVEL_RAW=$(rpc 99 "tools/call" '{"name":"machine_get_state","arguments":{}}')
+# Check if settings tools are available by trying tools/list
+TOOLS_FOR_ACCESS=$(rpc 99 "tools/list" '{}')
+HAS_SETTINGS_SET=$(echo "$TOOLS_FOR_ACCESS" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+tools = [t['name'] for t in d.get('result',{}).get('tools',[])]
+print('1' if 'settings_set' in tools else '0')
+" 2>/dev/null)
+
+if [ "$HAS_SETTINGS_SET" = "1" ]; then
+    echo -e "${CYAN}10. Write Tools (Full Automation)${NC}"
+else
+    echo -e "${CYAN}10. Write Tools (SKIPPED — access level < 2, set to Full Automation to test)${NC}"
+    SKIP=$((SKIP + 7))
+fi
+
+# shots_set_feedback (control category — level 1+, always available)
+if [ "$SHOT_ID" != "0" ] && [ -n "$SHOT_ID" ]; then
+    FEEDBACK_RAW=$(rpc 100 "tools/call" "{\"name\":\"shots_set_feedback\",\"arguments\":{\"shotId\":$SHOT_ID,\"enjoyment\":85,\"notes\":\"MCP test note\"}}")
+    FEEDBACK=$(echo "$FEEDBACK_RAW" | parse_tool_result)
+    assert_ok "shots_set_feedback saves feedback" "$FEEDBACK" \
+        "d.get('success') == True"
+else
+    echo -e "  ${YELLOW}SKIP${NC} shots_set_feedback (no shots)"
+    SKIP=$((SKIP + 1))
+fi
+
+# shots_set_feedback without data
+FEEDBACK_EMPTY_RAW=$(rpc 101 "tools/call" '{"name":"shots_set_feedback","arguments":{"shotId":1}}')
+FEEDBACK_EMPTY=$(echo "$FEEDBACK_EMPTY_RAW" | parse_tool_result)
+assert_ok "shots_set_feedback requires enjoyment or notes" "$FEEDBACK_EMPTY" \
+    "'error' in d"
+
+# dialing_suggest_change
+SUGGEST_RAW=$(rpc 102 "tools/call" '{"name":"dialing_suggest_change","arguments":{"parameter":"grind","suggestion":"Grind 2 clicks finer","rationale":"Shot was sour, indicating under-extraction"}}')
+SUGGEST=$(echo "$SUGGEST_RAW" | parse_tool_result)
+assert_ok "dialing_suggest_change returns suggestion" "$SUGGEST" \
+    "d.get('parameter') == 'grind' and d.get('status') == 'suggestion_displayed'"
+
+if [ "$HAS_SETTINGS_SET" = "1" ]; then
+    # settings_set
+    SETW_RAW=$(rpc 103 "tools/call" '{"name":"settings_set","arguments":{"targetWeight":36.0}}')
+    SETW=$(echo "$SETW_RAW" | parse_tool_result)
+    assert_ok "settings_set updates targetWeight" "$SETW" \
+        "d.get('success') == True and 'targetWeight' in d.get('updated',[])"
+
+    # settings_set with no valid keys
+    SETW_EMPTY_RAW=$(rpc 104 "tools/call" '{"name":"settings_set","arguments":{}}')
+    SETW_EMPTY=$(echo "$SETW_EMPTY_RAW" | parse_tool_result)
+    assert_ok "settings_set with no keys returns error" "$SETW_EMPTY" \
+        "'error' in d"
+
+    # profiles_set_active with invalid profile
+    BAD_PROFILE_RAW=$(rpc 105 "tools/call" '{"name":"profiles_set_active","arguments":{"filename":"nonexistent_xyz"}}')
+    BAD_PROFILE=$(echo "$BAD_PROFILE_RAW" | parse_tool_result)
+    assert_ok "profiles_set_active rejects invalid profile" "$BAD_PROFILE" \
+        "'error' in d"
+
+    # dialing_apply_change
+    APPLY_RAW=$(rpc 106 "tools/call" '{"name":"dialing_apply_change","arguments":{"grinderSetting":"12","targetWeight":38.0}}')
+    APPLY=$(echo "$APPLY_RAW" | parse_tool_result)
+    assert_ok "dialing_apply_change applies changes" "$APPLY" \
+        "d.get('success') == True and 'grinderSetting' in d.get('applied',[])"
+fi
+
+echo
+
+# ─── 11. Input Validation & Edge Cases ───
+echo -e "${CYAN}11. Input Validation & Edge Cases${NC}"
 
 # Missing required params
 MISSING_RAW=$(rpc 80 "tools/call" '{"name":"shots_get_detail","arguments":{}}')
@@ -483,8 +554,8 @@ assert_ok "unknown tool returns error" "$UNKNOWN_TOOL_RAW" \
 
 echo
 
-# ─── 11. Rate Limiting ───
-echo -e "${CYAN}11. Rate Limiting${NC}"
+# ─── 12. Rate Limiting ───
+echo -e "${CYAN}12. Rate Limiting${NC}"
 
 # Use a fresh session so previous control calls don't affect the count
 curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION" > /dev/null 2>&1
@@ -532,8 +603,8 @@ assert_ok "read calls not rate limited" "$READ12" "'phase' in d"
 
 echo
 
-# ─── 12. Session Limits ───
-echo -e "${CYAN}12. Session Limits${NC}"
+# ─── 13. Session Limits ───
+echo -e "${CYAN}13. Session Limits${NC}"
 
 # Delete current session
 curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION" > /dev/null 2>&1
@@ -572,8 +643,8 @@ SESSION=$(grep -i 'Mcp-Session' /tmp/mcp_headers 2>/dev/null | awk '{print $2}' 
 
 echo
 
-# ─── 13. Session Management ───
-echo -e "${CYAN}13. Session Management${NC}"
+# ─── 14. Session Management ───
+echo -e "${CYAN}14. Session Management${NC}"
 
 # DELETE session
 DEL_RESP=$(curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION")

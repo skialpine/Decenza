@@ -275,6 +275,7 @@ set(SOURCES
     src/mcp/mcptools_dialing.cpp
     src/mcp/mcptools_control.cpp
     src/mcp/mcpresources.cpp
+    src/mcp/mcptools_write.cpp
     src/network/mqttclient.cpp
     src/network/webdebuglogger.cpp
     src/network/locationprovider.cpp
