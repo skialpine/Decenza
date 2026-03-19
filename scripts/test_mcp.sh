@@ -4,7 +4,7 @@
 # Requires: curl, python3
 # The app must be running with MCP enabled in settings.
 
-set -euo pipefail
+set -uo pipefail
 
 HOST="${1:-localhost:8888}"
 BASE="http://$HOST/mcp"
@@ -28,7 +28,7 @@ rpc() {
     if [ -n "$SESSION" ]; then
         headers+=(-H "Mcp-Session: $SESSION")
     fi
-    curl -s -D /tmp/mcp_headers "${headers[@]}" -X POST "$BASE" \
+    curl -s --max-time 5 -D /tmp/mcp_headers "${headers[@]}" -X POST "$BASE" \
         -d "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"$method\",\"params\":$params}"
 }
 
@@ -389,8 +389,154 @@ assert_ok "machine_skip_frame rejects when not extracting" "$SKIP_RESULT" \
 
 echo
 
-# ─── 9. Session Management ───
-echo -e "${CYAN}9. Session Management${NC}"
+# ─── 9. Input Validation & Edge Cases ───
+echo -e "${CYAN}9. Input Validation & Edge Cases${NC}"
+
+# Missing required params
+MISSING_RAW=$(rpc 80 "tools/call" '{"name":"shots_get_detail","arguments":{}}')
+MISSING=$(echo "$MISSING_RAW" | parse_tool_result)
+assert_ok "shots_get_detail missing shotId returns error" "$MISSING" \
+    "'error' in d"
+
+MISSING2_RAW=$(rpc 81 "tools/call" '{"name":"profiles_get_detail","arguments":{}}')
+MISSING2=$(echo "$MISSING2_RAW" | parse_tool_result)
+assert_ok "profiles_get_detail missing filename returns error" "$MISSING2" \
+    "'error' in d"
+
+# Boundary: shots_compare with 1 shot (needs 2-10)
+COMPARE1_RAW=$(rpc 82 "tools/call" '{"name":"shots_compare","arguments":{"shotIds":[1]}}')
+COMPARE1=$(echo "$COMPARE1_RAW" | parse_tool_result)
+assert_ok "shots_compare with 1 shot returns error" "$COMPARE1" \
+    "'error' in d and '2-10' in d.get('error','')"
+
+# Boundary: shots_compare with 11 shots (needs 2-10)
+COMPARE11_RAW=$(rpc 83 "tools/call" '{"name":"shots_compare","arguments":{"shotIds":[1,2,3,4,5,6,7,8,9,10,11]}}')
+COMPARE11=$(echo "$COMPARE11_RAW" | parse_tool_result)
+assert_ok "shots_compare with 11 shots returns error" "$COMPARE11" \
+    "'error' in d and '2-10' in d.get('error','')"
+
+# Boundary: shots_list limit clamped to max 100
+BIGLIST_RAW=$(rpc 84 "tools/call" '{"name":"shots_list","arguments":{"limit":150}}')
+BIGLIST=$(echo "$BIGLIST_RAW" | parse_tool_result)
+assert_ok "shots_list clamps limit to 100" "$BIGLIST" \
+    "d.get('count',0) <= 100"
+
+# Boundary: shots_list with huge offset returns empty
+BIGOFF_RAW=$(rpc 85 "tools/call" '{"name":"shots_list","arguments":{"offset":999999,"limit":5}}')
+BIGOFF=$(echo "$BIGOFF_RAW" | parse_tool_result)
+assert_ok "shots_list with huge offset returns empty" "$BIGOFF" \
+    "d.get('count') == 0 and d.get('total',0) > 0"
+
+# Pagination: offset is reflected in response
+PAGE_RAW=$(rpc 86 "tools/call" '{"name":"shots_list","arguments":{"offset":3,"limit":2}}')
+PAGE=$(echo "$PAGE_RAW" | parse_tool_result)
+assert_ok "shots_list offset reflected in response" "$PAGE" \
+    "d.get('offset') == 3"
+
+# settings_get with non-existent key returns no extra fields
+BADKEY_RAW=$(rpc 87 "tools/call" '{"name":"settings_get","arguments":{"keys":["nonexistentKey999"]}}')
+BADKEY=$(echo "$BADKEY_RAW" | parse_tool_result)
+assert_ok "settings_get with unknown key returns empty" "$BADKEY" \
+    "'nonexistentKey999' not in d"
+
+# Unknown tool name
+UNKNOWN_TOOL_RAW=$(rpc 88 "tools/call" '{"name":"totally_fake_tool","arguments":{}}')
+assert_ok "unknown tool returns error" "$UNKNOWN_TOOL_RAW" \
+    "'error' in d.get('result',{}) or 'error' in d"
+
+echo
+
+# ─── 10. Rate Limiting ───
+echo -e "${CYAN}10. Rate Limiting${NC}"
+
+# Use a fresh session so previous control calls don't affect the count
+curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION" > /dev/null 2>&1
+RATE_INIT=$(curl -s -D /tmp/mcp_headers -X POST "$BASE" -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","id":99,"method":"initialize","params":{"capabilities":{}}}')
+SESSION=$(grep -i 'Mcp-Session' /tmp/mcp_headers 2>/dev/null | awk '{print $2}' | tr -d '\r\n')
+
+# Fire 11 machine_wake calls (succeeds on simulator).
+# Calls 1-10 should work, 11th should be rate limited.
+RATE_OK=true
+ELEVENTH_LIMITED=false
+for i in $(seq 1 11); do
+    RATE_RAW=$(rpc $((100+i)) "tools/call" '{"name":"machine_wake","arguments":{}}')
+    HAS_RATE_ERR=$(echo "$RATE_RAW" | python3 -c "
+import json, sys
+try:
+    d = json.loads(sys.stdin.read())
+    # Rate limit error is at top-level JSON-RPC error, not inside tool result
+    print('1' if d.get('error',{}).get('code') == -32000 else '0')
+except:
+    print('0')
+" 2>/dev/null)
+    if [ "$i" -le 10 ] && [ "$HAS_RATE_ERR" = "1" ]; then RATE_OK=false; fi
+    if [ "$i" -eq 11 ] && [ "$HAS_RATE_ERR" = "1" ]; then ELEVENTH_LIMITED=true; fi
+done
+
+if [ "$RATE_OK" = true ]; then
+    echo -e "  ${GREEN}PASS${NC} first 10 control calls not rate limited"
+    PASS=$((PASS + 1))
+else
+    echo -e "  ${RED}FAIL${NC} some of first 10 calls were incorrectly rate limited"
+    FAIL=$((FAIL + 1))
+fi
+if [ "$ELEVENTH_LIMITED" = true ]; then
+    echo -e "  ${GREEN}PASS${NC} 11th control call rate limited"
+    PASS=$((PASS + 1))
+else
+    echo -e "  ${RED}FAIL${NC} 11th control call should be rate limited"
+    FAIL=$((FAIL + 1))
+fi
+
+# Read tools should never be rate limited (even after control limit hit)
+READ12=$(rpc 133 "tools/call" '{"name":"machine_get_state","arguments":{}}' | parse_tool_result)
+assert_ok "read calls not rate limited" "$READ12" "'phase' in d"
+
+echo
+
+# ─── 11. Session Limits ───
+echo -e "${CYAN}11. Session Limits${NC}"
+
+# Delete current session
+curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION" > /dev/null 2>&1
+
+# Create sessions until we hit the limit (max 8 total)
+CREATED_SESSIONS=()
+HIT_LIMIT=false
+for i in $(seq 1 12); do
+    SINIT=$(curl -s --max-time 5 -D /tmp/mcp_sess_headers -X POST "$BASE" -H "Content-Type: application/json" \
+        -d "{\"jsonrpc\":\"2.0\",\"id\":$((200+i)),\"method\":\"initialize\",\"params\":{\"capabilities\":{}}}")
+    SID=$(grep -i 'Mcp-Session' /tmp/mcp_sess_headers 2>/dev/null | awk '{print $2}' | tr -d '\r\n')
+    HAS_ERROR=$(echo "$SINIT" | python3 -c "import json,sys; d=json.load(sys.stdin); print('1' if 'error' in d else '0')" 2>/dev/null)
+    if [ "$HAS_ERROR" = "1" ]; then
+        HIT_LIMIT=true
+        assert_ok "session limit enforced (rejected after ${#CREATED_SESSIONS[@]} sessions)" "$SINIT" \
+            "d.get('error',{}).get('code') == -32000"
+        break
+    fi
+    CREATED_SESSIONS+=("$SID")
+done
+
+if [ "$HIT_LIMIT" = false ]; then
+    echo -e "  ${RED}FAIL${NC} created 12 sessions without hitting limit"
+    FAIL=$((FAIL + 1))
+fi
+
+# Cleanup
+for sid in "${CREATED_SESSIONS[@]}"; do
+    curl -s -X DELETE "$BASE" -H "Mcp-Session: $sid" > /dev/null 2>&1
+done
+
+# Re-create session for remaining tests
+REINIT=$(curl -s -D /tmp/mcp_headers -X POST "$BASE" -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","id":210,"method":"initialize","params":{"capabilities":{}}}')
+SESSION=$(grep -i 'Mcp-Session' /tmp/mcp_headers 2>/dev/null | awk '{print $2}' | tr -d '\r\n')
+
+echo
+
+# ─── 12. Session Management ───
+echo -e "${CYAN}12. Session Management${NC}"
 
 # DELETE session
 DEL_RESP=$(curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION")
