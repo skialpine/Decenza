@@ -1019,8 +1019,7 @@ Page {
                         var summary = MainController.aiManager.generateHistoryShotSummary(shotData)
                         if (summary.length > 0) MainController.copyToClipboard(summary)
                     }
-                    var urls = ["claude://", "https://claude.ai/new", "https://chatgpt.com/", "https://gemini.google.com/app", "https://grok.com/"]
-                    var url = Settings.discussShotApp === 5 ? Settings.discussShotCustomUrl : (urls[Settings.discussShotApp] || "claude://")
+                    var url = Settings.discussShotUrl()
                     if (url.length > 0) Qt.openUrlExternally(url)
                 }
             }

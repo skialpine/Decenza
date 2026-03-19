@@ -26,7 +26,11 @@ KeyboardAwareContainer {
 
     // Discuss Shot app display names (index matches Settings.discussShotApp)
     readonly property var discussAppNames: [
-        "Claude App", "Claude Web", "ChatGPT", "Gemini", "Grok",
+        TranslationManager.translate("settings.ai.discuss.app.claudeApp", "Claude App"),
+        TranslationManager.translate("settings.ai.discuss.app.claudeWeb", "Claude Web"),
+        TranslationManager.translate("settings.ai.discuss.app.chatgpt", "ChatGPT"),
+        TranslationManager.translate("settings.ai.discuss.app.gemini", "Gemini"),
+        TranslationManager.translate("settings.ai.discuss.app.grok", "Grok"),
         TranslationManager.translate("settings.ai.discuss.customUrl", "Custom URL")
     ]
 
@@ -644,6 +648,7 @@ KeyboardAwareContainer {
                             var serverUrl = MainController.shotServer ? MainController.shotServer.url : "http://localhost:8888"
                             MainController.copyToClipboard(serverUrl + "/mcp/setup")
                             mcpSetupUrlCopiedText.visible = true
+                            setupUrlCopiedTimer.restart()
                         }
                     }
 
@@ -655,6 +660,12 @@ KeyboardAwareContainer {
                         font.pixelSize: Theme.scaled(11)
                         wrapMode: Text.WordWrap
                         Layout.fillWidth: true
+                    }
+
+                    Timer {
+                        id: setupUrlCopiedTimer
+                        interval: 3000
+                        onTriggered: mcpSetupUrlCopiedText.visible = false
                     }
                 }
 
@@ -935,14 +946,7 @@ KeyboardAwareContainer {
     SelectionDialog {
         id: discussAppDialog
         title: TranslationManager.translate("settings.ai.discuss.selectAppTitle", "Select AI App")
-        options: [
-            "Claude App",
-            "Claude Web",
-            "ChatGPT",
-            "Gemini",
-            "Grok",
-            TranslationManager.translate("settings.ai.discuss.customUrl", "Custom URL")
-        ]
+        options: aiTab.discussAppNames
         currentIndex: Settings.discussShotApp
         onSelected: function(index) { Settings.discussShotApp = index }
     }

@@ -1,3 +1,7 @@
+// TODO: Move SQL queries to background thread per CLAUDE.md design principle.
+// Current tool handler architecture (synchronous QJsonObject return) prevents this.
+// Requires refactoring McpToolHandler to support async responses.
+
 #include "mcpserver.h"
 #include "mcpresourceregistry.h"
 #include "../ble/de1device.h"

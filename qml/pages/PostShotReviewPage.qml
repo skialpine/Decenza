@@ -1109,7 +1109,7 @@ Page {
             color: Theme.primaryColor
 
             Accessible.role: Accessible.Button
-            Accessible.name: TranslationManager.translate("postShotReview.accessible.discuss", "Discuss shot with external AI app")
+            Accessible.name: TranslationManager.translate("postshotreview.accessible.discuss", "Discuss shot with external AI app")
             Accessible.focusable: true
             Accessible.onPressAction: discussArea.clicked(null)
 
@@ -1135,7 +1135,7 @@ Page {
                 }
 
                 Tr {
-                    key: "postShotReview.button.discuss"
+                    key: "postshotreview.button.discuss"
                     fallback: "Discuss"
                     color: "white"
                     font: Theme.bodyFont
@@ -1154,8 +1154,7 @@ Page {
                         if (summary.length > 0) MainController.copyToClipboard(summary)
                     }
                     // Open configured AI app
-                    var urls = ["claude://", "https://claude.ai/new", "https://chatgpt.com/", "https://gemini.google.com/app", "https://grok.com/"]
-                    var url = Settings.discussShotApp === 5 ? Settings.discussShotCustomUrl : (urls[Settings.discussShotApp] || "claude://")
+                    var url = Settings.discussShotUrl()
                     if (url.length > 0) Qt.openUrlExternally(url)
                 }
             }

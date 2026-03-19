@@ -58,7 +58,11 @@ void registerControlTools(McpToolRegistry* registry, DE1Device* device, MachineS
                 result["error"] = "Machine not connected";
                 return result;
             }
-            if (!machineState || !machineState->isReady()) {
+            if (!machineState) {
+                result["error"] = "Machine state not available";
+                return result;
+            }
+            if (!machineState->isReady()) {
                 result["error"] = "Machine not ready (current phase: " + machineState->phaseString() + ")";
                 return result;
             }
@@ -80,7 +84,11 @@ void registerControlTools(McpToolRegistry* registry, DE1Device* device, MachineS
                 result["error"] = "Machine not connected";
                 return result;
             }
-            if (!machineState || !machineState->isReady()) {
+            if (!machineState) {
+                result["error"] = "Machine state not available";
+                return result;
+            }
+            if (!machineState->isReady()) {
                 result["error"] = "Machine not ready (current phase: " + machineState->phaseString() + ")";
                 return result;
             }
@@ -102,7 +110,11 @@ void registerControlTools(McpToolRegistry* registry, DE1Device* device, MachineS
                 result["error"] = "Machine not connected";
                 return result;
             }
-            if (!machineState || !machineState->isReady()) {
+            if (!machineState) {
+                result["error"] = "Machine state not available";
+                return result;
+            }
+            if (!machineState->isReady()) {
                 result["error"] = "Machine not ready (current phase: " + machineState->phaseString() + ")";
                 return result;
             }
@@ -124,7 +136,11 @@ void registerControlTools(McpToolRegistry* registry, DE1Device* device, MachineS
                 result["error"] = "Machine not connected";
                 return result;
             }
-            if (!machineState || !machineState->isReady()) {
+            if (!machineState) {
+                result["error"] = "Machine state not available";
+                return result;
+            }
+            if (!machineState->isReady()) {
                 result["error"] = "Machine not ready (current phase: " + machineState->phaseString() + ")";
                 return result;
             }

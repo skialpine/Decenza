@@ -104,7 +104,6 @@ private:
     // SSE clients
     QSet<QTcpSocket*> m_sseClients;
     void broadcastSseNotification(const QString& resourceUri);
-    void sendSseEvent(QTcpSocket* socket, const QByteArray& event);
 
     // Limits
     static constexpr int MaxSessions = 8;

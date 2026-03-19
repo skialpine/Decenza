@@ -12,22 +12,8 @@ Item {
     implicitWidth: isCompact ? compactContent.implicitWidth : fullContent.implicitWidth
     implicitHeight: isCompact ? compactContent.implicitHeight : fullContent.implicitHeight
 
-    // Discuss Shot app URLs (index matches Settings.discussShotApp)
-    readonly property var discussAppUrls: [
-        "claude://",
-        "https://claude.ai/new",
-        "https://chatgpt.com/",
-        "https://gemini.google.com/app",
-        "https://grok.com/"
-    ]
-
     function openDiscuss() {
-        var url = ""
-        if (Settings.discussShotApp === 5) {
-            url = Settings.discussShotCustomUrl
-        } else {
-            url = discussAppUrls[Settings.discussShotApp] || "claude://"
-        }
+        var url = Settings.discussShotUrl()
         if (url.length > 0) Qt.openUrlExternally(url)
     }
 

@@ -240,6 +240,11 @@ Settings::Settings(QObject* parent)
     if (m_hasBrewYieldOverride) {
         m_brewYieldOverride = m_settings.value("brew/brewYieldOverride", 0.0).toDouble();
     }
+
+    // Generate MCP API key on first run (avoids const_cast in the getter)
+    if (m_settings.value("mcp/apiKey", "").toString().isEmpty()) {
+        m_settings.setValue("mcp/apiKey", QUuid::createUuid().toString(QUuid::WithoutBraces));
+    }
 }
 
 // Machine settings
@@ -3464,13 +3469,7 @@ void Settings::setMcpConfirmationLevel(int level) {
 }
 
 QString Settings::mcpApiKey() const {
-    QString key = m_settings.value("mcp/apiKey", "").toString();
-    if (key.isEmpty()) {
-        // Generate on first access
-        key = QUuid::createUuid().toString(QUuid::WithoutBraces);
-        const_cast<QSettings&>(m_settings).setValue("mcp/apiKey", key);
-    }
-    return key;
+    return m_settings.value("mcp/apiKey", "").toString();
 }
 
 void Settings::regenerateMcpApiKey() {
@@ -3499,6 +3498,20 @@ void Settings::setDiscussShotCustomUrl(const QString& url) {
         m_settings.setValue("ai/discussShotCustomUrl", url);
         emit discussShotCustomUrlChanged();
     }
+}
+
+QString Settings::discussShotUrl() const {
+    static const QStringList urls = {
+        "claude://",
+        "https://claude.ai/new",
+        "https://chatgpt.com/",
+        "https://gemini.google.com/app",
+        "https://grok.com/"
+    };
+    int app = discussShotApp();
+    if (app == 5) return discussShotCustomUrl();
+    if (app >= 0 && app < urls.size()) return urls[app];
+    return urls[0];
 }
 
 // MQTT settings (Home Automation)

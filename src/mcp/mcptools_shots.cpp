@@ -1,3 +1,7 @@
+// TODO: Move SQL queries to background thread per CLAUDE.md design principle.
+// Current tool handler architecture (synchronous QJsonObject return) prevents this.
+// Requires refactoring McpToolHandler to support async responses.
+
 #include "mcpserver.h"
 #include "mcptoolregistry.h"
 #include "../history/shothistorystorage.h"
@@ -55,23 +59,31 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
                                   "espresso_notes, bean_brand, bean_type, profile_kb_id "
                                   "FROM shots WHERE 1=1 ";
                     QString countSql = "SELECT COUNT(*) FROM shots WHERE 1=1 ";
-                    QStringList conditions;
 
-                    if (!profileFilter.isEmpty())
-                        conditions << "profile_name LIKE '%" + profileFilter + "%'";
-                    if (!beanFilter.isEmpty())
-                        conditions << "bean_brand LIKE '%" + beanFilter + "%'";
-                    if (minEnjoyment >= 0)
-                        conditions << "enjoyment >= " + QString::number(minEnjoyment);
-
-                    for (const auto& cond : conditions) {
-                        sql += " AND " + cond;
-                        countSql += " AND " + cond;
+                    if (!profileFilter.isEmpty()) {
+                        sql += " AND profile_name LIKE :profileFilter";
+                        countSql += " AND profile_name LIKE :profileFilter";
+                    }
+                    if (!beanFilter.isEmpty()) {
+                        sql += " AND bean_brand LIKE :beanFilter";
+                        countSql += " AND bean_brand LIKE :beanFilter";
+                    }
+                    if (minEnjoyment >= 0) {
+                        sql += " AND enjoyment >= :minEnjoyment";
+                        countSql += " AND enjoyment >= :minEnjoyment";
                     }
                     sql += " ORDER BY timestamp DESC LIMIT " + QString::number(limit) + " OFFSET " + QString::number(offset);
 
                     QSqlQuery query(db);
-                    if (query.exec(sql)) {
+                    query.prepare(sql);
+                    if (!profileFilter.isEmpty())
+                        query.bindValue(":profileFilter", "%" + profileFilter + "%");
+                    if (!beanFilter.isEmpty())
+                        query.bindValue(":beanFilter", "%" + beanFilter + "%");
+                    if (minEnjoyment >= 0)
+                        query.bindValue(":minEnjoyment", minEnjoyment);
+
+                    if (query.exec()) {
                         while (query.next()) {
                             QJsonObject shot;
                             shot["id"] = query.value("id").toLongLong();
@@ -91,7 +103,14 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
                     }
 
                     QSqlQuery countQuery(db);
-                    if (countQuery.exec(countSql) && countQuery.next())
+                    countQuery.prepare(countSql);
+                    if (!profileFilter.isEmpty())
+                        countQuery.bindValue(":profileFilter", "%" + profileFilter + "%");
+                    if (!beanFilter.isEmpty())
+                        countQuery.bindValue(":beanFilter", "%" + beanFilter + "%");
+                    if (minEnjoyment >= 0)
+                        countQuery.bindValue(":minEnjoyment", minEnjoyment);
+                    if (countQuery.exec() && countQuery.next())
                         totalCount = countQuery.value(0).toInt();
                 }
             }
