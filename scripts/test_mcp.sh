@@ -497,8 +497,86 @@ fi
 
 echo
 
-# ─── 11. Input Validation & Edge Cases ───
-echo -e "${CYAN}11. Input Validation & Edge Cases${NC}"
+# ─── 11. Access Level Gating (interactive) ───
+if [ "${SKIP_INTERACTIVE:-}" != "1" ]; then
+    echo -e "${CYAN}11. Access Level Gating (requires manual setting changes)${NC}"
+
+    # Helper: create fresh session and test tool access
+    test_access_level() {
+        local level_name="$1"
+        local expected_level="$2"  # 0=Monitor, 1=Control, 2=Full
+
+        echo -e "  ${YELLOW}ACTION${NC}: Set access level to ${CYAN}$level_name${NC} in Settings > AI > MCP, then press Enter"
+        read -r
+
+        # Fresh session
+        local ASESS=$(curl -s --max-time 5 -D /tmp/mcp_access_headers -X POST "$BASE" -H "Content-Type: application/json" \
+            -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}')
+        local ASID=$(grep -i 'Mcp-Session' /tmp/mcp_access_headers 2>/dev/null | awk '{print $2}' | tr -d '\r\n')
+
+        # Check which tools are visible
+        local ATOOLS=$(curl -s --max-time 5 -X POST "$BASE" -H "Content-Type: application/json" -H "Mcp-Session: $ASID" \
+            -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+tools = [t['name'] for t in d.get('result',{}).get('tools',[])]
+print(json.dumps(tools))
+" 2>/dev/null)
+
+        # Read tools should always be visible
+        assert_ok "$level_name: read tools visible" "$ATOOLS" \
+            "'machine_get_state' in d and 'shots_list' in d"
+
+        if [ "$expected_level" -eq 0 ]; then
+            # Monitor: control tools should NOT be visible
+            assert_ok "$level_name: control tools hidden" "$ATOOLS" \
+                "'machine_wake' not in d and 'machine_start_espresso' not in d"
+            assert_ok "$level_name: settings tools hidden" "$ATOOLS" \
+                "'settings_set' not in d and 'profiles_set_active' not in d"
+
+            # Verify calling a control tool is rejected
+            local REJECT=$(curl -s --max-time 5 -X POST "$BASE" -H "Content-Type: application/json" -H "Mcp-Session: $ASID" \
+                -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"machine_wake","arguments":{}}}')
+            assert_ok "$level_name: control tool call rejected" "$REJECT" \
+                "d.get('error',{}).get('code') == -32603"
+
+        elif [ "$expected_level" -eq 1 ]; then
+            # Control: control tools visible, settings tools NOT
+            assert_ok "$level_name: control tools visible" "$ATOOLS" \
+                "'machine_wake' in d and 'machine_stop' in d"
+            assert_ok "$level_name: settings tools hidden" "$ATOOLS" \
+                "'settings_set' not in d and 'profiles_set_active' not in d"
+
+            # Verify calling a settings tool is rejected
+            local REJECT=$(curl -s --max-time 5 -X POST "$BASE" -H "Content-Type: application/json" -H "Mcp-Session: $ASID" \
+                -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"settings_set","arguments":{"targetWeight":36}}}')
+            assert_ok "$level_name: settings tool call rejected" "$REJECT" \
+                "d.get('error',{}).get('code') == -32603"
+
+        elif [ "$expected_level" -eq 2 ]; then
+            # Full: everything visible
+            assert_ok "$level_name: control tools visible" "$ATOOLS" \
+                "'machine_wake' in d and 'machine_stop' in d"
+            assert_ok "$level_name: settings tools visible" "$ATOOLS" \
+                "'settings_set' in d and 'profiles_set_active' in d"
+        fi
+
+        # Cleanup
+        curl -s --max-time 5 -X DELETE "$BASE" -H "Mcp-Session: $ASID" > /dev/null 2>&1
+    }
+
+    test_access_level "Monitor Only" 0
+    test_access_level "Control" 1
+    test_access_level "Full Automation" 2
+
+    echo
+else
+    echo -e "${CYAN}11. Access Level Gating (SKIPPED — set SKIP_INTERACTIVE=1)${NC}"
+    echo
+fi
+
+# ─── 12. Input Validation & Edge Cases ───
+echo -e "${CYAN}12. Input Validation & Edge Cases${NC}"
 
 # Missing required params
 MISSING_RAW=$(rpc 80 "tools/call" '{"name":"shots_get_detail","arguments":{}}')
@@ -554,8 +632,8 @@ assert_ok "unknown tool returns error" "$UNKNOWN_TOOL_RAW" \
 
 echo
 
-# ─── 12. Rate Limiting ───
-echo -e "${CYAN}12. Rate Limiting${NC}"
+# ─── 13. Rate Limiting ───
+echo -e "${CYAN}13. Rate Limiting${NC}"
 
 # Use a fresh session so previous control calls don't affect the count
 curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION" > /dev/null 2>&1
@@ -603,8 +681,8 @@ assert_ok "read calls not rate limited" "$READ12" "'phase' in d"
 
 echo
 
-# ─── 13. Session Limits ───
-echo -e "${CYAN}13. Session Limits${NC}"
+# ─── 14. Session Limits ───
+echo -e "${CYAN}14. Session Limits${NC}"
 
 # Delete current session
 curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION" > /dev/null 2>&1
@@ -643,8 +721,8 @@ SESSION=$(grep -i 'Mcp-Session' /tmp/mcp_headers 2>/dev/null | awk '{print $2}' 
 
 echo
 
-# ─── 14. Session Management ───
-echo -e "${CYAN}14. Session Management${NC}"
+# ─── 15. Session Management ───
+echo -e "${CYAN}15. Session Management${NC}"
 
 # DELETE session
 DEL_RESP=$(curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION")
