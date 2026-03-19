@@ -378,11 +378,12 @@ Q_PROPERTY(QString discussShotCustomUrl READ discussShotCustomUrl WRITE setDiscu
 **`discussShotApp`** (int enum):
 | Value | Name | URL / Deep Link | Notes |
 |-------|------|-----------------|-------|
-| 0 | Claude | `https://claude.ai/new` | Best with MCP — Claude Desktop can pull shot data directly via tools |
-| 1 | ChatGPT | `https://chatgpt.com/` | OpenAI's assistant |
-| 2 | Gemini | `https://gemini.google.com/app` | Google's AI |
-| 3 | Grok | `https://grok.com/` | xAI's assistant |
-| 4 | Custom URL | Uses `discussShotCustomUrl` value | For self-hosted models (Ollama web UI, etc.) or any other AI service |
+| 0 | Claude App | `claude://` | Opens Claude Desktop app via URL scheme — best with MCP, can pull shot data directly via tools |
+| 1 | Claude Web | `https://claude.ai/new` | Opens claude.ai in browser — for users without the desktop app |
+| 2 | ChatGPT | `https://chatgpt.com/` | OpenAI's assistant |
+| 3 | Gemini | `https://gemini.google.com/app` | Google's AI |
+| 4 | Grok | `https://grok.com/` | xAI's assistant |
+| 5 | Custom URL | Uses `discussShotCustomUrl` value | For self-hosted models (Ollama web UI, etc.) or any other AI service |
 
 Default: `0` (Claude).
 

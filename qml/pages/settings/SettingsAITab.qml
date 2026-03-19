@@ -26,7 +26,7 @@ KeyboardAwareContainer {
 
     // Discuss Shot app display names (index matches Settings.discussShotApp)
     readonly property var discussAppNames: [
-        "Claude", "ChatGPT", "Gemini", "Grok",
+        "Claude App", "Claude Web", "ChatGPT", "Gemini", "Grok",
         TranslationManager.translate("settings.ai.discuss.customUrl", "Custom URL")
     ]
 
@@ -706,7 +706,7 @@ KeyboardAwareContainer {
 
                 // Custom URL field (only when Custom URL is selected)
                 ColumnLayout {
-                    visible: Settings.discussShotApp === 4
+                    visible: Settings.discussShotApp === 5
                     Layout.fillWidth: true
                     spacing: Theme.scaled(4)
 
@@ -731,7 +731,8 @@ KeyboardAwareContainer {
         id: discussAppDialog
         title: TranslationManager.translate("settings.ai.discuss.selectAppTitle", "Select AI App")
         options: [
-            "Claude",
+            "Claude App",
+            "Claude Web",
             "ChatGPT",
             "Gemini",
             "Grok",

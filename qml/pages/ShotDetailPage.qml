@@ -973,6 +973,59 @@ Page {
             }
         }
 
+        // Discuss button - opens external AI app
+        Rectangle {
+            id: discussButton
+            visible: shotData.duration > 0
+            Layout.preferredWidth: discussContent.width + 32
+            Layout.preferredHeight: Theme.scaled(44)
+            radius: Theme.scaled(8)
+            color: discussArea.pressed ? Qt.darker(Theme.primaryColor, 1.2) : Theme.primaryColor
+
+            Accessible.role: Accessible.Button
+            Accessible.name: TranslationManager.translate("shotdetail.accessible.discuss", "Discuss shot with external AI app")
+            Accessible.focusable: true
+            Accessible.onPressAction: discussArea.clicked(null)
+
+            Row {
+                id: discussContent
+                anchors.centerIn: parent
+                spacing: Theme.scaled(6)
+
+                Image {
+                    source: "qrc:/icons/sparkle.svg"
+                    width: Theme.scaled(18)
+                    height: Theme.scaled(18)
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: status === Image.Ready
+                    Accessible.ignored: true
+                }
+
+                Tr {
+                    key: "shotdetail.discuss"
+                    fallback: "Discuss"
+                    color: "white"
+                    font: Theme.bodyFont
+                    anchors.verticalCenter: parent.verticalCenter
+                    Accessible.ignored: true
+                }
+            }
+
+            MouseArea {
+                id: discussArea
+                anchors.fill: parent
+                onClicked: {
+                    if (!Settings.mcpEnabled && MainController.aiManager) {
+                        var summary = MainController.aiManager.generateHistoryShotSummary(shotData)
+                        if (summary.length > 0) MainController.copyToClipboard(summary)
+                    }
+                    var urls = ["claude://", "https://claude.ai/new", "https://chatgpt.com/", "https://gemini.google.com/app", "https://grok.com/"]
+                    var url = Settings.discussShotApp === 5 ? Settings.discussShotCustomUrl : (urls[Settings.discussShotApp] || "claude://")
+                    if (url.length > 0) Qt.openUrlExternally(url)
+                }
+            }
+        }
+
         // Email Prompt button - fallback for users without API keys
         Rectangle {
             id: emailButton
