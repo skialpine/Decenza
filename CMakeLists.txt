@@ -32,6 +32,16 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+# Address Sanitizer — catches use-after-free, heap overflow, etc.
+# Enable in Qt Creator: Projects → Build → CMake → add ENABLE_ASAN=ON
+# Or configure from CLI: cmake ... -DENABLE_ASAN=ON
+option(ENABLE_ASAN "Enable Address Sanitizer (debug builds)" OFF)
+if(ENABLE_ASAN)
+    message(STATUS "Address Sanitizer ENABLED")
+    add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address)
+endif()
+
 # Optional features (Quick3D not available on all platforms, e.g. Raspberry Pi)
 option(ENABLE_QUICK3D "Enable Qt Quick3D for 3D screensavers" ON)
 
