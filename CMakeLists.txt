@@ -267,6 +267,7 @@ set(SOURCES
     src/network/shotserver_settings.cpp
     src/network/shotserver_auth.cpp
     src/network/shotserver_ai.cpp
+    src/mcp/mcpserver.cpp
     src/network/mqttclient.cpp
     src/network/webdebuglogger.cpp
     src/network/locationprovider.cpp
@@ -387,6 +388,10 @@ set(HEADERS
     src/network/shotreporter.h
     src/network/crashreporter.h
     src/network/librarysharing.h
+    src/mcp/mcpserver.h
+    src/mcp/mcpsession.h
+    src/mcp/mcptoolregistry.h
+    src/mcp/mcpresourceregistry.h
     src/core/settingsserializer.h
     src/core/datamigrationclient.h
     src/core/databasebackupmanager.h

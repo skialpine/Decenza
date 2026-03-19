@@ -13,6 +13,7 @@
 #include "../ai/aimanager.h"
 #include "../core/batterymanager.h"
 #include "../core/memorymonitor.h"
+#include "../mcp/mcpserver.h"
 #include "version.h"
 
 #include <QThread>
@@ -960,6 +961,22 @@ void ShotServer::handleRequest(QTcpSocket* socket, const QByteArray& request)
             handleAuthRoute(socket, method, path, body);
             return;
         }
+    }
+
+    // MCP Server routes
+    if (path == "/mcp" || path.startsWith("/mcp/")) {
+        if (!m_mcpServer || !m_settings || !m_settings->mcpEnabled()) {
+            sendResponse(socket, 404, "text/plain", "Not Found");
+            return;
+        }
+        // Extract headers from the raw request
+        int headerEnd = request.indexOf("\r\n\r\n");
+        QByteArray headers = (headerEnd > 0) ? request.left(headerEnd) : QByteArray();
+        QByteArray body;
+        if (headerEnd > 0 && headerEnd + 4 < request.size())
+            body = request.mid(headerEnd + 4);
+        m_mcpServer->handleHttpRequest(socket, method, path, headers, body);
+        return;
     }
 
     // Route requests
