@@ -169,9 +169,8 @@ void registerWriteTools(McpToolRegistry* registry, MainController* mainControlle
                     updated << "targetWeight";
                 }
 
-                QMetaObject::invokeMethod(mainController, [mainController, currentParams]() {
-                    mainController->uploadRecipeProfile(currentParams);
-                }, Qt::QueuedConnection);
+                // Call directly — tool handlers run on the main thread
+                mainController->uploadRecipeProfile(currentParams);
             }
 
             if (args.contains("steamTemperature")) {
@@ -292,9 +291,8 @@ void registerWriteTools(McpToolRegistry* registry, MainController* mainControlle
                     applied << "targetWeight";
                 }
 
-                QMetaObject::invokeMethod(mainController, [mainController, currentParams]() {
-                    mainController->uploadRecipeProfile(currentParams);
-                }, Qt::QueuedConnection);
+                // Call directly — tool handlers run on the main thread
+                mainController->uploadRecipeProfile(currentParams);
             }
 
             // Metadata-only changes go directly to Settings
