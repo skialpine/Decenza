@@ -111,13 +111,8 @@ void registerProfileTools(McpToolRegistry* registry, MainController* mainControl
             if (!profile.isEmpty())
                 result["title"] = profile["title"].toString();
 
-            QString editorType = profile["editorType"].toString();
-
-            // Infer editor type the same way the app does
-            if (editorType.isEmpty()) {
-                QVariantMap recipeParams = mainController->getOrConvertRecipeParams();
-                editorType = recipeParams["editorType"].toString();
-            }
+            // Use the same authoritative method the app uses to determine editor type
+            QString editorType = mainController->currentEditorType();
             result["editorType"] = editorType;
 
             if (editorType == "advanced") {
@@ -246,13 +241,8 @@ void registerProfileTools(McpToolRegistry* registry, MainController* mainControl
                 return result;
             }
 
-            // Determine editor type to choose the correct code path
-            QVariantMap profile = mainController->getCurrentProfile();
-            QString editorType = profile["editorType"].toString();
-            if (editorType.isEmpty()) {
-                QVariantMap recipeParams = mainController->getOrConvertRecipeParams();
-                editorType = recipeParams["editorType"].toString();
-            }
+            // Use the same authoritative method the app uses to determine editor type
+            QString editorType = mainController->currentEditorType();
 
             if (editorType == "advanced") {
                 // Advanced path: use uploadProfile() — same as ProfileEditorPage
