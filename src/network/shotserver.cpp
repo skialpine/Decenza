@@ -1085,6 +1085,70 @@ Write-Host '  "What is the state of my espresso machine?"'
             return;
         }
 
+        if (path == "/mcp/uninstall.sh") {
+            QString script = R"BASH(#!/bin/bash
+set -e
+echo "Removing Decenza MCP from Claude Desktop..."
+
+CONFIG_DIR="$HOME/Library/Application Support/Claude"
+CONFIG="$CONFIG_DIR/claude_desktop_config.json"
+
+if [ ! -f "$CONFIG" ]; then
+    echo "Claude Desktop config not found — nothing to remove."
+    exit 0
+fi
+
+python3 -c "
+import json
+with open('$CONFIG') as f:
+    config = json.load(f)
+if 'mcpServers' in config and 'decenza' in config['mcpServers']:
+    del config['mcpServers']['decenza']
+    if not config['mcpServers']:
+        del config['mcpServers']
+    with open('$CONFIG', 'w') as f:
+        json.dump(config, f, indent=2)
+    print('Removed decenza from:', '$CONFIG')
+else:
+    print('Decenza not found in config — nothing to remove.')
+"
+
+echo ""
+echo "Done! Restart Claude Desktop to apply."
+)BASH";
+            sendResponse(socket, 200, "text/plain; charset=utf-8", script.toUtf8());
+            return;
+        }
+
+        if (path == "/mcp/uninstall.ps1") {
+            QString script = R"PS1(
+Write-Host "Removing Decenza MCP from Claude Desktop..."
+
+$configPath = "$env:APPDATA\Claude\claude_desktop_config.json"
+if (-not (Test-Path $configPath)) {
+    Write-Host "Claude Desktop config not found - nothing to remove."
+    exit 0
+}
+
+$config = Get-Content $configPath | ConvertFrom-Json
+if ($config.mcpServers -and $config.mcpServers.decenza) {
+    $config.mcpServers.PSObject.Properties.Remove('decenza')
+    if (($config.mcpServers.PSObject.Properties | Measure-Object).Count -eq 0) {
+        $config.PSObject.Properties.Remove('mcpServers')
+    }
+    $config | ConvertTo-Json -Depth 10 | Set-Content $configPath
+    Write-Host "Removed decenza from: $configPath"
+} else {
+    Write-Host "Decenza not found in config - nothing to remove."
+}
+
+Write-Host ""
+Write-Host "Done! Restart Claude Desktop to apply."
+)PS1";
+            sendResponse(socket, 200, "text/plain; charset=utf-8", script.toUtf8());
+            return;
+        }
+
         // Setup guide page (available even when MCP is disabled)
         if (path == "/mcp/setup") {
             QString serverUrl = url();
@@ -1141,37 +1205,46 @@ a{color:#6c8cff}
 <li><strong>Full Automation</strong> &mdash; + change profiles, settings, parameters</li>
 </ul>
 
+<h2>Prerequisites</h2>
+<div class="step"><a href="https://nodejs.org">Node.js</a> must be installed on your computer (provides <code>npx</code> used by the connector).</div>
+
 <h2>Setup Steps</h2>
 <div class="step"><span class="step-num">1.</span> Enable MCP in Decenza: Settings &gt; AI &gt; MCP Server &gt; toggle ON</div>
 <div class="step"><span class="step-num">2.</span> On your computer, install <a href="https://claude.ai/download">Claude Desktop</a></div>
 <div class="step"><span class="step-num">3.</span> Run this command in your terminal to configure Claude Desktop:
-<pre id="installCmd"><code id="installCmdText">Loading...</code><button class="copy-btn" onclick="copyInstallCmd(this)">Copy</button></pre></div>
+<pre id="installCmd"><code id="installCmdText">Loading...</code><button class="copy-btn" onclick="copyCmd('installCmdText',this)">Copy</button></pre></div>
 <div class="step"><span class="step-num">4.</span> Restart Claude Desktop (Quit &amp; reopen)</div>
 <div class="step"><span class="step-num">5.</span> Ask Claude: <em>"What's the current state of my espresso machine?"</em></div>
 
+<h2>Uninstall</h2>
+<p>To remove the Decenza MCP server from Claude Desktop:</p>
+<pre id="uninstallCmd"><code id="uninstallCmdText">Loading...</code><button class="copy-btn" onclick="copyCmd('uninstallCmdText',this)">Copy</button></pre>
+<p style="color:#999;font-size:13px">Then restart Claude Desktop.</p>
+
 <script>
 (function(){
-var url='%3';
 var p=navigator.platform||navigator.userAgent||'';
 var isMac=p.indexOf('Mac')>=0;
 var isWin=p.indexOf('Win')>=0;
+var o=location.origin;
 
-if(isMac){
+if(isWin){
 document.getElementById('installCmdText').textContent=
-'curl -fsSL '+location.origin+'/mcp/install.sh | bash';
-}else if(isWin){
-document.getElementById('installCmdText').textContent=
-'powershell -c "irm '+location.origin+'/mcp/install.ps1 | iex"';
+'powershell -c "irm '+o+'/mcp/install.ps1 | iex"';
+document.getElementById('uninstallCmdText').textContent=
+'powershell -c "irm '+o+'/mcp/uninstall.ps1 | iex"';
 }else{
 document.getElementById('installCmdText').textContent=
-'curl -fsSL '+location.origin+'/mcp/install.sh | bash';
+'curl -fsSL '+o+'/mcp/install.sh | bash';
+document.getElementById('uninstallCmdText').textContent=
+'curl -fsSL '+o+'/mcp/uninstall.sh | bash';
 }
 })();
 </script>
 
 <script>
-function copyInstallCmd(btn){
-var text=document.getElementById('installCmdText').textContent;
+function copyCmd(id,btn){
+var text=document.getElementById(id).textContent;
 if(navigator.clipboard&&window.isSecureContext){
 navigator.clipboard.writeText(text).then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy'},2000)});
 }else{
