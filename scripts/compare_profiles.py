@@ -344,6 +344,10 @@ for dk, dv in sorted(decenza.items()):
     jd = dv['data']
     td = de1app[mk]['data']
     ptype = jd.get('legacy_profile_type', jd.get('profile_type', ''))
+    # Warn if simple profile has is_recipe_mode (stale conversion artifact)
+    if ptype in ('settings_2a', 'settings_2b') and jd.get('is_recipe_mode', False):
+        has_major = True
+        details = [f"  WARNING: simple profile ({ptype}) has is_recipe_mode=true (stale recipe params will override scalars)"] + details
     if ptype in ('settings_2a', 'settings_2b'):
         PROFILE_SETTINGS += [
             ('preinfusion_time', 'preinfusion_time', 'preinfusion_time'),
