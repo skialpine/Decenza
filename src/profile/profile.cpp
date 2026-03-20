@@ -1122,9 +1122,12 @@ void Profile::regenerateSimpleFrames() {
 
     m_preinfuseFrameCount = countPreinfuseFrames(m_steps);
 
-    if (!m_steps.isEmpty()) {
-        m_espressoTemperature = m_steps.first().temperature;
-    }
+    // Do NOT sync m_espressoTemperature from first frame here.
+    // The caller (applyRecipeToScalarFields) already set it from tempStart.
+    // Syncing from the first frame is wrong when preinfusionTime=0 and
+    // tempStepsEnabled=true — the first frame would be the hold frame at
+    // temp2, not temp0. Simple profiles have authoritative scalar temperature
+    // (see fromJson guard at line ~548).
 }
 
 void Profile::regenerateFromRecipe() {
