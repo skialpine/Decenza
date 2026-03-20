@@ -87,7 +87,7 @@ ChartView {
         min: 0
         // recalcMax() guarantees calculatedMax >= minTime
         max: calculatedMax
-        tickCount: Math.min(7, Math.max(3, Math.floor(max / 10) + 2))
+        tickCount: Math.min(7, Math.max(3, Math.floor(calculatedMax / 10) + 2))
         labelFormat: "%.0f"
         labelsColor: Theme.textSecondaryColor
         gridLineColor: Qt.rgba(255, 255, 255, 0.1)
