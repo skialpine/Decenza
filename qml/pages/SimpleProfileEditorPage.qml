@@ -382,6 +382,10 @@ Page {
                                 value: val(recipe.pourTemperature, 90)
                                 onValueModified: function(newValue) { updateProfileTemp(Math.round(newValue * 10) / 10) }
                             }
+
+                            // Dose
+                            Text { text: TranslationManager.translate("simpleProfile.dose", "Dose"); font: Theme.captionFont; color: Theme.weightColor }
+                            ValueInput { Layout.fillWidth: true; valueColor: Theme.weightColor; accessibleName: TranslationManager.translate("simpleProfileEditor.dose", "Dose"); from: 3; to: 40; stepSize: 0.1; suffix: " g"; value: val(recipe.dose, 18); onValueModified: function(newValue) { updateRecipe("dose", Math.round(newValue * 10) / 10) } }
                         }
 
                         // Separator
@@ -568,10 +572,6 @@ Page {
                                     Text { text: "4:"; font.family: Theme.bodyFont.family; font.pixelSize: Theme.bodyFont.pixelSize; font.bold: true; color: Theme.primaryColor }
                                     Text { text: tr("stopAtWeight", "Stop at Weight"); font.family: Theme.bodyFont.family; font.pixelSize: Theme.bodyFont.pixelSize; font.bold: true; color: Theme.textColor }
                                 }
-
-                                // Dose
-                                Text { text: TranslationManager.translate("simpleProfile.dose", "Dose"); font: Theme.captionFont; color: Theme.weightColor }
-                                ValueInput { Layout.fillWidth: true; valueColor: Theme.weightColor; accessibleName: TranslationManager.translate("simpleProfileEditor.dose", "Dose"); from: 3; to: 40; stepSize: 0.1; suffix: " g"; value: val(recipe.dose, 18); onValueModified: function(newValue) { updateRecipe("dose", Math.round(newValue * 10) / 10) } }
 
                                 // Weight
                                 Text { text: TranslationManager.translate("simpleProfile.weight", "Weight"); font: Theme.captionFont; color: Theme.weightColor }

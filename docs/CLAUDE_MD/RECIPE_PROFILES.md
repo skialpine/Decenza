@@ -14,12 +14,14 @@ The Recipe Editor provides simplified, coffee-concept-based interfaces for creat
 
 The Recipe Editor supports four editor types, each generating a different frame structure:
 
-| Type | Key | Profile Type | Origin | Description |
-|------|-----|-------------|--------|-------------|
-| D-Flow | `dflow` | `settings_2c` | Damian Brakel | Flow-driven extraction with pressure limit |
-| A-Flow | `aflow` | `settings_2c` | Janek | Hybrid pressure-then-flow extraction |
-| Pressure | `pressure` | `settings_2a` | de1app | Simple pressure profile |
-| Flow | `flow` | `settings_2b` | de1app | Simple flow profile |
+| Type | Key | Profile Type | Origin | QML Page | Description |
+|------|-----|-------------|--------|----------|-------------|
+| D-Flow | `dflow` | `settings_2c` | Damian Brakel | `RecipeEditorPage.qml` | Flow-driven extraction with pressure limit |
+| A-Flow | `aflow` | `settings_2c` | Janek | `RecipeEditorPage.qml` | Hybrid pressure-then-flow extraction |
+| Pressure | `pressure` | `settings_2a` | de1app | `SimpleProfileEditorPage.qml` (via `PressureEditorPage.qml`) | Simple pressure profile |
+| Flow | `flow` | `settings_2b` | de1app | `SimpleProfileEditorPage.qml` (via `FlowEditorPage.qml`) | Simple flow profile |
+
+Profiles that don't match any of the above open in `ProfileEditorPage.qml`, the advanced frame-by-frame editor.
 
 ## Editor Selection
 
@@ -528,8 +530,11 @@ src/controllers/
                             # currentEditorType() with title-first detection
 
 qml/pages/
-├── RecipeEditorPage.qml    # Main recipe editor UI (D-Flow + A-Flow)
-└── ProfileEditorPage.qml   # Advanced frame editor (existing)
+├── RecipeEditorPage.qml        # D-Flow + A-Flow recipe editor
+├── SimpleProfileEditorPage.qml # Pressure + Flow recipe editor (shared base)
+├── PressureEditorPage.qml      # Thin wrapper: SimpleProfileEditorPage { profileType: "pressure" }
+├── FlowEditorPage.qml          # Thin wrapper: SimpleProfileEditorPage { profileType: "flow" }
+└── ProfileEditorPage.qml       # Advanced frame-by-frame editor (fallback for non-recipe profiles)
 
 qml/components/
 ├── RecipeSection.qml       # Section with title header
