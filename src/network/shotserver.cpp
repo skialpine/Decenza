@@ -1015,7 +1015,7 @@ with open('$CONFIG') as f:
 config.setdefault('mcpServers', {})
 config['mcpServers']['decenza'] = {
     'command': 'npx',
-    'args': ['-y', 'mcp-remote', '%1']
+    'args': ['-y', 'mcp-remote', '%1', '--allow-http']
 }
 with open('$CONFIG', 'w') as f:
     json.dump(config, f, indent=2)
@@ -1027,7 +1027,7 @@ else
   "mcpServers": {
     "decenza": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "%1"]
+      "args": ["-y", "mcp-remote", "%1", "--allow-http"]
     }
   }
 }
@@ -1072,7 +1072,7 @@ if (Test-Path $configPath) {
 if (-not $config.mcpServers) { $config | Add-Member -NotePropertyName mcpServers -NotePropertyValue @{} }
 $config.mcpServers.decenza = @{
     command = "npx"
-    args = @("-y", "mcp-remote", "%1")
+    args = @("-y", "mcp-remote", "%1", "--allow-http")
 }
 $config | ConvertTo-Json -Depth 10 | Set-Content $configPath
 Write-Host "Config updated: $configPath"
