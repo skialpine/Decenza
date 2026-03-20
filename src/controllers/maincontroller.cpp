@@ -1741,6 +1741,13 @@ QVariantMap MainController::getOrConvertRecipeParams() {
         params.targetVolume = m_currentProfile.targetVolume();
         params.fillTemperature = m_currentProfile.espressoTemperature();
         params.pourTemperature = m_currentProfile.espressoTemperature();
+        // Temperature presets: [0]=Start, [1]=Preinfuse, [2]=Hold, [3]=Decline
+        const auto& presets = m_currentProfile.temperaturePresets();
+        double baseTemp = m_currentProfile.espressoTemperature();
+        params.tempStart = presets.value(0, baseTemp);
+        params.tempPreinfuse = presets.value(1, baseTemp);
+        params.tempHold = presets.value(2, baseTemp);
+        params.tempDecline = presets.value(3, baseTemp);
         params.preinfusionTime = m_currentProfile.preinfusionTime();
         params.preinfusionFlowRate = m_currentProfile.preinfusionFlowRate();
         params.preinfusionStopPressure = m_currentProfile.preinfusionStopPressure();
