@@ -15,9 +15,11 @@ Page {
         Settings.waterVolumeMode = getCurrentVesselMode()
         Settings.hotWaterFlowRate = getCurrentVesselFlowRate()
         MainController.applyHotWaterSettings()
-        // Tare immediately so display shows 0g instead of current scale weight
-        // (scale will tare again when hot water flow actually starts)
-        if (!isVolumeMode) {
+        // Tare immediately so display shows 0g instead of current scale weight.
+        // Skip if already dispensing — the C++ flow-start handler tares with a
+        // 200ms delay to avoid BLE command contention; a duplicate tare here
+        // would overwrite the baseline and risk BLE packet drops.
+        if (!isVolumeMode && !isDispensing) {
             MachineState.tareScale()
         }
     }
@@ -136,7 +138,7 @@ Page {
                         id: hotWaterProgressText
                         visible: !isVolumeMode
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: Math.max(0, ScaleDevice ? ScaleDevice.weight : 0).toFixed(0) + "g / " + Settings.waterVolume + "g"
+                        text: Math.max(0, MachineState.scaleWeight).toFixed(0) + "g / " + Settings.waterVolume + "g"
                         color: Theme.textColor
                         font: Theme.timerFont
                     }
@@ -170,7 +172,7 @@ Page {
                         color: Theme.surfaceColor
 
                         Rectangle {
-                            width: parent.width * Math.min(1, Math.max(0, ScaleDevice ? ScaleDevice.weight : 0) / Settings.waterVolume)
+                            width: parent.width * Math.min(1, Math.max(0, MachineState.scaleWeight) / Settings.waterVolume)
                             height: parent.height
                             radius: Theme.scaled(4)
                             color: Theme.primaryColor
