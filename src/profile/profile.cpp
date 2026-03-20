@@ -1093,6 +1093,40 @@ QList<QByteArray> Profile::toFrameBytes() const {
     return frames;
 }
 
+void Profile::regenerateSimpleFrames() {
+    double temp0 = m_temperaturePresets.value(0, m_espressoTemperature);
+    double temp1 = m_temperaturePresets.value(1, m_espressoTemperature);
+    double temp2 = m_temperaturePresets.value(2, m_espressoTemperature);
+    double temp3 = m_temperaturePresets.value(3, m_espressoTemperature);
+
+    if (m_profileType == QLatin1String("settings_2a")) {
+        m_steps = generatePressureProfileFrames(
+            m_preinfusionTime, m_preinfusionFlowRate, m_preinfusionStopPressure,
+            m_espressoHoldTime, m_espressoPressure,
+            m_espressoDeclineTime, m_pressureEnd,
+            m_maximumFlow, m_maximumFlowRangeDefault,
+            temp0, temp1, temp2, temp3,
+            m_tempStepsEnabled);
+    } else if (m_profileType == QLatin1String("settings_2b")) {
+        m_steps = generateFlowProfileFrames(
+            m_preinfusionTime, m_preinfusionFlowRate, m_preinfusionStopPressure,
+            m_espressoHoldTime, m_flowProfileHold,
+            m_espressoDeclineTime, m_flowProfileDecline,
+            m_maximumPressure, m_maximumPressureRangeDefault,
+            temp0, temp1, temp2, temp3,
+            m_tempStepsEnabled);
+    } else {
+        qWarning() << "regenerateSimpleFrames called on non-simple profile type:" << m_profileType;
+        return;
+    }
+
+    m_preinfuseFrameCount = countPreinfuseFrames(m_steps);
+
+    if (!m_steps.isEmpty()) {
+        m_espressoTemperature = m_steps.first().temperature;
+    }
+}
+
 void Profile::regenerateFromRecipe() {
     if (!m_isRecipeMode) {
         return;
