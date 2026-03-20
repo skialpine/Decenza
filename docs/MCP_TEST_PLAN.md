@@ -1,251 +1,431 @@
 # MCP Tool Test Plan
 
-Verifies all MCP tools work correctly as a second UI to the QML app. Each test records the tool called, expected behavior, and pass/fail result.
+Sequential runbook to verify all MCP tools work correctly as a second UI to the QML app. Each test has explicit tool calls, expected results, and cleanup steps. Tests must be run in order — later tests depend on state from earlier ones.
 
-Last run: 2026-03-20 (simulator mode, 37 tools registered)
+## Prerequisites
 
-## 1. Machine State (read)
+- App running (simulator or production)
+- MCP connected (`/mcp` in Claude Code)
+- Machine in Ready or Sleep state (not mid-operation)
+
+## State Capture (run before tests)
+
+Save these values — they will be restored at the end:
+```
+Call: profiles_get_active
+Save: ORIGINAL_PROFILE = filename, ORIGINAL_MODIFIED = modified
+
+Call: profiles_get_params
+Save: ORIGINAL_TEMP (tempStart for recipe, espresso_temperature for advanced)
+
+Call: settings_get
+Save: ORIGINAL_BRAND = dyeBeanBrand, ORIGINAL_GRIND = dyeGrinderSetting
+Save: ORIGINAL_BEAN_TYPE = dyeBeanType, ORIGINAL_ROAST = dyeRoastLevel
+
+Call: machine_get_state
+Save: ORIGINAL_PHASE = phase (if Sleep, will wake for tests then re-sleep at end)
+```
+
+If ORIGINAL_MODIFIED is true, warn the user — tests will modify the profile and the unsaved changes will be lost.
+
+## Run Log
+
+| Date | Tools | Passed | Skipped | Failed | Notes |
+|------|-------|--------|---------|--------|-------|
+| 2026-03-20 | 37 | 41 | 1 | 0 | Initial run, simulator mode |
+
+---
+
+## 1. Machine State (read-only, no state changes)
 
 ### 1.1 machine_get_state
-- **Action**: Read machine state
-- **Expected**: Returns phase, connection, water level, firmware
-- **Result**: PASS — returned Ready phase, waterLevelMl=872, firmwareVersion=SIM-1.0
+```
+Call: machine_get_state
+Expect: phase exists, connected=true, waterLevelMl > 0, firmwareVersion non-empty
+```
 
 ### 1.2 machine_get_telemetry
-- **Action**: Read live telemetry
-- **Expected**: Returns pressure, flow, temp, weight values
-- **Result**: PASS — returned pressure=0, flow=0, temperature=93, mixTemperature=92.5
+```
+Call: machine_get_telemetry
+Expect: temperature > 0, pressure/flow/weight are numbers
+```
 
 ## 2. Machine Control
 
-### 2.1 machine_wake
-- **Action**: Wake machine from sleep
-- **Expected**: Machine transitions to Idle then Ready
-- **Result**: PASS — "Wake command sent"
+### 2.1 machine_sleep
+```
+Call: machine_sleep (confirmed: true)
+Expect: success=true
+```
 
-### 2.2 machine_sleep
-- **Action**: Put machine to sleep
-- **Expected**: Machine transitions to Sleep
-- **Result**: PASS — "Sleep command sent"
+### 2.2 machine_wake
+```
+Call: machine_wake (confirmed: true)
+Expect: success=true
+Verify: machine_get_state → phase is "Ready" or "Idle" (not "Sleep")
+Note: machine must be awake for remaining tests. Will restore ORIGINAL_PHASE at end.
+```
 
-### 2.3 machine_stop
-- **Action**: Stop current operation (only valid during operation)
-- **Expected**: Returns success or appropriate error if not in operation
-- **Result**: PASS — returned error "No operation in progress" (correct)
+### 2.3 machine_stop (no operation running)
+```
+Call: machine_stop (confirmed: true)
+Expect: error containing "No operation" or similar
+```
 
-### 2.4 machine_skip_frame
-- **Action**: Skip to next frame (only valid during espresso)
-- **Expected**: Returns appropriate error if not in espresso
-- **Result**: PASS — returned error "No extraction in progress" (correct)
+### 2.4 machine_skip_frame (no extraction running)
+```
+Call: machine_skip_frame (confirmed: true)
+Expect: error containing "No extraction" or similar
+```
 
 ### 2.5 machine_start_espresso / steam / hot_water / flush
-- **Action**: Start operations (headless DE1 only)
-- **Expected**: Returns error on simulator (no headless support)
-- **Result**: NOT TESTED — skipped (simulator, not headless)
+```
+SKIP if simulator mode (not headless DE1)
+On real headless DE1:
+  Call: machine_start_espresso
+  Expect: success=true, then machine_get_state shows espresso phase
+  Call: machine_stop (confirmed: true)
+  Expect: success=true
+```
 
-## 3. Profile Management (read)
+## 3. Profile Read — All 5 Editor Types
 
 ### 3.1 profiles_list
-- **Action**: List all profiles
-- **Expected**: Returns array with filename, title, editorType for each
-- **Result**: PASS — 94 profiles, all have editorType (pressure/flow/dflow/aflow/advanced)
+```
+Call: profiles_list
+Expect: count > 0, each profile has filename, title, editorType
+Verify: editorType values include at least "pressure", "flow", "dflow", "aflow", "advanced"
+```
 
 ### 3.2 profiles_get_active
-- **Action**: Get current profile
-- **Expected**: Returns filename, title, editorType (not empty), modified, targetWeight, targetTemperature
-- **Result**: PASS — editorType="pressure" for Default, "advanced" for Adaptive v2
+```
+Call: profiles_get_active
+Expect: filename non-empty, editorType non-empty, modified is boolean, targetWeight > 0
+Save: note the filename and editorType as ORIGINAL_PROFILE and ORIGINAL_EDITOR
+```
 
 ### 3.3 profiles_get_detail
-- **Action**: Get full profile JSON for a specific profile
-- **Expected**: Returns complete profile with steps/frames
-- **Result**: PASS — Blooming Espresso returned with 6 frames, notes, metadata
+```
+Call: profiles_get_detail (filename: "blooming_espresso")
+Expect: title="Blooming Espresso", steps is array with length > 0, espresso_temperature > 0
+```
 
-### 3.4 profiles_get_params — pressure editor
-- **Action**: Load Default profile, get params
-- **Expected**: Returns only pressure-relevant fields
-- **Result**: PASS — returned espressoPressure, pressureEnd, limiter, preinfusion, hold, decline, per-step temps. No D-Flow/A-Flow fields.
+### 3.4 profiles_get_params — pressure
+```
+Call: profiles_set_active (filename: "default", confirmed: true)
+Call: profiles_get_params
+Expect: editorType="pressure"
+Expect present: espressoPressure, pressureEnd, preinfusionTime, holdTime, simpleDeclineTime, tempStart, tempHold, limiterValue
+Expect absent: fillTemperature, pourFlow, rampTime, steps
+```
 
-### 3.5 profiles_get_params — flow editor
-- **Action**: Load Flow profile for straight espresso, get params
-- **Expected**: Returns flow fields instead of pressure fields
-- **Result**: PASS — returned holdFlow=2, flowEnd=1.2, limiterValue=8.6. No espressoPressure/pressureEnd.
+### 3.5 profiles_get_params — flow
+```
+Call: profiles_set_active (filename: "flow_profile_for_straight_espresso", confirmed: true)
+Call: profiles_get_params
+Expect: editorType="flow"
+Expect present: holdFlow, flowEnd, preinfusionTime, holdTime, simpleDeclineTime, tempStart, limiterValue
+Expect absent: espressoPressure, pressureEnd, fillTemperature, pourFlow, rampTime, steps
+```
 
-### 3.6 profiles_get_params — dflow editor
-- **Action**: Load D-Flow / Q, get params
-- **Expected**: Returns fill/infuse/pour params only
-- **Result**: PASS — returned fillTemperature=84, pourFlow=1.8, pourPressure=10. No simple profile fields.
+### 3.6 profiles_get_params — dflow
+```
+Call: profiles_set_active (filename: "d_flow_q", confirmed: true)
+Call: profiles_get_params
+Expect: editorType="dflow"
+Expect present: fillTemperature, fillPressure, fillFlow, infusePressure, infuseTime, pourTemperature, pourFlow, pourPressure
+Expect absent: preinfusionTime, espressoPressure, holdFlow, rampTime, steps
+```
 
-### 3.7 profiles_get_params — aflow editor
-- **Action**: Load A-Flow / default-medium, get params
-- **Expected**: Returns fill/infuse/pour + A-Flow-specific fields
-- **Result**: PASS — returned rampTime=10, rampDownEnabled=false, flowExtractionUp=true, secondFillEnabled=false
+### 3.7 profiles_get_params — aflow
+```
+Call: profiles_set_active (filename: "a_flow_default_medium", confirmed: true)
+Call: profiles_get_params
+Expect: editorType="aflow"
+Expect present: (all dflow fields) + rampTime, rampDownEnabled, flowExtractionUp, secondFillEnabled
+Expect absent: preinfusionTime, espressoPressure, steps
+```
 
-### 3.8 profiles_get_params — advanced editor
-- **Action**: Load Adaptive v2, get params
-- **Expected**: Returns full profile data with frames
-- **Result**: PASS — returned editorType="advanced", 7 frames with all step details, profile_notes, metadata
+### 3.8 profiles_get_params — advanced
+```
+Call: profiles_set_active (filename: "adaptive_v2", confirmed: true)
+Call: profiles_get_params
+Expect: editorType="advanced"
+Expect present: steps (array with 7 elements), espresso_temperature, profile_notes, preinfuse_frame_count
+Expect absent: fillTemperature, pourFlow, preinfusionTime, espressoPressure
+```
 
-## 4. Profile Editing (write)
+## 4. Profile Editing
+
+### Setup: switch to pressure profile
+```
+Call: profiles_set_active (filename: "default", confirmed: true)
+Call: profiles_get_params
+Save: note tempStart as ORIGINAL_TEMP
+```
 
 ### 4.1 profiles_edit_params — recipe profile
-- **Action**: Edit Default temperature via profiles_edit_params
-- **Expected**: Temperature changes, profile marked modified
-- **Result**: PASS — targetTemperature changed to 92, modified=true, editorType="pressure"
+```
+Call: profiles_edit_params (tempStart: ORIGINAL_TEMP+2, tempPreinfuse: ORIGINAL_TEMP+2, tempHold: ORIGINAL_TEMP+2, tempDecline: ORIGINAL_TEMP+2, confirmed: true)
+Expect: success=true, editorType="pressure", modified=true
+Verify: profiles_get_active → targetTemperature = ORIGINAL_TEMP+2, modified=true
+```
 
-### 4.2 profiles_edit_params — advanced profile
-- **Action**: Edit Adaptive v2 espresso_temperature via profiles_edit_params
-- **Expected**: espresso_temperature changes, all 7 frames preserved
-- **Result**: PASS — espresso_temperature=95, all 7 frames intact with original per-frame temperatures
+### 4.2 Restore temperature
+```
+Call: profiles_edit_params (tempStart: ORIGINAL_TEMP, tempPreinfuse: ORIGINAL_TEMP-2, tempHold: ORIGINAL_TEMP-2, tempDecline: ORIGINAL_TEMP-2, confirmed: true)
+Expect: success=true
+```
 
 ### 4.3 settings_set — temperature on recipe profile
-- **Action**: Change espressoTemperature on Default via settings_set
-- **Expected**: Frames regenerated, profile modified
-- **Result**: PASS — targetTemperature updated to 90
+```
+Call: settings_set (espressoTemperature: ORIGINAL_TEMP+2, confirmed: true)
+Expect: success=true, updated includes "espressoTemperature"
+Verify: profiles_get_active → targetTemperature = ORIGINAL_TEMP+2
+```
 
-### 4.4 settings_set — temperature on advanced profile
-- **Action**: Change espressoTemperature on Adaptive v2 via settings_set
-- **Expected**: espresso_temperature updated, all 7 frames preserved
-- **Result**: PASS — temperature changed, editorType still "advanced", frames not destroyed
+### 4.4 Restore temperature
+```
+Call: settings_set (espressoTemperature: ORIGINAL_TEMP, confirmed: true)
+```
 
-### 4.5 dialing_apply_change — temperature on advanced profile
-- **Action**: Change espressoTemperature on Adaptive v2 via dialing_apply_change
-- **Expected**: Frames preserved, uses uploadProfile()
-- **Result**: PASS — temperature changed to 94, editorType still "advanced"
+### 4.5 profiles_edit_params — advanced profile (frame preservation)
+```
+Call: profiles_set_active (filename: "adaptive_v2", confirmed: true)
+Call: profiles_get_params
+Save: note steps array length as FRAME_COUNT, espresso_temperature as ADV_TEMP
+Call: profiles_edit_params (espresso_temperature: ADV_TEMP+2, confirmed: true)
+Expect: success=true, editorType="advanced"
+Verify: profiles_get_params → steps has FRAME_COUNT elements (frames NOT destroyed), espresso_temperature = ADV_TEMP+2
+```
 
-### 4.6 profiles_save — save in place
-- **Action**: Edit profile, then save
-- **Expected**: Profile saved to disk, modified flag cleared
-- **Result**: PASS — modified=false after save
+### 4.6 settings_set — temperature on advanced profile (frame preservation)
+```
+Call: settings_set (espressoTemperature: ADV_TEMP+3, confirmed: true)
+Expect: updated includes "espressoTemperature"
+Verify: profiles_get_params → steps still has FRAME_COUNT elements, espresso_temperature = ADV_TEMP+3
+```
 
-### 4.7 profiles_save — Save As
-- **Action**: Save current profile with filename="mcp_test_copy", title="MCP Test Copy"
-- **Expected**: New profile created
-- **Result**: PASS — "Profile saved as: MCP Test Copy"
+### 4.7 dialing_apply_change — temperature on advanced profile (frame preservation)
+```
+Call: dialing_apply_change (espressoTemperature: ADV_TEMP, confirmed: true)
+Expect: applied includes "espressoTemperature"
+Verify: profiles_get_active → editorType="advanced", targetTemperature = ADV_TEMP
+```
 
-### 4.8 profiles_delete — user profile
-- **Action**: Delete mcp_test_copy
-- **Expected**: Profile deleted
-- **Result**: PASS — "Profile deleted: mcp_test_copy"
+### 4.8 profiles_save — save in place
+```
+Call: profiles_set_active (filename: "default", confirmed: true)
+Call: profiles_edit_params (tempStart: 91, tempPreinfuse: 91, tempHold: 91, tempDecline: 91, confirmed: true)
+Verify: profiles_get_active → modified=true
+Call: profiles_save (confirmed: true)
+Expect: success=true, filename="default"
+Verify: profiles_get_active → modified=false
+Note: this creates a user override of the built-in "default" — cleaned up in 4.11
+```
 
-### 4.9 profiles_delete — built-in revert
-- **Action**: Delete Default (which had a saved user override)
-- **Expected**: Local override removed, reverts to built-in
-- **Result**: PASS — "Profile deleted: default"
+### 4.9 profiles_save — Save As
+```
+Call: profiles_save (filename: "_mcp_test_tmp", title: "MCP Test Temp", confirmed: true)
+Expect: success=true, filename="_mcp_test_tmp"
+Note: this creates a temporary profile — cleaned up immediately in 4.10
+```
 
-### 4.10 profiles_set_active — built-in profile
-- **Action**: Switch to blooming_espresso (built-in)
-- **Expected**: Profile loads (profileExists finds built-in via m_availableProfiles)
-- **Result**: PASS — "Profile activation queued: blooming_espresso"
+### 4.10 profiles_delete — user profile
+```
+Call: profiles_delete (filename: "_mcp_test_tmp", confirmed: true)
+Expect: success=true, message contains "deleted"
+Verify: profiles_list → no profile with filename "_mcp_test_tmp"
+```
+
+### 4.11 profiles_delete — built-in revert
+```
+Call: profiles_delete (filename: "default", confirmed: true)
+Expect: success=true (either "deleted" for user copy or "reverted" for built-in)
+Verify: profiles_set_active (filename: "default", confirmed: true) → success (built-in still exists)
+Note: this cleans up the user override created in 4.8, restoring "default" to built-in state
+```
+
+### 4.12 profiles_set_active — built-in profile
+```
+Call: profiles_set_active (filename: "blooming_espresso", confirmed: true)
+Expect: success=true
+Verify: profiles_get_active → title="Blooming Espresso"
+```
 
 ## 5. Settings
 
 ### 5.1 settings_get
-- **Action**: Read all settings
-- **Expected**: Returns temperature, weight, steam, water, DYE fields
-- **Result**: PASS — returned 20 fields including espressoTemperature, targetWeight, steam, water, DYE
+```
+Call: settings_get
+Expect: espressoTemperature, targetWeight, steamTemperature, waterTemperature, dyeBeanBrand all present
+Save: note dyeBeanBrand as ORIGINAL_BRAND, dyeGrinderSetting as ORIGINAL_GRIND
+```
 
 ### 5.2 settings_set — DYE metadata
-- **Action**: Set bean brand and grinder setting
-- **Expected**: Fields updated, returned in updated list
-- **Result**: PASS — updated=["dyeBeanBrand","dyeGrinderSetting"]
+```
+Call: settings_set (dyeBeanBrand: "MCP Test Brand", dyeGrinderSetting: "99", confirmed: true)
+Expect: success=true, updated includes "dyeBeanBrand" and "dyeGrinderSetting"
+```
+
+### 5.3 Cleanup: restore DYE
+```
+Call: settings_set (dyeBeanBrand: ORIGINAL_BRAND, dyeGrinderSetting: ORIGINAL_GRIND, confirmed: true)
+Expect: success=true
+```
 
 ## 6. Shot History
 
 ### 6.1 shots_list
-- **Action**: List recent shots (limit 3)
-- **Expected**: Returns array of shot summaries
-- **Result**: PASS — 3 shots returned with id, profileName, dose, yield, duration, enjoyment
+```
+Call: shots_list (limit: 3)
+Expect: count=3, each shot has id, profileName, duration, enjoyment
+Save: note first shot id as SHOT_ID, second shot id as SHOT_ID_2
+```
 
-### 6.2 shots_list — with filter
-- **Action**: List shots filtered by profileName="D-Flow"
-- **Expected**: Only matching shots returned
-- **Result**: PASS — 3 D-Flow shots returned (757 total matching)
+### 6.2 shots_list — filtered
+```
+Call: shots_list (profileName: "D-Flow", limit: 3)
+Expect: count > 0, all returned shots have profileName containing "D-Flow"
+```
 
 ### 6.3 shots_get_detail
-- **Action**: Get full detail of shot 899
-- **Expected**: Returns time-series data
-- **Result**: PASS — returned pressure[], flow[], temperature[], weight[] arrays + phases, debug log
+```
+Call: shots_get_detail (shotId: SHOT_ID)
+Expect: id=SHOT_ID, pressure array non-empty, flow array non-empty, temperature array non-empty
+```
 
 ### 6.4 shots_compare
-- **Action**: Compare shots 899 and 898
-- **Expected**: Returns summary for both
-- **Result**: PASS — returned comparison data (large response)
+```
+Call: shots_compare (shotIds: [SHOT_ID, SHOT_ID_2])
+Expect: response contains data for both shot IDs
+```
 
 ### 6.5 shots_set_feedback
-- **Action**: Set enjoyment=90 and notes on shot 899
-- **Expected**: Feedback saved
-- **Result**: PASS — "Feedback saved for shot 899"
+```
+Call: shots_get_detail (shotId: SHOT_ID)
+Save: ORIGINAL_ENJOYMENT = enjoyment, ORIGINAL_NOTES = notes (espressoNotes)
+Call: shots_set_feedback (shotId: SHOT_ID, enjoyment: 85, notes: "MCP test run")
+Expect: success=true, message contains shot ID
+Cleanup: shots_set_feedback (shotId: SHOT_ID, enjoyment: ORIGINAL_ENJOYMENT, notes: ORIGINAL_NOTES)
+```
 
 ## 7. Dial-In
 
 ### 7.1 dialing_get_context
-- **Action**: Get full dial-in context for most recent shot
-- **Expected**: Returns shot summary, history, profile knowledge, bean metadata
-- **Result**: PASS — returned shot, dialInHistory, profileKnowledge, currentBean, currentProfile, shotAnalysis
+```
+Call: dialing_get_context (history_limit: 2)
+Expect: shotId > 0, shot object present, currentBean present, currentProfile present
+Expect: profileKnowledge non-empty (if profile has knowledge base)
+```
 
 ### 7.2 dialing_suggest_change
-- **Action**: Suggest a grind change
-- **Expected**: Returns suggestion with status
-- **Result**: PASS — status="suggestion_displayed"
+```
+Call: dialing_suggest_change (parameter: "grind", suggestion: "Test suggestion", rationale: "MCP test")
+Expect: status="suggestion_displayed", parameter="grind"
+```
 
-### 7.3 dialing_apply_change — metadata
-- **Action**: Change grinder setting and bean brand
-- **Expected**: Settings updated, no profile corruption
-- **Result**: PASS — applied=["grinderSetting","dyeBeanBrand"]
+### 7.3 dialing_apply_change — metadata only
+```
+Call: dialing_apply_change (grinderSetting: "99", confirmed: true)
+Expect: applied includes "grinderSetting"
+Cleanup: dialing_apply_change (grinderSetting: ORIGINAL_GRIND, confirmed: true)
+```
 
 ## 8. Scale
 
 ### 8.1 scale_get_weight
-- **Action**: Read current weight
-- **Expected**: Returns weight and flow rate
-- **Result**: PASS — weight=0, flowRate=0 (no cup on simulated scale)
+```
+Call: scale_get_weight
+Expect: weight is number, flowRate is number
+```
 
 ### 8.2 scale_tare
-- **Action**: Tare the scale
-- **Expected**: Scale zeroed
-- **Result**: PASS — "Scale tared"
+```
+Call: scale_tare
+Expect: success=true
+```
 
-### 8.3 scale_timer_start / stop / reset
-- **Action**: Start, stop, reset timer
-- **Expected**: Timer operations succeed
-- **Result**: PASS — all three returned success
+### 8.3 scale_timer — start, stop, reset
+```
+Call: scale_timer_start
+Expect: success=true
+Call: scale_timer_stop
+Expect: success=true
+Call: scale_timer_reset
+Expect: success=true
+```
 
 ## 9. Devices
 
 ### 9.1 devices_list
-- **Action**: List discovered BLE devices
-- **Expected**: Returns device list (may be empty in simulator)
-- **Result**: PASS — count=0, devices=[] (simulator mode, expected)
+```
+Call: devices_list
+Expect: devices is array (may be empty in simulator), count is number
+```
 
 ### 9.2 devices_connection_status
-- **Action**: Get connection status
-- **Expected**: Returns DE1 and scale connection state
-- **Result**: PASS — machineConnected=true, bleAvailable=true
+```
+Call: devices_connection_status
+Expect: machineConnected is boolean, bleAvailable is boolean
+```
 
 ### 9.3 devices_scan
-- **Action**: Start BLE scan
-- **Expected**: Scan initiated
-- **Result**: PASS — "BLE scan started"
+```
+Call: devices_scan
+Expect: success=true
+```
 
 ## 10. Debug
 
 ### 10.1 debug_get_log
-- **Action**: Read debug log with offset/limit
-- **Expected**: Returns log lines with pagination
-- **Result**: PASS — returned 5 lines, totalLines=5940, hasMore=true
+```
+Call: debug_get_log (offset: 0, limit: 10)
+Expect: totalLines > 0, returnedLines <= 10, hasMore=true (if totalLines > 10)
+```
+
+## Cleanup (restore system to original state)
+
+```
+Step 1 — Restore active profile:
+  Call: profiles_set_active (filename: ORIGINAL_PROFILE, confirmed: true)
+  Verify: profiles_get_active → filename = ORIGINAL_PROFILE
+
+Step 2 — Restore DYE metadata:
+  Call: settings_set (dyeBeanBrand: ORIGINAL_BRAND, dyeBeanType: ORIGINAL_BEAN_TYPE,
+                      dyeRoastLevel: ORIGINAL_ROAST, dyeGrinderSetting: ORIGINAL_GRIND,
+                      confirmed: true)
+
+Step 3 — Restore machine phase (if was sleeping):
+  If ORIGINAL_PHASE was "Sleep":
+    Call: machine_sleep (confirmed: true)
+
+Step 4 — Verify clean state:
+  Call: profiles_get_active → filename = ORIGINAL_PROFILE, modified = false
+  Call: settings_get → dyeBeanBrand = ORIGINAL_BRAND, dyeGrinderSetting = ORIGINAL_GRIND
+  Call: machine_get_state → phase matches ORIGINAL_PHASE (or Ready if was Ready)
+```
+
+### What this test plan does NOT leave behind
+- No temporary profiles on disk (`_mcp_test_tmp` deleted in 4.10, `default` override reverted in 4.11)
+- No modified DYE metadata (restored in cleanup step 2)
+- No modified grinder setting (restored in 7.3 cleanup and cleanup step 2)
+- No permanently altered shot feedback (restored in 6.5 cleanup)
+- No changed machine phase (restored in cleanup step 3)
+- Active profile and temperature restored to pre-test values
 
 ## Summary
 
-| Category | Tests | Passed | Skipped |
-|----------|-------|--------|---------|
-| Machine State | 2 | 2 | 0 |
-| Machine Control | 5 | 4 | 1 (start ops — simulator) |
-| Profile Read | 8 | 8 | 0 |
-| Profile Edit | 10 | 10 | 0 |
-| Settings | 2 | 2 | 0 |
-| Shot History | 5 | 5 | 0 |
-| Dial-In | 3 | 3 | 0 |
-| Scale | 3 | 3 | 0 |
-| Devices | 3 | 3 | 0 |
-| Debug | 1 | 1 | 0 |
-| **Total** | **42** | **41** | **1** |
+| Category | Tests | Notes |
+|----------|-------|-------|
+| Machine State | 2 | Read-only |
+| Machine Control | 4+1 | 1 skipped in simulator (start ops) |
+| Profile Read | 8 | All 5 editor types |
+| Profile Edit | 12 | Includes frame preservation checks for advanced |
+| Settings | 3 | Includes cleanup |
+| Shot History | 5 | |
+| Dial-In | 3 | Includes cleanup |
+| Scale | 3 | |
+| Devices | 3 | |
+| Debug | 1 | |
+| **Total** | **44** | |
