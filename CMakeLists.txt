@@ -516,7 +516,6 @@ endif()
 if(IOS OR APPLE)
     qt_import_plugins(Decenza
         INCLUDE_BY_TYPE multimedia Qt6::QDarwinMediaPlugin
-        EXCLUDE_BY_TYPE multimedia Qt6::QFFmpegMediaPlugin
         INCLUDE_BY_TYPE permissions Qt6::QDarwinLocationPermissionPlugin
     )
 endif()
