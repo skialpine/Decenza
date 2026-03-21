@@ -143,12 +143,7 @@ void registerWriteTools(McpToolRegistry* registry, MainController* mainControlle
                 return result;
             }
 
-            // MCP may send integers as strings — handle both
             qint64 shotId = args["shotId"].toInteger();
-            if (shotId <= 0)
-                shotId = static_cast<qint64>(args["shotId"].toDouble());
-            if (shotId <= 0)
-                shotId = args["shotId"].toString().toLongLong();
             if (shotId <= 0) {
                 result["error"] = "Valid shotId is required";
                 return result;

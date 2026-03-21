@@ -56,7 +56,10 @@ public:
         return result;
     }
 
-    // Call a tool, checking access level
+    // Call a tool, checking access level.
+    // Arguments are normalized against the tool's input schema before dispatch —
+    // MCP clients may send integers as strings (especially after the confirmation
+    // round-trip where args are serialized to JSON text and re-parsed).
     QJsonObject callTool(const QString& name, const QJsonObject& arguments,
                          int accessLevel, QString& errorOut) const
     {
@@ -70,7 +73,7 @@ public:
             errorOut = "Access level insufficient";
             return {};
         }
-        return tool.handler(arguments);
+        return tool.handler(normalizeArguments(arguments, tool.inputSchema));
     }
 
     bool hasTool(const QString& name) const { return m_tools.contains(name); }
@@ -83,6 +86,35 @@ public:
     }
 
 private:
+    // Coerce string-typed values to the type declared in the tool's inputSchema.
+    // MCP clients may send "123" instead of 123 after a confirmation round-trip.
+    static QJsonObject normalizeArguments(const QJsonObject& args, const QJsonObject& schema)
+    {
+        QJsonObject properties = schema["properties"].toObject();
+        if (properties.isEmpty()) return args;
+
+        QJsonObject normalized = args;
+        for (auto it = args.begin(); it != args.end(); ++it) {
+            if (!it.value().isString()) continue;  // only coerce strings
+            QJsonObject prop = properties[it.key()].toObject();
+            QString type = prop["type"].toString();
+            if (type == "integer") {
+                bool ok;
+                qint64 v = it.value().toString().toLongLong(&ok);
+                if (ok) normalized[it.key()] = v;
+            } else if (type == "number") {
+                bool ok;
+                double v = it.value().toString().toDouble(&ok);
+                if (ok) normalized[it.key()] = v;
+            } else if (type == "boolean") {
+                QString s = it.value().toString().toLower();
+                if (s == "true") normalized[it.key()] = true;
+                else if (s == "false") normalized[it.key()] = false;
+            }
+        }
+        return normalized;
+    }
+
     static int categoryMinLevel(const QString& category)
     {
         if (category == "read") return 0;
