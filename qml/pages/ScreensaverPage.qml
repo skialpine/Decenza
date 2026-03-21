@@ -130,6 +130,7 @@ Page {
             if (isCurrentItemImage) {
                 // Display image with cross-fade transition
                 // Destroy video decoder while showing images to free memory
+                pendingVideoSource = ""  // Clear before deactivation to prevent onItemChanged replay
                 mediaPlayerLoader.active = false
                 mediaPlaying = true
                 videoSkipCount = 0
