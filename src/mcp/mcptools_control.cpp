@@ -2,10 +2,12 @@
 #include "mcptoolregistry.h"
 #include "../ble/de1device.h"
 #include "../machine/machinestate.h"
+#include "../controllers/maincontroller.h"
 
 #include <QJsonObject>
 
-void registerControlTools(McpToolRegistry* registry, DE1Device* device, MachineState* machineState)
+void registerControlTools(McpToolRegistry* registry, DE1Device* device, MachineState* machineState,
+                          MainController* mainController)
 {
     // machine_wake
     registry->registerTool(
@@ -54,9 +56,17 @@ void registerControlTools(McpToolRegistry* registry, DE1Device* device, MachineS
     // machine_start_espresso
     registry->registerTool(
         "machine_start_espresso",
-        "Start pulling an espresso shot. Machine must be in Ready state. Only works on DE1 v1.0 headless machines — most machines with GHC require a physical button press. Do not offer this unless the user explicitly asks.",
-        QJsonObject{{"type", "object"}, {"properties", QJsonObject{}}},
-        [device, machineState](const QJsonObject&) -> QJsonObject {
+        "Start pulling an espresso shot. Machine must be in Ready state. Only works on DE1 v1.0 headless machines — "
+        "most machines with GHC require a physical button press. Do not offer this unless the user explicitly asks. "
+        "Optional brew overrides (dose, yield, temperature, grind) are applied for this shot only — they are "
+        "automatically cleared when the shot ends, matching the QML BrewDialog behavior.",
+        QJsonObject{{"type", "object"}, {"properties", QJsonObject{
+            {"dose", QJsonObject{{"type", "number"}, {"description", "Override dose weight for this shot (grams)"}}},
+            {"yield", QJsonObject{{"type", "number"}, {"description", "Override target yield for this shot (grams)"}}},
+            {"temperature", QJsonObject{{"type", "number"}, {"description", "Override temperature for this shot (Celsius)"}}},
+            {"grind", QJsonObject{{"type", "string"}, {"description", "Override grind setting for this shot"}}}
+        }}},
+        [device, machineState, mainController](const QJsonObject& args) -> QJsonObject {
             QJsonObject result;
             if (!device || !device->isConnected()) {
                 result["error"] = "Machine not connected";
@@ -70,9 +80,21 @@ void registerControlTools(McpToolRegistry* registry, DE1Device* device, MachineS
                 result["error"] = "Machine not ready (current phase: " + machineState->phaseString() + ")";
                 return result;
             }
+
+            // Apply brew overrides if provided — same as QML BrewDialog
+            bool hasOverrides = args.contains("dose") || args.contains("yield") ||
+                                args.contains("temperature") || args.contains("grind");
+            if (hasOverrides && mainController) {
+                double dose = args.contains("dose") ? args["dose"].toDouble() : 0;
+                double yield = args.contains("yield") ? args["yield"].toDouble() : 0;
+                double temperature = args.contains("temperature") ? args["temperature"].toDouble() : 0;
+                QString grind = args["grind"].toString();
+                mainController->activateBrewWithOverrides(dose, yield, temperature, grind);
+            }
+
             device->startEspresso();
             result["success"] = true;
-            result["message"] = "Espresso started";
+            result["message"] = hasOverrides ? "Espresso started with brew overrides" : "Espresso started";
             return result;
         },
         "control");

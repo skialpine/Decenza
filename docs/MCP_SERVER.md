@@ -87,8 +87,8 @@ Each tool has a `category` that determines the minimum access level required:
 | Category | Min Access Level | Tools |
 |----------|-----------------|-------|
 | `read` | 0 (Monitor) | machine_get_state, machine_get_telemetry, shots_list, shots_get_detail, shots_compare, profiles_list, profiles_get_active, profiles_get_detail, profiles_get_params, settings_get, dialing_get_context |
-| `control` | 1 (Control) | machine_wake, machine_sleep, machine_start_espresso, machine_start_steam, machine_start_hot_water, machine_start_flush, machine_stop, machine_skip_frame, shots_set_feedback, dialing_suggest_change |
-| `settings` | 2 (Full) | profiles_set_active, profiles_edit_params, profiles_save, profiles_delete, settings_set, dialing_apply_change |
+| `control` | 1 (Control) | machine_wake, machine_sleep, machine_start_espresso, machine_start_steam, machine_start_hot_water, machine_start_flush, machine_stop, machine_skip_frame, shots_update, dialing_suggest_change |
+| `settings` | 2 (Full) | profiles_set_active, profiles_edit_params, profiles_save, profiles_delete, profiles_create, shots_delete, settings_set |
 
 ### Tool → Confirmation Level Mapping
 
@@ -107,9 +107,10 @@ Two confirmation mechanisms are used depending on where the user is:
 | profiles_edit_params | **Confirm** | Confirm | Chat |
 | profiles_save | **Confirm** | Confirm | Chat |
 | profiles_delete | **Confirm** | Confirm | Chat |
+| profiles_create | **Confirm** | Confirm | Chat |
+| shots_delete | **Confirm** | Confirm | Chat |
 | settings_set | **Confirm** | Confirm | Chat |
-| dialing_apply_change | **Confirm** | Confirm | Chat |
-| shots_set_feedback | No confirm | No confirm | — |
+| shots_update | No confirm | No confirm | — |
 | dialing_suggest_change | No confirm | No confirm | — |
 
 When confirmation level is 0 (None), all tools execute immediately regardless of mechanism.
@@ -152,7 +153,7 @@ This avoids holding HTTP connections and works naturally with the conversational
 |------|-------------|----------|
 | `machine_wake` | Wake from sleep | control |
 | `machine_sleep` | Put to sleep | control |
-| `machine_start_espresso` | Start pulling a shot | control |
+| `machine_start_espresso` | Start pulling a shot. Optional brew overrides (dose, yield, temperature, grind) apply for this shot only, matching QML BrewDialog. | control |
 | `machine_start_steam` | Start steaming | control |
 | `machine_start_hot_water` | Dispense hot water | control |
 | `machine_start_flush` | Flush group head | control |
@@ -171,7 +172,8 @@ This avoids holding HTTP connections and works naturally with the conversational
 | `shots_list` | List shots with filters (limit, offset, profile, bean, enjoyment) | read |
 | `shots_get_detail` | Full shot record with time-series data | read |
 | `shots_compare` | Side-by-side comparison of 2+ shots | read |
-| `shots_set_feedback` | Record enjoyment rating (0-100) and/or tasting notes for a shot. Closes the dial-in feedback loop — the AI can ask "how was that shot?" and record the response. Call `updateShotMetadataStatic()` via `QThread::create()` with `QPointer<QTcpSocket>` guard and `QMetaObject::invokeMethod(..., Qt::QueuedConnection)` callback — same pattern as `shotserver.cpp` shot updates. Never call the static function directly on the main thread. | control |
+| `shots_update` | Update any metadata field on a shot: enjoyment, notes, dose, yield, bean info, grinder info, barista, TDS, EY. Same fields the QML shot editor can change. Replaces the old `shots_set_feedback`. | control |
+| `shots_delete` | Delete a shot by ID. Permanent and cannot be undone. | settings |
 
 ### Profile Management
 | Tool | Description | Category |
@@ -184,6 +186,7 @@ This avoids holding HTTP connections and works naturally with the conversational
 | `profiles_edit_params` | Edit the current profile's recipe parameters and regenerate frames. Only provide fields you want to change — unspecified fields keep their current values. Triggers frame regeneration and uploads to machine. Profile is marked modified but not saved to disk — call `profiles_save` to persist. | settings |
 | `profiles_save` | Save the current (modified) profile to disk. Without this, edits are active on the machine but lost if another profile is loaded. Optionally provide filename + title for Save As. | settings |
 | `profiles_delete` | Delete a user/downloaded profile. For built-in profiles, removes local overrides and reverts to the original built-in version. | settings |
+| `profiles_create` | Create a new blank profile with a given editor type (dflow, aflow, pressure, flow, advanced) and title. Uses the same creation functions as the QML UI. | settings |
 
 ### Settings
 | Tool | Description | Category |
@@ -199,7 +202,7 @@ The MCP enables an external AI (e.g. Claude Desktop) to act as a dial-in advisor
 |------|-------------|----------|
 | `dialing_get_context` | Get full dial-in context bundle: current profile recipe + profile knowledge + recent shot summary (via `ShotSummarizer`) + dial-in history (last N shots with same profile family via `ShotHistoryStorage::getRecentShotsByKbId()`) + bean metadata + dial-in reference tables (`docs/ESPRESSO_DIAL_IN_REFERENCE.md`). This is the primary read tool for dial-in — a single call gives the AI everything it needs to analyze a shot and suggest changes. | read |
 | `dialing_suggest_change` | Suggest a parameter change to the user with rationale (e.g. "Grind 2 clicks finer to reduce sourness"). Returns the suggestion as structured data. The app shows it as a toast/notification via `McpServer::suggestionReceived` signal → QML handler. Track whether a suggestion is currently displayed via an event-based boolean (`m_suggestionPending`), set when the signal fires and cleared by QML `onSuggestionDismissed` callback. Do NOT use a timer to clear this flag. If a new suggestion arrives while one is displayed, replace the current toast. | control |
-| `dialing_apply_change` | **DEPRECATED — remove in phase 15.** Convenience wrapper that duplicates `settings_set` + `profiles_set_active`. Caused the advanced-profile-corruption bug due to duplicated code paths. Callers should use `settings_set` for temp/weight/DYE changes and `profiles_set_active` for profile switches. | settings |
+| ~~`dialing_apply_change`~~ | **Removed.** Was a convenience wrapper that duplicated `settings_set` + `profiles_set_active`. Caused the advanced-profile-corruption bug due to duplicated code paths. Use `settings_set` for temp/weight/DYE changes and `profiles_set_active` for profile switches. | — |
 
 **Design note — why one read tool instead of four:** An earlier version had separate `dialing_get_shot_summary`, `dialing_get_history`, `dialing_get_profile_knowledge`, and `dialing_get_context` tools. These were consolidated into just `dialing_get_context` because: (1) the MCP client almost always needs all the context together, (2) fewer tools means better MCP client compatibility and less confusion for the AI, (3) the individual data is still available via generic tools (`shots_get_detail`, `profiles_get_detail`, `settings_get`) if needed. The `dialing_get_context` tool accepts optional parameters to control what's included (e.g., `shot_id` to analyze a specific shot instead of the most recent, `history_limit` to control how many prior shots to include).
 
@@ -623,7 +626,7 @@ Before adding new tools, consolidate existing ones to reduce tool count and avoi
 | 12 | Device tools | ✅ Done | list, scan, connect_scale, connection_status |
 | 13 | Confirmation dialog | ✅ Done | Hybrid: in-app for start ops, chat for settings |
 | 14 | Profile editor tools | ✅ Done | get_params, edit_params, save, delete (all 5 editor types) |
-| 15 | QML parity: high | 🔲 Next | profiles_create, shots_update/delete, brew overrides, consolidation |
+| 15 | QML parity: high | ✅ Done | profiles_create, shots_update/delete, brew overrides, removed dialing_apply_change |
 | 16 | QML parity: medium | 🔲 Future | visualizer, favorites, frame manipulation |
 | 17 | QML parity: low | 🔲 Future | bean inventory, streaming, direct control, community, presets, backup |
 

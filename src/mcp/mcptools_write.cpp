@@ -20,16 +20,30 @@ static QAtomicInt s_mcpWriteConnCounter{0};
 void registerWriteTools(McpToolRegistry* registry, MainController* mainController,
                         ShotHistoryStorage* shotHistory, Settings* settings)
 {
-    // shots_set_feedback
+    // shots_update — replaces shots_set_feedback with full metadata editing (same as QML)
     registry->registerTool(
-        "shots_set_feedback",
-        "Record enjoyment rating (0-100) and/or tasting notes for a shot",
+        "shots_update",
+        "Update any metadata field on a shot. Supports all fields the QML shot editor can change: "
+        "enjoyment, notes, dose, yield, bean info, grinder info, barista, TDS, EY.",
         QJsonObject{
             {"type", "object"},
             {"properties", QJsonObject{
                 {"shotId", QJsonObject{{"type", "integer"}, {"description", "Shot ID"}}},
                 {"enjoyment", QJsonObject{{"type", "integer"}, {"description", "Enjoyment rating 0-100"}}},
-                {"notes", QJsonObject{{"type", "string"}, {"description", "Tasting notes"}}}
+                {"notes", QJsonObject{{"type", "string"}, {"description", "Tasting notes"}}},
+                {"doseWeight", QJsonObject{{"type", "number"}, {"description", "Dose weight in grams"}}},
+                {"drinkWeight", QJsonObject{{"type", "number"}, {"description", "Yield/drink weight in grams"}}},
+                {"beanBrand", QJsonObject{{"type", "string"}, {"description", "Bean brand"}}},
+                {"beanType", QJsonObject{{"type", "string"}, {"description", "Bean type/name"}}},
+                {"roastLevel", QJsonObject{{"type", "string"}, {"description", "Roast level"}}},
+                {"roastDate", QJsonObject{{"type", "string"}, {"description", "Roast date (YYYY-MM-DD)"}}},
+                {"grinderBrand", QJsonObject{{"type", "string"}, {"description", "Grinder brand"}}},
+                {"grinderModel", QJsonObject{{"type", "string"}, {"description", "Grinder model"}}},
+                {"grinderBurrs", QJsonObject{{"type", "string"}, {"description", "Grinder burrs"}}},
+                {"grinderSetting", QJsonObject{{"type", "string"}, {"description", "Grinder setting"}}},
+                {"barista", QJsonObject{{"type", "string"}, {"description", "Barista name"}}},
+                {"drinkTds", QJsonObject{{"type", "number"}, {"description", "TDS measurement"}}},
+                {"drinkEy", QJsonObject{{"type", "number"}, {"description", "Extraction yield percentage"}}}
             }},
             {"required", QJsonArray{"shotId"}}
         },
@@ -46,19 +60,46 @@ void registerWriteTools(McpToolRegistry* registry, MainController* mainControlle
                 return result;
             }
 
+            // Map MCP parameter names to DB column names
             QVariantMap metadata;
             if (args.contains("enjoyment"))
                 metadata["enjoyment"] = qBound(0, args["enjoyment"].toInt(), 100);
             if (args.contains("notes"))
                 metadata["espresso_notes"] = args["notes"].toString();
+            if (args.contains("doseWeight"))
+                metadata["dose_weight"] = args["doseWeight"].toDouble();
+            if (args.contains("drinkWeight"))
+                metadata["drink_weight"] = args["drinkWeight"].toDouble();
+            if (args.contains("beanBrand"))
+                metadata["bean_brand"] = args["beanBrand"].toString();
+            if (args.contains("beanType"))
+                metadata["bean_type"] = args["beanType"].toString();
+            if (args.contains("roastLevel"))
+                metadata["roast_level"] = args["roastLevel"].toString();
+            if (args.contains("roastDate"))
+                metadata["roast_date"] = args["roastDate"].toString();
+            if (args.contains("grinderBrand"))
+                metadata["grinder_brand"] = args["grinderBrand"].toString();
+            if (args.contains("grinderModel"))
+                metadata["grinder_model"] = args["grinderModel"].toString();
+            if (args.contains("grinderBurrs"))
+                metadata["grinder_burrs"] = args["grinderBurrs"].toString();
+            if (args.contains("grinderSetting"))
+                metadata["grinder_setting"] = args["grinderSetting"].toString();
+            if (args.contains("barista"))
+                metadata["barista"] = args["barista"].toString();
+            if (args.contains("drinkTds"))
+                metadata["drink_tds"] = args["drinkTds"].toDouble();
+            if (args.contains("drinkEy"))
+                metadata["drink_ey"] = args["drinkEy"].toDouble();
 
             if (metadata.isEmpty()) {
-                result["error"] = "Provide enjoyment and/or notes";
+                result["error"] = "Provide at least one field to update";
                 return result;
             }
 
             const QString dbPath = shotHistory->databasePath();
-            const QString connName = QString("mcp_feedback_%1").arg(s_mcpWriteConnCounter.fetchAndAddRelaxed(1));
+            const QString connName = QString("mcp_update_%1").arg(s_mcpWriteConnCounter.fetchAndAddRelaxed(1));
 
             bool ok = false;
             {
@@ -71,13 +112,51 @@ void registerWriteTools(McpToolRegistry* registry, MainController* mainControlle
 
             if (ok) {
                 result["success"] = true;
-                result["message"] = "Feedback saved for shot " + QString::number(shotId);
+                QStringList fields;
+                for (auto it = metadata.begin(); it != metadata.end(); ++it)
+                    fields << it.key();
+                result["updated"] = QJsonArray::fromStringList(fields);
+                result["message"] = "Shot " + QString::number(shotId) + " updated";
             } else {
                 result["error"] = "Failed to update shot " + QString::number(shotId);
             }
             return result;
         },
         "control");
+
+    // shots_delete
+    registry->registerTool(
+        "shots_delete",
+        "Delete a shot by ID. This is permanent and cannot be undone.",
+        QJsonObject{
+            {"type", "object"},
+            {"properties", QJsonObject{
+                {"shotId", QJsonObject{{"type", "integer"}, {"description", "Shot ID to delete"}}},
+                {"confirmed", QJsonObject{{"type", "boolean"}, {"description", "Set to true after user confirms this action in chat"}}}
+            }},
+            {"required", QJsonArray{"shotId"}}
+        },
+        [shotHistory](const QJsonObject& args) -> QJsonObject {
+            QJsonObject result;
+            if (!shotHistory || !shotHistory->isReady()) {
+                result["error"] = "Shot history not available";
+                return result;
+            }
+
+            qint64 shotId = args["shotId"].toInteger();
+            if (shotId <= 0) {
+                result["error"] = "Valid shotId is required";
+                return result;
+            }
+
+            // requestDeleteShot is async — queues the delete on a background thread
+            shotHistory->requestDeleteShot(shotId);
+
+            result["success"] = true;
+            result["message"] = "Shot " + QString::number(shotId) + " deletion queued";
+            return result;
+        },
+        "settings");
 
     // profiles_set_active
     registry->registerTool(
@@ -122,7 +201,8 @@ void registerWriteTools(McpToolRegistry* registry, MainController* mainControlle
     // settings_set
     registry->registerTool(
         "settings_set",
-        "Update espresso settings: temperature, target weight, steam/water settings, DYE metadata",
+        "Update espresso settings: temperature, target weight, steam/water settings, DYE metadata. "
+        "For temperature and weight changes, also use this instead of the removed dialing_apply_change.",
         QJsonObject{
             {"type", "object"},
             {"properties", QJsonObject{
@@ -261,111 +341,4 @@ void registerWriteTools(McpToolRegistry* registry, MainController* mainControlle
             return result;
         },
         "control");
-
-    // dialing_apply_change
-    registry->registerTool(
-        "dialing_apply_change",
-        "Apply a dial-in change: adjust grind setting, target weight, temperature, switch profile, or update bean metadata",
-        QJsonObject{
-            {"type", "object"},
-            {"properties", QJsonObject{
-                {"grinderSetting", QJsonObject{{"type", "string"}, {"description", "New grinder setting"}}},
-                {"targetWeight", QJsonObject{{"type", "number"}, {"description", "New target weight in grams"}}},
-                {"espressoTemperature", QJsonObject{{"type", "number"}, {"description", "New brew temperature in Celsius"}}},
-                {"profileFilename", QJsonObject{{"type", "string"}, {"description", "Switch to this profile"}}},
-                {"dyeBeanBrand", QJsonObject{{"type", "string"}, {"description", "Update bean brand"}}},
-                {"dyeBeanType", QJsonObject{{"type", "string"}, {"description", "Update bean type"}}},
-                {"dyeRoastLevel", QJsonObject{{"type", "string"}, {"description", "Update roast level"}}},
-                {"confirmed", QJsonObject{{"type", "boolean"}, {"description", "Set to true after user confirms this action in chat"}}}
-            }}
-        },
-        [mainController, settings](const QJsonObject& args) -> QJsonObject {
-            QJsonObject result;
-            QStringList applied;
-
-            // Temperature and weight changes use the same code path as the QML editors:
-            // recipe profiles → uploadRecipeProfile(), advanced → uploadProfile()
-            bool needsProfileUpdate = args.contains("espressoTemperature") || args.contains("targetWeight");
-            if (needsProfileUpdate && mainController) {
-                QString editorType = mainController->currentEditorType();
-                if (editorType == "advanced") {
-                    // Advanced path: use uploadProfile() — same as ProfileEditorPage
-                    QVariantMap profileData = mainController->getCurrentProfile();
-                    if (args.contains("espressoTemperature")) {
-                        profileData["espresso_temperature"] = args["espressoTemperature"].toDouble();
-                        applied << "espressoTemperature";
-                    }
-                    if (args.contains("targetWeight")) {
-                        profileData["target_weight"] = args["targetWeight"].toDouble();
-                        applied << "targetWeight";
-                    }
-                    mainController->uploadProfile(profileData);
-                } else {
-                    // Recipe path: use uploadRecipeProfile() — same as RecipeEditorPage/SimpleProfileEditorPage
-                    QVariantMap currentParams = mainController->getOrConvertRecipeParams();
-                    if (args.contains("espressoTemperature")) {
-                        double v = args["espressoTemperature"].toDouble();
-                        // Set all temperature fields uniformly (matching QML editor behavior)
-                        currentParams["fillTemperature"] = v;
-                        currentParams["pourTemperature"] = v;
-                        currentParams["tempStart"] = v;
-                        currentParams["tempPreinfuse"] = v;
-                        currentParams["tempHold"] = v;
-                        currentParams["tempDecline"] = v;
-                        applied << "espressoTemperature";
-                    }
-                    if (args.contains("targetWeight")) {
-                        currentParams["targetWeight"] = args["targetWeight"].toDouble();
-                        applied << "targetWeight";
-                    }
-                    mainController->uploadRecipeProfile(currentParams);
-                }
-            }
-
-            // Metadata-only changes go directly to Settings
-            if (settings) {
-                if (args.contains("grinderSetting")) {
-                    QString v = args["grinderSetting"].toString();
-                    QMetaObject::invokeMethod(settings, [settings, v]() { settings->setDyeGrinderSetting(v); }, Qt::QueuedConnection);
-                    applied << "grinderSetting";
-                }
-                if (args.contains("dyeBeanBrand")) {
-                    QString v = args["dyeBeanBrand"].toString();
-                    QMetaObject::invokeMethod(settings, [settings, v]() { settings->setDyeBeanBrand(v); }, Qt::QueuedConnection);
-                    applied << "dyeBeanBrand";
-                }
-                if (args.contains("dyeBeanType")) {
-                    QString v = args["dyeBeanType"].toString();
-                    QMetaObject::invokeMethod(settings, [settings, v]() { settings->setDyeBeanType(v); }, Qt::QueuedConnection);
-                    applied << "dyeBeanType";
-                }
-                if (args.contains("dyeRoastLevel")) {
-                    QString v = args["dyeRoastLevel"].toString();
-                    QMetaObject::invokeMethod(settings, [settings, v]() { settings->setDyeRoastLevel(v); }, Qt::QueuedConnection);
-                    applied << "dyeRoastLevel";
-                }
-            }
-
-            if (mainController && args.contains("profileFilename")) {
-                QString filename = args["profileFilename"].toString();
-                if (mainController->profileExists(filename)) {
-                    QMetaObject::invokeMethod(mainController, [mainController, filename]() {
-                        mainController->loadProfile(filename);
-                    }, Qt::QueuedConnection);
-                    applied << "profileFilename";
-                } else {
-                    result["profileError"] = "Profile not found: " + filename;
-                }
-            }
-
-            if (applied.isEmpty() && !result.contains("profileError")) {
-                result["error"] = "No valid changes provided";
-                return result;
-            }
-
-            result["success"] = true;
-            result["applied"] = QJsonArray::fromStringList(applied);
-            return result;
-        },
-        "settings");
 }
