@@ -391,4 +391,65 @@ void registerProfileTools(McpToolRegistry* registry, MainController* mainControl
             return result;
         },
         "settings");
+
+    // profiles_create
+    registry->registerTool(
+        "profiles_create",
+        "Create a new blank profile with the given editor type and title. "
+        "Uses the same creation functions as the QML UI. "
+        "The new profile becomes active and can be edited via profiles_edit_params.",
+        QJsonObject{
+            {"type", "object"},
+            {"properties", QJsonObject{
+                {"editorType", QJsonObject{{"type", "string"}, {"description", "Editor type: dflow, aflow, pressure, flow, or advanced"}}},
+                {"title", QJsonObject{{"type", "string"}, {"description", "Profile title"}}},
+                {"confirmed", QJsonObject{{"type", "boolean"}, {"description", "Set to true after user confirms this action in chat"}}}
+            }},
+            {"required", QJsonArray{"editorType", "title"}}
+        },
+        [mainController](const QJsonObject& args) -> QJsonObject {
+            QJsonObject result;
+            if (!mainController) {
+                result["error"] = "Controller not available";
+                return result;
+            }
+
+            QString editorType = args["editorType"].toString();
+            QString title = args["title"].toString();
+            if (title.isEmpty()) {
+                result["error"] = "title is required";
+                return result;
+            }
+
+            // D-Flow/A-Flow profiles require title prefix for editor type detection
+            // (matching QML RecipeEditorPage behavior which always prefixes)
+            if (editorType == "dflow" && !title.startsWith("D-Flow")) {
+                title = "D-Flow / " + title;
+            } else if (editorType == "aflow" && !title.startsWith("A-Flow")) {
+                title = "A-Flow / " + title;
+            }
+
+            // Route to the same creation functions as the QML UI
+            if (editorType == "dflow") {
+                mainController->createNewRecipe(title);
+            } else if (editorType == "aflow") {
+                mainController->createNewAFlowRecipe(title);
+            } else if (editorType == "pressure") {
+                mainController->createNewPressureProfile(title);
+            } else if (editorType == "flow") {
+                mainController->createNewFlowProfile(title);
+            } else if (editorType == "advanced") {
+                mainController->createNewProfile(title);
+            } else {
+                result["error"] = "Invalid editorType: " + editorType + ". Must be dflow, aflow, pressure, flow, or advanced.";
+                return result;
+            }
+
+            result["success"] = true;
+            result["message"] = "Profile created: " + title;
+            result["editorType"] = editorType;
+            result["filename"] = mainController->baseProfileName();
+            return result;
+        },
+        "settings");
 }

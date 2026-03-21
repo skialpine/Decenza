@@ -85,6 +85,35 @@ except Exception as e:
     fi
 }
 
+declare -a ALL_SESSIONS  # Track all sessions created during the test run
+
+cleanup_all_sessions() {
+    if [ ${#ALL_SESSIONS[@]} -gt 0 ]; then
+        for sid in "${ALL_SESSIONS[@]}"; do
+            curl -s --max-time 2 -X DELETE "$BASE" -H "Mcp-Session-Id: $sid" > /dev/null 2>&1
+        done
+    fi
+}
+trap cleanup_all_sessions EXIT
+
+# Create a session, set SESSION + INIT_RESP, track for cleanup
+create_session() {
+    INIT_RESP=$(curl -s --max-time 5 -D /tmp/mcp_headers -X POST "$BASE" -H "Content-Type: application/json" \
+        -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}')
+    SESSION=$(extract_session)
+    if [ -n "${SESSION:-}" ]; then
+        ALL_SESSIONS+=("$SESSION")
+    fi
+}
+
+# Delete the current session
+delete_session() {
+    if [ -n "${SESSION:-}" ]; then
+        curl -s --max-time 2 -X DELETE "$BASE" -H "Mcp-Session-Id: $SESSION" > /dev/null 2>&1
+        SESSION=""
+    fi
+}
+
 echo -e "${CYAN}═══════════════════════════════════════════${NC}"
 echo -e "${CYAN}  Decenza MCP Server Test Suite${NC}"
 echo -e "${CYAN}  Target: $BASE${NC}"
@@ -96,8 +125,7 @@ echo -e "${CYAN}1. Protocol${NC}"
 
 # Test: MCP disabled returns 404 (can't test if enabled — skip)
 # Test: Initialize
-INIT_RESP=$(rpc 1 "initialize" '{"capabilities":{}}')
-SESSION=$(extract_session)
+create_session
 assert_ok "initialize returns protocolVersion" "$INIT_RESP" \
     "d.get('result',{}).get('protocolVersion') == '2025-03-26'"
 assert_ok "initialize returns serverInfo" "$INIT_RESP" \
@@ -117,12 +145,22 @@ if [ -z "$SESSION" ]; then
     exit 1
 fi
 
-# Test: Invalid session
-INVALID_RESP=$(curl -s -X POST "$BASE" -H "Content-Type: application/json" \
+# Test: Invalid session auto-recovers (PR #520 — mcp-remote can't re-initialize)
+# May also get "Too many sessions" if slots are full — both are valid server responses
+INVALID_RESP=$(curl -s -D /tmp/mcp_invalid_headers -X POST "$BASE" -H "Content-Type: application/json" \
     -H "Mcp-Session: invalid-session-id" \
     -d '{"jsonrpc":"2.0","id":99,"method":"tools/list","params":{}}')
-assert_ok "invalid session returns error" "$INVALID_RESP" \
-    "d.get('error',{}).get('code') == -32600"
+assert_ok "invalid session handled (auto-recover or limit)" "$INVALID_RESP" \
+    "isinstance(d.get('result',{}).get('tools'), list) or d.get('error',{}).get('code') == -32000"
+# Clean up the auto-recovered session if one was created
+INVALID_SID=$(grep -i 'Mcp-Session-Id' /tmp/mcp_invalid_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+if [ -z "$INVALID_SID" ]; then
+    INVALID_SID=$(grep -i 'Mcp-Session:' /tmp/mcp_invalid_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+fi
+if [ -n "$INVALID_SID" ]; then
+    curl -s --max-time 2 -X DELETE "$BASE" -H "Mcp-Session-Id: $INVALID_SID" > /dev/null 2>&1
+    ALL_SESSIONS+=("$INVALID_SID")
+fi
 
 # Test: Unknown method
 UNK_RESP=$(rpc 2 "unknown/method" '{}')
@@ -216,7 +254,8 @@ if [ -z "$EXTRA_SID" ]; then
     EXTRA_SID=$(grep -i 'Mcp-Session:' /tmp/mcp_status_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
 fi
 if [ -n "$EXTRA_SID" ]; then
-    curl -s --max-time 5 -X DELETE "$BASE" -H "Mcp-Session-Id: $EXTRA_SID" > /dev/null 2>&1
+    curl -s --max-time 2 -X DELETE "$BASE" -H "Mcp-Session-Id: $EXTRA_SID" > /dev/null 2>&1
+    ALL_SESSIONS+=("$EXTRA_SID")
 fi
 
 BAD_SESS_STATUS=$(curl -s --max-time 5 -D - -o /dev/null -X POST "$BASE" \
@@ -267,7 +306,14 @@ print(json.dumps([t['name'] for t in tools]))
 assert_ok "tools/list returns array" "$TOOLS_RESP" \
     "isinstance(d.get('result',{}).get('tools'), list)"
 
-EXPECTED_TOOLS="machine_get_state machine_get_telemetry shots_list shots_get_detail shots_compare profiles_list profiles_get_active profiles_get_detail settings_get dialing_get_context machine_wake machine_sleep machine_start_espresso machine_start_steam machine_start_hot_water machine_start_flush machine_stop machine_skip_frame shots_set_feedback profiles_set_active settings_set dialing_suggest_change dialing_apply_change scale_tare scale_timer_start scale_timer_stop scale_timer_reset scale_get_weight devices_list devices_scan devices_connect_scale devices_connection_status debug_get_log"
+EXPECTED_TOOLS="machine_get_state machine_get_telemetry shots_list shots_get_detail shots_compare shots_update shots_delete profiles_list profiles_get_active profiles_get_detail profiles_get_params profiles_edit_params profiles_save profiles_delete profiles_create settings_get dialing_get_context machine_wake machine_sleep machine_start_espresso machine_start_steam machine_start_hot_water machine_start_flush machine_stop machine_skip_frame profiles_set_active settings_set dialing_suggest_change scale_tare scale_timer_start scale_timer_stop scale_timer_reset scale_get_weight devices_list devices_scan devices_connect_scale devices_connection_status debug_get_log"
+
+# Verify removed tools are NOT registered
+REMOVED_TOOLS="dialing_apply_change shots_set_feedback"
+for tool in $REMOVED_TOOLS; do
+    assert_ok "removed tool '$tool' NOT registered" "$TOOLS_JSON" \
+        "'$tool' not in d"
+done
 for tool in $EXPECTED_TOOLS; do
     assert_ok "tool '$tool' registered" "$TOOLS_JSON" \
         "'$tool' in d"
@@ -400,8 +446,18 @@ assert_ok "profiles_get_active returns filename" "$ACTIVE" \
     "'filename' in d and len(d['filename']) > 0"
 assert_ok "profiles_get_active returns title" "$ACTIVE" \
     "'title' in d"
+assert_ok "profiles_get_active returns editorType" "$ACTIVE" \
+    "'editorType' in d and len(d['editorType']) > 0"
 assert_ok "profiles_get_active returns targetWeight" "$ACTIVE" \
     "'targetWeight' in d"
+
+# profiles_get_params — editor-type-aware
+PARAMS_RAW=$(rpc 44 "tools/call" '{"name":"profiles_get_params","arguments":{}}')
+PARAMS=$(echo "$PARAMS_RAW" | parse_tool_result)
+assert_ok "profiles_get_params returns editorType" "$PARAMS" \
+    "'editorType' in d and len(d['editorType']) > 0"
+assert_ok "profiles_get_params returns filename" "$PARAMS" \
+    "'filename' in d"
 
 # Get detail for first profile
 PROFILE_FILE=$(echo "$PROFILES" | python3 -c "
@@ -654,30 +710,28 @@ if [ "$HAS_SETTINGS_SET" = "1" ]; then
     echo -e "${CYAN}12. Write Tools (Full Automation)${NC}"
 
     # Fresh session to avoid rate limit from earlier control tool calls
-    curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION" > /dev/null 2>&1
-    WRITE_INIT=$(curl -s -D /tmp/mcp_headers -X POST "$BASE" -H "Content-Type: application/json" \
-        -d '{"jsonrpc":"2.0","id":99,"method":"initialize","params":{"capabilities":{}}}')
-    SESSION=$(grep -i 'Mcp-Session' /tmp/mcp_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+    delete_session
+    create_session
 else
     echo -e "${CYAN}12. Write Tools (SKIPPED — access level < 2, set to Full Automation to test)${NC}"
     SKIP=$((SKIP + 7))
 fi
 
-# shots_set_feedback (control category — level 1+, always available)
+# shots_update (control category — level 1+, always available)
 if [ "$SHOT_ID" != "0" ] && [ -n "$SHOT_ID" ]; then
-    FEEDBACK_RAW=$(rpc 100 "tools/call" "{\"name\":\"shots_set_feedback\",\"arguments\":{\"shotId\":$SHOT_ID,\"enjoyment\":85,\"notes\":\"MCP test note\"}}")
-    FEEDBACK=$(echo "$FEEDBACK_RAW" | parse_tool_result)
-    assert_ok "shots_set_feedback saves feedback" "$FEEDBACK" \
+    UPDATE_RAW=$(rpc 100 "tools/call" "{\"name\":\"shots_update\",\"arguments\":{\"shotId\":$SHOT_ID,\"enjoyment\":85,\"notes\":\"MCP test note\"}}")
+    UPDATE=$(echo "$UPDATE_RAW" | parse_tool_result)
+    assert_ok "shots_update saves metadata" "$UPDATE" \
         "d.get('success') == True"
 else
-    echo -e "  ${YELLOW}SKIP${NC} shots_set_feedback (no shots)"
+    echo -e "  ${YELLOW}SKIP${NC} shots_update (no shots)"
     SKIP=$((SKIP + 1))
 fi
 
-# shots_set_feedback without data
-FEEDBACK_EMPTY_RAW=$(rpc 101 "tools/call" '{"name":"shots_set_feedback","arguments":{"shotId":1}}')
-FEEDBACK_EMPTY=$(echo "$FEEDBACK_EMPTY_RAW" | parse_tool_result)
-assert_ok "shots_set_feedback requires enjoyment or notes" "$FEEDBACK_EMPTY" \
+# shots_update without data
+UPDATE_EMPTY_RAW=$(rpc 101 "tools/call" '{"name":"shots_update","arguments":{"shotId":1}}')
+UPDATE_EMPTY=$(echo "$UPDATE_EMPTY_RAW" | parse_tool_result)
+assert_ok "shots_update requires at least one field" "$UPDATE_EMPTY" \
     "'error' in d"
 
 # dialing_suggest_change
@@ -687,29 +741,42 @@ assert_ok "dialing_suggest_change returns suggestion" "$SUGGEST" \
     "d.get('parameter') == 'grind' and d.get('status') == 'suggestion_displayed'"
 
 if [ "$HAS_SETTINGS_SET" = "1" ]; then
-    # settings_set
-    SETW_RAW=$(rpc 103 "tools/call" '{"name":"settings_set","arguments":{"targetWeight":36.0}}')
+    # settings_set (confirmed: true to pass chat confirmation gate)
+    SETW_RAW=$(rpc 103 "tools/call" '{"name":"settings_set","arguments":{"targetWeight":36.0,"confirmed":true}}')
     SETW=$(echo "$SETW_RAW" | parse_tool_result)
     assert_ok "settings_set updates targetWeight" "$SETW" \
         "d.get('success') == True and 'targetWeight' in d.get('updated',[])"
 
     # settings_set with no valid keys
-    SETW_EMPTY_RAW=$(rpc 104 "tools/call" '{"name":"settings_set","arguments":{}}')
+    SETW_EMPTY_RAW=$(rpc 104 "tools/call" '{"name":"settings_set","arguments":{"confirmed":true}}')
     SETW_EMPTY=$(echo "$SETW_EMPTY_RAW" | parse_tool_result)
     assert_ok "settings_set with no keys returns error" "$SETW_EMPTY" \
         "'error' in d"
 
     # profiles_set_active with invalid profile
-    BAD_PROFILE_RAW=$(rpc 105 "tools/call" '{"name":"profiles_set_active","arguments":{"filename":"nonexistent_xyz"}}')
+    BAD_PROFILE_RAW=$(rpc 105 "tools/call" '{"name":"profiles_set_active","arguments":{"filename":"nonexistent_xyz","confirmed":true}}')
     BAD_PROFILE=$(echo "$BAD_PROFILE_RAW" | parse_tool_result)
     assert_ok "profiles_set_active rejects invalid profile" "$BAD_PROFILE" \
         "'error' in d"
 
-    # dialing_apply_change
-    APPLY_RAW=$(rpc 106 "tools/call" '{"name":"dialing_apply_change","arguments":{"grinderSetting":"12","targetWeight":38.0}}')
-    APPLY=$(echo "$APPLY_RAW" | parse_tool_result)
-    assert_ok "dialing_apply_change applies changes" "$APPLY" \
-        "d.get('success') == True and 'grinderSetting' in d.get('applied',[])"
+    # profiles_create + profiles_delete roundtrip
+    CREATE_RAW=$(rpc 106 "tools/call" '{"name":"profiles_create","arguments":{"editorType":"pressure","title":"_MCP Test Profile","confirmed":true}}')
+    CREATE=$(echo "$CREATE_RAW" | parse_tool_result)
+    assert_ok "profiles_create creates profile" "$CREATE" \
+        "d.get('success') == True and d.get('editorType') == 'pressure'"
+
+    # Clean up: switch to default, then delete the test profile
+    CREATED_FILE=$(echo "$CREATE" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('filename',''))" 2>/dev/null)
+    rpc 108 "tools/call" '{"name":"profiles_set_active","arguments":{"filename":"default","confirmed":true}}' > /dev/null
+    sleep 1
+    if [ -n "$CREATED_FILE" ]; then
+        DEL_RAW=$(rpc 109 "tools/call" "{\"name\":\"profiles_delete\",\"arguments\":{\"filename\":\"$CREATED_FILE\",\"confirmed\":true}}")
+        DEL=$(echo "$DEL_RAW" | parse_tool_result)
+        assert_ok "profiles_delete removes created profile" "$DEL" \
+            "d.get('success') == True"
+    fi
+    # Verify we're back on default
+    sleep 0.5
 fi
 
 echo
@@ -726,10 +793,14 @@ if [ "${SKIP_INTERACTIVE:-}" != "1" ]; then
         echo -e "  ${YELLOW}ACTION${NC}: Set access level to ${CYAN}$level_name${NC} in Settings > AI > MCP, then press Enter"
         read -r
 
-        # Fresh session
+        # Fresh session (tracked for cleanup)
         local ASESS=$(curl -s --max-time 5 -D /tmp/mcp_access_headers -X POST "$BASE" -H "Content-Type: application/json" \
             -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}')
-        local ASID=$(grep -i 'Mcp-Session' /tmp/mcp_access_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+        local ASID=$(grep -i 'Mcp-Session-Id' /tmp/mcp_access_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+        if [ -z "$ASID" ]; then
+            ASID=$(grep -i 'Mcp-Session:' /tmp/mcp_access_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+        fi
+        ALL_SESSIONS+=("$ASID")
 
         # Check which tools are visible
         local ATOOLS=$(curl -s --max-time 5 -X POST "$BASE" -H "Content-Type: application/json" -H "Mcp-Session: $ASID" \
@@ -853,10 +924,8 @@ echo
 echo -e "${CYAN}15. Rate Limiting${NC}"
 
 # Use a fresh session so previous control calls don't affect the count
-curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION" > /dev/null 2>&1
-RATE_INIT=$(curl -s -D /tmp/mcp_headers -X POST "$BASE" -H "Content-Type: application/json" \
-    -d '{"jsonrpc":"2.0","id":99,"method":"initialize","params":{"capabilities":{}}}')
-SESSION=$(grep -i 'Mcp-Session' /tmp/mcp_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+delete_session
+create_session
 
 # Fire 11 machine_wake calls (succeeds on simulator).
 # Calls 1-10 should work, 11th should be rate limited.
@@ -901,24 +970,27 @@ echo
 # ─── 16. Session Limits ───
 echo -e "${CYAN}16. Session Limits${NC}"
 
-# Delete current session
-curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION" > /dev/null 2>&1
+# Delete current session to free a slot
+delete_session
 
 # Create sessions until we hit the limit (max 8 total)
-CREATED_SESSIONS=()
+LIMIT_SESSIONS=()
 HIT_LIMIT=false
 for i in $(seq 1 12); do
     SINIT=$(curl -s --max-time 5 -D /tmp/mcp_sess_headers -X POST "$BASE" -H "Content-Type: application/json" \
         -d "{\"jsonrpc\":\"2.0\",\"id\":$((200+i)),\"method\":\"initialize\",\"params\":{\"capabilities\":{}}}")
-    SID=$(grep -i 'Mcp-Session' /tmp/mcp_sess_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+    SID=$(grep -i 'Mcp-Session-Id' /tmp/mcp_sess_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+    if [ -z "$SID" ]; then
+        SID=$(grep -i 'Mcp-Session:' /tmp/mcp_sess_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+    fi
     HAS_ERROR=$(echo "$SINIT" | python3 -c "import json,sys; d=json.load(sys.stdin); print('1' if 'error' in d else '0')" 2>/dev/null)
     if [ "$HAS_ERROR" = "1" ]; then
         HIT_LIMIT=true
-        assert_ok "session limit enforced (rejected after ${#CREATED_SESSIONS[@]} sessions)" "$SINIT" \
+        assert_ok "session limit enforced (rejected after ${#LIMIT_SESSIONS[@]} sessions)" "$SINIT" \
             "d.get('error',{}).get('code') == -32000"
         break
     fi
-    CREATED_SESSIONS+=("$SID")
+    LIMIT_SESSIONS+=("$SID")
 done
 
 if [ "$HIT_LIMIT" = false ]; then
@@ -926,15 +998,13 @@ if [ "$HIT_LIMIT" = false ]; then
     FAIL=$((FAIL + 1))
 fi
 
-# Cleanup
-for sid in "${CREATED_SESSIONS[@]}"; do
-    curl -s -X DELETE "$BASE" -H "Mcp-Session: $sid" > /dev/null 2>&1
+# Cleanup all limit test sessions
+for sid in "${LIMIT_SESSIONS[@]}"; do
+    curl -s --max-time 2 -X DELETE "$BASE" -H "Mcp-Session-Id: $sid" > /dev/null 2>&1
 done
 
 # Re-create session for remaining tests
-REINIT=$(curl -s -D /tmp/mcp_headers -X POST "$BASE" -H "Content-Type: application/json" \
-    -d '{"jsonrpc":"2.0","id":210,"method":"initialize","params":{"capabilities":{}}}')
-SESSION=$(grep -i 'Mcp-Session' /tmp/mcp_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+create_session
 
 echo
 
@@ -942,16 +1012,21 @@ echo
 echo -e "${CYAN}17. Session Management${NC}"
 
 # DELETE session
-DEL_RESP=$(curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION")
+DEL_RESP=$(curl -s -X DELETE "$BASE" -H "Mcp-Session-Id: $SESSION")
 assert_ok "DELETE /mcp returns 200" "$DEL_RESP" \
     "True"  # any response is ok
 
-# Verify deleted session is invalid
-POST_DEL=$(curl -s -X POST "$BASE" -H "Content-Type: application/json" \
+# Verify deleted session auto-recovers (PR #520 — mcp-remote can't re-initialize)
+POST_DEL=$(curl -s -D /tmp/mcp_del_headers -X POST "$BASE" -H "Content-Type: application/json" \
     -H "Mcp-Session: $SESSION" \
     -d '{"jsonrpc":"2.0","id":99,"method":"tools/list","params":{}}')
-assert_ok "deleted session returns error" "$POST_DEL" \
-    "d.get('error',{}).get('code') == -32600"
+assert_ok "deleted session auto-recovers with new session" "$POST_DEL" \
+    "isinstance(d.get('result',{}).get('tools'), list)"
+# Track the auto-recovered session for cleanup
+DEL_SID=$(grep -i 'Mcp-Session-Id' /tmp/mcp_del_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+if [ -n "$DEL_SID" ]; then
+    ALL_SESSIONS+=("$DEL_SID")
+fi
 
 echo
 

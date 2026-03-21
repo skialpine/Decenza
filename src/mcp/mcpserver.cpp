@@ -24,7 +24,8 @@ void registerProfileTools(McpToolRegistry* registry, MainController* mainControl
 void registerSettingsReadTools(McpToolRegistry* registry, Settings* settings);
 void registerDialingTools(McpToolRegistry* registry, MainController* mainController,
                           ShotHistoryStorage* shotHistory, Settings* settings);
-void registerControlTools(McpToolRegistry* registry, DE1Device* device, MachineState* machineState);
+void registerControlTools(McpToolRegistry* registry, DE1Device* device, MachineState* machineState,
+                          MainController* mainController);
 void registerWriteTools(McpToolRegistry* registry, MainController* mainController,
                         ShotHistoryStorage* shotHistory, Settings* settings);
 void registerScaleTools(McpToolRegistry* registry, MachineState* machineState);
@@ -63,7 +64,7 @@ void McpServer::registerAllTools()
     registerProfileTools(m_toolRegistry, m_mainController);
     registerSettingsReadTools(m_toolRegistry, m_settings);
     registerDialingTools(m_toolRegistry, m_mainController, m_shotHistory, m_settings);
-    registerControlTools(m_toolRegistry, m_device, m_machineState);
+    registerControlTools(m_toolRegistry, m_device, m_machineState, m_mainController);
     registerWriteTools(m_toolRegistry, m_mainController, m_shotHistory, m_settings);
     registerScaleTools(m_toolRegistry, m_machineState);
     registerDeviceTools(m_toolRegistry, m_bleManager, m_device);
@@ -629,7 +630,8 @@ bool McpServer::needsChatConfirmation(const QString& toolName) const
     // All non-zero levels: settings/profile/dial-in write ops
     if (toolName == "profiles_set_active" || toolName == "profiles_edit_params" ||
         toolName == "profiles_save" || toolName == "profiles_delete" ||
-        toolName == "settings_set" || toolName == "dialing_apply_change")
+        toolName == "profiles_create" || toolName == "shots_delete" ||
+        toolName == "settings_set")
         return true;
 
     // Level 2 (All Control): also non-start machine control ops
@@ -656,8 +658,9 @@ QString McpServer::confirmationDescription(const QString& toolName) const
         {"profiles_edit_params", "Edit profile parameters"},
         {"profiles_save", "Save profile to disk"},
         {"profiles_delete", "Delete a profile"},
+        {"profiles_create", "Create a new profile"},
+        {"shots_delete", "Delete a shot permanently"},
         {"settings_set", "Change machine settings"},
-        {"dialing_apply_change", "Apply a dial-in change"},
     };
     return descriptions.value(toolName, toolName);
 }
