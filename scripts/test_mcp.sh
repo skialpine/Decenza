@@ -117,12 +117,20 @@ if [ -z "$SESSION" ]; then
     exit 1
 fi
 
-# Test: Invalid session
-INVALID_RESP=$(curl -s -X POST "$BASE" -H "Content-Type: application/json" \
+# Test: Invalid session auto-recovers (PR #520 — mcp-remote can't re-initialize)
+INVALID_RESP=$(curl -s -D /tmp/mcp_invalid_headers -X POST "$BASE" -H "Content-Type: application/json" \
     -H "Mcp-Session: invalid-session-id" \
     -d '{"jsonrpc":"2.0","id":99,"method":"tools/list","params":{}}')
-assert_ok "invalid session returns error" "$INVALID_RESP" \
-    "d.get('error',{}).get('code') == -32600"
+assert_ok "invalid session auto-recovers" "$INVALID_RESP" \
+    "isinstance(d.get('result',{}).get('tools'), list)"
+# Clean up the auto-recovered session
+INVALID_SID=$(grep -i 'Mcp-Session-Id' /tmp/mcp_invalid_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+if [ -z "$INVALID_SID" ]; then
+    INVALID_SID=$(grep -i 'Mcp-Session:' /tmp/mcp_invalid_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+fi
+if [ -n "$INVALID_SID" ]; then
+    curl -s -X DELETE "$BASE" -H "Mcp-Session-Id: $INVALID_SID" > /dev/null 2>&1
+fi
 
 # Test: Unknown method
 UNK_RESP=$(rpc 2 "unknown/method" '{}')
@@ -972,12 +980,12 @@ DEL_RESP=$(curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION")
 assert_ok "DELETE /mcp returns 200" "$DEL_RESP" \
     "True"  # any response is ok
 
-# Verify deleted session is invalid
+# Verify deleted session auto-recovers (PR #520 — mcp-remote can't re-initialize)
 POST_DEL=$(curl -s -X POST "$BASE" -H "Content-Type: application/json" \
     -H "Mcp-Session: $SESSION" \
     -d '{"jsonrpc":"2.0","id":99,"method":"tools/list","params":{}}')
-assert_ok "deleted session returns error" "$POST_DEL" \
-    "d.get('error',{}).get('code') == -32600"
+assert_ok "deleted session auto-recovers with new session" "$POST_DEL" \
+    "isinstance(d.get('result',{}).get('tools'), list)"
 
 echo
 
