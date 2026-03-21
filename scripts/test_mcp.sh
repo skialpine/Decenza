@@ -85,6 +85,40 @@ except Exception as e:
     fi
 }
 
+ALL_SESSIONS=()  # Track all sessions created during the test run
+
+cleanup_all_sessions() {
+    for sid in "${ALL_SESSIONS[@]}"; do
+        curl -s --max-time 2 -X DELETE "$BASE" -H "Mcp-Session-Id: $sid" > /dev/null 2>&1
+    done
+}
+trap cleanup_all_sessions EXIT
+
+# Create a session and track it for cleanup
+create_session() {
+    local resp
+    resp=$(curl -s --max-time 5 -D /tmp/mcp_headers -X POST "$BASE" -H "Content-Type: application/json" \
+        -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}')
+    local sid
+    sid=$(grep -i 'Mcp-Session-Id' /tmp/mcp_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+    if [ -z "$sid" ]; then
+        sid=$(grep -i 'Mcp-Session:' /tmp/mcp_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+    fi
+    if [ -n "$sid" ]; then
+        ALL_SESSIONS+=("$sid")
+    fi
+    SESSION="$sid"
+    echo "$resp"
+}
+
+# Delete the current session and remove from tracking
+delete_session() {
+    if [ -n "$SESSION" ]; then
+        curl -s --max-time 2 -X DELETE "$BASE" -H "Mcp-Session-Id: $SESSION" > /dev/null 2>&1
+        SESSION=""
+    fi
+}
+
 echo -e "${CYAN}═══════════════════════════════════════════${NC}"
 echo -e "${CYAN}  Decenza MCP Server Test Suite${NC}"
 echo -e "${CYAN}  Target: $BASE${NC}"
@@ -96,8 +130,7 @@ echo -e "${CYAN}1. Protocol${NC}"
 
 # Test: MCP disabled returns 404 (can't test if enabled — skip)
 # Test: Initialize
-INIT_RESP=$(rpc 1 "initialize" '{"capabilities":{}}')
-SESSION=$(extract_session)
+INIT_RESP=$(create_session)
 assert_ok "initialize returns protocolVersion" "$INIT_RESP" \
     "d.get('result',{}).get('protocolVersion') == '2025-03-26'"
 assert_ok "initialize returns serverInfo" "$INIT_RESP" \
@@ -224,7 +257,8 @@ if [ -z "$EXTRA_SID" ]; then
     EXTRA_SID=$(grep -i 'Mcp-Session:' /tmp/mcp_status_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
 fi
 if [ -n "$EXTRA_SID" ]; then
-    curl -s --max-time 5 -X DELETE "$BASE" -H "Mcp-Session-Id: $EXTRA_SID" > /dev/null 2>&1
+    curl -s --max-time 2 -X DELETE "$BASE" -H "Mcp-Session-Id: $EXTRA_SID" > /dev/null 2>&1
+    ALL_SESSIONS+=("$EXTRA_SID")
 fi
 
 BAD_SESS_STATUS=$(curl -s --max-time 5 -D - -o /dev/null -X POST "$BASE" \
@@ -679,10 +713,8 @@ if [ "$HAS_SETTINGS_SET" = "1" ]; then
     echo -e "${CYAN}12. Write Tools (Full Automation)${NC}"
 
     # Fresh session to avoid rate limit from earlier control tool calls
-    curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION" > /dev/null 2>&1
-    WRITE_INIT=$(curl -s -D /tmp/mcp_headers -X POST "$BASE" -H "Content-Type: application/json" \
-        -d '{"jsonrpc":"2.0","id":99,"method":"initialize","params":{"capabilities":{}}}')
-    SESSION=$(grep -i 'Mcp-Session' /tmp/mcp_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+    delete_session
+    WRITE_INIT=$(create_session)
 else
     echo -e "${CYAN}12. Write Tools (SKIPPED — access level < 2, set to Full Automation to test)${NC}"
     SKIP=$((SKIP + 7))
@@ -760,10 +792,14 @@ if [ "${SKIP_INTERACTIVE:-}" != "1" ]; then
         echo -e "  ${YELLOW}ACTION${NC}: Set access level to ${CYAN}$level_name${NC} in Settings > AI > MCP, then press Enter"
         read -r
 
-        # Fresh session
+        # Fresh session (tracked for cleanup)
         local ASESS=$(curl -s --max-time 5 -D /tmp/mcp_access_headers -X POST "$BASE" -H "Content-Type: application/json" \
             -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}')
-        local ASID=$(grep -i 'Mcp-Session' /tmp/mcp_access_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+        local ASID=$(grep -i 'Mcp-Session-Id' /tmp/mcp_access_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+        if [ -z "$ASID" ]; then
+            ASID=$(grep -i 'Mcp-Session:' /tmp/mcp_access_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+        fi
+        ALL_SESSIONS+=("$ASID")
 
         # Check which tools are visible
         local ATOOLS=$(curl -s --max-time 5 -X POST "$BASE" -H "Content-Type: application/json" -H "Mcp-Session: $ASID" \
@@ -887,10 +923,8 @@ echo
 echo -e "${CYAN}15. Rate Limiting${NC}"
 
 # Use a fresh session so previous control calls don't affect the count
-curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION" > /dev/null 2>&1
-RATE_INIT=$(curl -s -D /tmp/mcp_headers -X POST "$BASE" -H "Content-Type: application/json" \
-    -d '{"jsonrpc":"2.0","id":99,"method":"initialize","params":{"capabilities":{}}}')
-SESSION=$(grep -i 'Mcp-Session' /tmp/mcp_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+delete_session
+RATE_INIT=$(create_session)
 
 # Fire 11 machine_wake calls (succeeds on simulator).
 # Calls 1-10 should work, 11th should be rate limited.
@@ -935,24 +969,27 @@ echo
 # ─── 16. Session Limits ───
 echo -e "${CYAN}16. Session Limits${NC}"
 
-# Delete current session
-curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION" > /dev/null 2>&1
+# Delete current session to free a slot
+delete_session
 
 # Create sessions until we hit the limit (max 8 total)
-CREATED_SESSIONS=()
+LIMIT_SESSIONS=()
 HIT_LIMIT=false
 for i in $(seq 1 12); do
     SINIT=$(curl -s --max-time 5 -D /tmp/mcp_sess_headers -X POST "$BASE" -H "Content-Type: application/json" \
         -d "{\"jsonrpc\":\"2.0\",\"id\":$((200+i)),\"method\":\"initialize\",\"params\":{\"capabilities\":{}}}")
-    SID=$(grep -i 'Mcp-Session' /tmp/mcp_sess_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+    SID=$(grep -i 'Mcp-Session-Id' /tmp/mcp_sess_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+    if [ -z "$SID" ]; then
+        SID=$(grep -i 'Mcp-Session:' /tmp/mcp_sess_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+    fi
     HAS_ERROR=$(echo "$SINIT" | python3 -c "import json,sys; d=json.load(sys.stdin); print('1' if 'error' in d else '0')" 2>/dev/null)
     if [ "$HAS_ERROR" = "1" ]; then
         HIT_LIMIT=true
-        assert_ok "session limit enforced (rejected after ${#CREATED_SESSIONS[@]} sessions)" "$SINIT" \
+        assert_ok "session limit enforced (rejected after ${#LIMIT_SESSIONS[@]} sessions)" "$SINIT" \
             "d.get('error',{}).get('code') == -32000"
         break
     fi
-    CREATED_SESSIONS+=("$SID")
+    LIMIT_SESSIONS+=("$SID")
 done
 
 if [ "$HIT_LIMIT" = false ]; then
@@ -960,15 +997,13 @@ if [ "$HIT_LIMIT" = false ]; then
     FAIL=$((FAIL + 1))
 fi
 
-# Cleanup
-for sid in "${CREATED_SESSIONS[@]}"; do
-    curl -s -X DELETE "$BASE" -H "Mcp-Session: $sid" > /dev/null 2>&1
+# Cleanup all limit test sessions
+for sid in "${LIMIT_SESSIONS[@]}"; do
+    curl -s --max-time 2 -X DELETE "$BASE" -H "Mcp-Session-Id: $sid" > /dev/null 2>&1
 done
 
 # Re-create session for remaining tests
-REINIT=$(curl -s -D /tmp/mcp_headers -X POST "$BASE" -H "Content-Type: application/json" \
-    -d '{"jsonrpc":"2.0","id":210,"method":"initialize","params":{"capabilities":{}}}')
-SESSION=$(grep -i 'Mcp-Session' /tmp/mcp_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+REINIT=$(create_session)
 
 echo
 
@@ -976,16 +1011,21 @@ echo
 echo -e "${CYAN}17. Session Management${NC}"
 
 # DELETE session
-DEL_RESP=$(curl -s -X DELETE "$BASE" -H "Mcp-Session: $SESSION")
+DEL_RESP=$(curl -s -X DELETE "$BASE" -H "Mcp-Session-Id: $SESSION")
 assert_ok "DELETE /mcp returns 200" "$DEL_RESP" \
     "True"  # any response is ok
 
 # Verify deleted session auto-recovers (PR #520 — mcp-remote can't re-initialize)
-POST_DEL=$(curl -s -X POST "$BASE" -H "Content-Type: application/json" \
+POST_DEL=$(curl -s -D /tmp/mcp_del_headers -X POST "$BASE" -H "Content-Type: application/json" \
     -H "Mcp-Session: $SESSION" \
     -d '{"jsonrpc":"2.0","id":99,"method":"tools/list","params":{}}')
 assert_ok "deleted session auto-recovers with new session" "$POST_DEL" \
     "isinstance(d.get('result',{}).get('tools'), list)"
+# Track the auto-recovered session for cleanup
+DEL_SID=$(grep -i 'Mcp-Session-Id' /tmp/mcp_del_headers 2>/dev/null | head -1 | awk '{print $2}' | tr -d '\r\n')
+if [ -n "$DEL_SID" ]; then
+    ALL_SESSIONS+=("$DEL_SID")
+fi
 
 echo
 
