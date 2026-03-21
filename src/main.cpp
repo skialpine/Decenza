@@ -298,12 +298,9 @@ int main(int argc, char *argv[])
     // Include wall clock in all log messages on all platforms
     qSetMessagePattern("[LOG] [%{time HH:mm:ss.zzz}] %{message}");
 
-#if defined(Q_OS_IOS) || defined(Q_OS_MACOS)
-    // Use basic (single-threaded) render loop on Apple platforms to avoid
-    // CoreText threading crashes. The threaded render loop calls
-    // CTFontDrawGlyphs → CopyEmojiImage from QSGRenderThread, but CoreText's
-    // bitmap emoji rendering is not thread-safe — causes SIGBUS in
-    // PNGReadPlugin::InitializePluginData (use-after-free on render thread).
+#ifdef Q_OS_IOS
+    // Use basic (single-threaded) render loop on iOS to avoid threading issues
+    // with Qt Multimedia VideoOutput calling UIKit APIs from render thread
     qputenv("QSG_RENDER_LOOP", "basic");
 #endif
 

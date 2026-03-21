@@ -468,15 +468,19 @@ Page {
 
         Text {
             anchors.centerIn: parent
+            textFormat: Text.RichText
             text: {
+                // Sanitize author name — Pexels usernames can contain emoji
+                // which triggers CoreText CopyEmojiImage crash on render thread
+                var author = Theme.replaceEmojiWithImg(ScreensaverManager.currentVideoAuthor, Theme.scaled(14))
                 if (parent.showDate) {
-                    return ScreensaverManager.currentMediaDate
+                    return Theme.replaceEmojiWithImg(ScreensaverManager.currentMediaDate, Theme.scaled(14))
                 } else if (isCurrentItemImage) {
                     return TranslationManager.translate("screensaver.photo_by", "Photo by %1 (Pexels)")
-                           .arg(ScreensaverManager.currentVideoAuthor)
+                           .arg(author)
                 } else {
                     return TranslationManager.translate("screensaver.video_by", "Video by %1 (Pexels)")
-                           .arg(ScreensaverManager.currentVideoAuthor)
+                           .arg(author)
                 }
             }
             color: "white"
