@@ -56,10 +56,10 @@ void registerProfileTools(McpToolRegistry* registry, MainController* mainControl
             if (!profile.isEmpty()) {
                 result["title"] = profile["title"].toString();
                 result["editorType"] = mainController->currentEditorType();
-                result["targetWeight"] = mainController->profileTargetWeight();
-                result["targetTemperature"] = mainController->profileTargetTemperature();
+                result["targetWeightG"] = mainController->profileTargetWeight();
+                result["targetTemperatureC"] = mainController->profileTargetTemperature();
                 if (mainController->profileHasRecommendedDose())
-                    result["recommendedDose"] = mainController->profileRecommendedDose();
+                    result["recommendedDoseG"] = mainController->profileRecommendedDose();
             }
             return result;
         },

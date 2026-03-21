@@ -23,10 +23,10 @@ void registerMachineTools(McpToolRegistry* registry, DE1Device* device,
                 result["isHeating"] = machineState->isHeating();
                 result["isReady"] = machineState->isReady();
                 result["isFlowing"] = machineState->isFlowing();
-                result["shotTime"] = machineState->shotTime();
-                result["targetWeight"] = machineState->targetWeight();
-                result["targetVolume"] = machineState->targetVolume();
-                result["scaleWeight"] = machineState->scaleWeight();
+                result["shotTimeSec"] = machineState->shotTime();
+                result["targetWeightG"] = machineState->targetWeight();
+                result["targetVolumeMl"] = machineState->targetVolume();
+                result["scaleWeightG"] = machineState->scaleWeight();
             }
             if (device) {
                 result["connected"] = device->isConnected();
@@ -35,9 +35,9 @@ void registerMachineTools(McpToolRegistry* registry, DE1Device* device,
                 result["waterLevelMm"] = device->waterLevelMm();
                 result["firmwareVersion"] = device->firmwareVersion();
                 result["isHeadless"] = device->isHeadless();
-                result["pressure"] = device->pressure();
-                result["temperature"] = device->temperature();
-                result["steamTemperature"] = device->steamTemperature();
+                result["pressureBar"] = device->pressure();
+                result["temperatureC"] = device->temperature();
+                result["steamTemperatureC"] = device->steamTemperature();
             }
             return result;
         },
@@ -51,19 +51,19 @@ void registerMachineTools(McpToolRegistry* registry, DE1Device* device,
         [device, machineState, mainController](const QJsonObject&) -> QJsonObject {
             QJsonObject result;
             if (device) {
-                result["pressure"] = device->pressure();
-                result["flow"] = device->flow();
-                result["temperature"] = device->temperature();
-                result["mixTemperature"] = device->mixTemperature();
-                result["steamTemperature"] = device->steamTemperature();
-                result["goalPressure"] = device->goalPressure();
-                result["goalFlow"] = device->goalFlow();
-                result["goalTemperature"] = device->goalTemperature();
+                result["pressureBar"] = device->pressure();
+                result["flowMlPerSec"] = device->flow();
+                result["temperatureC"] = device->temperature();
+                result["mixTemperatureC"] = device->mixTemperature();
+                result["steamTemperatureC"] = device->steamTemperature();
+                result["goalPressureBar"] = device->goalPressure();
+                result["goalFlowMlPerSec"] = device->goalFlow();
+                result["goalTemperatureC"] = device->goalTemperature();
             }
             if (machineState) {
-                result["scaleWeight"] = machineState->scaleWeight();
-                result["scaleFlowRate"] = machineState->scaleFlowRate();
-                result["shotTime"] = machineState->shotTime();
+                result["scaleWeightG"] = machineState->scaleWeight();
+                result["scaleFlowRateMlPerSec"] = machineState->scaleFlowRate();
+                result["shotTimeSec"] = machineState->shotTime();
             }
 
             // Include time-series data during active shot

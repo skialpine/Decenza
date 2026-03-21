@@ -91,9 +91,9 @@ void registerScaleTools(McpToolRegistry* registry, MachineState* machineState)
                 result["error"] = "No scale connected";
                 return result;
             }
-            result["weight"] = machineState->scaleWeight();
-            result["flowRate"] = machineState->scaleFlowRate();
-            result["smoothedFlowRate"] = machineState->smoothedScaleFlowRate();
+            result["weightG"] = machineState->scaleWeight();
+            result["flowRateMlPerSec"] = machineState->scaleFlowRate();
+            result["smoothedFlowRateMlPerSec"] = machineState->smoothedScaleFlowRate();
             result["scaleName"] = machineState->scale()->objectName();
             return result;
         },

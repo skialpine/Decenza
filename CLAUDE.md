@@ -343,6 +343,17 @@ The ShotServer is split into multiple files: `shotserver.cpp` (core + routing), 
 - **Use `AbortController` with a timeout** for community API calls (client-side 45s, server-side 60s safety net).
 - **Don't mutate state before async success.** For example, increment a page counter only after the fetch succeeds, not before — otherwise failed requests skip pages permanently.
 
+### MCP Tool Responses (src/mcp/)
+
+MCP tool responses are consumed by LLMs which cannot reliably interpret raw numbers. Follow these conventions:
+
+- **Never return Unix timestamps.** Use ISO 8601 with timezone: `dt.toOffsetFromUtc(dt.offsetFromUtc()).toString(Qt::ISODate)` → `"2026-03-21T11:20:41-06:00"`
+- **Include units in field names.** `doseG` (grams), `pressureBar`, `temperatureC`, `flowMlPerSec`, `durationSec`, `weightG`, `targetVolumeMl`. An AI seeing `"pressure": 9.0` doesn't know bar vs PSI vs kPa.
+- **Include scale in field names for bounded values.** `enjoyment0to100` instead of `enjoyment`.
+- **Use human-readable strings for enums.** Machine phases, editor types, and states as strings (`"idle"`, `"pouring"`), not numeric codes.
+
+See `docs/MCP_SERVER.md` for the full data conventions section.
+
 ## Emoji System
 
 Emojis are rendered as pre-rendered SVG images (Twemoji), not via a color font. This avoids D3D12/GPU crashes caused by CBDT/CBLC bitmap fonts (NotoColorEmoji.ttf) being incompatible with Qt's scene graph glyph cache across all platforms.

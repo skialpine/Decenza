@@ -6,6 +6,7 @@
 #include "mcptoolregistry.h"
 #include "../history/shothistorystorage.h"
 
+#include <QDateTime>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QSqlDatabase>
@@ -87,12 +88,13 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
                         while (query.next()) {
                             QJsonObject shot;
                             shot["id"] = query.value("id").toLongLong();
-                            shot["timestamp"] = query.value("timestamp").toLongLong();
+                            auto dt = QDateTime::fromSecsSinceEpoch(query.value("timestamp").toLongLong());
+                            shot["timestamp"] = dt.toOffsetFromUtc(dt.offsetFromUtc()).toString(Qt::ISODate);
                             shot["profileName"] = query.value("profile_name").toString();
-                            shot["dose"] = query.value("dose_weight").toDouble();
-                            shot["yield"] = query.value("final_weight").toDouble();
-                            shot["duration"] = query.value("duration_seconds").toDouble();
-                            shot["enjoyment"] = query.value("enjoyment").toInt();
+                            shot["doseG"] = query.value("dose_weight").toDouble();
+                            shot["yieldG"] = query.value("final_weight").toDouble();
+                            shot["durationSec"] = query.value("duration_seconds").toDouble();
+                            shot["enjoyment0to100"] = query.value("enjoyment").toInt();
                             shot["grinderSetting"] = query.value("grinder_setting").toString();
                             shot["grinderModel"] = query.value("grinder_model").toString();
                             shot["notes"] = query.value("espresso_notes").toString();

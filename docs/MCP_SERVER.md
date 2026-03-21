@@ -232,6 +232,17 @@ The MCP enables an external AI (e.g. Claude Desktop) to act as a dial-in advisor
 
 The MCP AI has a significant advantage over the in-app AI: it's not limited by token budgets or cloud API costs. It can read the full profile knowledge base, all dial-in reference tables, and maintain a long conversation across multiple shots without worrying about context trimming.
 
+## AI-Friendly Data Conventions
+
+MCP tool responses are consumed by LLMs (Claude, ChatGPT, etc.) which cannot reliably interpret raw numbers without context. All numeric fields in MCP responses follow these conventions:
+
+- **Timestamps**: ISO 8601 with timezone offset (e.g., `"2026-03-21T11:20:41-06:00"`), never Unix epoch
+- **Units in field names**: Numeric fields include their unit as a suffix — `doseG` (grams), `pressureBar` (bar), `temperatureC` (Celsius), `flowMlPerSec` (ml/s), `durationSec` (seconds), `weightG` (grams), `targetVolumeMl` (ml)
+- **Scales in field names**: Bounded values indicate their range — `enjoyment0to100` (0-100 rating)
+- **Human-readable enums**: Machine phases, editor types, and states are returned as strings (`"idle"`, `"pouring"`, `"dflow"`), not numeric codes
+
+When adding new MCP tool responses, never return raw numbers that require domain knowledge to interpret. An AI seeing `"pressure": 9.0` doesn't know if that's bar, PSI, or kPa. Use `"pressureBar": 9.0` instead.
+
 ## Resources (SSE Notifications)
 
 | URI | Description | Notification Trigger |
@@ -377,7 +388,7 @@ Add all `src/mcp/*.cpp` to SOURCES and `src/mcp/*.h` to HEADERS. Add `McpConfirm
 The `dialing_get_context` tool requires `ShotHistoryStorage::getRecentShotsByKbId(const QString& kbId, int limit)` which does not yet exist (only referenced as a TODO comment at `shothistorystorage.cpp:649`). This must be implemented before the dial-in tools. It should:
 - Follow the existing async pattern: `requestRecentShotsByKbId()` on main thread → `QThread::create()` background query → emit `recentShotsByKbIdReady()` signal
 - Query: `SELECT ... FROM shots WHERE profile_kb_id = :kbId ORDER BY created_at DESC LIMIT :limit`
-- Return summary data (not full time-series) for each shot: id, timestamp, profile name, dose, yield, duration, enjoyment, grinder setting, temperature, tasting notes
+- Return summary data (not full time-series) for each shot: id, timestamp (ISO 8601 with timezone), profileName, doseG, yieldG, durationSec, enjoyment0to100, grinderSetting, temperature, notes
 
 ## Thread Safety
 

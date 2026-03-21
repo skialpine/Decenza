@@ -11,6 +11,7 @@
 #include "../core/settings.h"
 #include "../profile/profile.h"
 
+#include <QDateTime>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -100,12 +101,13 @@ void registerDialingTools(McpToolRegistry* registry, MainController* mainControl
                             while (hQuery.next()) {
                                 QJsonObject h;
                                 h["id"] = hQuery.value("id").toLongLong();
-                                h["timestamp"] = hQuery.value("timestamp").toLongLong();
+                                auto dt = QDateTime::fromSecsSinceEpoch(hQuery.value("timestamp").toLongLong());
+                                h["timestamp"] = dt.toOffsetFromUtc(dt.offsetFromUtc()).toString(Qt::ISODate);
                                 h["profileName"] = hQuery.value("profile_name").toString();
-                                h["dose"] = hQuery.value("dose_weight").toDouble();
-                                h["yield"] = hQuery.value("final_weight").toDouble();
-                                h["duration"] = hQuery.value("duration_seconds").toDouble();
-                                h["enjoyment"] = hQuery.value("enjoyment").toInt();
+                                h["doseG"] = hQuery.value("dose_weight").toDouble();
+                                h["yieldG"] = hQuery.value("final_weight").toDouble();
+                                h["durationSec"] = hQuery.value("duration_seconds").toDouble();
+                                h["enjoyment0to100"] = hQuery.value("enjoyment").toInt();
                                 h["grinderSetting"] = hQuery.value("grinder_setting").toString();
                                 h["grinderModel"] = hQuery.value("grinder_model").toString();
                                 h["notes"] = hQuery.value("espresso_notes").toString();
