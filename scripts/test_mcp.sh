@@ -704,26 +704,26 @@ assert_ok "dialing_suggest_change returns suggestion" "$SUGGEST" \
     "d.get('parameter') == 'grind' and d.get('status') == 'suggestion_displayed'"
 
 if [ "$HAS_SETTINGS_SET" = "1" ]; then
-    # settings_set
-    SETW_RAW=$(rpc 103 "tools/call" '{"name":"settings_set","arguments":{"targetWeight":36.0}}')
+    # settings_set (confirmed: true to pass chat confirmation gate)
+    SETW_RAW=$(rpc 103 "tools/call" '{"name":"settings_set","arguments":{"targetWeight":36.0,"confirmed":true}}')
     SETW=$(echo "$SETW_RAW" | parse_tool_result)
     assert_ok "settings_set updates targetWeight" "$SETW" \
         "d.get('success') == True and 'targetWeight' in d.get('updated',[])"
 
     # settings_set with no valid keys
-    SETW_EMPTY_RAW=$(rpc 104 "tools/call" '{"name":"settings_set","arguments":{}}')
+    SETW_EMPTY_RAW=$(rpc 104 "tools/call" '{"name":"settings_set","arguments":{"confirmed":true}}')
     SETW_EMPTY=$(echo "$SETW_EMPTY_RAW" | parse_tool_result)
     assert_ok "settings_set with no keys returns error" "$SETW_EMPTY" \
         "'error' in d"
 
     # profiles_set_active with invalid profile
-    BAD_PROFILE_RAW=$(rpc 105 "tools/call" '{"name":"profiles_set_active","arguments":{"filename":"nonexistent_xyz"}}')
+    BAD_PROFILE_RAW=$(rpc 105 "tools/call" '{"name":"profiles_set_active","arguments":{"filename":"nonexistent_xyz","confirmed":true}}')
     BAD_PROFILE=$(echo "$BAD_PROFILE_RAW" | parse_tool_result)
     assert_ok "profiles_set_active rejects invalid profile" "$BAD_PROFILE" \
         "'error' in d"
 
     # profiles_create + profiles_delete roundtrip
-    CREATE_RAW=$(rpc 106 "tools/call" '{"name":"profiles_create","arguments":{"editorType":"pressure","title":"_MCP Test Profile"}}')
+    CREATE_RAW=$(rpc 106 "tools/call" '{"name":"profiles_create","arguments":{"editorType":"pressure","title":"_MCP Test Profile","confirmed":true}}')
     CREATE=$(echo "$CREATE_RAW" | parse_tool_result)
     assert_ok "profiles_create creates profile" "$CREATE" \
         "d.get('success') == True and d.get('editorType') == 'pressure'"
@@ -731,7 +731,7 @@ if [ "$HAS_SETTINGS_SET" = "1" ]; then
     # Clean up: delete the created profile
     CREATED_FILE=$(echo "$CREATE" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('filename',''))" 2>/dev/null)
     if [ -n "$CREATED_FILE" ]; then
-        DEL_RAW=$(rpc 107 "tools/call" "{\"name\":\"profiles_delete\",\"arguments\":{\"filename\":\"$CREATED_FILE\"}}")
+        DEL_RAW=$(rpc 107 "tools/call" "{\"name\":\"profiles_delete\",\"arguments\":{\"filename\":\"$CREATED_FILE\",\"confirmed\":true}}")
         DEL=$(echo "$DEL_RAW" | parse_tool_result)
         assert_ok "profiles_delete removes created profile" "$DEL" \
             "d.get('success') == True"
