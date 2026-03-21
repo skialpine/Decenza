@@ -561,22 +561,47 @@ The following QML capabilities do not yet have MCP equivalents. Organized by pri
 
 16. **Brew overrides**: `machine_start_espresso` should accept optional dose/yield/temperature/grind overrides — matching the BrewDialog that QML shows before starting a shot. Calls `activateBrewWithOverrides()`. This lets MCP start a shot with specific parameters without permanently changing the profile.
 
+#### High Priority (needed for QML parity)
+
+16. **Full settings read/write parity**: `settings_get` and `settings_set` must cover every setting the QML Settings tabs expose. Currently only covers espresso/steam/water/DYE fields. Missing settings by tab:
+
+**Preferences**: themeMode, darkThemeName, lightThemeName, autoSleepMinutes, postShotReviewTimeout, extractionView, smartChargingMode, keepSteamHeaterOn, steamDisabled, steamAutoFlush, refillKitOverride, perScreenScale, flowCalibration
+
+**Connections**: savedDE1Address, savedScaleAddress, scaleType, knownScales, usbScaleEnabled
+
+**Screensaver**: screensaverType, screensaverTimeout, screensaverBrightness, screensaverVideos
+
+**Accessibility**: accessibilityEnabled, ttsEnabled, ttsVolume, tickSoundsEnabled, announceExtractionProgress, accessibilityExtractionInterval
+
+**AI**: aiProvider, aiApiKey, aiModel, mcpEnabled, mcpAccessLevel, mcpConfirmationLevel, discussShotApp, discussShotCustomUrl
+
+**History**: shotHistoryGroupBy, shotHistorySortOrder
+
+**Data**: backup/restore operations, database stats
+
+**Options/Steam/Water**: steamTemperature, steamTimeout, steamFlow, steamPitcherPresets, waterTemperature, waterVolume, waterVolumeMode, waterVesselPresets
+
+**Home Automation (MQTT)**: mqttEnabled, mqttBrokerUrl, mqttTopic
+
+**Language**: currentLanguage, availableLanguages
+
+Each setting should use the same `Settings` property that the QML binding uses — no separate code paths.
+
 #### Medium Priority (useful but not blocking)
 
-17. **Visualizer integration**: `visualizer_upload` to upload a shot to visualizer.coffee, `visualizer_import` to import a profile by share code or shot ID. These are network operations the QML UI does via VisualizerUploader and VisualizerImporter.
+17. **Visualizer integration**: `visualizer_upload` to upload a shot to visualizer.coffee, `visualizer_import` to import a profile by share code or shot ID.
 
-18. **Profile favorites**: Read/write favorite profiles list — `profiles_get_favorites`, `profiles_add_favorite`, `profiles_remove_favorite`. The IdlePage shows favorites as quick-switch buttons; MCP should be able to manage them.
+18. **Profile favorites**: Read/write favorite profiles list. IdlePage shows favorites as quick-switch buttons.
 
-19. **Advanced frame manipulation**: Individual frame operations for advanced profiles — `profiles_add_frame`, `profiles_delete_frame`, `profiles_move_frame`, `profiles_set_frame_property`. Currently MCP can replace the entire steps array via `profiles_edit_params`, but QML's ProfileEditorPage also has granular frame operations. **Alternative**: rely on `profiles_edit_params` with full steps array (already works) and skip granular tools to avoid API bloat.
+19. **Advanced frame manipulation**: Individual frame operations (`addFrame`, `deleteFrame`, `moveFrame`, `setFrameProperty`). Alternative: rely on `profiles_edit_params` with full steps array (already works).
 
 #### Low Priority (future phases)
 
 20. **Bean inventory system**: Full CRUD for beans and batches. Requires new DB tables and significant UI work.
 21. **Real-time streaming**: Subscribe/read for live sensor data during shots. Requires WebSocket or enhanced SSE.
-22. **Direct control mode**: Live setpoint adjustment during shots (`setLivePressure`, `setLiveFlow`, `setLiveTemperature`). Only useful for advanced users doing manual profiling.
+22. **Direct control mode**: Live setpoint adjustment during shots (`setLivePressure`, `setLiveFlow`, `setLiveTemperature`).
 23. **Community library**: Browse and download community-shared profiles. Complex async network flow.
-24. **Presets management**: Steam pitcher presets, water vessel presets, profile visibility (hidden/selected built-ins). Low-frequency operations.
-25. **Backup/restore**: Create and restore database backups via MCP.
+24. **Backup/restore**: Create and restore database backups via MCP.
 
 ### Restructuring Proposal
 
@@ -627,8 +652,9 @@ Before adding new tools, consolidate existing ones to reduce tool count and avoi
 | 13 | Confirmation dialog | ✅ Done | Hybrid: in-app for start ops, chat for settings |
 | 14 | Profile editor tools | ✅ Done | get_params, edit_params, save, delete (all 5 editor types) |
 | 15 | QML parity: high | ✅ Done | profiles_create, shots_update/delete, brew overrides, removed dialing_apply_change |
-| 16 | QML parity: medium | 🔲 Future | visualizer, favorites, frame manipulation |
-| 17 | QML parity: low | 🔲 Future | bean inventory, streaming, direct control, community, presets, backup |
+| 16 | Full settings parity | 🔲 Next | All QML Settings tabs readable + writable via settings_get/set |
+| 17 | QML parity: medium | 🔲 Future | visualizer, favorites, frame manipulation |
+| 18 | QML parity: low | 🔲 Future | bean inventory, streaming, direct control, community, backup |
 
 ## Verification
 
