@@ -38,18 +38,27 @@ public:
         m_tools[name] = tool;
     }
 
-    // List tools filtered by access level
+    // List all tools. Tools above the current access level are still listed
+    // (so the AI knows they exist) but their descriptions note the required level.
+    // Access is enforced in callTool — restricted tools return an error when called.
     // 0 = Monitor (read only), 1 = Control (read + control), 2 = Full (all)
     QJsonArray listTools(int accessLevel) const
     {
+        static const char* levelNames[] = {"Monitor", "Control", "Full"};
         QJsonArray result;
         for (auto it = m_tools.constBegin(); it != m_tools.constEnd(); ++it) {
             const auto& tool = it.value();
-            if (categoryMinLevel(tool.category) > accessLevel) continue;
+            int required = categoryMinLevel(tool.category);
 
             QJsonObject toolJson;
             toolJson["name"] = tool.name;
-            toolJson["description"] = tool.description;
+            if (required > accessLevel) {
+                int reqClamped = qBound(0, required, 2);
+                toolJson["description"] = QString("[DISABLED — requires '%1' access level in Settings > AI > MCP] ")
+                    .arg(levelNames[reqClamped]) + tool.description;
+            } else {
+                toolJson["description"] = tool.description;
+            }
             toolJson["inputSchema"] = tool.inputSchema;
             result.append(toolJson);
         }
