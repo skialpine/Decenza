@@ -143,16 +143,14 @@ void registerWriteTools(McpToolRegistry* registry, MainController* mainControlle
                 return result;
             }
 
-            // Debug: log what we received
-            qDebug() << "shots_delete args:" << QJsonDocument(args).toJson(QJsonDocument::Compact);
-            qDebug() << "shots_delete shotId type:" << args["shotId"].type() << "value:" << args["shotId"];
-
+            // MCP may send integers as strings — handle both
             qint64 shotId = args["shotId"].toInteger();
             if (shotId <= 0)
                 shotId = static_cast<qint64>(args["shotId"].toDouble());
+            if (shotId <= 0)
+                shotId = args["shotId"].toString().toLongLong();
             if (shotId <= 0) {
-                result["error"] = "Valid shotId is required (got: " +
-                    QString::fromUtf8(QJsonDocument(QJsonObject{{"shotId", args["shotId"]}}).toJson(QJsonDocument::Compact)) + ")";
+                result["error"] = "Valid shotId is required";
                 return result;
             }
 
