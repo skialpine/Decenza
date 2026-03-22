@@ -57,17 +57,17 @@ void registerMcpResources(McpResourceRegistry* registry, DE1Device* device,
         [device, machineState]() -> QJsonObject {
             QJsonObject result;
             if (device) {
-                result["pressure"] = device->pressure();
-                result["flow"] = device->flow();
-                result["temperature"] = device->temperature();
-                result["goalPressure"] = device->goalPressure();
-                result["goalFlow"] = device->goalFlow();
-                result["goalTemperature"] = device->goalTemperature();
+                result["pressureBar"] = device->pressure();
+                result["flowMlPerSec"] = device->flow();
+                result["temperatureC"] = device->temperature();
+                result["goalPressureBar"] = device->goalPressure();
+                result["goalFlowMlPerSec"] = device->goalFlow();
+                result["goalTemperatureC"] = device->goalTemperature();
             }
             if (machineState) {
-                result["scaleWeight"] = machineState->scaleWeight();
-                result["scaleFlowRate"] = machineState->scaleFlowRate();
-                result["shotTime"] = machineState->shotTime();
+                result["scaleWeightG"] = machineState->scaleWeight();
+                result["scaleFlowRateMlPerSec"] = machineState->scaleFlowRate();
+                result["shotTimeSec"] = machineState->shotTime();
             }
             return result;
         });
