@@ -89,7 +89,8 @@ private:
     QJsonObject handleToolsCall(const QJsonObject& params, McpSession* session,
                                 QTcpSocket* socket, const QVariant& requestId);
     QJsonObject handleResourcesList(const QJsonObject& params, McpSession* session);
-    QJsonObject handleResourcesRead(const QJsonObject& params, McpSession* session);
+    QJsonObject handleResourcesRead(const QJsonObject& params, McpSession* session,
+                                    QTcpSocket* socket, const QVariant& requestId);
 
     // Session management
     McpSession* findOrCreateSession(const QString& sessionHeader);
@@ -141,6 +142,10 @@ private:
 
     // In-app confirmation (machine_start_* tools)
     std::optional<PendingConfirmation> m_pendingConfirmation;
+
+    // Async tool response helper — sends the tool result back on the held HTTP connection
+    void sendAsyncToolResponse(QPointer<QTcpSocket> socket, const QVariant& requestId,
+                               const QString& sessionId, const QJsonObject& toolResult);
 
     // Limits
     static constexpr int MaxSessions = 8;

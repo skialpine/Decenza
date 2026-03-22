@@ -1,8 +1,3 @@
-// TODO: Move SQL queries and disk I/O (debug log reads) to background thread
-// per CLAUDE.md design principle. Current tool handler architecture (synchronous
-// QJsonObject return) prevents this. Requires refactoring McpToolHandler to
-// support async responses.
-
 #include "mcpserver.h"
 #include "mcpresourceregistry.h"
 #include "mcptoolregistry.h"
@@ -18,9 +13,11 @@
 #include <QJsonArray>
 #include <QSqlDatabase>
 #include <QSqlQuery>
-#include <QAtomicInt>
+#include <QThread>
+#include <QMetaObject>
+#include <QCoreApplication>
 
-static QAtomicInt s_mcpResConnCounter{0};
+#include "../core/dbutils.h"
 
 void registerMcpResources(McpResourceRegistry* registry, DE1Device* device,
                           MachineState* machineState, MainController* mainController,
@@ -89,23 +86,24 @@ void registerMcpResources(McpResourceRegistry* registry, DE1Device* device,
         });
 
     // decenza://shots/recent
-    registry->registerResource(
+    registry->registerAsyncResource(
         "decenza://shots/recent",
         "Recent Shots",
         "Last 10 shots with summary data",
         "application/json",
-        [shotHistory]() -> QJsonObject {
-            QJsonObject result;
-            if (!shotHistory || !shotHistory->isReady()) return result;
+        [shotHistory](std::function<void(QJsonObject)> respond) {
+            if (!shotHistory || !shotHistory->isReady()) {
+                respond(QJsonObject{{"shots", QJsonArray()}, {"count", 0}});
+                return;
+            }
 
             const QString dbPath = shotHistory->databasePath();
-            const QString connName = QString("mcp_res_recent_%1").arg(s_mcpResConnCounter.fetchAndAddRelaxed(1));
 
-            QJsonArray shots;
-            {
-                QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-                db.setDatabaseName(dbPath);
-                if (db.open()) {
+            QThread* thread = QThread::create([dbPath, respond]() {
+                QJsonObject result;
+                QJsonArray shots;
+
+                withTempDb(dbPath, "mcp_res_recent", [&](QSqlDatabase& db) {
                     QSqlQuery query(db);
                     if (query.exec("SELECT id, timestamp, profile_name, dose_weight, final_weight, "
                                    "duration_seconds, enjoyment, bean_brand, bean_type "
@@ -125,13 +123,18 @@ void registerMcpResources(McpResourceRegistry* registry, DE1Device* device,
                             shots.append(shot);
                         }
                     }
-                }
-            }
-            QSqlDatabase::removeDatabase(connName);
+                });
 
-            result["shots"] = shots;
-            result["count"] = shots.size();
-            return result;
+                result["shots"] = shots;
+                result["count"] = shots.size();
+
+                QMetaObject::invokeMethod(qApp, [respond, result]() {
+                    respond(result);
+                }, Qt::QueuedConnection);
+            });
+
+            QObject::connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+            thread->start();
         });
 
     // decenza://profiles/list

@@ -864,24 +864,11 @@ qint64 ShotHistoryStorage::saveShotStatic(const QString& dbPath, const ShotSaveD
         return -1;
     }
 
-    const QString connName = QString("shs_save_%1")
-        .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
-
     qint64 shotId = -1;
-    {
-        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-        db.setDatabaseName(dbPath);
-
+    withTempDb(dbPath, "shs_save", [&](QSqlDatabase& db) {
         // Use do-while(false) so error paths 'break' out while db/query are still
-        // in scope — QSqlDatabase::removeDatabase() runs only after they're destroyed.
+        // in scope.
         do {
-            if (!db.open()) {
-                qWarning() << "ShotHistoryStorage: Failed to open DB for async saveShot";
-                break;
-            }
-
-            QSqlQuery(db).exec("PRAGMA busy_timeout = 5000");
-
             if (!db.transaction()) {
                 qWarning() << "ShotHistoryStorage: Failed to start transaction:" << db.lastError().text();
                 break;
@@ -978,8 +965,7 @@ qint64 ShotHistoryStorage::saveShotStatic(const QString& dbPath, const ShotSaveD
             QSqlQuery walQuery(db);
             walQuery.exec("PRAGMA wal_checkpoint(PASSIVE)");
         } while (false);
-    }
-    QSqlDatabase::removeDatabase(connName);
+    });
 
     return shotId;
 }
@@ -1403,65 +1389,55 @@ void ShotHistoryStorage::requestShotsFiltered(const QVariantMap& filterMap, int 
     auto destroyed = m_destroyed;
     QThread* thread = QThread::create(
         [this, dbPath, sql, countSql, bindValues, countBindValues, serial, isAppend, destroyed]() {
-            const QString connName = QString("shs_filter_%1")
-                .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
-
             QVariantList results;
             int totalCount = 0;
 
-            {
-                QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-                db.setDatabaseName(dbPath);
-                if (db.open()) {
-                    // Data query
-                    QSqlQuery query(db);
-                    if (query.prepare(sql)) {
-                        for (int i = 0; i < bindValues.size(); ++i)
-                            query.bindValue(i, bindValues[i]);
+            withTempDb(dbPath, "shs_filter", [&](QSqlDatabase& db) {
+                // Data query
+                QSqlQuery query(db);
+                if (query.prepare(sql)) {
+                    for (int i = 0; i < bindValues.size(); ++i)
+                        query.bindValue(i, bindValues[i]);
 
-                        if (query.exec()) {
-                            while (query.next()) {
-                                QVariantMap shot;
-                                shot["id"] = query.value(0).toLongLong();
-                                shot["uuid"] = query.value(1).toString();
-                                shot["timestamp"] = query.value(2).toLongLong();
-                                shot["profileName"] = query.value(3).toString();
-                                shot["duration"] = query.value(4).toDouble();
-                                shot["finalWeight"] = query.value(5).toDouble();
-                                shot["doseWeight"] = query.value(6).toDouble();
-                                shot["beanBrand"] = query.value(7).toString();
-                                shot["beanType"] = query.value(8).toString();
-                                shot["enjoyment"] = query.value(9).toInt();
-                                shot["hasVisualizerUpload"] = !query.value(10).isNull();
-                                shot["grinderSetting"] = query.value(11).toString();
-                                shot["temperatureOverride"] = query.value(12).toDouble();
-                                shot["yieldOverride"] = query.value(13).toDouble();
-                                shot["beverageType"] = query.value(14).toString();
-                                shot["drinkTds"] = query.value(15).toDouble();
-                                shot["drinkEy"] = query.value(16).toDouble();
+                    if (query.exec()) {
+                        while (query.next()) {
+                            QVariantMap shot;
+                            shot["id"] = query.value(0).toLongLong();
+                            shot["uuid"] = query.value(1).toString();
+                            shot["timestamp"] = query.value(2).toLongLong();
+                            shot["profileName"] = query.value(3).toString();
+                            shot["duration"] = query.value(4).toDouble();
+                            shot["finalWeight"] = query.value(5).toDouble();
+                            shot["doseWeight"] = query.value(6).toDouble();
+                            shot["beanBrand"] = query.value(7).toString();
+                            shot["beanType"] = query.value(8).toString();
+                            shot["enjoyment"] = query.value(9).toInt();
+                            shot["hasVisualizerUpload"] = !query.value(10).isNull();
+                            shot["grinderSetting"] = query.value(11).toString();
+                            shot["temperatureOverride"] = query.value(12).toDouble();
+                            shot["yieldOverride"] = query.value(13).toDouble();
+                            shot["beverageType"] = query.value(14).toString();
+                            shot["drinkTds"] = query.value(15).toDouble();
+                            shot["drinkEy"] = query.value(16).toDouble();
 
-                                QDateTime dt = QDateTime::fromSecsSinceEpoch(
-                                    query.value(2).toLongLong());
-                                shot["dateTime"] = dt.toString(use12h() ? "yyyy-MM-dd h:mm AP" : "yyyy-MM-dd HH:mm");
+                            QDateTime dt = QDateTime::fromSecsSinceEpoch(
+                                query.value(2).toLongLong());
+                            shot["dateTime"] = dt.toString(use12h() ? "yyyy-MM-dd h:mm AP" : "yyyy-MM-dd HH:mm");
 
-                                results.append(shot);
-                            }
+                            results.append(shot);
                         }
                     }
-
-                    // Count query
-                    QSqlQuery countQuery(db);
-                    if (countQuery.prepare(countSql)) {
-                        for (int i = 0; i < countBindValues.size(); ++i)
-                            countQuery.bindValue(i, countBindValues[i]);
-                        if (countQuery.exec() && countQuery.next())
-                            totalCount = countQuery.value(0).toInt();
-                    }
-                } else {
-                    qWarning() << "ShotHistoryStorage: Failed to open DB for async filter";
                 }
-            }
-            QSqlDatabase::removeDatabase(connName);
+
+                // Count query
+                QSqlQuery countQuery(db);
+                if (countQuery.prepare(countSql)) {
+                    for (int i = 0; i < countBindValues.size(); ++i)
+                        countQuery.bindValue(i, countBindValues[i]);
+                    if (countQuery.exec() && countQuery.next())
+                        totalCount = countQuery.value(0).toInt();
+                }
+            });
 
             QMetaObject::invokeMethod(
                 this,
@@ -1493,19 +1469,10 @@ void ShotHistoryStorage::requestShot(qint64 shotId)
 
     auto destroyed = m_destroyed;
     QThread* thread = QThread::create([this, dbPath, shotId, destroyed]() {
-        const QString connName = QString("shs_shot_%1")
-            .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
-
         ShotRecord record;
-        {
-            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-            db.setDatabaseName(dbPath);
-            if (db.open())
-                record = loadShotRecordStatic(db, shotId);
-            else
-                qWarning() << "ShotHistoryStorage: Failed to open DB for async getShot";
-        }
-        QSqlDatabase::removeDatabase(connName);
+        withTempDb(dbPath, "shs_shot", [&](QSqlDatabase& db) {
+            record = loadShotRecordStatic(db, shotId);
+        });
 
         // Convert to QVariantMap on main thread (touches QML-visible data)
         QMetaObject::invokeMethod(this, [this, shotId, record = std::move(record), destroyed]() {
@@ -1532,49 +1499,39 @@ void ShotHistoryStorage::requestRecentShotsByKbId(const QString& kbId, int limit
 
     auto destroyed = m_destroyed;
     QThread* thread = QThread::create([this, dbPath, kbId, limit, destroyed]() {
-        const QString connName = QString("shs_kbid_%1")
-            .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
-
         QVariantList results;
-        {
-            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-            db.setDatabaseName(dbPath);
-            if (db.open()) {
-                QSqlQuery query(db);
-                query.prepare(QStringLiteral(
-                    "SELECT id, timestamp, profile_name, dose_weight, final_weight, "
-                    "duration_seconds, enjoyment, grinder_setting, grinder_model, "
-                    "espresso_notes, bean_brand, bean_type, profile_kb_id "
-                    "FROM shots WHERE profile_kb_id = :kbId "
-                    "ORDER BY timestamp DESC LIMIT :limit"));
-                query.bindValue(":kbId", kbId);
-                query.bindValue(":limit", limit);
+        withTempDb(dbPath, "shs_kbid", [&](QSqlDatabase& db) {
+            QSqlQuery query(db);
+            query.prepare(QStringLiteral(
+                "SELECT id, timestamp, profile_name, dose_weight, final_weight, "
+                "duration_seconds, enjoyment, grinder_setting, grinder_model, "
+                "espresso_notes, bean_brand, bean_type, profile_kb_id "
+                "FROM shots WHERE profile_kb_id = :kbId "
+                "ORDER BY timestamp DESC LIMIT :limit"));
+            query.bindValue(":kbId", kbId);
+            query.bindValue(":limit", limit);
 
-                if (query.exec()) {
-                    while (query.next()) {
-                        QVariantMap shot;
-                        shot["id"] = query.value("id").toLongLong();
-                        shot["timestamp"] = query.value("timestamp").toLongLong();
-                        shot["profileName"] = query.value("profile_name").toString();
-                        shot["dose"] = query.value("dose_weight").toDouble();
-                        shot["yield"] = query.value("final_weight").toDouble();
-                        shot["duration"] = query.value("duration_seconds").toDouble();
-                        shot["enjoyment"] = query.value("enjoyment").toInt();
-                        shot["grinderSetting"] = query.value("grinder_setting").toString();
-                        shot["grinderModel"] = query.value("grinder_model").toString();
-                        shot["notes"] = query.value("espresso_notes").toString();
-                        shot["beanBrand"] = query.value("bean_brand").toString();
-                        shot["beanType"] = query.value("bean_type").toString();
-                        results.append(shot);
-                    }
-                } else {
-                    qWarning() << "ShotHistoryStorage: recentShotsByKbId query failed:" << query.lastError().text();
+            if (query.exec()) {
+                while (query.next()) {
+                    QVariantMap shot;
+                    shot["id"] = query.value("id").toLongLong();
+                    shot["timestamp"] = query.value("timestamp").toLongLong();
+                    shot["profileName"] = query.value("profile_name").toString();
+                    shot["dose"] = query.value("dose_weight").toDouble();
+                    shot["yield"] = query.value("final_weight").toDouble();
+                    shot["duration"] = query.value("duration_seconds").toDouble();
+                    shot["enjoyment"] = query.value("enjoyment").toInt();
+                    shot["grinderSetting"] = query.value("grinder_setting").toString();
+                    shot["grinderModel"] = query.value("grinder_model").toString();
+                    shot["notes"] = query.value("espresso_notes").toString();
+                    shot["beanBrand"] = query.value("bean_brand").toString();
+                    shot["beanType"] = query.value("bean_type").toString();
+                    results.append(shot);
                 }
             } else {
-                qWarning() << "ShotHistoryStorage: Failed to open DB for recentShotsByKbId";
+                qWarning() << "ShotHistoryStorage: recentShotsByKbId query failed:" << query.lastError().text();
             }
-        }
-        QSqlDatabase::removeDatabase(connName);
+        });
 
         QMetaObject::invokeMethod(this, [this, kbId, results = std::move(results), destroyed]() {
             if (*destroyed) {
@@ -1786,33 +1743,22 @@ void ShotHistoryStorage::deleteShots(const QVariantList& shotIds)
 
     auto destroyed = m_destroyed;
     QThread* thread = QThread::create([this, dbPath, sql, shotIds, destroyed]() {
-        const QString connName = QString("shs_delete_%1")
-            .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
-
         bool success = false;
-        {
-            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-            db.setDatabaseName(dbPath);
-            if (db.open()) {
-                QSqlQuery(db).exec("PRAGMA busy_timeout = 5000");
-                db.transaction();
-                QSqlQuery query(db);
-                if (query.prepare(sql)) {
-                    for (int i = 0; i < shotIds.size(); ++i)
-                        query.bindValue(i, shotIds[i].toLongLong());
-                    if (query.exec()) {
-                        db.commit();
-                        success = true;
-                    } else {
-                        qWarning() << "ShotHistoryStorage: Failed to batch delete shots:" << query.lastError().text();
-                        db.rollback();
-                    }
+        withTempDb(dbPath, "shs_delete", [&](QSqlDatabase& db) {
+            db.transaction();
+            QSqlQuery query(db);
+            if (query.prepare(sql)) {
+                for (int i = 0; i < shotIds.size(); ++i)
+                    query.bindValue(i, shotIds[i].toLongLong());
+                if (query.exec()) {
+                    db.commit();
+                    success = true;
+                } else {
+                    qWarning() << "ShotHistoryStorage: Failed to batch delete shots:" << query.lastError().text();
+                    db.rollback();
                 }
-            } else {
-                qWarning() << "ShotHistoryStorage: Failed to open DB for async deleteShots";
             }
-        }
-        QSqlDatabase::removeDatabase(connName);
+        });
 
         QMetaObject::invokeMethod(this, [this, shotIds, success, destroyed]() {
             if (*destroyed) {
@@ -1846,28 +1792,17 @@ void ShotHistoryStorage::requestDeleteShot(qint64 shotId)
     auto destroyed = m_destroyed;
 
     QThread* thread = QThread::create([this, dbPath, shotId, destroyed]() {
-        const QString connName = QString("shs_rdel_%1")
-            .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
-
         bool success = false;
-        {
-            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-            db.setDatabaseName(dbPath);
-            if (db.open()) {
-                QSqlQuery(db).exec("PRAGMA busy_timeout = 5000");
-                QSqlQuery query(db);
-                query.prepare("DELETE FROM shots WHERE id = ?");
-                query.bindValue(0, shotId);
-                if (query.exec()) {
-                    success = true;
-                } else {
-                    qWarning() << "ShotHistoryStorage: Failed to async delete shot:" << query.lastError().text();
-                }
+        withTempDb(dbPath, "shs_rdel", [&](QSqlDatabase& db) {
+            QSqlQuery query(db);
+            query.prepare("DELETE FROM shots WHERE id = ?");
+            query.bindValue(0, shotId);
+            if (query.exec()) {
+                success = true;
             } else {
-                qWarning() << "ShotHistoryStorage: Failed to open DB for async deleteShot";
+                qWarning() << "ShotHistoryStorage: Failed to async delete shot:" << query.lastError().text();
             }
-        }
-        QSqlDatabase::removeDatabase(connName);
+        });
 
         QMetaObject::invokeMethod(this, [this, shotId, success, destroyed]() {
             if (*destroyed) {
@@ -2117,46 +2052,36 @@ void ShotHistoryStorage::requestAutoFavorites(const QString& groupBy, int maxIte
     ).arg(selectColumns, groupColumns, joinConditions).arg(maxItems);
 
     QThread* thread = QThread::create([this, dbPath, sql, destroyed]() {
-        const QString connName = QString("shs_raf_%1")
-            .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
-
         QVariantList results;
-        {
-            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-            db.setDatabaseName(dbPath);
-            if (db.open()) {
-                QSqlQuery(db).exec("PRAGMA busy_timeout = 5000");
-                QSqlQuery query(db);
-                if (query.exec(sql)) {
-                    while (query.next()) {
-                        QVariantMap entry;
-                        entry["shotId"] = query.value("id").toLongLong();
-                        entry["profileName"] = query.value("profile_name").toString();
-                        entry["beanBrand"] = query.value("bean_brand").toString();
-                        entry["beanType"] = query.value("bean_type").toString();
-                        entry["grinderBrand"] = query.value("grinder_brand").toString();
-                        entry["grinderModel"] = query.value("grinder_model").toString();
-                        entry["grinderBurrs"] = query.value("grinder_burrs").toString();
-                        entry["grinderSetting"] = query.value("grinder_setting").toString();
-                        entry["doseWeight"] = query.value("dose_weight").toDouble();
-                        entry["finalWeight"] = query.value("final_weight").toDouble();
-                        entry["lastUsedTimestamp"] = query.value("timestamp").toLongLong();
-                        entry["shotCount"] = query.value("shot_count").toInt();
-                        entry["avgEnjoyment"] = query.value("avg_enjoyment").toInt();
-                        results.append(entry);
-                    }
-                } else {
-                    qWarning() << "ShotHistoryStorage: Async getAutoFavorites query failed:" << query.lastError().text();
+        if (!withTempDb(dbPath, "shs_raf", [&](QSqlDatabase& db) {
+            QSqlQuery query(db);
+            if (query.exec(sql)) {
+                while (query.next()) {
+                    QVariantMap entry;
+                    entry["shotId"] = query.value("id").toLongLong();
+                    entry["profileName"] = query.value("profile_name").toString();
+                    entry["beanBrand"] = query.value("bean_brand").toString();
+                    entry["beanType"] = query.value("bean_type").toString();
+                    entry["grinderBrand"] = query.value("grinder_brand").toString();
+                    entry["grinderModel"] = query.value("grinder_model").toString();
+                    entry["grinderBurrs"] = query.value("grinder_burrs").toString();
+                    entry["grinderSetting"] = query.value("grinder_setting").toString();
+                    entry["doseWeight"] = query.value("dose_weight").toDouble();
+                    entry["finalWeight"] = query.value("final_weight").toDouble();
+                    entry["lastUsedTimestamp"] = query.value("timestamp").toLongLong();
+                    entry["shotCount"] = query.value("shot_count").toInt();
+                    entry["avgEnjoyment"] = query.value("avg_enjoyment").toInt();
+                    results.append(entry);
                 }
             } else {
-                qWarning() << "ShotHistoryStorage: Failed to open DB for async getAutoFavorites";
-                QMetaObject::invokeMethod(this, [this, destroyed]() {
-                    if (*destroyed) return;
-                    emit errorOccurred("Failed to open database for auto-favorites");
-                }, Qt::QueuedConnection);
+                qWarning() << "ShotHistoryStorage: Async getAutoFavorites query failed:" << query.lastError().text();
             }
+        })) {
+            QMetaObject::invokeMethod(this, [this, destroyed]() {
+                if (*destroyed) return;
+                emit errorOccurred("Failed to open database for auto-favorites");
+            }, Qt::QueuedConnection);
         }
-        QSqlDatabase::removeDatabase(connName);
 
         QMetaObject::invokeMethod(this, [this, results, destroyed]() {
             if (*destroyed) {
@@ -2231,57 +2156,47 @@ void ShotHistoryStorage::requestAutoFavoriteGroupDetails(const QString& groupBy,
         "ORDER BY timestamp DESC";
 
     QThread* thread = QThread::create([this, dbPath, statsSql, notesSql, bindValues, destroyed]() {
-        const QString connName = QString("shs_ragd_%1")
-            .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
-
         QVariantMap result;
-        {
-            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-            db.setDatabaseName(dbPath);
-            if (db.open()) {
-                QSqlQuery(db).exec("PRAGMA busy_timeout = 5000");
-                // Stats query
-                QSqlQuery statsQuery(db);
-                statsQuery.prepare(statsSql);
-                for (int i = 0; i < bindValues.size(); ++i)
-                    statsQuery.bindValue(i, bindValues[i]);
+        if (!withTempDb(dbPath, "shs_ragd", [&](QSqlDatabase& db) {
+            // Stats query
+            QSqlQuery statsQuery(db);
+            statsQuery.prepare(statsSql);
+            for (int i = 0; i < bindValues.size(); ++i)
+                statsQuery.bindValue(i, bindValues[i]);
 
-                if (statsQuery.exec() && statsQuery.next()) {
-                    result["avgTds"] = statsQuery.value("avg_tds").toDouble();
-                    result["avgEy"] = statsQuery.value("avg_ey").toDouble();
-                    result["avgDuration"] = statsQuery.value("avg_duration").toDouble();
-                    result["avgDose"] = statsQuery.value("avg_dose").toDouble();
-                    result["avgYield"] = statsQuery.value("avg_yield").toDouble();
-                    result["avgTemperature"] = statsQuery.value("avg_temperature").toDouble();
-                }
-
-                // Notes query
-                QSqlQuery notesQuery(db);
-                notesQuery.prepare(notesSql);
-                for (int i = 0; i < bindValues.size(); ++i)
-                    notesQuery.bindValue(i, bindValues[i]);
-
-                QVariantList notes;
-                if (notesQuery.exec()) {
-                    while (notesQuery.next()) {
-                        QVariantMap note;
-                        note["text"] = notesQuery.value("espresso_notes").toString();
-                        qint64 ts = notesQuery.value("timestamp").toLongLong();
-                        note["timestamp"] = ts;
-                        note["dateTime"] = QDateTime::fromSecsSinceEpoch(ts).toString(use12h() ? "yyyy-MM-dd h:mm AP" : "yyyy-MM-dd HH:mm");
-                        notes.append(note);
-                    }
-                }
-                result["notes"] = notes;
-            } else {
-                qWarning() << "ShotHistoryStorage: Failed to open DB for async getAutoFavoriteGroupDetails";
-                QMetaObject::invokeMethod(this, [this, destroyed]() {
-                    if (*destroyed) return;
-                    emit errorOccurred("Failed to open database for auto-favorite details");
-                }, Qt::QueuedConnection);
+            if (statsQuery.exec() && statsQuery.next()) {
+                result["avgTds"] = statsQuery.value("avg_tds").toDouble();
+                result["avgEy"] = statsQuery.value("avg_ey").toDouble();
+                result["avgDuration"] = statsQuery.value("avg_duration").toDouble();
+                result["avgDose"] = statsQuery.value("avg_dose").toDouble();
+                result["avgYield"] = statsQuery.value("avg_yield").toDouble();
+                result["avgTemperature"] = statsQuery.value("avg_temperature").toDouble();
             }
+
+            // Notes query
+            QSqlQuery notesQuery(db);
+            notesQuery.prepare(notesSql);
+            for (int i = 0; i < bindValues.size(); ++i)
+                notesQuery.bindValue(i, bindValues[i]);
+
+            QVariantList notes;
+            if (notesQuery.exec()) {
+                while (notesQuery.next()) {
+                    QVariantMap note;
+                    note["text"] = notesQuery.value("espresso_notes").toString();
+                    qint64 ts = notesQuery.value("timestamp").toLongLong();
+                    note["timestamp"] = ts;
+                    note["dateTime"] = QDateTime::fromSecsSinceEpoch(ts).toString(use12h() ? "yyyy-MM-dd h:mm AP" : "yyyy-MM-dd HH:mm");
+                    notes.append(note);
+                }
+            }
+            result["notes"] = notes;
+        })) {
+            QMetaObject::invokeMethod(this, [this, destroyed]() {
+                if (*destroyed) return;
+                emit errorOccurred("Failed to open database for auto-favorite details");
+            }, Qt::QueuedConnection);
         }
-        QSqlDatabase::removeDatabase(connName);
 
         QMetaObject::invokeMethod(this, [this, result, destroyed]() {
             if (*destroyed) {
@@ -2843,25 +2758,14 @@ cleanup:
 
 int ShotHistoryStorage::getShotCountStatic(const QString& dbPath)
 {
-    const QString connName = QString("count_%1")
-        .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
-
     int count = -1;  // -1 = error (distinguishes from 0 = empty)
-    {
-        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-        db.setDatabaseName(dbPath);
-        if (db.open()) {
-            QSqlQuery query(db);
-            if (query.exec("SELECT COUNT(*) FROM shots") && query.next())
-                count = query.value(0).toInt();
-            else
-                qWarning() << "ShotHistoryStorage::getShotCountStatic: COUNT query failed:" << query.lastError().text();
-            db.close();
-        } else {
-            qWarning() << "ShotHistoryStorage::getShotCountStatic: Failed to open DB:" << db.lastError().text();
-        }
-    }
-    QSqlDatabase::removeDatabase(connName);
+    withTempDb(dbPath, "shs_count", [&](QSqlDatabase& db) {
+        QSqlQuery query(db);
+        if (query.exec("SELECT COUNT(*) FROM shots") && query.next())
+            count = query.value(0).toInt();
+        else
+            qWarning() << "ShotHistoryStorage::getShotCountStatic: COUNT query failed:" << query.lastError().text();
+    });
     return count;
 }
 
@@ -3194,27 +3098,20 @@ void ShotHistoryStorage::requestUpdateGrinderFields(const QString& oldBrand, con
 
     QThread* thread = QThread::create([this, dbPath, oldBrand, oldModel, newBrand, newModel, newBurrs, destroyed]() {
         int count = 0;
-        {
-            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "grinder_update_" + QString::number(reinterpret_cast<quintptr>(QThread::currentThread())));
-            db.setDatabaseName(dbPath);
-            if (db.open()) {
-                QSqlQuery(db).exec("PRAGMA busy_timeout = 5000");
-                QSqlQuery query(db);
-                query.prepare("UPDATE shots SET grinder_brand = ?, grinder_model = ?, grinder_burrs = ? "
-                              "WHERE grinder_brand = ? AND grinder_model = ?");
-                query.bindValue(0, newBrand);
-                query.bindValue(1, newModel);
-                query.bindValue(2, newBurrs);
-                query.bindValue(3, oldBrand);
-                query.bindValue(4, oldModel);
-                if (query.exec())
-                    count = query.numRowsAffected();
-                else
-                    qWarning() << "ShotHistoryStorage: Failed to bulk update grinder fields:" << query.lastError().text();
-                db.close();
-            }
-            QSqlDatabase::removeDatabase("grinder_update_" + QString::number(reinterpret_cast<quintptr>(QThread::currentThread())));
-        }
+        withTempDb(dbPath, "shs_grinder_update", [&](QSqlDatabase& db) {
+            QSqlQuery query(db);
+            query.prepare("UPDATE shots SET grinder_brand = ?, grinder_model = ?, grinder_burrs = ? "
+                          "WHERE grinder_brand = ? AND grinder_model = ?");
+            query.bindValue(0, newBrand);
+            query.bindValue(1, newModel);
+            query.bindValue(2, newBurrs);
+            query.bindValue(3, oldBrand);
+            query.bindValue(4, oldModel);
+            if (query.exec())
+                count = query.numRowsAffected();
+            else
+                qWarning() << "ShotHistoryStorage: Failed to bulk update grinder fields:" << query.lastError().text();
+        });
 
         QMetaObject::invokeMethod(this, [this, count, destroyed]() {
             if (*destroyed) return;

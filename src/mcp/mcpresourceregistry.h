@@ -8,13 +8,16 @@
 #include <functional>
 
 using McpResourceReader = std::function<QJsonObject()>;
+using McpAsyncResourceReader = std::function<void(std::function<void(QJsonObject)> respond)>;
 
 struct McpResourceDefinition {
     QString uri;
     QString name;
     QString description;
     QString mimeType;
-    McpResourceReader reader;
+    McpResourceReader reader;           // sync reader (null for async)
+    McpAsyncResourceReader asyncReader; // async reader (null for sync)
+    bool isAsync = false;
 };
 
 class McpResourceRegistry : public QObject {
@@ -32,6 +35,20 @@ public:
         res.description = description;
         res.mimeType = mimeType;
         res.reader = reader;
+        m_resources[uri] = res;
+    }
+
+    void registerAsyncResource(const QString& uri, const QString& name,
+                               const QString& description, const QString& mimeType,
+                               McpAsyncResourceReader reader)
+    {
+        McpResourceDefinition res;
+        res.uri = uri;
+        res.name = name;
+        res.description = description;
+        res.mimeType = mimeType;
+        res.asyncReader = reader;
+        res.isAsync = true;
         m_resources[uri] = res;
     }
 
@@ -57,7 +74,35 @@ public:
             errorOut = "Unknown resource: " + uri;
             return {};
         }
+        if (it.value().isAsync) {
+            errorOut = "Resource is async, use readAsyncResource(): " + uri;
+            return {};
+        }
         return it.value().reader();
+    }
+
+    // Returns true if the async reader was dispatched. The respond callback
+    // will be called on the main thread with the resource data.
+    bool readAsyncResource(const QString& uri, QString& errorOut,
+                           std::function<void(QJsonObject)> respond) const
+    {
+        auto it = m_resources.constFind(uri);
+        if (it == m_resources.constEnd()) {
+            errorOut = "Unknown resource: " + uri;
+            return false;
+        }
+        if (!it.value().isAsync || !it.value().asyncReader) {
+            errorOut = "Resource is not async: " + uri;
+            return false;
+        }
+        it.value().asyncReader(std::move(respond));
+        return true;
+    }
+
+    bool isAsyncResource(const QString& uri) const
+    {
+        auto it = m_resources.constFind(uri);
+        return (it != m_resources.constEnd()) && it.value().isAsync;
     }
 
     bool hasResource(const QString& uri) const { return m_resources.contains(uri); }

@@ -1,10 +1,7 @@
-// TODO: Move SQL queries to background thread per CLAUDE.md design principle.
-// Current tool handler architecture (synchronous QJsonObject return) prevents this.
-// Requires refactoring McpToolHandler to support async responses.
-
 #include "mcpserver.h"
 #include "mcptoolregistry.h"
 #include "../history/shothistorystorage.h"
+#include "../core/dbutils.h"
 
 #include <QDateTime>
 #include <QJsonObject>
@@ -13,14 +10,13 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QThread>
-#include <QAtomicInt>
-
-static QAtomicInt s_mcpShotConnCounter{0};
+#include <QMetaObject>
+#include <QCoreApplication>
 
 void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistory)
 {
     // shots_list
-    registry->registerTool(
+    registry->registerAsyncTool(
         "shots_list",
         "List recent shots with optional filters. Returns summary data (no time-series).",
         QJsonObject{
@@ -35,11 +31,10 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
                 {"before", QJsonObject{{"type", "string"}, {"description", "Only shots before this ISO timestamp (e.g. 2026-03-21T23:59:59)"}}}
             }}
         },
-        [shotHistory](const QJsonObject& args) -> QJsonObject {
-            QJsonObject result;
+        [shotHistory](const QJsonObject& args, std::function<void(QJsonObject)> respond) {
             if (!shotHistory || !shotHistory->isReady()) {
-                result["error"] = "Shot history not available";
-                return result;
+                respond(QJsonObject{{"error", "Shot history not available"}});
+                return;
             }
 
             int limit = qBound(1, args["limit"].toInt(20), 100);
@@ -58,14 +53,15 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
             }
 
             const QString dbPath = shotHistory->databasePath();
-            const QString connName = QString("mcp_shots_list_%1").arg(s_mcpShotConnCounter.fetchAndAddRelaxed(1));
 
-            QJsonArray shots;
-            int totalCount = 0;
-            {
-                QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-                db.setDatabaseName(dbPath);
-                if (db.open()) {
+            QThread* thread = QThread::create(
+                [dbPath, limit, offset, profileFilter, beanFilter,
+                 minEnjoyment, afterEpoch, beforeEpoch, respond]() {
+                QJsonObject result;
+                QJsonArray shots;
+                int totalCount = 0;
+
+                if (!withTempDb(dbPath, "mcp_shots_list", [&](QSqlDatabase& db) {
                     QString sql = "SELECT id, timestamp, profile_name, dose_weight, final_weight, "
                                   "duration_seconds, enjoyment, grinder_setting, grinder_model, "
                                   "espresso_notes, bean_brand, bean_type "
@@ -141,24 +137,29 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
                         countQuery.bindValue(":before", beforeEpoch);
                     if (countQuery.exec() && countQuery.next())
                         totalCount = countQuery.value(0).toInt();
-                } else {
+                })) {
                     result["error"] = "Failed to open shot database";
                 }
-            }
-            QSqlDatabase::removeDatabase(connName);
 
-            if (!result.contains("error")) {
-                result["shots"] = shots;
-                result["count"] = shots.size();
-                result["total"] = totalCount;
-                result["offset"] = offset;
-            }
-            return result;
+                if (!result.contains("error")) {
+                    result["shots"] = shots;
+                    result["count"] = shots.size();
+                    result["total"] = totalCount;
+                    result["offset"] = offset;
+                }
+
+                QMetaObject::invokeMethod(qApp, [respond, result]() {
+                    respond(result);
+                }, Qt::QueuedConnection);
+            });
+
+            QObject::connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+            thread->start();
         },
         "read");
 
     // shots_get_detail
-    registry->registerTool(
+    registry->registerAsyncTool(
         "shots_get_detail",
         "Get full shot record including time-series data (pressure, flow, temperature, weight curves)",
         QJsonObject{
@@ -168,26 +169,24 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
             }},
             {"required", QJsonArray{"shotId"}}
         },
-        [shotHistory](const QJsonObject& args) -> QJsonObject {
-            QJsonObject result;
+        [shotHistory](const QJsonObject& args, std::function<void(QJsonObject)> respond) {
             if (!shotHistory || !shotHistory->isReady()) {
-                result["error"] = "Shot history not available";
-                return result;
+                respond(QJsonObject{{"error", "Shot history not available"}});
+                return;
             }
 
             qint64 shotId = args["shotId"].toInteger();
             if (shotId <= 0) {
-                result["error"] = "Valid shotId is required";
-                return result;
+                respond(QJsonObject{{"error", "Valid shotId is required"}});
+                return;
             }
 
             const QString dbPath = shotHistory->databasePath();
-            const QString connName = QString("mcp_shot_detail_%1").arg(s_mcpShotConnCounter.fetchAndAddRelaxed(1));
 
-            {
-                QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-                db.setDatabaseName(dbPath);
-                if (db.open()) {
+            QThread* thread = QThread::create([dbPath, shotId, respond]() {
+                QJsonObject result;
+
+                if (!withTempDb(dbPath, "mcp_shot_detail", [&](QSqlDatabase& db) {
                     ShotRecord record = ShotHistoryStorage::loadShotRecordStatic(db, shotId);
                     QVariantMap shotMap = ShotHistoryStorage::convertShotRecord(record);
                     if (!shotMap.isEmpty()) {
@@ -195,18 +194,22 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
                     } else {
                         result["error"] = "Shot not found: " + QString::number(shotId);
                     }
-                } else {
+                })) {
                     result["error"] = "Failed to open shot database";
                 }
-            }
-            QSqlDatabase::removeDatabase(connName);
 
-            return result;
+                QMetaObject::invokeMethod(qApp, [respond, result]() {
+                    respond(result);
+                }, Qt::QueuedConnection);
+            });
+
+            QObject::connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+            thread->start();
         },
         "read");
 
     // shots_compare
-    registry->registerTool(
+    registry->registerAsyncTool(
         "shots_compare",
         "Side-by-side comparison of 2 or more shots. Returns summary data for each shot.",
         QJsonObject{
@@ -220,27 +223,25 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
             }},
             {"required", QJsonArray{"shotIds"}}
         },
-        [shotHistory](const QJsonObject& args) -> QJsonObject {
-            QJsonObject result;
+        [shotHistory](const QJsonObject& args, std::function<void(QJsonObject)> respond) {
             if (!shotHistory || !shotHistory->isReady()) {
-                result["error"] = "Shot history not available";
-                return result;
+                respond(QJsonObject{{"error", "Shot history not available"}});
+                return;
             }
 
             QJsonArray idArray = args["shotIds"].toArray();
             if (idArray.size() < 2 || idArray.size() > 10) {
-                result["error"] = "Provide 2-10 shot IDs for comparison";
-                return result;
+                respond(QJsonObject{{"error", "Provide 2-10 shot IDs for comparison"}});
+                return;
             }
 
             const QString dbPath = shotHistory->databasePath();
-            const QString connName = QString("mcp_compare_%1").arg(s_mcpShotConnCounter.fetchAndAddRelaxed(1));
 
-            QJsonArray shots;
-            {
-                QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-                db.setDatabaseName(dbPath);
-                if (db.open()) {
+            QThread* thread = QThread::create([dbPath, idArray, respond]() {
+                QJsonObject result;
+                QJsonArray shots;
+
+                if (!withTempDb(dbPath, "mcp_compare", [&](QSqlDatabase& db) {
                     for (const auto& idVal : idArray) {
                         qint64 shotId = idVal.toInteger();
                         ShotRecord record = ShotHistoryStorage::loadShotRecordStatic(db, shotId);
@@ -248,69 +249,63 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
                         if (!shotMap.isEmpty())
                             shots.append(QJsonObject::fromVariantMap(shotMap));
                     }
-                } else {
+                })) {
                     result["error"] = "Failed to open shot database";
                 }
-            }
-            QSqlDatabase::removeDatabase(connName);
 
-            result["shots"] = shots;
-            result["count"] = shots.size();
+                result["shots"] = shots;
+                result["count"] = shots.size();
 
-            // Compute changes between consecutive shots
-            if (shots.size() >= 2) {
-                QJsonArray changes;
-                for (qsizetype i = 1; i < shots.size(); ++i) {
-                    QJsonObject prev = shots[i-1].toObject();
-                    QJsonObject curr = shots[i].toObject();
-                    QJsonObject diff;
-                    diff["fromShotId"] = prev["id"];
-                    diff["toShotId"] = curr["id"];
+                // Compute changes between consecutive shots
+                if (shots.size() >= 2) {
+                    QJsonArray changes;
+                    for (qsizetype i = 1; i < shots.size(); ++i) {
+                        QJsonObject prev = shots[i-1].toObject();
+                        QJsonObject curr = shots[i].toObject();
+                        QJsonObject diff;
+                        diff["fromShotId"] = prev["id"];
+                        diff["toShotId"] = curr["id"];
 
-                    // Compare key dial-in fields
-                    auto diffStr = [&](const QString& key) {
-                        QString a = prev[key].toString(), b = curr[key].toString();
-                        if (!a.isEmpty() && !b.isEmpty() && a != b)
-                            diff[key] = QString("%1 -> %2").arg(a, b);
-                    };
-                    auto diffNum = [&](const QString& key, const QString& unit) {
-                        double a = prev[key].toDouble(), b = curr[key].toDouble();
-                        if (a != 0 && b != 0 && qAbs(a - b) > 0.01)
-                            diff[key] = QString("%1 -> %2 %3 (%4%5)")
-                                .arg(a, 0, 'f', 1).arg(b, 0, 'f', 1).arg(unit)
-                                .arg(b > a ? "+" : "").arg(b - a, 0, 'f', 1);
-                    };
+                        auto diffStr = [&](const QString& key) {
+                            QString a = prev[key].toString(), b = curr[key].toString();
+                            if (!a.isEmpty() && !b.isEmpty() && a != b)
+                                diff[key] = QString("%1 -> %2").arg(a, b);
+                        };
+                        auto diffNumUnit = [&](const QString& srcKey, const QString& outKey, const QString& unit) {
+                            double a = prev[srcKey].toDouble(), b = curr[srcKey].toDouble();
+                            if (a != 0 && b != 0 && qAbs(a - b) > 0.01)
+                                diff[outKey] = QString("%1 -> %2 %3 (%4%5)")
+                                    .arg(a, 0, 'f', 1).arg(b, 0, 'f', 1).arg(unit)
+                                    .arg(b > a ? "+" : "").arg(b - a, 0, 'f', 1);
+                        };
 
-                    diffStr("grinderSetting");
-                    diffStr("profileName");
-                    diffStr("beanBrand");
-                    // Use convertShotRecord keys for lookup, unit-suffixed keys for output
-                    auto diffNumUnit = [&](const QString& srcKey, const QString& outKey, const QString& unit) {
-                        double a = prev[srcKey].toDouble(), b = curr[srcKey].toDouble();
-                        if (a != 0 && b != 0 && qAbs(a - b) > 0.01)
-                            diff[outKey] = QString("%1 -> %2 %3 (%4%5)")
-                                .arg(a, 0, 'f', 1).arg(b, 0, 'f', 1).arg(unit)
-                                .arg(b > a ? "+" : "").arg(b - a, 0, 'f', 1);
-                    };
-                    diffNumUnit("doseWeight", "doseG", "g");
-                    diffNumUnit("finalWeight", "yieldG", "g");
-                    diffNumUnit("duration", "durationSec", "s");
-                    diffNumUnit("enjoyment", "enjoyment0to100", "");
+                        diffStr("grinderSetting");
+                        diffStr("profileName");
+                        diffStr("beanBrand");
+                        diffNumUnit("doseWeight", "doseG", "g");
+                        diffNumUnit("finalWeight", "yieldG", "g");
+                        diffNumUnit("duration", "durationSec", "s");
+                        diffNumUnit("enjoyment", "enjoyment0to100", "");
 
-                    // Only include if something changed
-                    if (diff.size() > 2) // more than just fromShotId/toShotId
-                        changes.append(diff);
+                        if (diff.size() > 2)
+                            changes.append(diff);
+                    }
+                    if (!changes.isEmpty())
+                        result["changes"] = changes;
                 }
-                if (!changes.isEmpty())
-                    result["changes"] = changes;
-            }
 
-            return result;
+                QMetaObject::invokeMethod(qApp, [respond, result]() {
+                    respond(result);
+                }, Qt::QueuedConnection);
+            });
+
+            QObject::connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+            thread->start();
         },
         "read");
 
     // shots_get_debug_log — read the per-shot debug log with pagination
-    registry->registerTool(
+    registry->registerAsyncTool(
         "shots_get_debug_log",
         "Read the debug log captured during a shot extraction. Contains BLE frames, "
         "phase transitions, stop-at-weight events, flow calibration, and all qDebug output "
@@ -324,29 +319,27 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
             }},
             {"required", QJsonArray{"shotId"}}
         },
-        [shotHistory](const QJsonObject& args) -> QJsonObject {
-            QJsonObject result;
+        [shotHistory](const QJsonObject& args, std::function<void(QJsonObject)> respond) {
             if (!shotHistory || !shotHistory->isReady()) {
-                result["error"] = "Shot history not available";
-                return result;
+                respond(QJsonObject{{"error", "Shot history not available"}});
+                return;
             }
 
             qint64 shotId = args["shotId"].toInteger();
             if (shotId <= 0) {
-                result["error"] = "Valid shotId is required";
-                return result;
+                respond(QJsonObject{{"error", "Valid shotId is required"}});
+                return;
             }
 
             qsizetype offset = qMax(qsizetype(0), static_cast<qsizetype>(args["offset"].toInt(0)));
             qsizetype limit = qBound(qsizetype(1), static_cast<qsizetype>(args["limit"].toInt(500)), qsizetype(2000));
 
             const QString dbPath = shotHistory->databasePath();
-            const QString connName = QString("mcp_shot_debug_%1").arg(s_mcpShotConnCounter.fetchAndAddRelaxed(1));
 
-            {
-                QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-                db.setDatabaseName(dbPath);
-                if (db.open()) {
+            QThread* thread = QThread::create([dbPath, shotId, offset, limit, respond]() {
+                QJsonObject result;
+
+                if (!withTempDb(dbPath, "mcp_shot_debug", [&](QSqlDatabase& db) {
                     QSqlQuery query(db);
                     query.prepare("SELECT debug_log FROM shots WHERE id = ?");
                     query.addBindValue(shotId);
@@ -373,13 +366,18 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
                     } else {
                         result["error"] = "Shot not found: " + QString::number(shotId);
                     }
-                } else {
-                    result["error"] = "Failed to open shot database";
+                })) {
+                    if (!result.contains("error"))
+                        result["error"] = "Failed to open shot database";
                 }
-            }
-            QSqlDatabase::removeDatabase(connName);
 
-            return result;
+                QMetaObject::invokeMethod(qApp, [respond, result]() {
+                    respond(result);
+                }, Qt::QueuedConnection);
+            });
+
+            QObject::connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+            thread->start();
         },
         "read");
 }

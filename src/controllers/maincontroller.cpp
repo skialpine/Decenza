@@ -29,6 +29,7 @@
 #include <QTextStream>
 #include <QThread>
 #include <QSqlDatabase>
+#include "../core/dbutils.h"
 #include <QSqlError>
 #include <QPointer>
 #include <tuple>
@@ -1118,21 +1119,12 @@ void MainController::loadShotWithMetadata(qint64 shotId) {
     // it. All dereferences occur inside the QueuedConnection callback, which runs on the
     // main thread where QPointer's tracking is valid.
     QThread* thread = QThread::create([self, dbPath, shotId]() {
-        const QString connName = QString("load_meta_%1")
-            .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
-
         ShotRecord record;
-        try {
-            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-            db.setDatabaseName(dbPath);
-            if (db.open())
-                record = ShotHistoryStorage::loadShotRecordStatic(db, shotId);
-            else
-                qWarning() << "loadShotWithMetadata: Failed to open DB:" << db.lastError().text();
-        } catch (const std::exception& e) {
-            qWarning() << "loadShotWithMetadata: Exception loading shot" << shotId << ":" << e.what();
+        if (!withTempDb(dbPath, "load_meta", [&](QSqlDatabase& db) {
+            record = ShotHistoryStorage::loadShotRecordStatic(db, shotId);
+        })) {
+            qWarning() << "loadShotWithMetadata: Failed to open DB for shot" << shotId;
         }
-        QSqlDatabase::removeDatabase(connName);
 
         // Apply metadata on main thread (interacts with QML state and BLE)
         QMetaObject::invokeMethod(qApp, [self, shotId, record = std::move(record)]() {

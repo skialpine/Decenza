@@ -321,7 +321,7 @@ QJsonObject McpServer::handleJsonRpc(const QJsonObject& request, McpSession* ses
     if (method == "resources/list")
         return handleResourcesList(params, session);
     if (method == "resources/read")
-        return handleResourcesRead(params, session);
+        return handleResourcesRead(params, session, socket, requestId);
 
     // Unknown method
     QJsonObject error;
@@ -454,6 +454,34 @@ QJsonObject McpServer::handleToolsCall(const QJsonObject& params, McpSession* se
         return deferred;
     }
 
+    // Async tool: dispatch to background thread, send response later
+    if (m_toolRegistry->isAsyncTool(toolName)) {
+        QPointer<QTcpSocket> socketPtr(socket);
+        QVariant reqId = requestId;
+        QString sessId = session->id();
+
+        QString error;
+        bool dispatched = m_toolRegistry->callAsyncTool(
+            toolName, arguments, accessLevel, error,
+            [this, socketPtr, reqId, sessId](QJsonObject toolResult) {
+                sendAsyncToolResponse(socketPtr, reqId, sessId, toolResult);
+            });
+
+        if (!dispatched) {
+            QJsonObject errorObj;
+            errorObj["code"] = -32603;
+            errorObj["message"] = error;
+            QJsonObject result;
+            result["error"] = errorObj;
+            return result;
+        }
+
+        QJsonObject deferred;
+        deferred["_deferred"] = true;
+        return deferred;
+    }
+
+    // Synchronous tool
     QString error;
     QJsonObject toolResult = m_toolRegistry->callTool(toolName, arguments, accessLevel, error);
 
@@ -486,11 +514,52 @@ QJsonObject McpServer::handleResourcesList(const QJsonObject& params, McpSession
     return result;
 }
 
-QJsonObject McpServer::handleResourcesRead(const QJsonObject& params, McpSession* session)
+QJsonObject McpServer::handleResourcesRead(const QJsonObject& params, McpSession* session,
+                                            QTcpSocket* socket, const QVariant& requestId)
 {
     Q_UNUSED(session)
 
     QString uri = params["uri"].toString();
+
+    // Async resources: dispatch to background, send response later
+    if (m_resourceRegistry->isAsyncResource(uri)) {
+        QPointer<QTcpSocket> socketPtr(socket);
+        QVariant reqId = requestId;
+        QString sessId = session->id();
+
+        QString error;
+        bool dispatched = m_resourceRegistry->readAsyncResource(uri, error,
+            [this, socketPtr, reqId, sessId, uri](QJsonObject resourceData) {
+                if (!socketPtr || socketPtr->state() != QAbstractSocket::ConnectedState) {
+                    qDebug() << "McpServer: async resource response dropped (socket disconnected)";
+                    return;
+                }
+
+                QJsonObject result;
+                QJsonArray contents;
+                QJsonObject content;
+                content["uri"] = uri;
+                content["mimeType"] = "application/json";
+                content["text"] = QString::fromUtf8(QJsonDocument(resourceData).toJson(QJsonDocument::Compact));
+                contents.append(content);
+                result["contents"] = contents;
+                sendJsonRpcResponse(socketPtr, result, reqId, sessId);
+            });
+
+        if (!dispatched) {
+            QJsonObject errorObj;
+            errorObj["code"] = -32602;
+            errorObj["message"] = error;
+            QJsonObject result;
+            result["error"] = errorObj;
+            return result;
+        }
+
+        QJsonObject deferred;
+        deferred["_deferred"] = true;
+        return deferred;
+    }
+
     QString error;
     QJsonObject resourceData = m_resourceRegistry->readResource(uri, error);
 
@@ -603,6 +672,28 @@ void McpServer::confirmationResolved(const QString& sessionId, bool accepted)
     }
 
     qDebug() << "McpServer: User confirmed" << pending.toolName;
+
+    // Async tools: dispatch to background thread
+    if (m_toolRegistry->isAsyncTool(pending.toolName)) {
+        QPointer<QTcpSocket> socketPtr(pending.socket);
+        QString error;
+        bool dispatched = m_toolRegistry->callAsyncTool(
+            pending.toolName, pending.arguments, pending.accessLevel, error,
+            [this, socketPtr, reqId = pending.requestId, sessId = pending.sessionId](QJsonObject toolResult) {
+                sendAsyncToolResponse(socketPtr, reqId, sessId, toolResult);
+            });
+        if (!dispatched) {
+            QJsonObject errorObj;
+            errorObj["code"] = -32603;
+            errorObj["message"] = error;
+            QJsonObject result;
+            result["error"] = errorObj;
+            sendJsonRpcResponse(pending.socket, result, pending.requestId, pending.sessionId);
+        }
+        return;
+    }
+
+    // Synchronous tools
     QString error;
     QJsonObject toolResult = m_toolRegistry->callTool(
         pending.toolName, pending.arguments, pending.accessLevel, error);
@@ -625,6 +716,24 @@ void McpServer::confirmationResolved(const QString& sessionId, bool accepted)
     content.append(textContent);
     result["content"] = content;
     sendJsonRpcResponse(pending.socket, result, pending.requestId, pending.sessionId);
+}
+
+void McpServer::sendAsyncToolResponse(QPointer<QTcpSocket> socket, const QVariant& requestId,
+                                       const QString& sessionId, const QJsonObject& toolResult)
+{
+    if (!socket || socket->state() != QAbstractSocket::ConnectedState) {
+        qDebug() << "McpServer: async tool response dropped (socket disconnected)";
+        return;
+    }
+
+    QJsonObject result;
+    QJsonArray content;
+    QJsonObject textContent;
+    textContent["type"] = "text";
+    textContent["text"] = QString::fromUtf8(QJsonDocument(toolResult).toJson(QJsonDocument::Compact));
+    content.append(textContent);
+    result["content"] = content;
+    sendJsonRpcResponse(socket, result, requestId, sessionId);
 }
 
 bool McpServer::needsInAppConfirmation(const QString& toolName) const

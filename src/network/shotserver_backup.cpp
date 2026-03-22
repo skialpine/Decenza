@@ -2,6 +2,7 @@
 #include "webdebuglogger.h"
 #include "webtemplates.h"
 #include "../history/shothistorystorage.h"
+#include "../core/dbutils.h"
 #include "../ble/de1device.h"
 #include "../machine/machinestate.h"
 #include "../screensaver/screensavervideomanager.h"
@@ -468,18 +469,10 @@ void ShotServer::handleBackupFull(QTcpSocket* socket)
 
         // 2. Shots database (checkpoint via temporary connection, then read file)
         if (!dbPath.isEmpty()) {
-            const QString connName = QString("shs_backup_%1")
-                .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
-            {
-                QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-                db.setDatabaseName(dbPath);
-                if (db.open()) {
-                    QSqlQuery(db).exec("PRAGMA busy_timeout = 5000");
-                    QSqlQuery walQuery(db);
-                    walQuery.exec("PRAGMA wal_checkpoint(FULL)");
-                }
-            }
-            QSqlDatabase::removeDatabase(connName);
+            withTempDb(dbPath, "shs_backup", [&](QSqlDatabase& db) {
+                QSqlQuery walQuery(db);
+                walQuery.exec("PRAGMA wal_checkpoint(FULL)");
+            });
 
             QFile dbFile(dbPath);
             if (dbFile.open(QIODevice::ReadOnly)) {
