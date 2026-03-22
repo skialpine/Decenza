@@ -3096,6 +3096,9 @@ void MainController::onShotEnded() {
         : m_shotDataModel->rawTime();
 
     double doseWeight = m_settings->dyeBeanWeight();
+    // If DYE dose is unset (0), fall back to profile's recommended dose
+    if (doseWeight <= 0 && m_currentProfile.hasRecommendedDose())
+        doseWeight = m_currentProfile.recommendedDose();
 
     // Get final weight — use actual scale data if available, estimate from volume only
     // when no scale data was recorded at all (no scale connected)
@@ -3112,6 +3115,10 @@ void MainController::onShotEnded() {
         if (finalWeight < 0) finalWeight = 0;
         qDebug() << "No scale: estimated weight from" << cumulativeVolume << "ml ->" << finalWeight << "g";
     }
+    // Last resort: if yield is still 0 and profile has a target weight, use that
+    // (SAW-stopped shots reach approximately the target weight)
+    if (finalWeight <= 0 && m_currentProfile.targetWeight() > 0)
+        finalWeight = m_currentProfile.targetWeight();
 
     // Smooth weight flow rate before saving (centered moving average over 7 points ≈ 1.4s at 5Hz).
     // The raw LSLR data from recording has staircase artifacts from 0.1g scale quantization;
