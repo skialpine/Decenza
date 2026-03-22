@@ -81,8 +81,10 @@ public:
         return it.value().reader();
     }
 
-    // Returns true if the async reader was dispatched. The respond callback
-    // will be called on the main thread with the resource data.
+    // Returns true if the async reader was dispatched. By convention, each
+    // reader must invoke respond() on the main thread via
+    // QMetaObject::invokeMethod(qApp, ..., Qt::QueuedConnection).
+    // The registry does not enforce this — it is the reader's responsibility.
     bool readAsyncResource(const QString& uri, QString& errorOut,
                            std::function<void(QJsonObject)> respond) const
     {

@@ -233,8 +233,8 @@ static QVariantList loadRecentShotsByKbId(
             shot["temperatureOverride"] = query.value(17).toDouble();
             shot["profileJson"] = query.value(18).toString();
             QDateTime dt = QDateTime::fromSecsSinceEpoch(query.value(1).toLongLong());
-            // Fixed format for AI consumption (not locale-dependent display)
-            shot["dateTime"] = dt.toString("yyyy-MM-dd HH:mm");
+            // ISO 8601 with timezone for AI consumption (CLAUDE.md MCP convention)
+            shot["dateTime"] = dt.toOffsetFromUtc(dt.offsetFromUtc()).toString(Qt::ISODate);
             results.append(shot);
         }
     });

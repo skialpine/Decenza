@@ -123,9 +123,11 @@ void registerWriteTools(McpToolRegistry* registry, MainController* mainControlle
                     result["error"] = "Failed to update shot " + QString::number(shotId);
                 }
 
-                QMetaObject::invokeMethod(qApp, [respond, result, shotHistory, ok]() {
-                    if (ok)
+                QMetaObject::invokeMethod(qApp, [respond, result, shotHistory, shotId, ok]() {
+                    if (ok) {
                         shotHistory->invalidateDistinctCache();
+                        emit shotHistory->shotMetadataUpdated(shotId, true);
+                    }
                     respond(result);
                 }, Qt::QueuedConnection);
             });

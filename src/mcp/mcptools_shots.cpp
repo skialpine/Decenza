@@ -129,7 +129,7 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
                         countQuery.bindValue(":profileFilter", "%" + profileFilter + "%");
                     if (!beanFilter.isEmpty())
                         countQuery.bindValue(":beanFilter", "%" + beanFilter + "%");
-                    if (minEnjoyment >= 0)
+                    if (minEnjoyment > 0)
                         countQuery.bindValue(":minEnjoyment", minEnjoyment);
                     if (afterEpoch > 0)
                         countQuery.bindValue(":after", afterEpoch);
