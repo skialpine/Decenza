@@ -171,33 +171,6 @@ void registerDialingTools(McpToolRegistry* registry, MainController* mainControl
                                         smallestStep = diff;
                                 }
                                 grinderCtx["smallestStep"] = smallestStep;
-
-                                // Infer finer direction from duration correlation
-                                QSqlQuery finerQuery(db);
-                                finerQuery.prepare(
-                                    "SELECT grinder_setting, AVG(duration_seconds) FROM shots "
-                                    "WHERE grinder_model = :model AND beverage_type = :bev "
-                                    "AND grinder_setting IN (:min, :max) "
-                                    "AND duration_seconds > 5 "
-                                    "GROUP BY grinder_setting");
-                                finerQuery.bindValue(":model", grinderModel);
-                                finerQuery.bindValue(":bev", beverageType);
-                                finerQuery.bindValue(":min", QString::number(numeric.first()));
-                                finerQuery.bindValue(":max", QString::number(numeric.last()));
-                                double avgDurAtMin = 0, avgDurAtMax = 0;
-                                if (finerQuery.exec()) {
-                                    while (finerQuery.next()) {
-                                        double setting = finerQuery.value(0).toDouble();
-                                        double avgDur = finerQuery.value(1).toDouble();
-                                        if (qFuzzyCompare(setting, numeric.first()))
-                                            avgDurAtMin = avgDur;
-                                        else if (qFuzzyCompare(setting, numeric.last()))
-                                            avgDurAtMax = avgDur;
-                                    }
-                                }
-                                if (avgDurAtMin > 0 && avgDurAtMax > 0) {
-                                    grinderCtx["finerDirection"] = (avgDurAtMin > avgDurAtMax) ? "lower" : "higher";
-                                }
                             }
 
                             result["grinderContext"] = grinderCtx;
