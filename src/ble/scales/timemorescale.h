@@ -32,6 +32,7 @@ private slots:
 
 private:
     void sendCommand(const QByteArray& cmd);
+    void sendInitSequence();
 
     ScaleBleTransport* m_transport = nullptr;
     QString m_name = "Timemore";

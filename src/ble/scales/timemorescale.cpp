@@ -6,19 +6,30 @@
 #define TIMEMORE_LOG(msg)  SCALE_LOG("TimemoreScale", msg)
 #define TIMEMORE_WARN(msg) SCALE_WARN("TimemoreScale", msg)
 
-// Timemore Dot/Duo BLE protocol (reverse-engineered)
-// Packets: 17 bytes, header A5 5A, checksum at byte[16] = XOR of bytes[2..15]
-// Checksum verified for tare; timer command structure is predicted and unconfirmed.
-// Notify packets: type 0x01 = weight data, weight at bytes[8-9] big-endian
+// Timemore Dot/Duo BLE protocol
+// Commands: 8-10 bytes, header A5 5A, variable-length with trailing checksum.
+// Tare command confirmed via HCI snoop of official Timemore app.
+// Init sequence: 6 commands sent after connect to enable HW tare/timer.
+// Notify packets: type 0x01 = weight data, weight at bytes[8-9] big-endian, signed, tenths of gram.
 namespace {
-    // Tare command (confirmed working)
-    const QByteArray CMD_TARE = QByteArray::fromHex("A55A020000000000000000000000000002");
-    // Timer commands (predicted from Duo pattern — may not work on all models)
-    const QByteArray CMD_TIMER_START = QByteArray::fromHex("A55A030100000000000000000000000002");
-    const QByteArray CMD_TIMER_STOP  = QByteArray::fromHex("A55A030200000000000000000000000001");
-    const QByteArray CMD_TIMER_RESET = QByteArray::fromHex("A55A030000000000000000000000000003");
-    // Heartbeat / keepalive
-    const QByteArray CMD_HEARTBEAT   = QByteArray::fromHex("A55A000000000000000000000000000000");
+    // Init commands (sent after connect — official app sends these twice)
+    const QByteArray CMD_INIT[] = {
+        QByteArray::fromHex("A55A02130000000000"),
+        QByteArray::fromHex("A55A02080000000000"),
+        QByteArray::fromHex("A55A02050000000000"),
+        QByteArray::fromHex("A55A02020000000000"),
+        QByteArray::fromHex("A55A02060000000000"),
+        QByteArray::fromHex("A55A020C0000000000"),
+    };
+    // Tare command (HCI snoop confirmed — official app sends this to zero the scale)
+    const QByteArray CMD_TARE = QByteArray::fromHex("A55A030D000200000071");
+    // Timer commands (from HCI snoop)
+    const QByteArray CMD_TIMER_START = QByteArray::fromHex("A55A03020001010020");
+    const QByteArray CMD_TIMER_STOP  = QByteArray::fromHex("A55A030200010200FFD0");
+    const QByteArray CMD_TIMER_RESET = QByteArray::fromHex("A55A030200010300FF81");
+    // Polling / keepalive (official app sends every ~10-15s)
+    const QByteArray CMD_POLL_1 = QByteArray::fromHex("A55A02080000000000");
+    const QByteArray CMD_POLL_2 = QByteArray::fromHex("A55A0308000201000025");
 }
 
 TimemoreScale::TimemoreScale(ScaleBleTransport* transport, QObject* parent)
@@ -120,6 +131,11 @@ void TimemoreScale::onCharacteristicsDiscoveryFinished(const QBluetoothUuid& ser
         if (!m_transport || !m_characteristicsReady) return;
         TIMEMORE_LOG("Enabling notifications (200ms)");
         m_transport->enableNotifications(Scale::Generic::SERVICE, Scale::Generic::STATUS);
+
+        // Send init sequence after notifications are enabled (official app sends twice)
+        QTimer::singleShot(300, this, [this]() {
+            sendInitSequence();
+        });
     });
 }
 
@@ -150,8 +166,37 @@ void TimemoreScale::sendCommand(const QByteArray& cmd) {
                                      ScaleBleTransport::WriteType::WithoutResponse);
 }
 
+void TimemoreScale::sendInitSequence() {
+    if (!m_transport || !m_characteristicsReady) return;
+    TIMEMORE_LOG("Sending init sequence (6 commands × 2 rounds)");
+
+    // Send all 6 init commands twice with delays, using a chained timer approach
+    int delay = 0;
+    for (int round = 0; round < 2; ++round) {
+        for (int i = 0; i < 6; ++i) {
+            QByteArray cmd = CMD_INIT[i]; // copy for lambda capture
+            QTimer::singleShot(delay, this, [this, cmd, round, i]() {
+                if (!m_transport || !m_characteristicsReady) return;
+                sendCommand(cmd);
+            });
+            delay += 150;
+        }
+        delay += 300; // gap between rounds
+    }
+
+    // Send initial poll after init completes
+    QTimer::singleShot(delay + 200, this, [this]() {
+        sendKeepAlive();
+        TIMEMORE_LOG("Init sequence complete — HW tare/timer should be available");
+    });
+}
+
 void TimemoreScale::sendKeepAlive() {
-    sendCommand(CMD_HEARTBEAT);
+    // Polling pattern from official app — keeps connection alive and enables HW commands
+    sendCommand(CMD_POLL_1);
+    QTimer::singleShot(100, this, [this]() {
+        sendCommand(CMD_POLL_2);
+    });
 }
 
 void TimemoreScale::tare() {
