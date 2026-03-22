@@ -2494,6 +2494,8 @@ void MainController::computeAutoFlowCalibration() {
     constexpr double kMinSampleRatio = 0.4;          // (generous bounds: window-level check is tighter)
     constexpr double kMaxWindowRatio = 1.35;         // window-mean machine/weight ratio — reject if scale data is suspect
     constexpr double kMinWindowRatio = 0.75;         // (de1app GFC users get ~0.9-1.1 ratios on good data)
+    constexpr double kMinWindowStartTime = 10.0;     // seconds — skip early extraction where LSLR weight flow
+                                                     // lags behind actual flow, producing inflated ratios
 
     // Find the best steady-pour window: stable pressure above minimum + meaningful weight flow.
     // We track the best (longest) qualifying window found across the entire shot.
@@ -2532,6 +2534,13 @@ void MainController::computeAutoFlowCalibration() {
         double dpdt = qAbs(pressureData[i].y() - pressureData[i - 1].y()) / dt;
         double pressure = pressureData[i].y();
         double t = pressureData[i].x();
+
+        // Skip early extraction where LSLR weight flow hasn't converged yet.
+        // The rolling regression lags behind actual flow for the first ~10-12s,
+        // producing artificially low weight flow and inflated machine/weight ratios.
+        if (t < kMinWindowStartTime) {
+            continue;
+        }
 
         // Require stable pressure AND minimum pressure.
         // The minimum pressure rejects empty-portafilter / no-coffee shots where
