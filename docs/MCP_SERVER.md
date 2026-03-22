@@ -163,15 +163,15 @@ This avoids holding HTTP connections and works naturally with the conversational
 ### Machine State
 | Tool | Description | Category |
 |------|-------------|----------|
-| `machine_get_state` | Phase, connection, readiness, heating status, water level (ml + mm), firmware version | read |
+| `machine_get_state` | Phase, connection, readiness, heating status, water level (ml + mm), firmware version, active profile name | read |
 | `machine_get_telemetry` | Live pressure, flow, temp, weight, goal values. During a shot, also returns the current shot's time-series data so far (not just the latest sample) so the AI can detect channeling or stalling mid-shot. | read |
 
 ### Shot History
 | Tool | Description | Category |
 |------|-------------|----------|
-| `shots_list` | List shots with filters (limit, offset, profile, bean, enjoyment) | read |
+| `shots_list` | List shots with filters (limit, offset, profile, bean, enjoyment, after/before date range) | read |
 | `shots_get_detail` | Full shot record with time-series data | read |
-| `shots_compare` | Side-by-side comparison of 2+ shots | read |
+| `shots_compare` | Side-by-side comparison of 2+ shots with auto-computed change diffs (grind, dose, yield, duration) | read |
 | `shots_update` | Update any metadata field on a shot: enjoyment, notes, dose, yield, bean info, grinder info, barista, TDS, EY. Same fields the QML shot editor can change. Replaces the old `shots_set_feedback`. | control |
 | `shots_delete` | Delete a shot by ID. Permanent and cannot be undone. | settings |
 

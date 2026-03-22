@@ -30,7 +30,9 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
                 {"offset", QJsonObject{{"type", "integer"}, {"description", "Offset for pagination"}}},
                 {"profileName", QJsonObject{{"type", "string"}, {"description", "Filter by profile name (substring match)"}}},
                 {"beanBrand", QJsonObject{{"type", "string"}, {"description", "Filter by bean brand"}}},
-                {"minEnjoyment", QJsonObject{{"type", "integer"}, {"description", "Minimum enjoyment rating (0-100)"}}}
+                {"minEnjoyment", QJsonObject{{"type", "integer"}, {"description", "Minimum enjoyment rating (0-100)"}}},
+                {"after", QJsonObject{{"type", "string"}, {"description", "Only shots after this ISO timestamp (e.g. 2026-03-15T00:00:00)"}}},
+                {"before", QJsonObject{{"type", "string"}, {"description", "Only shots before this ISO timestamp (e.g. 2026-03-21T23:59:59)"}}}
             }}
         },
         [shotHistory](const QJsonObject& args) -> QJsonObject {
@@ -45,6 +47,15 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
             QString profileFilter = args["profileName"].toString();
             QString beanFilter = args["beanBrand"].toString();
             int minEnjoyment = args["minEnjoyment"].toInt(-1);
+            qint64 afterEpoch = 0, beforeEpoch = 0;
+            if (args.contains("after")) {
+                QDateTime dt = QDateTime::fromString(args["after"].toString(), Qt::ISODate);
+                if (dt.isValid()) afterEpoch = dt.toSecsSinceEpoch();
+            }
+            if (args.contains("before")) {
+                QDateTime dt = QDateTime::fromString(args["before"].toString(), Qt::ISODate);
+                if (dt.isValid()) beforeEpoch = dt.toSecsSinceEpoch();
+            }
 
             const QString dbPath = shotHistory->databasePath();
             const QString connName = QString("mcp_shots_list_%1").arg(s_mcpShotConnCounter.fetchAndAddRelaxed(1));
@@ -73,6 +84,14 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
                         sql += " AND enjoyment >= :minEnjoyment";
                         countSql += " AND enjoyment >= :minEnjoyment";
                     }
+                    if (afterEpoch > 0) {
+                        sql += " AND timestamp >= :after";
+                        countSql += " AND timestamp >= :after";
+                    }
+                    if (beforeEpoch > 0) {
+                        sql += " AND timestamp <= :before";
+                        countSql += " AND timestamp <= :before";
+                    }
                     sql += " ORDER BY timestamp DESC LIMIT " + QString::number(limit) + " OFFSET " + QString::number(offset);
 
                     QSqlQuery query(db);
@@ -83,6 +102,10 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
                         query.bindValue(":beanFilter", "%" + beanFilter + "%");
                     if (minEnjoyment >= 0)
                         query.bindValue(":minEnjoyment", minEnjoyment);
+                    if (afterEpoch > 0)
+                        query.bindValue(":after", afterEpoch);
+                    if (beforeEpoch > 0)
+                        query.bindValue(":before", beforeEpoch);
 
                     if (query.exec()) {
                         while (query.next()) {
@@ -112,6 +135,10 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
                         countQuery.bindValue(":beanFilter", "%" + beanFilter + "%");
                     if (minEnjoyment >= 0)
                         countQuery.bindValue(":minEnjoyment", minEnjoyment);
+                    if (afterEpoch > 0)
+                        countQuery.bindValue(":after", afterEpoch);
+                    if (beforeEpoch > 0)
+                        countQuery.bindValue(":before", beforeEpoch);
                     if (countQuery.exec() && countQuery.next())
                         totalCount = countQuery.value(0).toInt();
                 }
@@ -221,6 +248,47 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
 
             result["shots"] = shots;
             result["count"] = shots.size();
+
+            // Compute changes between consecutive shots
+            if (shots.size() >= 2) {
+                QJsonArray changes;
+                for (qsizetype i = 1; i < shots.size(); ++i) {
+                    QJsonObject prev = shots[i-1].toObject();
+                    QJsonObject curr = shots[i].toObject();
+                    QJsonObject diff;
+                    diff["fromShotId"] = prev["id"];
+                    diff["toShotId"] = curr["id"];
+
+                    // Compare key dial-in fields
+                    auto diffStr = [&](const QString& key) {
+                        QString a = prev[key].toString(), b = curr[key].toString();
+                        if (!a.isEmpty() && !b.isEmpty() && a != b)
+                            diff[key] = QString("%1 -> %2").arg(a, b);
+                    };
+                    auto diffNum = [&](const QString& key, const QString& unit) {
+                        double a = prev[key].toDouble(), b = curr[key].toDouble();
+                        if (a != 0 && b != 0 && qAbs(a - b) > 0.01)
+                            diff[key] = QString("%1 -> %2 %3 (%4%5)")
+                                .arg(a, 0, 'f', 1).arg(b, 0, 'f', 1).arg(unit)
+                                .arg(b > a ? "+" : "").arg(b - a, 0, 'f', 1);
+                    };
+
+                    diffStr("grinderSetting");
+                    diffStr("profileName");
+                    diffStr("beanBrand");
+                    diffNum("doseWeight", "g");
+                    diffNum("finalWeight", "g");
+                    diffNum("duration", "s");
+                    diffNum("enjoyment", "");
+
+                    // Only include if something changed
+                    if (diff.size() > 2) // more than just fromShotId/toShotId
+                        changes.append(diff);
+                }
+                if (!changes.isEmpty())
+                    result["changes"] = changes;
+            }
+
             return result;
         },
         "read");

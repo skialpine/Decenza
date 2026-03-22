@@ -16,8 +16,11 @@ void registerMachineTools(McpToolRegistry* registry, DE1Device* device,
         "machine_get_state",
         "Get current machine state: phase, connection status, readiness, heating, water level, firmware version",
         QJsonObject{{"type", "object"}, {"properties", QJsonObject{}}},
-        [device, machineState](const QJsonObject&) -> QJsonObject {
+        [device, machineState, mainController](const QJsonObject&) -> QJsonObject {
             QJsonObject result;
+            if (mainController) {
+                result["activeProfile"] = mainController->currentProfileName();
+            }
             if (machineState) {
                 result["phase"] = machineState->phaseString();
                 result["isHeating"] = machineState->isHeating();

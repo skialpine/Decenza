@@ -41,7 +41,7 @@ If ORIGINAL_MODIFIED is true, warn the user — tests will modify the profile an
 ### 1.1 machine_get_state
 ```
 Call: machine_get_state
-Expect: phase exists, connected=true, waterLevelMl > 0, firmwareVersion non-empty
+Expect: phase exists, connected=true, waterLevelMl > 0, firmwareVersion non-empty, activeProfile non-empty
 ```
 
 ### 1.2 machine_get_telemetry

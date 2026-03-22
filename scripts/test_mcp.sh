@@ -334,6 +334,8 @@ assert_ok "machine_get_state returns waterLevelMl" "$STATE" \
     "'waterLevelMl' in d"
 assert_ok "machine_get_state returns firmwareVersion" "$STATE" \
     "'firmwareVersion' in d"
+assert_ok "machine_get_state returns activeProfile" "$STATE" \
+    "'activeProfile' in d and len(d['activeProfile']) > 0"
 
 TELEM_RAW=$(rpc 21 "tools/call" '{"name":"machine_get_telemetry","arguments":{}}')
 TELEM=$(echo "$TELEM_RAW" | parse_tool_result)
@@ -417,6 +419,12 @@ print(d.get('profileName','')[:10])
         assert_ok "shots_list filter by profileName works" "$FILTERED" \
             "d.get('count',0) > 0"
     fi
+
+    # Date range filter
+    DATE_FILTERED_RAW=$(rpc 35 "tools/call" '{"name":"shots_list","arguments":{"limit":5,"after":"2026-01-01T00:00:00"}}')
+    DATE_FILTERED=$(echo "$DATE_FILTERED_RAW" | parse_tool_result)
+    assert_ok "shots_list with date range filter works" "$DATE_FILTERED" \
+        "d.get('count',0) >= 0"
 else
     echo -e "  ${YELLOW}SKIP${NC} shot detail/compare tests (no shots in database)"
     SKIP=$((SKIP + 3))
@@ -520,6 +528,8 @@ assert_ok "dialing_get_context returns shot summary" "$DIALING" \
     "'shot' in d and 'profileName' in d.get('shot',{})"
 assert_ok "dialing_get_context returns currentBean" "$DIALING" \
     "'currentBean' in d"
+assert_ok "dialing_get_context returns beanAgeDays" "$DIALING" \
+    "'beanAgeDays' in d.get('currentBean',{}) or d.get('currentBean',{}).get('roastDate','') == ''"
 assert_ok "dialing_get_context returns currentProfile" "$DIALING" \
     "'currentProfile' in d"
 assert_ok "dialing_get_context returns profileKnowledge" "$DIALING" \

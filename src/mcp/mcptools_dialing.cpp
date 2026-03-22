@@ -236,6 +236,15 @@ void registerDialingTools(McpToolRegistry* registry, MainController* mainControl
                 bean["grinderBurrs"] = settings->dyeGrinderBurrs();
                 bean["grinderSetting"] = settings->dyeGrinderSetting();
                 bean["doseWeightG"] = settings->dyeBeanWeight();
+                // Compute bean age in days from roast date
+                QString roastDateStr = settings->dyeRoastDate();
+                if (!roastDateStr.isEmpty()) {
+                    QDate roastDate = QDate::fromString(roastDateStr, "yyyy-MM-dd");
+                    if (roastDate.isValid()) {
+                        qint64 daysSinceRoast = roastDate.daysTo(QDate::currentDate());
+                        bean["beanAgeDays"] = daysSinceRoast;
+                    }
+                }
                 result["currentBean"] = bean;
             }
 
