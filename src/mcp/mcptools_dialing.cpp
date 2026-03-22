@@ -128,8 +128,7 @@ void registerDialingTools(McpToolRegistry* registry, MainController* mainControl
                     if (!grinderModel.isEmpty()) {
                         QSqlQuery gQuery(db);
                         gQuery.prepare("SELECT DISTINCT grinder_setting FROM shots "
-                                       "WHERE grinder_model = :model AND grinder_setting != '' "
-                                       "ORDER BY timestamp DESC LIMIT 50");
+                                       "WHERE grinder_model = :model AND grinder_setting != ''");
                         gQuery.bindValue(":model", grinderModel);
                         if (gQuery.exec()) {
                             QJsonArray settingsObserved;
