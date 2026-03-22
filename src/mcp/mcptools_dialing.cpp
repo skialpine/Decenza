@@ -1,7 +1,3 @@
-// TODO: Move SQL queries to background thread per CLAUDE.md design principle.
-// Current tool handler architecture (synchronous QJsonObject return) prevents this.
-// Requires refactoring McpToolHandler to support async responses.
-
 #include "mcpserver.h"
 #include "mcptoolregistry.h"
 #include "../history/shothistorystorage.h"
@@ -20,15 +16,27 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QFile>
-#include <QAtomicInt>
+#include <QThread>
+#include <QMetaObject>
+#include <QCoreApplication>
 
-static QAtomicInt s_mcpDialConnCounter{0};
+#include "../core/dbutils.h"
+
+// Data collected on the background thread (pure SQL results, no QObject access)
+struct DialingDbResult {
+    QVariantMap shotData;
+    QString profileKbId;
+    QJsonArray dialInHistory;
+    QJsonObject grinderContext;
+    QString referenceGuide;
+    QString profileKnowledgeBase;
+};
 
 void registerDialingTools(McpToolRegistry* registry, MainController* mainController,
                           ShotHistoryStorage* shotHistory, Settings* settings)
 {
     // dialing_get_context
-    registry->registerTool(
+    registry->registerAsyncTool(
         "dialing_get_context",
         "Get full dial-in context: recent shot summary, dial-in history (last N shots with same profile), "
         "profile knowledge, bean/grinder metadata, grinder context (observed settings range and step size), "
@@ -44,65 +52,62 @@ void registerDialingTools(McpToolRegistry* registry, MainController* mainControl
                 {"history_limit", QJsonObject{{"type", "integer"}, {"description", "Number of prior shots with same profile to include (default 5, max 20)"}}}
             }}
         },
-        [mainController, shotHistory, settings](const QJsonObject& args) -> QJsonObject {
-            QJsonObject result;
-
+        [mainController, shotHistory, settings](const QJsonObject& args, std::function<void(QJsonObject)> respond) {
             if (!shotHistory || !shotHistory->isReady()) {
-                result["error"] = "Shot history not available";
-                return result;
+                respond(QJsonObject{{"error", "Shot history not available"}});
+                return;
             }
 
             int historyLimit = qBound(1, args["history_limit"].toInt(5), 20);
 
-            // --- 1. Load the target shot ---
+            // Resolve shot ID on the main thread (lastSavedShotId is a simple getter)
             qint64 shotId = args["shot_id"].toInteger(0);
             if (shotId <= 0)
                 shotId = shotHistory->lastSavedShotId();
 
-            // If no shot saved this session, query DB for most recent
-            if (shotId <= 0) {
-                const QString connName2 = QString("mcp_dialing_latest_%1").arg(s_mcpDialConnCounter.fetchAndAddRelaxed(1));
-                {
-                    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName2);
-                    db.setDatabaseName(shotHistory->databasePath());
-                    if (db.open()) {
+            const QString dbPath = shotHistory->databasePath();
+
+            QThread* thread = QThread::create(
+                [dbPath, shotId, historyLimit, mainController, settings, respond]() {
+                // --- All SQL runs on this background thread ---
+                DialingDbResult dbResult;
+
+                qint64 resolvedShotId = shotId;
+
+                // If no shot saved this session, query DB for most recent
+                if (resolvedShotId <= 0) {
+                    withTempDb(dbPath, "mcp_dialing_latest", [&](QSqlDatabase& db) {
                         QSqlQuery q(db);
                         if (q.exec("SELECT id FROM shots ORDER BY timestamp DESC LIMIT 1") && q.next())
-                            shotId = q.value(0).toLongLong();
-                    }
+                            resolvedShotId = q.value(0).toLongLong();
+                    });
                 }
-                QSqlDatabase::removeDatabase(connName2);
-            }
 
-            if (shotId <= 0) {
-                result["error"] = "No shots available";
-                return result;
-            }
+                if (resolvedShotId <= 0) {
+                    QMetaObject::invokeMethod(qApp, [respond]() {
+                        respond(QJsonObject{{"error", "No shots available"}});
+                    }, Qt::QueuedConnection);
+                    return;
+                }
 
-            const QString dbPath = shotHistory->databasePath();
-            const QString connName = QString("mcp_dialing_%1").arg(s_mcpDialConnCounter.fetchAndAddRelaxed(1));
+                withTempDb(dbPath, "mcp_dialing", [&](QSqlDatabase& db) {
+                    ShotRecord record = ShotHistoryStorage::loadShotRecordStatic(db, resolvedShotId);
+                    dbResult.shotData = ShotHistoryStorage::convertShotRecord(record);
+                    dbResult.profileKbId = record.profileKbId;
 
-            QVariantMap shotData;
-            QString profileKbId;
-            {
-                QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-                db.setDatabaseName(dbPath);
-                if (db.open()) {
-                    ShotRecord record = ShotHistoryStorage::loadShotRecordStatic(db, shotId);
-                    shotData = ShotHistoryStorage::convertShotRecord(record);
-                    profileKbId = record.profileKbId;
-
-                    // --- 2. Load dial-in history (same profile family) ---
-                    if (!profileKbId.isEmpty()) {
-                        QJsonArray historyArr;
+                    // --- Dial-in history (same profile family) ---
+                    if (!dbResult.profileKbId.isEmpty()) {
                         QSqlQuery hQuery(db);
-                        QString hSql = "SELECT id, timestamp, profile_name, dose_weight, final_weight, "
+                        hQuery.prepare("SELECT id, timestamp, profile_name, dose_weight, final_weight, "
                                        "duration_seconds, enjoyment, grinder_setting, grinder_model, "
                                        "espresso_notes, bean_brand, bean_type "
-                                       "FROM shots WHERE profile_kb_id = '" + profileKbId + "' "
-                                       "AND id != " + QString::number(shotId) + " "
-                                       "ORDER BY timestamp DESC LIMIT " + QString::number(historyLimit);
-                        if (hQuery.exec(hSql)) {
+                                       "FROM shots WHERE profile_kb_id = ? "
+                                       "AND id != ? "
+                                       "ORDER BY timestamp DESC LIMIT ?");
+                        hQuery.bindValue(0, dbResult.profileKbId);
+                        hQuery.bindValue(1, resolvedShotId);
+                        hQuery.bindValue(2, historyLimit);
+                        if (hQuery.exec()) {
                             while (hQuery.next()) {
                                 QJsonObject h;
                                 h["id"] = hQuery.value("id").toLongLong();
@@ -118,15 +123,15 @@ void registerDialingTools(McpToolRegistry* registry, MainController* mainControl
                                 h["notes"] = hQuery.value("espresso_notes").toString();
                                 h["beanBrand"] = hQuery.value("bean_brand").toString();
                                 h["beanType"] = hQuery.value("bean_type").toString();
-                                historyArr.append(h);
+                                dbResult.dialInHistory.append(h);
                             }
                         }
-                        result["dialInHistory"] = historyArr;
                     }
 
-                    // --- Grinder context: mine shot history for setting range/step ---
-                    QString grinderModel = shotData.contains("grinderModel") ? shotData["grinderModel"].toString() : QString();
-                    QString beverageType = shotData.value("beverageType", "espresso").toString();
+                    // --- Grinder context ---
+                    QString grinderModel = dbResult.shotData.contains("grinderModel")
+                        ? dbResult.shotData["grinderModel"].toString() : QString();
+                    QString beverageType = dbResult.shotData.value("beverageType", "espresso").toString();
                     if (beverageType.isEmpty()) beverageType = "espresso";
                     if (!grinderModel.isEmpty()) {
                         QSqlQuery gQuery(db);
@@ -176,104 +181,123 @@ void registerDialingTools(McpToolRegistry* registry, MainController* mainControl
                                 grinderCtx["smallestStep"] = smallestStep;
                             }
 
-                            result["grinderContext"] = grinderCtx;
+                            dbResult.grinderContext = grinderCtx;
                         }
                     }
+                });
+
+                // --- File I/O on background thread (avoid blocking main thread) ---
+                QFile refFile("docs/ESPRESSO_DIAL_IN_REFERENCE.md");
+                if (refFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                    dbResult.referenceGuide = QString::fromUtf8(refFile.readAll());
+                    refFile.close();
                 }
-            }
-            QSqlDatabase::removeDatabase(connName);
+                QFile kbFile("docs/PROFILE_KNOWLEDGE_BASE.md");
+                if (kbFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                    dbResult.profileKnowledgeBase = QString::fromUtf8(kbFile.readAll());
+                    kbFile.close();
+                }
 
-            if (shotData.isEmpty()) {
-                result["error"] = "Shot not found: " + QString::number(shotId);
-                return result;
-            }
+                // --- Deliver results to main thread for final assembly ---
+                // Main-thread work: settings access, AI analysis, profile info
+                QMetaObject::invokeMethod(qApp,
+                    [respond, dbResult, resolvedShotId, mainController, settings]() {
 
-            // --- Shot summary ---
-            result["shotId"] = shotId;
-            QJsonObject shotSummary;
-            shotSummary["profileName"] = shotData["profileName"].toString();
-            shotSummary["doseG"] = shotData["doseWeight"].toDouble();
-            shotSummary["yieldG"] = shotData["finalWeight"].toDouble();
-            shotSummary["durationSec"] = shotData["duration"].toDouble();
-            shotSummary["enjoyment0to100"] = shotData["enjoyment"].toInt();
-            shotSummary["notes"] = shotData["espressoNotes"].toString();
-            shotSummary["beanBrand"] = shotData["beanBrand"].toString();
-            shotSummary["beanType"] = shotData["beanType"].toString();
-            shotSummary["roastLevel"] = shotData["roastLevel"].toString();
-            shotSummary["grinderModel"] = shotData["grinderModel"].toString();
-            shotSummary["grinderSetting"] = shotData["grinderSetting"].toString();
-            shotSummary["grinderBurrs"] = shotData["grinderBurrs"].toString();
-            double dose = shotData["doseWeight"].toDouble();
-            double yield = shotData["finalWeight"].toDouble();
-            if (dose > 0)
-                shotSummary["ratio"] = QString("1:%1").arg(yield / dose, 0, 'f', 2);
-            result["shot"] = shotSummary;
-
-            // --- AI-generated shot analysis ---
-            if (mainController && mainController->aiManager()) {
-                AIManager* ai = mainController->aiManager();
-                QString analysis = ai->generateHistoryShotSummary(shotData);
-                if (!analysis.isEmpty())
-                    result["shotAnalysis"] = analysis;
-            }
-
-            // --- 3. Profile knowledge ---
-            QString profileTitle = shotData["profileName"].toString();
-            QString profileKnowledge = ShotSummarizer::shotAnalysisSystemPrompt(
-                "espresso", profileTitle, QString(), profileKbId);
-            if (!profileKnowledge.isEmpty())
-                result["profileKnowledge"] = profileKnowledge;
-
-            // --- 4. Bean/grinder metadata (current DYE settings) ---
-            if (settings) {
-                QJsonObject bean;
-                bean["brand"] = settings->dyeBeanBrand();
-                bean["type"] = settings->dyeBeanType();
-                bean["roastDate"] = settings->dyeRoastDate();
-                bean["roastLevel"] = settings->dyeRoastLevel();
-                bean["grinderBrand"] = settings->dyeGrinderBrand();
-                bean["grinderModel"] = settings->dyeGrinderModel();
-                bean["grinderBurrs"] = settings->dyeGrinderBurrs();
-                bean["grinderSetting"] = settings->dyeGrinderSetting();
-                bean["doseWeightG"] = settings->dyeBeanWeight();
-                // Compute bean age in days from roast date
-                QString roastDateStr = settings->dyeRoastDate();
-                if (!roastDateStr.isEmpty()) {
-                    QDate roastDate = QDate::fromString(roastDateStr, "yyyy-MM-dd");
-                    if (roastDate.isValid()) {
-                        qint64 daysSinceRoast = roastDate.daysTo(QDate::currentDate());
-                        bean["beanAgeDays"] = daysSinceRoast;
+                    if (dbResult.shotData.isEmpty()) {
+                        respond(QJsonObject{{"error", "Shot not found: " + QString::number(resolvedShotId)}});
+                        return;
                     }
-                }
-                result["currentBean"] = bean;
-            }
 
-            // --- 5. Current profile info ---
-            if (mainController) {
-                QJsonObject profileInfo;
-                profileInfo["filename"] = mainController->currentProfileName();
-                profileInfo["targetWeightG"] = mainController->profileTargetWeight();
-                profileInfo["targetTemperatureC"] = mainController->profileTargetTemperature();
-                if (mainController->profileHasRecommendedDose())
-                    profileInfo["recommendedDoseG"] = mainController->profileRecommendedDose();
-                result["currentProfile"] = profileInfo;
-            }
+                    QJsonObject result;
+                    result["shotId"] = resolvedShotId;
 
-            // --- 6. Dial-in reference tables ---
-            QFile refFile("docs/ESPRESSO_DIAL_IN_REFERENCE.md");
-            if (refFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-                result["referenceGuide"] = QString::fromUtf8(refFile.readAll());
-                refFile.close();
-            }
+                    if (!dbResult.dialInHistory.isEmpty())
+                        result["dialInHistory"] = dbResult.dialInHistory;
+                    if (!dbResult.grinderContext.isEmpty())
+                        result["grinderContext"] = dbResult.grinderContext;
 
-            // --- 7. Full profile knowledge base (all profiles) ---
-            QFile kbFile("docs/PROFILE_KNOWLEDGE_BASE.md");
-            if (kbFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-                result["profileKnowledgeBase"] = QString::fromUtf8(kbFile.readAll());
-                kbFile.close();
-            }
+                    // --- Shot summary ---
+                    const auto& sd = dbResult.shotData;
+                    QJsonObject shotSummary;
+                    shotSummary["profileName"] = sd["profileName"].toString();
+                    shotSummary["doseG"] = sd["doseWeight"].toDouble();
+                    shotSummary["yieldG"] = sd["finalWeight"].toDouble();
+                    shotSummary["durationSec"] = sd["duration"].toDouble();
+                    shotSummary["enjoyment0to100"] = sd["enjoyment"].toInt();
+                    shotSummary["notes"] = sd["espressoNotes"].toString();
+                    shotSummary["beanBrand"] = sd["beanBrand"].toString();
+                    shotSummary["beanType"] = sd["beanType"].toString();
+                    shotSummary["roastLevel"] = sd["roastLevel"].toString();
+                    shotSummary["grinderModel"] = sd["grinderModel"].toString();
+                    shotSummary["grinderSetting"] = sd["grinderSetting"].toString();
+                    shotSummary["grinderBurrs"] = sd["grinderBurrs"].toString();
+                    double dose = sd["doseWeight"].toDouble();
+                    double yield = sd["finalWeight"].toDouble();
+                    if (dose > 0)
+                        shotSummary["ratio"] = QString("1:%1").arg(yield / dose, 0, 'f', 2);
+                    result["shot"] = shotSummary;
 
-            return result;
+                    // --- AI-generated shot analysis ---
+                    if (mainController && mainController->aiManager()) {
+                        AIManager* ai = mainController->aiManager();
+                        QString analysis = ai->generateHistoryShotSummary(dbResult.shotData);
+                        if (!analysis.isEmpty())
+                            result["shotAnalysis"] = analysis;
+                    }
+
+                    // --- Profile knowledge ---
+                    QString profileTitle = sd["profileName"].toString();
+                    QString profileKnowledge = ShotSummarizer::shotAnalysisSystemPrompt(
+                        "espresso", profileTitle, QString(), dbResult.profileKbId);
+                    if (!profileKnowledge.isEmpty())
+                        result["profileKnowledge"] = profileKnowledge;
+
+                    // --- Bean/grinder metadata (current DYE settings) ---
+                    if (settings) {
+                        QJsonObject bean;
+                        bean["brand"] = settings->dyeBeanBrand();
+                        bean["type"] = settings->dyeBeanType();
+                        bean["roastDate"] = settings->dyeRoastDate();
+                        bean["roastLevel"] = settings->dyeRoastLevel();
+                        bean["grinderBrand"] = settings->dyeGrinderBrand();
+                        bean["grinderModel"] = settings->dyeGrinderModel();
+                        bean["grinderBurrs"] = settings->dyeGrinderBurrs();
+                        bean["grinderSetting"] = settings->dyeGrinderSetting();
+                        bean["doseWeightG"] = settings->dyeBeanWeight();
+                        QString roastDateStr = settings->dyeRoastDate();
+                        if (!roastDateStr.isEmpty()) {
+                            QDate roastDate = QDate::fromString(roastDateStr, "yyyy-MM-dd");
+                            if (roastDate.isValid()) {
+                                qint64 daysSinceRoast = roastDate.daysTo(QDate::currentDate());
+                                bean["beanAgeDays"] = daysSinceRoast;
+                            }
+                        }
+                        result["currentBean"] = bean;
+                    }
+
+                    // --- Current profile info ---
+                    if (mainController) {
+                        QJsonObject profileInfo;
+                        profileInfo["filename"] = mainController->currentProfileName();
+                        profileInfo["targetWeightG"] = mainController->profileTargetWeight();
+                        profileInfo["targetTemperatureC"] = mainController->profileTargetTemperature();
+                        if (mainController->profileHasRecommendedDose())
+                            profileInfo["recommendedDoseG"] = mainController->profileRecommendedDose();
+                        result["currentProfile"] = profileInfo;
+                    }
+
+                    // --- Dial-in reference tables (read on background thread) ---
+                    if (!dbResult.referenceGuide.isEmpty())
+                        result["referenceGuide"] = dbResult.referenceGuide;
+                    if (!dbResult.profileKnowledgeBase.isEmpty())
+                        result["profileKnowledgeBase"] = dbResult.profileKnowledgeBase;
+
+                    respond(result);
+                }, Qt::QueuedConnection);
+            });
+
+            QObject::connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+            thread->start();
         },
         "read");
 }

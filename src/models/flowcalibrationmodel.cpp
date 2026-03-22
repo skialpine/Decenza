@@ -7,6 +7,7 @@
 #include <QDebug>
 #include <QThread>
 #include <QSqlDatabase>
+#include "../core/dbutils.h"
 #include <QSqlError>
 #include <QSqlQuery>
 
@@ -57,41 +58,28 @@ void FlowCalibrationModel::loadRecentShots() {
     auto destroyed = m_destroyed;
 
     QThread* thread = QThread::create([this, dbPath, destroyed]() {
-        const QString connName = QString("fcm_recent_%1")
-            .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
-
         QVector<qint64> shotIds;
         ShotRecord firstRecord;
-        bool dbFailed = false;
-
-        {
-            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-            db.setDatabaseName(dbPath);
-            if (db.open()) {
-                QSqlQuery query(db);
-                if (!query.prepare("SELECT id FROM shots ORDER BY timestamp DESC LIMIT 50")) {
-                    qWarning() << "FlowCalibrationModel: query prepare failed:" << query.lastError().text();
-                } else if (query.exec()) {
-                    while (query.next()) {
-                        qint64 id = query.value(0).toLongLong();
-                        ShotRecord record = ShotHistoryStorage::loadShotRecordStatic(db, id);
-                        if (!record.weightFlowRate.isEmpty()) {
-                            shotIds.append(id);
-                            if (shotIds.size() == 1) {
-                                firstRecord = std::move(record);
-                            }
+        bool dbFailed = !withTempDb(dbPath, "fcm_recent", [&](QSqlDatabase& db) {
+            QSqlQuery query(db);
+            if (!query.prepare("SELECT id FROM shots ORDER BY timestamp DESC LIMIT 50")) {
+                qWarning() << "FlowCalibrationModel: query prepare failed:" << query.lastError().text();
+            } else if (query.exec()) {
+                while (query.next()) {
+                    qint64 id = query.value(0).toLongLong();
+                    ShotRecord record = ShotHistoryStorage::loadShotRecordStatic(db, id);
+                    if (!record.weightFlowRate.isEmpty()) {
+                        shotIds.append(id);
+                        if (shotIds.size() == 1) {
+                            firstRecord = std::move(record);
                         }
-                        if (shotIds.size() >= 20) break;
                     }
-                } else {
-                    qWarning() << "FlowCalibrationModel: query exec failed:" << query.lastError().text();
+                    if (shotIds.size() >= 20) break;
                 }
             } else {
-                qWarning() << "FlowCalibrationModel: Failed to open DB for async loadRecentShots";
-                dbFailed = true;
+                qWarning() << "FlowCalibrationModel: query exec failed:" << query.lastError().text();
             }
-        }
-        QSqlDatabase::removeDatabase(connName);
+        });
 
         QMetaObject::invokeMethod(this, [this, shotIds = std::move(shotIds),
                                          firstRecord = std::move(firstRecord), dbFailed, destroyed]() {
@@ -172,22 +160,10 @@ void FlowCalibrationModel::loadCurrentShot() {
     auto destroyed = m_destroyed;
 
     QThread* thread = QThread::create([this, dbPath, shotId, destroyed]() {
-        const QString connName = QString("fcm_shot_%1")
-            .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
-
         ShotRecord record;
-        bool dbFailed = false;
-        {
-            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-            db.setDatabaseName(dbPath);
-            if (db.open())
-                record = ShotHistoryStorage::loadShotRecordStatic(db, shotId);
-            else {
-                qWarning() << "FlowCalibrationModel: Failed to open DB for async loadCurrentShot";
-                dbFailed = true;
-            }
-        }
-        QSqlDatabase::removeDatabase(connName);
+        bool dbFailed = !withTempDb(dbPath, "fcm_shot", [&](QSqlDatabase& db) {
+            record = ShotHistoryStorage::loadShotRecordStatic(db, shotId);
+        });
 
         QMetaObject::invokeMethod(this, [this, record = std::move(record), dbFailed, destroyed]() {
             if (*destroyed) {

@@ -4,6 +4,7 @@
 #include <QDateTime>
 #include <QLocale>
 #include <QSqlDatabase>
+#include "../core/dbutils.h"
 #include <QThread>
 #include <algorithm>
 #include <QtCharts/QXYSeries>
@@ -192,62 +193,52 @@ void ShotComparisonModel::scheduleLoad()
     // and deliver results back to the main thread via a queued invocation.
     // Qt guarantees the functor is not called if `this` is already destroyed.
     QThread* thread = QThread::create([this, dbPath, windowIds, serial]() {
-        const QString connName = QString("scm_load_%1")
-            .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()), 0, 16);
-
         QList<ComparisonShot> shots;
-        {
-            QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-            db.setDatabaseName(dbPath);
-            if (db.open()) {
-                for (qint64 id : windowIds) {
-                    ShotRecord record = ShotHistoryStorage::loadShotRecordStatic(db, id);
-                    if (record.summary.id == 0) continue;
+        withTempDb(dbPath, "scm_load", [&](QSqlDatabase& db) {
+            for (qint64 id : windowIds) {
+                ShotRecord record = ShotHistoryStorage::loadShotRecordStatic(db, id);
+                if (record.summary.id == 0) continue;
 
-                    ComparisonShot shot;
-                    shot.id = record.summary.id;
-                    shot.profileName = record.summary.profileName;
-                    shot.beanBrand = record.summary.beanBrand;
-                    shot.beanType = record.summary.beanType;
-                    shot.roastDate = record.roastDate;
-                    shot.roastLevel = record.roastLevel;
-                    shot.grinderBrand = record.grinderBrand;
-                    shot.grinderModel = record.grinderModel;
-                    shot.grinderBurrs = record.grinderBurrs;
-                    shot.grinderSetting = record.grinderSetting;
-                    shot.duration = record.summary.duration;
-                    shot.doseWeight = record.summary.doseWeight;
-                    shot.finalWeight = record.summary.finalWeight;
-                    shot.drinkTds = record.drinkTds;
-                    shot.drinkEy = record.drinkEy;
-                    shot.enjoyment = record.summary.enjoyment;
-                    shot.timestamp = record.summary.timestamp;
-                    shot.notes = record.espressoNotes;
-                    shot.barista = record.barista;
-                    shot.temperatureOverride = record.temperatureOverride;
-                    shot.yieldOverride = record.yieldOverride;
-                    shot.pressure = record.pressure;
-                    shot.flow = record.flow;
-                    shot.temperature = record.temperature;
-                    shot.weight = record.weight;
-                    shot.weightFlowRate = record.weightFlowRate;
-                    shot.resistance = record.resistance;
+                ComparisonShot shot;
+                shot.id = record.summary.id;
+                shot.profileName = record.summary.profileName;
+                shot.beanBrand = record.summary.beanBrand;
+                shot.beanType = record.summary.beanType;
+                shot.roastDate = record.roastDate;
+                shot.roastLevel = record.roastLevel;
+                shot.grinderBrand = record.grinderBrand;
+                shot.grinderModel = record.grinderModel;
+                shot.grinderBurrs = record.grinderBurrs;
+                shot.grinderSetting = record.grinderSetting;
+                shot.duration = record.summary.duration;
+                shot.doseWeight = record.summary.doseWeight;
+                shot.finalWeight = record.summary.finalWeight;
+                shot.drinkTds = record.drinkTds;
+                shot.drinkEy = record.drinkEy;
+                shot.enjoyment = record.summary.enjoyment;
+                shot.timestamp = record.summary.timestamp;
+                shot.notes = record.espressoNotes;
+                shot.barista = record.barista;
+                shot.temperatureOverride = record.temperatureOverride;
+                shot.yieldOverride = record.yieldOverride;
+                shot.pressure = record.pressure;
+                shot.flow = record.flow;
+                shot.temperature = record.temperature;
+                shot.weight = record.weight;
+                shot.weightFlowRate = record.weightFlowRate;
+                shot.resistance = record.resistance;
 
-                    for (const auto& phase : record.phases) {
-                        ComparisonShot::PhaseMarker marker;
-                        marker.time = phase.time;
-                        marker.label = phase.label;
-                        marker.transitionReason = phase.transitionReason;
-                        shot.phases.append(marker);
-                    }
-
-                    shots.append(shot);
+                for (const auto& phase : record.phases) {
+                    ComparisonShot::PhaseMarker marker;
+                    marker.time = phase.time;
+                    marker.label = phase.label;
+                    marker.transitionReason = phase.transitionReason;
+                    shot.phases.append(marker);
                 }
-            } else {
-                qWarning() << "ShotComparisonModel: failed to open DB for comparison load";
+
+                shots.append(shot);
             }
-        }
-        QSqlDatabase::removeDatabase(connName);
+        });
 
         // Post results back to the main thread.
         // Qt discards this call automatically if `this` has been destroyed.

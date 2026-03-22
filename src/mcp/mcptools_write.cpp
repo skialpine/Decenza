@@ -1,7 +1,3 @@
-// TODO: Move SQL queries to background thread per CLAUDE.md design principle.
-// Current tool handler architecture (synchronous QJsonObject return) prevents this.
-// Requires refactoring McpToolHandler to support async responses.
-
 #include "mcpserver.h"
 #include "mcptoolregistry.h"
 #include "../history/shothistorystorage.h"
@@ -17,9 +13,11 @@
 #include <QJsonDocument>
 #include <QSqlDatabase>
 #include <QSqlQuery>
-#include <QAtomicInt>
+#include <QThread>
+#include <QMetaObject>
+#include <QCoreApplication>
 
-static QAtomicInt s_mcpWriteConnCounter{0};
+#include "../core/dbutils.h"
 
 void registerWriteTools(McpToolRegistry* registry, MainController* mainController,
                         ShotHistoryStorage* shotHistory, Settings* settings,
@@ -29,7 +27,7 @@ void registerWriteTools(McpToolRegistry* registry, MainController* mainControlle
                         BatteryManager* battery)
 {
     // shots_update — replaces shots_set_feedback with full metadata editing (same as QML)
-    registry->registerTool(
+    registry->registerAsyncTool(
         "shots_update",
         "Update any metadata field on a shot. Supports all fields the QML shot editor can change: "
         "enjoyment, notes, dose, yield, bean info, grinder info, barista, TDS, EY.",
@@ -55,17 +53,16 @@ void registerWriteTools(McpToolRegistry* registry, MainController* mainControlle
             }},
             {"required", QJsonArray{"shotId"}}
         },
-        [shotHistory](const QJsonObject& args) -> QJsonObject {
-            QJsonObject result;
+        [shotHistory](const QJsonObject& args, std::function<void(QJsonObject)> respond) {
             if (!shotHistory || !shotHistory->isReady()) {
-                result["error"] = "Shot history not available";
-                return result;
+                respond(QJsonObject{{"error", "Shot history not available"}});
+                return;
             }
 
             qint64 shotId = args["shotId"].toInteger();
             if (shotId <= 0) {
-                result["error"] = "Valid shotId is required";
-                return result;
+                respond(QJsonObject{{"error", "Valid shotId is required"}});
+                return;
             }
 
             // Keys must match what updateShotMetadataStatic() reads (camelCase)
@@ -102,33 +99,41 @@ void registerWriteTools(McpToolRegistry* registry, MainController* mainControlle
                 metadata["drinkEy"] = args["drinkEy"].toDouble();
 
             if (metadata.isEmpty()) {
-                result["error"] = "Provide at least one field to update";
-                return result;
+                respond(QJsonObject{{"error", "Provide at least one field to update"}});
+                return;
             }
 
             const QString dbPath = shotHistory->databasePath();
-            const QString connName = QString("mcp_update_%1").arg(s_mcpWriteConnCounter.fetchAndAddRelaxed(1));
 
-            bool ok = false;
-            {
-                QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", connName);
-                db.setDatabaseName(dbPath);
-                if (db.open())
+            QThread* thread = QThread::create([dbPath, shotId, metadata, respond, shotHistory]() {
+                bool ok = false;
+                withTempDb(dbPath, "mcp_update", [&](QSqlDatabase& db) {
                     ok = ShotHistoryStorage::updateShotMetadataStatic(db, shotId, metadata);
-            }
-            QSqlDatabase::removeDatabase(connName);
+                });
 
-            if (ok) {
-                result["success"] = true;
-                QStringList fields;
-                for (auto it = metadata.begin(); it != metadata.end(); ++it)
-                    fields << it.key();
-                result["updated"] = QJsonArray::fromStringList(fields);
-                result["message"] = "Shot " + QString::number(shotId) + " updated";
-            } else {
-                result["error"] = "Failed to update shot " + QString::number(shotId);
-            }
-            return result;
+                QJsonObject result;
+                if (ok) {
+                    result["success"] = true;
+                    QStringList fields;
+                    for (auto it = metadata.begin(); it != metadata.end(); ++it)
+                        fields << it.key();
+                    result["updated"] = QJsonArray::fromStringList(fields);
+                    result["message"] = "Shot " + QString::number(shotId) + " updated";
+                } else {
+                    result["error"] = "Failed to update shot " + QString::number(shotId);
+                }
+
+                QMetaObject::invokeMethod(qApp, [respond, result, shotHistory, shotId, ok]() {
+                    if (ok) {
+                        shotHistory->invalidateDistinctCache();
+                        emit shotHistory->shotMetadataUpdated(shotId, true);
+                    }
+                    respond(result);
+                }, Qt::QueuedConnection);
+            });
+
+            QObject::connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+            thread->start();
         },
         "control");
 

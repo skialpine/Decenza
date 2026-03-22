@@ -7,17 +7,23 @@
 #include <QHash>
 #include <functional>
 
-// Tool handler callback: takes arguments JSON, returns result JSON.
-// For async tools, the handler should return a "pending" marker and emit
-// the result later via McpServer's response mechanism.
+// Synchronous tool handler: takes arguments, returns result immediately.
 using McpToolHandler = std::function<QJsonObject(const QJsonObject& arguments)>;
+
+// Async tool handler: takes arguments and a respond callback.
+// The handler runs the work on a background thread and calls respond(result)
+// on the main thread when done. The respond callback sends the HTTP response.
+using McpAsyncToolHandler = std::function<void(const QJsonObject& arguments,
+                                               std::function<void(QJsonObject)> respond)>;
 
 struct McpToolDefinition {
     QString name;
     QString description;
     QJsonObject inputSchema;    // JSON Schema for the tool's parameters
-    McpToolHandler handler;
+    McpToolHandler handler;     // sync handler (null for async tools)
+    McpAsyncToolHandler asyncHandler; // async handler (null for sync tools)
     QString category;           // "read", "control", or "settings"
+    bool isAsync = false;
 };
 
 class McpToolRegistry : public QObject {
@@ -34,6 +40,20 @@ public:
         tool.description = description;
         tool.inputSchema = inputSchema;
         tool.handler = handler;
+        tool.category = category;
+        m_tools[name] = tool;
+    }
+
+    void registerAsyncTool(const QString& name, const QString& description,
+                           const QJsonObject& inputSchema, McpAsyncToolHandler handler,
+                           const QString& category)
+    {
+        McpToolDefinition tool;
+        tool.name = name;
+        tool.description = description;
+        tool.inputSchema = inputSchema;
+        tool.asyncHandler = handler;
+        tool.isAsync = true;
         tool.category = category;
         m_tools[name] = tool;
     }
@@ -78,6 +98,10 @@ public:
             return {};
         }
         const auto& tool = it.value();
+        if (tool.isAsync || !tool.handler) {
+            errorOut = "Tool is async, use callAsyncTool(): " + name;
+            return {};
+        }
         if (categoryMinLevel(tool.category) > accessLevel) {
             errorOut = "Access level insufficient";
             return {};
@@ -85,7 +109,39 @@ public:
         return tool.handler(normalizeArguments(arguments, tool.inputSchema));
     }
 
+    // Call an async tool, checking access level. Returns true if dispatched.
+    // By convention, each handler must invoke respond() on the main thread
+    // via QMetaObject::invokeMethod(qApp, ..., Qt::QueuedConnection).
+    // The registry does not enforce this — it is the handler's responsibility.
+    bool callAsyncTool(const QString& name, const QJsonObject& arguments,
+                       int accessLevel, QString& errorOut,
+                       std::function<void(QJsonObject)> respond) const
+    {
+        auto it = m_tools.constFind(name);
+        if (it == m_tools.constEnd()) {
+            errorOut = "Unknown tool: " + name;
+            return false;
+        }
+        const auto& tool = it.value();
+        if (!tool.isAsync || !tool.asyncHandler) {
+            errorOut = "Tool is not async: " + name;
+            return false;
+        }
+        if (categoryMinLevel(tool.category) > accessLevel) {
+            errorOut = "Access level insufficient";
+            return false;
+        }
+        tool.asyncHandler(normalizeArguments(arguments, tool.inputSchema), std::move(respond));
+        return true;
+    }
+
     bool hasTool(const QString& name) const { return m_tools.contains(name); }
+
+    bool isAsyncTool(const QString& name) const
+    {
+        auto it = m_tools.constFind(name);
+        return (it != m_tools.constEnd()) && it.value().isAsync;
+    }
 
     // Returns the category of a tool ("read", "control", "settings") or empty string
     QString toolCategory(const QString& name) const
