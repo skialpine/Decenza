@@ -1554,6 +1554,9 @@ QVariantMap ShotHistoryStorage::convertShotRecord(const ShotRecord& record)
     result["id"] = record.summary.id;
     result["uuid"] = record.summary.uuid;
     result["timestamp"] = record.summary.timestamp;
+    // ISO 8601 with timezone for MCP consumers (CLAUDE.md: "Never return Unix timestamps")
+    auto dt = QDateTime::fromSecsSinceEpoch(record.summary.timestamp);
+    result["timestampIso"] = dt.toOffsetFromUtc(dt.offsetFromUtc()).toString(Qt::ISODate);
     result["profileName"] = record.summary.profileName;
     result["duration"] = record.summary.duration;
     result["finalWeight"] = record.summary.finalWeight;

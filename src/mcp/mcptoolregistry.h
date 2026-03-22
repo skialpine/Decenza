@@ -98,6 +98,10 @@ public:
             return {};
         }
         const auto& tool = it.value();
+        if (tool.isAsync || !tool.handler) {
+            errorOut = "Tool is async, use callAsyncTool(): " + name;
+            return {};
+        }
         if (categoryMinLevel(tool.category) > accessLevel) {
             errorOut = "Access level insufficient";
             return {};
@@ -106,7 +110,9 @@ public:
     }
 
     // Call an async tool, checking access level. Returns true if dispatched.
-    // The respond callback will be called on the main thread with the result.
+    // By convention, each handler must invoke respond() on the main thread
+    // via QMetaObject::invokeMethod(qApp, ..., Qt::QueuedConnection).
+    // The registry does not enforce this — it is the handler's responsibility.
     bool callAsyncTool(const QString& name, const QJsonObject& arguments,
                        int accessLevel, QString& errorOut,
                        std::function<void(QJsonObject)> respond) const

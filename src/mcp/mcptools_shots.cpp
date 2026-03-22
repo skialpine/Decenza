@@ -96,7 +96,7 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
                         query.bindValue(":profileFilter", "%" + profileFilter + "%");
                     if (!beanFilter.isEmpty())
                         query.bindValue(":beanFilter", "%" + beanFilter + "%");
-                    if (minEnjoyment >= 0)
+                    if (minEnjoyment > 0)
                         query.bindValue(":minEnjoyment", minEnjoyment);
                     if (afterEpoch > 0)
                         query.bindValue(":after", afterEpoch);
@@ -253,8 +253,10 @@ void registerShotTools(McpToolRegistry* registry, ShotHistoryStorage* shotHistor
                     result["error"] = "Failed to open shot database";
                 }
 
-                result["shots"] = shots;
-                result["count"] = shots.size();
+                if (!result.contains("error")) {
+                    result["shots"] = shots;
+                    result["count"] = shots.size();
+                }
 
                 // Compute changes between consecutive shots
                 if (shots.size() >= 2) {

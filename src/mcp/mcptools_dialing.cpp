@@ -28,8 +28,8 @@ struct DialingDbResult {
     QString profileKbId;
     QJsonArray dialInHistory;
     QJsonObject grinderContext;
-    bool hasError = false;
-    QString error;
+    QString referenceGuide;
+    QString profileKnowledgeBase;
 };
 
 void registerDialingTools(McpToolRegistry* registry, MainController* mainController,
@@ -98,13 +98,16 @@ void registerDialingTools(McpToolRegistry* registry, MainController* mainControl
                     // --- Dial-in history (same profile family) ---
                     if (!dbResult.profileKbId.isEmpty()) {
                         QSqlQuery hQuery(db);
-                        QString hSql = "SELECT id, timestamp, profile_name, dose_weight, final_weight, "
+                        hQuery.prepare("SELECT id, timestamp, profile_name, dose_weight, final_weight, "
                                        "duration_seconds, enjoyment, grinder_setting, grinder_model, "
                                        "espresso_notes, bean_brand, bean_type "
-                                       "FROM shots WHERE profile_kb_id = '" + dbResult.profileKbId + "' "
-                                       "AND id != " + QString::number(resolvedShotId) + " "
-                                       "ORDER BY timestamp DESC LIMIT " + QString::number(historyLimit);
-                        if (hQuery.exec(hSql)) {
+                                       "FROM shots WHERE profile_kb_id = ? "
+                                       "AND id != ? "
+                                       "ORDER BY timestamp DESC LIMIT ?");
+                        hQuery.bindValue(0, dbResult.profileKbId);
+                        hQuery.bindValue(1, resolvedShotId);
+                        hQuery.bindValue(2, historyLimit);
+                        if (hQuery.exec()) {
                             while (hQuery.next()) {
                                 QJsonObject h;
                                 h["id"] = hQuery.value("id").toLongLong();
@@ -183,8 +186,20 @@ void registerDialingTools(McpToolRegistry* registry, MainController* mainControl
                     }
                 });
 
-                // --- Deliver DB results to main thread for final assembly ---
-                // Main-thread work: settings access, AI analysis, file reads, profile info
+                // --- File I/O on background thread (avoid blocking main thread) ---
+                QFile refFile("docs/ESPRESSO_DIAL_IN_REFERENCE.md");
+                if (refFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                    dbResult.referenceGuide = QString::fromUtf8(refFile.readAll());
+                    refFile.close();
+                }
+                QFile kbFile("docs/PROFILE_KNOWLEDGE_BASE.md");
+                if (kbFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                    dbResult.profileKnowledgeBase = QString::fromUtf8(kbFile.readAll());
+                    kbFile.close();
+                }
+
+                // --- Deliver results to main thread for final assembly ---
+                // Main-thread work: settings access, AI analysis, profile info
                 QMetaObject::invokeMethod(qApp,
                     [respond, dbResult, resolvedShotId, mainController, settings]() {
 
@@ -271,19 +286,11 @@ void registerDialingTools(McpToolRegistry* registry, MainController* mainControl
                         result["currentProfile"] = profileInfo;
                     }
 
-                    // --- Dial-in reference tables ---
-                    QFile refFile("docs/ESPRESSO_DIAL_IN_REFERENCE.md");
-                    if (refFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-                        result["referenceGuide"] = QString::fromUtf8(refFile.readAll());
-                        refFile.close();
-                    }
-
-                    // --- Full profile knowledge base ---
-                    QFile kbFile("docs/PROFILE_KNOWLEDGE_BASE.md");
-                    if (kbFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-                        result["profileKnowledgeBase"] = QString::fromUtf8(kbFile.readAll());
-                        kbFile.close();
-                    }
+                    // --- Dial-in reference tables (read on background thread) ---
+                    if (!dbResult.referenceGuide.isEmpty())
+                        result["referenceGuide"] = dbResult.referenceGuide;
+                    if (!dbResult.profileKnowledgeBase.isEmpty())
+                        result["profileKnowledgeBase"] = dbResult.profileKnowledgeBase;
 
                     respond(result);
                 }, Qt::QueuedConnection);
