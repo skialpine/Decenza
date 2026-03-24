@@ -130,6 +130,44 @@ add_decenza_test(tst_shotsettings
     ${SIMULATOR_SOURCES}
 )
 
+# --- tst_blefidelity: BLE encode round-trip for all built-in profiles ---
+add_decenza_test(tst_blefidelity
+    tst_blefidelity.cpp
+    ${PROFILE_SOURCES}
+    ${CODEC_SOURCES}
+)
+target_compile_definitions(tst_blefidelity PRIVATE
+    SRCDIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    PROFILES_DIR="${CMAKE_SOURCE_DIR}/resources/profiles"
+)
+
+# History sources (ShotHistoryStorage + transitive deps)
+set(HISTORY_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/history/shothistorystorage.cpp
+    ${CMAKE_SOURCE_DIR}/src/models/shotdatamodel.cpp
+    ${CMAKE_SOURCE_DIR}/src/rendering/fastlinerenderer.cpp
+    ${CMAKE_SOURCE_DIR}/src/network/visualizeruploader.cpp
+)
+
+# --- tst_dbmigration: DB schema creation and migration chain ---
+find_package(Qt6 REQUIRED COMPONENTS Quick)
+qt6_wrap_cpp(TST_DBMIGRATION_MOC_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/ble/de1transport.h
+)
+add_decenza_test(tst_dbmigration
+    tst_dbmigration.cpp
+    ${TST_DBMIGRATION_MOC_SOURCES}
+    ${HISTORY_SOURCES}
+    ${BLE_SOURCES}
+    ${PROFILE_SOURCES}
+    ${CORE_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${SIMULATOR_SOURCES}
+    ${CMAKE_BINARY_DIR}/version_code.cpp
+)
+target_link_libraries(tst_dbmigration PRIVATE Qt6::Charts Qt6::Quick)
+target_include_directories(tst_dbmigration PRIVATE ${CMAKE_BINARY_DIR})
+
 # --- tst_saw: WeightProcessor SAW tests (minimal deps) ---
 add_decenza_test(tst_saw
     tst_saw.cpp
