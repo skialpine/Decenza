@@ -435,8 +435,9 @@ private slots:
     }
 
     void profileWithLimiterHasExtension() {
-        // Find any profile with a limiter and verify extension frame exists
+        // Verify every profile with a limiter has extension frames
         QDir dir(kProfilesDir);
+        int checked = 0;
         for (const QString& f : dir.entryList({"*.json"}, QDir::Files)) {
             Profile p = loadProfile(dir.absoluteFilePath(f));
             bool hasLimiter = false;
@@ -449,17 +450,17 @@ private slots:
             if (!hasLimiter) continue;
 
             QList<QByteArray> frames = p.toFrameBytes();
-            // Should have more frames than steps + tail (extra extension frames)
             QVERIFY2(frames.size() > p.steps().size() + 1,
                      qPrintable(QString("Profile '%1' has limiter but no extension frames").arg(f)));
-            return;  // Found and verified one
+            checked++;
         }
-        QSKIP("No profiles with limiters found");
+        QVERIFY2(checked > 0, "No profiles with limiters found");
     }
 
     void volumeEncodingU10P0() {
-        // Verify U10P0 flag bit is always set in MaxVol bytes
+        // Verify U10P0 flag bit is always set in MaxVol bytes for all profiles
         QDir dir(kProfilesDir);
+        int checked = 0;
         for (const QString& f : dir.entryList({"*.json"}, QDir::Files)) {
             Profile p = loadProfile(dir.absoluteFilePath(f));
             if (p.steps().isEmpty()) continue;
@@ -471,8 +472,9 @@ private slots:
                          qPrintable(QString("Frame %1 in %2: U10P0 flag bit not set (0x%3)")
                                     .arg(i).arg(f).arg(maxVol, 4, 16, QChar('0'))));
             }
-            return;  // Checked one profile's frames
+            checked++;
         }
+        QVERIFY2(checked >= 50, qPrintable(QString("Only %1 profiles checked").arg(checked)));
     }
 
     void allProfilesEncodeWithoutCrash() {
