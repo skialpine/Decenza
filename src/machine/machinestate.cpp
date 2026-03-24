@@ -357,7 +357,7 @@ void MachineState::updatePhase() {
                     m_stopAtWeightTriggered = false;
                     m_stopAtVolumeTriggered = false;
                     m_stopAtTimeTriggered = false;
-                    m_preinfusionVolume = 0.0;
+                        m_preinfusionVolume = 0.0;
                     m_pourVolume = 0.0;
                     m_cumulativeVolume = 0.0;
                     m_lastEmittedCumulativeVolumeMl = -1;
@@ -542,7 +542,7 @@ void MachineState::onScaleWeightChanged(double weight) {
         }
     }
     // Hot water: MachineState handles stop-at-weight (ShotTimingController not active)
-    // Espresso: ShotTimingController handles stop-at-weight (with proper 1.5s lag compensation)
+    // Espresso: WeightProcessor handles SAW on worker thread (adaptive lag via learned drip data)
     if (state == DE1::State::HotWater) {
         checkStopAtWeightHotWater(weight);
     }
@@ -594,19 +594,26 @@ void MachineState::checkStopAtVolume() {
     if (m_stopAtVolumeTriggered) return;
     if (!m_tareCompleted) return;  // Don't check until tare has happened
 
+    // Skip volume-based stop when a physical scale is configured and the user has
+    // opted in. Uses "configured" (scaleAddress non-empty) not "connected" so a
+    // momentary BLE disconnect mid-shot doesn't re-enable SAV unexpectedly.
+    if (m_settings && m_settings->ignoreVolumeWithScale()
+        && !m_settings->scaleAddress().isEmpty()) return;
+
+    // Skip SAV for basic profiles when a physical scale is configured (matches de1app's
+    // skip_sav_check / expecting_present). Beta testing in de1app revealed basic profiles
+    // have unrealistically low volume targets that trigger early stops. Uses "configured"
+    // not "connected" so a momentary BLE disconnect doesn't re-enable SAV mid-session.
+    bool isBasicProfile = (m_profileType == QLatin1String("settings_2a")
+                        || m_profileType == QLatin1String("settings_2b"));
+    if (isBasicProfile && m_settings && !m_settings->scaleAddress().isEmpty()) return;
+
     double target = m_targetVolume;
     if (target <= 0) return;
 
-    // Get current flow rate for lag compensation
-    double flowRate = smoothedScaleFlowRate();
-    if (flowRate > 10.0) flowRate = 10.0;  // Cap to reasonable range
-    if (flowRate < 0) flowRate = 0;
-
-    // Use same lag compensation as weight-based stop
-    double lagSeconds = 0.5;
-    double lagCompensation = flowRate * lagSeconds;
-
-    if (m_pourVolume >= (target - lagCompensation)) {
+    // No lag compensation for SAV (matches de1app). Volume is already imprecise
+    // from the flow sensor, and de1app uses a raw comparison intentionally.
+    if (m_pourVolume >= target) {
         m_stopAtVolumeTriggered = true;
         emit targetVolumeReached();
 
@@ -614,6 +621,36 @@ void MachineState::checkStopAtVolume() {
                  << "ml (preinfusion:" << m_preinfusionVolume << "ml, total:" << m_cumulativeVolume << "ml) /" << target << "ml";
 
         // Stop the operation
+        if (m_device) {
+            m_device->stopOperation();
+        }
+    }
+}
+
+void MachineState::checkStopAtVolumeHotWater() {
+    if (m_stopAtVolumeTriggered) return;
+    if (!m_settings) return;
+    if (!m_tareCompleted) return;  // Don't check until tare has happened
+
+    // Match de1app's hot water SAV logic:
+    // - Scale configured: target = 250 ml (huge safety net, SAW does the real stopping)
+    // - No scale: target = waterVolume setting (app-side volume stop is primary)
+    double target;
+    if (!m_settings->scaleAddress().isEmpty()) {
+        target = 250.0;
+    } else {
+        target = m_settings->waterVolume();
+    }
+    if (target <= 0) return;
+
+    if (m_pourVolume >= target) {
+        m_stopAtVolumeTriggered = true;
+        emit targetVolumeReached();
+
+        qDebug() << "MachineState: Hot water volume stop -" << m_pourVolume
+                 << "ml /" << target << "ml"
+                 << (m_settings->scaleAddress().isEmpty() ? "(no scale)" : "(safety net)");
+
         if (m_device) {
             m_device->stopOperation();
         }
@@ -634,11 +671,12 @@ void MachineState::onFlowSample(double flowRate, double deltaTime) {
         m_scale->addFlowSample(flowRate, deltaTime);
     }
 
-    // Integrate flow to track volume (ml), split by phase like de1app
-    // flowRate is in ml/s, deltaTime is in seconds
+    // Integrate flow to track volume (ml), split by DE1 substate (matches de1app).
+    // de1app routes volume by substate: preinfusion → preinfusion_volume,
+    // pouring → pour_volume. Other substates (heating, stabilising) never reach
+    // here because isFlowing() excludes them above.
     double volumeDelta = flowRate * deltaTime;
     if (volumeDelta > 0) {
-        // Split volume by phase: preinfusion vs pouring (matches de1app behavior)
         if (m_phase == Phase::Preinfusion) {
             m_preinfusionVolume += volumeDelta;
             int roundedMl = static_cast<int>(m_preinfusionVolume);
@@ -663,11 +701,11 @@ void MachineState::onFlowSample(double flowRate, double deltaTime) {
             emit cumulativeVolumeChanged();
         }
 
-        // Check if we should stop at volume (only during espresso)
-        // Like de1app, both weight and volume are checked independently —
-        // whichever target is reached first stops the shot.
+        // Check volume-based stops (matches de1app: SAV runs for both Espresso and HotWater)
         if (state == DE1::State::Espresso) {
             checkStopAtVolume();
+        } else if (state == DE1::State::HotWater) {
+            checkStopAtVolumeHotWater();
         }
     }
 }

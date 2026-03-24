@@ -67,6 +67,7 @@ public:
     void setTimingController(ShotTimingController* controller);
     void setTargetWeight(double weight);
     void setTargetVolume(double volume);
+    void setProfileType(const QString& type) { m_profileType = type; }
     // Scale accessors (forward from current scale)
     double scaleWeight() const;
     double scaleFlowRate() const;
@@ -113,6 +114,7 @@ private:
     void stopShotTimer();
     void checkStopAtWeightHotWater(double weight);
     void checkStopAtVolume();
+    void checkStopAtVolumeHotWater();
     void checkStopAtTime();
 
     DE1Device* m_device = nullptr;
@@ -124,6 +126,7 @@ private:
     double m_shotTime = 0.0;
     double m_targetWeight = 36.0;
     double m_targetVolume = 0.0;
+    QString m_profileType = "settings_2c";
     double m_cumulativeVolume = 0.0;    // Total volume from flow meter (preinfusion + pour)
     int m_lastEmittedCumulativeVolumeMl = -1;  // Throttle: only emit when rounded ml changes
     double m_preinfusionVolume = 0.0;   // Volume during preinfusion substate (ml)
@@ -163,4 +166,8 @@ private:
     QTimer* m_weightTrailingTimer = nullptr;          // Trailing-edge for scaleWeightChanged
     QElapsedTimer m_flowRateEmitTimer;               // Throttle gate for scaleFlowRateChanged
     QTimer* m_flowRateTrailingTimer = nullptr;        // Trailing-edge for scaleFlowRateChanged
+
+#ifdef DECENZA_TESTING
+    friend class tst_SAV;
+#endif
 };

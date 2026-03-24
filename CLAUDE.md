@@ -418,7 +418,7 @@ See `docs/CLAUDE_MD/RECIPE_PROFILES.md` for the Recipe Editor, D-Flow/A-Flow/Pre
 - **DirectControl mode**: App sends setpoints frame-by-frame
 - Formats: JSON (unified with de1app v2), TCL (de1app import)
 - Tare happens when frame 0 starts (after machine preheat)
-- **Stop limits**: Both `target_weight` and `target_volume` are checked independently during espresso — whichever target is reached first stops the shot (matching de1app). A value of 0 means that limit is disabled. There is no `stop_at_type` selector.
+- **Stop limits**: `target_weight` (SAW) and `target_volume` (SAV) are checked independently — whichever triggers first stops the shot. A value of 0 means disabled. Volume bucketing uses **DE1 substate** splitting (matching de1app): flow during Preinfusion substate → preinfusion volume, flow during Pouring substate → pour volume. Other substates (heating, stabilising) are excluded. SAV uses a raw `pourVolume >= target` comparison with no lag compensation (matching de1app). SAW ignores the first 5 seconds of extraction and only fires after the current frame reaches `number_of_preinfuse_frames` (matching de1app). For **basic profiles** (`settings_2a`/`settings_2b`) with a BLE scale *configured* (not just connected), SAV is skipped (matching de1app's `skip_sav_check` / `expecting_present`). The DE1 firmware also has a `TargetEspressoVol` safety limit (200 ml, matching de1app's `espresso_typical_volume`) sent via `setShotSettings`.
 - **Profile comparison**: Run `python scripts/compare_profiles.py [de1app_profiles_dir]` to compare built-in profiles against de1app TCL sources. Checks frame data, exit conditions, and classifies differences by severity.
 - **Profile sync**: Run `python scripts/sync_profiles.py [de1app_profiles_dir]` to update built-in profile JSON files to match de1app TCL sources. **Modifies `resources/profiles/` in-place** — review changes before committing.
 - **Profile import test**: Run `python scripts/test_profile_import.py [de1app_profiles_dir]` to build a C++ test app that loads all profiles through `Profile::fromJson()` and `Profile::loadFromTclString()` and verifies parsed weight/volume values match de1app.
@@ -439,6 +439,10 @@ See `docs/CLAUDE_MD/DATA_MIGRATION.md` for architecture, REST endpoints, and imp
 ## Visualizer Integration
 
 See `docs/CLAUDE_MD/VISUALIZER.md` for DYE metadata, profile import, visualizer format, ProfileSaveHelper, and filename generation.
+
+## Unit Testing
+
+See `docs/CLAUDE_MD/TESTING.md` for the test framework, architecture, mock strategy, and how to add new tests. Tests use Qt Test (QTest) with `friend class` access behind `#ifdef DECENZA_TESTING`. Build with `-DBUILD_TESTS=ON`.
 
 ## BLE Protocol Notes
 

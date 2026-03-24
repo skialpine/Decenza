@@ -1040,6 +1040,7 @@ void MainController::loadProfile(const QString& profileName) {
     if (m_machineState) {
         m_machineState->setTargetWeight(m_currentProfile.targetWeight());
         m_machineState->setTargetVolume(m_currentProfile.targetVolume());
+        m_machineState->setProfileType(m_currentProfile.profileType());
     }
 
     // Upload to machine if connected (for frame-based mode)
@@ -1088,6 +1089,7 @@ bool MainController::loadProfileFromJson(const QString& jsonContent) {
     if (m_machineState) {
         m_machineState->setTargetWeight(m_currentProfile.targetWeight());
         m_machineState->setTargetVolume(m_currentProfile.targetVolume());
+        m_machineState->setProfileType(m_currentProfile.profileType());
     }
 
     // Upload to machine if connected (for frame-based mode)
@@ -1520,6 +1522,7 @@ void MainController::uploadProfile(const QVariantMap& profileData) {
         m_currentProfile.setTargetVolume(profileData["target_volume"].toDouble());
         if (m_machineState) {
             m_machineState->setTargetVolume(m_currentProfile.targetVolume());
+            m_machineState->setProfileType(m_currentProfile.profileType());
         }
     }
     if (profileData.contains("has_recommended_dose")) {
@@ -1715,6 +1718,7 @@ void MainController::uploadRecipeProfile(const QVariantMap& recipeParams) {
     if (m_machineState) {
         m_machineState->setTargetWeight(m_currentProfile.targetWeight());
         m_machineState->setTargetVolume(m_currentProfile.targetVolume());
+        m_machineState->setProfileType(m_currentProfile.profileType());
     }
 
     // Mark as modified
@@ -1876,6 +1880,7 @@ void MainController::createNewProfileWithEditorType(EditorType type, const QStri
     if (m_machineState) {
         m_machineState->setTargetWeight(m_currentProfile.targetWeight());
         m_machineState->setTargetVolume(m_currentProfile.targetVolume());
+        m_machineState->setProfileType(m_currentProfile.profileType());
     }
 
     emit currentProfileChanged();
@@ -2171,6 +2176,7 @@ void MainController::createNewProfile(const QString& title) {
     if (m_machineState) {
         m_machineState->setTargetWeight(m_currentProfile.targetWeight());
         m_machineState->setTargetVolume(m_currentProfile.targetVolume());
+        m_machineState->setProfileType(m_currentProfile.profileType());
     }
 
     emit currentProfileChanged();
