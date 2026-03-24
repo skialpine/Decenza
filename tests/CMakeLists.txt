@@ -101,6 +101,13 @@ add_decenza_test(tst_settings
     ${CORE_SOURCES}
 )
 
+# --- tst_tclimport: TCL profile import round-trip against de1app profiles ---
+add_decenza_test(tst_tclimport
+    tst_tclimport.cpp
+    ${PROFILE_SOURCES}
+    ${CODEC_SOURCES}
+)
+
 # --- tst_recipegenerator: Frame generation vs de1app stock profiles ---
 add_decenza_test(tst_recipegenerator
     tst_recipegenerator.cpp
