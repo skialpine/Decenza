@@ -168,6 +168,24 @@ add_decenza_test(tst_dbmigration
 target_link_libraries(tst_dbmigration PRIVATE Qt6::Charts Qt6::Quick)
 target_include_directories(tst_dbmigration PRIVATE ${CMAKE_BINARY_DIR})
 
+# --- tst_scaleprotocol: Scale BLE packet parsing (Decent, Bookoo) ---
+qt6_wrap_cpp(TST_SCALEPROTOCOL_MOC_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/ble/transport/scalebletransport.h
+)
+add_decenza_test(tst_scaleprotocol
+    tst_scaleprotocol.cpp
+    ${TST_SCALEPROTOCOL_MOC_SOURCES}
+    ${CMAKE_SOURCE_DIR}/src/ble/scaledevice.cpp
+    ${CMAKE_SOURCE_DIR}/src/ble/scales/decentscale.cpp
+    ${CMAKE_SOURCE_DIR}/src/ble/scales/bookooscale.cpp
+)
+
+# --- tst_weightprocessor: WeightProcessor edge cases (LSLR, oscillation, per-frame) ---
+add_decenza_test(tst_weightprocessor
+    tst_weightprocessor.cpp
+    ${CMAKE_SOURCE_DIR}/src/machine/weightprocessor.cpp
+)
+
 # --- tst_saw: WeightProcessor SAW tests (minimal deps) ---
 add_decenza_test(tst_saw
     tst_saw.cpp

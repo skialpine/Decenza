@@ -36,6 +36,9 @@ private slots:
     void onCharacteristicChanged(const QBluetoothUuid& characteristicUuid, const QByteArray& value);
 
 private:
+#ifdef DECENZA_TESTING
+    friend class tst_ScaleProtocol;
+#endif
     void parseWeightData(const QByteArray& data);
     void sendCommand(const QByteArray& command);
     void sendHeartbeat();

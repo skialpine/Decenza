@@ -33,6 +33,9 @@ private slots:
     void onNotificationsEnabled(const QBluetoothUuid& characteristicUuid);
 
 private:
+#ifdef DECENZA_TESTING
+    friend class tst_ScaleProtocol;
+#endif
     void sendCommand(const QByteArray& cmd);
     void parseWeightData(const QByteArray& data);
 
