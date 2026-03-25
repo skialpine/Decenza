@@ -2979,6 +2979,7 @@ void ShotServer::handlePocketStatus(QTcpSocket* socket)
         result["connected"] = m_device->isConnected();
         result["state"] = m_device->stateString();
         result["temperature"] = m_device->temperature();
+        result["goalTemperature"] = m_device->goalTemperature();
         result["waterLevelMl"] = m_device->waterLevelMl();
         bool isAwake = m_device->isConnected() &&
                       (m_device->state() != DE1::State::Sleep &&
