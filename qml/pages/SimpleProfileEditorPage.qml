@@ -1044,11 +1044,13 @@ Page {
             if (saveAsTitleField.text.length > 0) {
                 var filename = ProfileManager.titleToFilename(saveAsTitleField.text)
                 if (ProfileManager.isBuiltInFilename(filename)) {
+                    saveAsDialog.close()
                     builtInNameDialog.open()
                     return
                 }
                 if (ProfileManager.profileExists(filename) && filename !== originalProfileName) {
                     saveAsDialog.pendingFilename = filename
+                    saveAsDialog.close()
                     overwriteDialog.open()
                 } else {
                     if (ProfileManager.saveProfileAs(filename, saveAsTitleField.text)) {

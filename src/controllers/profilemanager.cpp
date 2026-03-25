@@ -2410,22 +2410,55 @@ void ProfileManager::migrateReadOnlyProfiles() {
         QString newFilename = filename;
         QString newTitle = profile.title();
 
-        // 4b: Rename user copies that shadow built-in profiles
+        // 4b: Handle user copies that shadow built-in profiles
         if (isBuiltInFilename(filename)) {
-            newTitle = profile.title() + " (user)";
-            profile.setTitle(newTitle);
-            profile.setReadOnly(0);  // User copy is editable
-            newFilename = titleToFilename(newTitle);
-            needsSave = true;
+            // Compare user copy against built-in to check if actually modified.
+            // Load the built-in and compare frames + key fields (ignoring read_only).
+            Profile builtIn = Profile::loadFromFile(QStringLiteral(":/profiles/") + filename + QStringLiteral(".json"));
+            bool isModified = (profile.steps().size() != builtIn.steps().size()
+                               || profile.title() != builtIn.title()
+                               || qAbs(profile.targetWeight() - builtIn.targetWeight()) > 0.01
+                               || qAbs(profile.espressoTemperature() - builtIn.espressoTemperature()) > 0.01
+                               || profile.profileType() != builtIn.profileType());
 
-            // Update favorites if the old filename was favorited
-            if (m_settings && m_settings->isFavoriteProfile(filename)) {
-                m_settings->updateFavoriteProfile(filename, newFilename, newTitle);
+            // Also compare frame data if sizes match
+            if (!isModified && !profile.steps().isEmpty()) {
+                const auto& userSteps = profile.steps();
+                const auto& builtInSteps = builtIn.steps();
+                for (qsizetype i = 0; i < userSteps.size(); ++i) {
+                    if (userSteps[i].name != builtInSteps[i].name
+                        || qAbs(userSteps[i].pressure - builtInSteps[i].pressure) > 0.01
+                        || qAbs(userSteps[i].flow - builtInSteps[i].flow) > 0.01
+                        || qAbs(userSteps[i].temperature - builtInSteps[i].temperature) > 0.01
+                        || qAbs(userSteps[i].seconds - builtInSteps[i].seconds) > 0.01) {
+                        isModified = true;
+                        break;
+                    }
+                }
             }
 
-            qDebug() << "migrateReadOnlyProfiles: renamed user override:"
-                     << filename << "->" << newFilename;
-            renamed++;
+            if (isModified) {
+                // User actually changed something — rename to preserve their edits
+                newTitle = profile.title() + " (user)";
+                profile.setTitle(newTitle);
+                profile.setReadOnly(0);  // User copy is editable
+                newFilename = titleToFilename(newTitle);
+                needsSave = true;
+
+                qDebug() << "migrateReadOnlyProfiles: renamed modified user override:"
+                         << filename << "->" << newFilename;
+                renamed++;
+            } else {
+                // Unmodified copy of built-in — just delete it, built-in will take over
+                if (isStorage && m_profileStorage && m_profileStorage->isConfigured()) {
+                    m_profileStorage->deleteProfile(filename);
+                } else {
+                    QFile::remove(filePath);
+                }
+                qDebug() << "migrateReadOnlyProfiles: deleted unmodified shadow of built-in:"
+                         << filename;
+                return;  // No further processing needed
+            }
         }
 
         // 4c: Detect broken D-Flow/A-Flow profiles (wrong frame count)
@@ -2490,6 +2523,23 @@ void ProfileManager::migrateReadOnlyProfiles() {
         if (!saved) {
             qWarning() << "migrateReadOnlyProfiles: failed to save" << newFilename;
             failed++;
+            return;
+        }
+
+        // Update favorites and currentProfile AFTER all renames are finalized
+        // (fixes issue where shadow-rename + broken-detection would leave
+        // favorites pointing to intermediate filename)
+        if (newFilename != filename) {
+            if (m_settings) {
+                if (m_settings->isFavoriteProfile(filename)) {
+                    m_settings->updateFavoriteProfile(filename, newFilename, newTitle);
+                }
+                if (m_settings->currentProfile() == filename) {
+                    m_settings->setCurrentProfile(newFilename);
+                    qDebug() << "migrateReadOnlyProfiles: updated currentProfile:"
+                             << filename << "->" << newFilename;
+                }
+            }
         }
     };
 
