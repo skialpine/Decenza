@@ -3,6 +3,7 @@
 #include "settingsserializer.h"
 #include "profilestorage.h"
 #include "../profile/profile.h"
+#include "../profile/profilesavehelper.h"
 #include "../history/shothistorystorage.h"
 #include "../screensaver/screensavervideomanager.h"
 #include "../ai/aimanager.h"
@@ -678,23 +679,28 @@ void DataMigrationClient::onProfileFileReply()
             return;
         }
 
-        // Check if file exists and if it's a true duplicate (same content)
+        // Check if incoming profile would shadow a built-in profile
         bool shouldSkip = false;
-        if (QFile::exists(targetPath)) {
-            // Load existing profile to compare
+        QString builtinPath = QStringLiteral(":/profiles/") + filename;
+        if (QFile::exists(builtinPath)) {
+            Profile builtIn = Profile::loadFromFile(builtinPath);
+            if (builtIn.isValid() && ProfileSaveHelper::compareProfiles(incomingProfile, builtIn)) {
+                // Identical to built-in — skip entirely
+                qDebug() << "DataMigrationClient: Skipping profile identical to built-in:" << filename;
+                shouldSkip = true;
+            }
+            // Different from built-in — force unique filename below
+        }
+
+        // Check if file already exists at target path
+        if (!shouldSkip && QFile::exists(targetPath)) {
             Profile existingProfile = Profile::loadFromFile(targetPath);
 
-            if (existingProfile.isValid()) {
-                // Check if they're the same profile (same title, author, and step count)
-                bool sameTitle = existingProfile.title() == incomingProfile.title();
-                bool sameAuthor = existingProfile.author() == incomingProfile.author();
-                bool sameSteps = existingProfile.steps().size() == incomingProfile.steps().size();
-
-                if (sameTitle && sameAuthor && sameSteps) {
-                    // True duplicate - skip import
-                    qDebug() << "DataMigrationClient: Skipping duplicate profile:" << filename;
-                    shouldSkip = true;
-                }
+            if (existingProfile.isValid() &&
+                ProfileSaveHelper::compareProfiles(existingProfile, incomingProfile)) {
+                // True duplicate — skip import
+                qDebug() << "DataMigrationClient: Skipping duplicate profile:" << filename;
+                shouldSkip = true;
             }
 
             // If not a true duplicate, append _imported suffix

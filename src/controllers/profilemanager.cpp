@@ -6,6 +6,7 @@
 #include "../machine/machinestate.h"
 #include "../profile/recipegenerator.h"
 #include "../profile/recipeanalyzer.h"
+#include "../profile/profilesavehelper.h"
 #include "../ai/shotsummarizer.h"
 #include <QDir>
 #include <QFile>
@@ -2412,30 +2413,12 @@ void ProfileManager::migrateReadOnlyProfiles() {
 
         // 4b: Handle user copies that shadow built-in profiles
         if (isBuiltInFilename(filename)) {
-            // Compare user copy against built-in to check if actually modified.
-            // Load the built-in and compare frames + key fields (ignoring read_only).
+            // Compare user copy against built-in using the unified comparison
+            // (same logic as de1app import and device migration).
             Profile builtIn = Profile::loadFromFile(QStringLiteral(":/profiles/") + filename + QStringLiteral(".json"));
-            bool isModified = (profile.steps().size() != builtIn.steps().size()
-                               || profile.title() != builtIn.title()
-                               || qAbs(profile.targetWeight() - builtIn.targetWeight()) > 0.01
-                               || qAbs(profile.espressoTemperature() - builtIn.espressoTemperature()) > 0.01
-                               || profile.profileType() != builtIn.profileType());
-
-            // Also compare frame data if sizes match
-            if (!isModified && !profile.steps().isEmpty()) {
-                const auto& userSteps = profile.steps();
-                const auto& builtInSteps = builtIn.steps();
-                for (qsizetype i = 0; i < userSteps.size(); ++i) {
-                    if (userSteps[i].name != builtInSteps[i].name
-                        || qAbs(userSteps[i].pressure - builtInSteps[i].pressure) > 0.01
-                        || qAbs(userSteps[i].flow - builtInSteps[i].flow) > 0.01
-                        || qAbs(userSteps[i].temperature - builtInSteps[i].temperature) > 0.01
-                        || qAbs(userSteps[i].seconds - builtInSteps[i].seconds) > 0.01) {
-                        isModified = true;
-                        break;
-                    }
-                }
-            }
+            bool isModified = !ProfileSaveHelper::compareProfiles(profile, builtIn);
+            // compareProfiles doesn't check title — check separately
+            if (!isModified && profile.title() != builtIn.title()) isModified = true;
 
             if (isModified) {
                 // User actually changed something — rename to preserve their edits
