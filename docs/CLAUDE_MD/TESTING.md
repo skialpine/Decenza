@@ -184,6 +184,17 @@ A QML binding smoke test that instantiates pages and verifies key property bindi
 
 `applyFlowCalibration()` existed as duplicate implementations in both MainController and ProfileManager. Since both were identical, no test could detect the divergence risk — but if either were updated independently, behavior would silently differ.
 
+## MCP Integration Tests
+
+`scripts/test_mcp.sh` runs ~200 tests against a live MCP server, covering protocol compliance, tool discovery, all read/write tools, resources, rate limiting, session management, settings parity, and input validation.
+
+```bash
+# App must be running with MCP enabled. Non-interactive mode skips the access-level gating test.
+SKIP_INTERACTIVE=1 bash scripts/test_mcp.sh localhost:8888
+```
+
+Run this after any changes to `src/mcp/`, `src/controllers/profilemanager.cpp`, or `src/network/shotserver*.cpp`.
+
 ## Adding New Tests
 
 1. Create `tests/tst_yourtest.cpp` with `QTEST_GUILESS_MAIN(tst_YourTest)` and `#include "tst_yourtest.moc"`
