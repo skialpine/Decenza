@@ -519,6 +519,26 @@ void BLEManager::clearSavedRefractometer() {
     m_savedRefractometerName.clear();
     m_refractometerDevice = nullptr;
     emit refractometerConnectedChanged();
+    emit disconnectRefractometerRequested();
+}
+
+void BLEManager::setRefractometerDevice(DiFluidR2* device) {
+    m_refractometerDevice = device;
+    if (m_refractometerDevice) {
+        connect(m_refractometerDevice, &DiFluidR2::connectedChanged,
+                this, &BLEManager::refractometerConnectedChanged);
+    }
+    emit refractometerConnectedChanged();
+}
+
+void BLEManager::tryDirectConnectToRefractometer() {
+    if (m_savedRefractometerAddress.isEmpty() || m_disabled) return;
+    // Piggyback on the scale scan infrastructure — set the flag so
+    // onDeviceDiscovered processes refractometer advertisements
+    if (!m_scanningForScales) {
+        m_scanningForScales = true;
+        startScan();
+    }
 }
 
 void BLEManager::setSavedDE1Address(const QString& address, const QString& name) {

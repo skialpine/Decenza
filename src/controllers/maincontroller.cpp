@@ -1858,24 +1858,21 @@ bool MainController::isSawSettling() const {
 }
 
 void MainController::setRefractometer(DiFluidR2* refractometer) {
+    // Disconnect old signal chain before connecting new one
+    if (m_refractometer) {
+        disconnect(m_refractometer, nullptr, this, nullptr);
+    }
     m_refractometer = refractometer;
     if (!m_refractometer) return;
 
-    // When R2 sends a TDS reading, auto-populate the DYE field
+    // When R2 sends a TDS reading, populate the DYE field.
+    // EY calculation is NOT done here — PostShotReviewPage QML is the single
+    // source of truth for EY when the page is active (it uses page-local
+    // editDoseWeight/editDrinkWeight which may differ from Settings).
     connect(m_refractometer, &DiFluidR2::tdsChanged, this, [this](double tds) {
         if (tds > 0 && m_settings) {
             qDebug() << "[Refractometer] TDS received:" << tds << "- populating DYE field";
             m_settings->setDyeDrinkTds(tds);
-
-            // Auto-calculate EY: (beverageWeight * TDS%) / doseWeight
-            double dose = m_settings->dyeBeanWeight();
-            double yield = m_settings->dyeDrinkWeight();
-            if (dose > 0 && yield > 0) {
-                double ey = (yield * tds) / dose;
-                ey = std::round(ey * 10.0) / 10.0;  // Round to 1 decimal
-                m_settings->setDyeDrinkEy(ey);
-                qDebug() << "[Refractometer] Auto-calculated EY:" << ey;
-            }
         }
     });
 }

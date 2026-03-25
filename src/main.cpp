@@ -1160,6 +1160,9 @@ int main(int argc, char *argv[])
         // Wire to MainController for TDS → Settings pipeline
         mainController.setRefractometer(refractometer.get());
 
+        // Tell BLEManager about the live device (for isRefractometerConnected property)
+        bleManager.setRefractometerDevice(refractometer.get());
+
         // Expose to QML
         engine.rootContext()->setContextProperty("Refractometer", refractometer.get());
 
@@ -1172,12 +1175,25 @@ int main(int argc, char *argv[])
         QObject::connect(refractometer.get(), &DiFluidR2::logMessage,
                          &bleManager, &BLEManager::appendScaleLog);
 
-        // Update connected state in BLEManager
-        QObject::connect(refractometer.get(), &DiFluidR2::connectedChanged,
-                         &bleManager, &BLEManager::refractometerConnectedChanged);
-
         qDebug() << "[Refractometer] Created and connecting to" << device.name();
     });
+
+    // Handle Forget Refractometer — disconnect and clean up
+    QObject::connect(&bleManager, &BLEManager::disconnectRefractometerRequested,
+                     [&refractometer, &mainController, &engine]() {
+        if (refractometer) {
+            qDebug() << "[Refractometer] Forget requested, disconnecting";
+            refractometer->disconnectFromDevice();
+            mainController.setRefractometer(nullptr);
+            engine.rootContext()->setContextProperty("Refractometer", nullptr);
+            refractometer.reset();
+        }
+    });
+
+    // Issue 3: Auto-reconnect refractometer on startup
+    if (!settings.savedRefractometerAddress().isEmpty()) {
+        bleManager.tryDirectConnectToRefractometer();
+    }
 
 #ifndef Q_OS_IOS
     // When USB scale discovered: wire it as the active scale (same pattern as BLE scale)

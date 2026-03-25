@@ -946,7 +946,7 @@ Item {
                                     }
 
                                     Text {
-                                        text: Settings.savedRefractometerName || "Refractometer"
+                                        text: Settings.savedRefractometerName || TranslationManager.translate("connections.refractometer", "Refractometer")
                                         color: Theme.textColor
                                         font.pixelSize: Theme.scaled(13)
                                         Layout.fillWidth: true
@@ -964,7 +964,7 @@ Item {
                                         Text {
                                             id: refBadgeText
                                             anchors.centerIn: parent
-                                            text: "Refractometer"
+                                            text: TranslationManager.translate("connections.refractometer", "Refractometer")
                                             color: Theme.primaryColor
                                             font.pixelSize: Theme.scaled(10)
                                             font.bold: true
@@ -1143,11 +1143,25 @@ Item {
 
                         delegate: ItemDelegate {
                             width: ListView.view.width
+
+                            Accessible.role: Accessible.Button
+                            Accessible.name: modelData.deviceName + ", " + (modelData.deviceClass === "refractometer"
+                                ? TranslationManager.translate("connections.refractometer", "Refractometer")
+                                : modelData.deviceType)
+                            Accessible.focusable: true
+                            Accessible.onPressAction: {
+                                if (modelData.deviceClass === "refractometer")
+                                    BLEManager.connectToRefractometer(modelData.address)
+                                else
+                                    BLEManager.connectToScale(modelData.address)
+                            }
+
                             contentItem: RowLayout {
                                 Text {
                                     text: modelData.deviceName
                                     color: Theme.textColor
                                     Layout.fillWidth: true
+                                    Accessible.ignored: true
                                 }
                                 // Type badge
                                 Rectangle {

@@ -72,10 +72,12 @@ public:
     // Refractometer support
     QVariantList discoveredRefractometers() const;
     bool isRefractometerConnected() const;
-    Q_INVOKABLE QBluetoothDeviceInfo getRefractometerDeviceInfo(const QString& address) const;
+    QBluetoothDeviceInfo getRefractometerDeviceInfo(const QString& address) const;
     Q_INVOKABLE void connectToRefractometer(const QString& address);
     Q_INVOKABLE void setSavedRefractometerAddress(const QString& address, const QString& name);
     Q_INVOKABLE void clearSavedRefractometer();
+    void setRefractometerDevice(DiFluidR2* device);
+    Q_INVOKABLE void tryDirectConnectToRefractometer();
 
     // DE1 address management
     void setSavedDE1Address(const QString& address, const QString& name);
@@ -119,6 +121,7 @@ signals:
     void refractometersChanged();
     void refractometerConnectedChanged();
     void refractometerDiscovered(const QBluetoothDeviceInfo& device);
+    void disconnectRefractometerRequested();
 
 
 private slots:
