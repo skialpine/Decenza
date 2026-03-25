@@ -53,6 +53,11 @@
 #include "ble/scaledevice.h"
 #include "ble/scales/scalefactory.h"
 #include "ble/scales/flowscale.h"
+#include "ble/refractometers/difluidr2.h"
+#include "ble/transport/qtscalebletransport.h"
+#if defined(Q_OS_IOS) || defined(Q_OS_MACOS)
+#include "ble/transport/corebluetooth/corebluetoothscalebletransport.h"
+#endif
 #include "machine/machinestate.h"
 #include "machine/weightprocessor.h"
 #include "models/shotdatamodel.h"
@@ -1125,6 +1130,53 @@ int main(int argc, char *argv[])
             // Now reset the physical scale
             physicalScale.reset();
         }
+    });
+
+    // === Refractometer (DiFluid R2) ===
+    std::unique_ptr<DiFluidR2> refractometer;
+    engine.rootContext()->setContextProperty("Refractometer", nullptr);
+
+    // Restore saved refractometer address for auto-reconnect
+    if (!settings.savedRefractometerAddress().isEmpty()) {
+        bleManager.setSavedRefractometerAddress(settings.savedRefractometerAddress(),
+                                                 settings.savedRefractometerName());
+    }
+
+    QObject::connect(&bleManager, &BLEManager::refractometerDiscovered,
+                     [&refractometer, &mainController, &engine, &bleManager, &settings](const QBluetoothDeviceInfo& device) {
+        if (refractometer && refractometer->isConnected()) {
+            return;  // Already connected
+        }
+
+        // Create transport using the same platform selection as scales
+#if defined(Q_OS_IOS) || defined(Q_OS_MACOS)
+        auto* transport = new CoreBluetoothScaleBleTransport();
+#else
+        auto* transport = new QtScaleBleTransport();
+#endif
+        refractometer = std::make_unique<DiFluidR2>(transport);
+        refractometer->connectToDevice(device);
+
+        // Wire to MainController for TDS → Settings pipeline
+        mainController.setRefractometer(refractometer.get());
+
+        // Expose to QML
+        engine.rootContext()->setContextProperty("Refractometer", refractometer.get());
+
+        // Save address for auto-reconnect
+        settings.setSavedRefractometerAddress(getDeviceIdentifier(device));
+        settings.setSavedRefractometerName(device.name());
+        bleManager.setSavedRefractometerAddress(getDeviceIdentifier(device), device.name());
+
+        // Forward R2 log messages to the scale log (shared log view)
+        QObject::connect(refractometer.get(), &DiFluidR2::logMessage,
+                         &bleManager, &BLEManager::appendScaleLog);
+
+        // Update connected state in BLEManager
+        QObject::connect(refractometer.get(), &DiFluidR2::connectedChanged,
+                         &bleManager, &BLEManager::refractometerConnectedChanged);
+
+        qDebug() << "[Refractometer] Created and connecting to" << device.name();
     });
 
 #ifndef Q_OS_IOS

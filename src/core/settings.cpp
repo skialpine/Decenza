@@ -437,6 +437,40 @@ void Settings::setShowScaleDialogs(bool enabled) {
     }
 }
 
+// Refractometer
+bool Settings::refractometerEnabled() const {
+    return m_settings.value("refractometer/enabled", false).toBool();
+}
+
+void Settings::setRefractometerEnabled(bool enabled) {
+    if (refractometerEnabled() != enabled) {
+        m_settings.setValue("refractometer/enabled", enabled);
+        emit refractometerEnabledChanged();
+    }
+}
+
+QString Settings::savedRefractometerAddress() const {
+    return m_settings.value("refractometer/address", "").toString();
+}
+
+void Settings::setSavedRefractometerAddress(const QString& address) {
+    if (savedRefractometerAddress() != address) {
+        m_settings.setValue("refractometer/address", address);
+        emit savedRefractometerChanged();
+    }
+}
+
+QString Settings::savedRefractometerName() const {
+    return m_settings.value("refractometer/name", "").toString();
+}
+
+void Settings::setSavedRefractometerName(const QString& name) {
+    if (savedRefractometerName() != name) {
+        m_settings.setValue("refractometer/name", name);
+        emit savedRefractometerChanged();
+    }
+}
+
 // USB serial polling
 bool Settings::usbSerialEnabled() const {
     return m_settings.value("usb/serialEnabled", false).toBool();

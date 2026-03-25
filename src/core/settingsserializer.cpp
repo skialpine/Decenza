@@ -32,6 +32,13 @@ QJsonObject SettingsSerializer::exportToJson(Settings* settings, bool includeSen
     scale["useFlowScale"] = settings->useFlowScale();
     root["scale"] = scale;
 
+    // Refractometer settings
+    QJsonObject refractometer;
+    refractometer["enabled"] = settings->refractometerEnabled();
+    refractometer["address"] = settings->savedRefractometerAddress();
+    refractometer["name"] = settings->savedRefractometerName();
+    root["refractometer"] = refractometer;
+
     // Espresso settings
     QJsonObject espresso;
     espresso["temperature"] = settings->espressoTemperature();
@@ -375,6 +382,14 @@ bool SettingsSerializer::importFromJson(Settings* settings, const QJsonObject& j
         if (scale.contains("type")) settings->setScaleType(scale["type"].toString());
         if (scale.contains("name")) settings->setScaleName(scale["name"].toString());
         if (scale.contains("useFlowScale")) settings->setUseFlowScale(scale["useFlowScale"].toBool());
+    }
+
+    // Refractometer settings
+    if (json.contains("refractometer") && !excludeKeys.contains("refractometer")) {
+        QJsonObject refractometer = json["refractometer"].toObject();
+        if (refractometer.contains("enabled")) settings->setRefractometerEnabled(refractometer["enabled"].toBool());
+        if (refractometer.contains("address")) settings->setSavedRefractometerAddress(refractometer["address"].toString());
+        if (refractometer.contains("name")) settings->setSavedRefractometerName(refractometer["name"].toString());
     }
 
     // Espresso settings

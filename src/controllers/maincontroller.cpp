@@ -18,6 +18,7 @@
 #include "../ble/blemanager.h"
 #include "../ble/scaledevice.h"
 #include "../ble/scales/flowscale.h"
+#include "../ble/refractometers/difluidr2.h"
 #include <QGuiApplication>
 #include <QClipboard>
 #include <cmath>
@@ -1358,6 +1359,13 @@ void MainController::onShotEnded() {
         m_visualizer->uploadShot(m_shotDataModel, m_profileManager->currentProfilePtr(), duration, finalWeight, doseWeight, metadata);
     }
 
+    // Auto-read TDS from refractometer if enabled and connected
+    if (m_refractometer && m_refractometer->isConnected()
+        && m_settings && m_settings->refractometerEnabled()) {
+        qDebug() << "  -> Auto-requesting TDS from refractometer";
+        m_refractometer->requestMeasurement();
+    }
+
     // Store pending shot data for later upload (user can re-upload with updated metadata)
     // Note: shotEndedShowMetadata is emitted from the shotSaved callback above,
     // after m_lastSavedShotId is set, so PostShotReviewPage gets a valid shot ID.
@@ -1847,6 +1855,29 @@ void MainController::onScaleWeightChanged(double weight) {
 
 bool MainController::isSawSettling() const {
     return m_timingController ? m_timingController->isSawSettling() : false;
+}
+
+void MainController::setRefractometer(DiFluidR2* refractometer) {
+    m_refractometer = refractometer;
+    if (!m_refractometer) return;
+
+    // When R2 sends a TDS reading, auto-populate the DYE field
+    connect(m_refractometer, &DiFluidR2::tdsChanged, this, [this](double tds) {
+        if (tds > 0 && m_settings) {
+            qDebug() << "[Refractometer] TDS received:" << tds << "- populating DYE field";
+            m_settings->setDyeDrinkTds(tds);
+
+            // Auto-calculate EY: (beverageWeight * TDS%) / doseWeight
+            double dose = m_settings->dyeBeanWeight();
+            double yield = m_settings->dyeDrinkWeight();
+            if (dose > 0 && yield > 0) {
+                double ey = (yield * tds) / dose;
+                ey = std::round(ey * 10.0) / 10.0;  // Round to 1 decimal
+                m_settings->setDyeDrinkEy(ey);
+                qDebug() << "[Refractometer] Auto-calculated EY:" << ey;
+            }
+        }
+    });
 }
 
 

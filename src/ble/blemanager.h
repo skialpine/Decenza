@@ -11,6 +11,7 @@
 #include <QFile>
 
 class ScaleDevice;
+class DiFluidR2;
 
 // Helper to get device identifier - iOS uses UUID, others use MAC address
 inline QString getDeviceIdentifier(const QBluetoothDeviceInfo& device) {
@@ -38,6 +39,8 @@ class BLEManager : public QObject {
     Q_PROPERTY(QVariantList discoveredDevices READ discoveredDevices NOTIFY devicesChanged)
     Q_PROPERTY(QVariantList discoveredScales READ discoveredScales NOTIFY scalesChanged)
     Q_PROPERTY(bool scaleConnectionFailed READ scaleConnectionFailed NOTIFY scaleConnectionFailedChanged)
+    Q_PROPERTY(QVariantList discoveredRefractometers READ discoveredRefractometers NOTIFY refractometersChanged)
+    Q_PROPERTY(bool refractometerConnected READ isRefractometerConnected NOTIFY refractometerConnectedChanged)
     Q_PROPERTY(bool hasSavedDE1 READ hasSavedDE1 CONSTANT)
     Q_PROPERTY(bool disabled READ isDisabled WRITE setDisabled NOTIFY disabledChanged)
 
@@ -65,6 +68,14 @@ public:
     // Scale address management
     Q_INVOKABLE void setSavedScaleAddress(const QString& address, const QString& type, const QString& name);
     Q_INVOKABLE void clearSavedScale();
+
+    // Refractometer support
+    QVariantList discoveredRefractometers() const;
+    bool isRefractometerConnected() const;
+    Q_INVOKABLE QBluetoothDeviceInfo getRefractometerDeviceInfo(const QString& address) const;
+    Q_INVOKABLE void connectToRefractometer(const QString& address);
+    Q_INVOKABLE void setSavedRefractometerAddress(const QString& address, const QString& name);
+    Q_INVOKABLE void clearSavedRefractometer();
 
     // DE1 address management
     void setSavedDE1Address(const QString& address, const QString& name);
@@ -105,6 +116,9 @@ signals:
     void scanStarted();  // Emitted when BLE scan actually begins
     void disabledChanged();
     void disconnectScaleRequested();  // Emitted when starting scan, scale should disconnect
+    void refractometersChanged();
+    void refractometerConnectedChanged();
+    void refractometerDiscovered(const QBluetoothDeviceInfo& device);
 
 
 private slots:
@@ -150,6 +164,12 @@ private:
     // Direct connect state - prevents duplicate connections from scan
     bool m_directConnectInProgress = false;
     QString m_directConnectAddress;
+
+    // Refractometer
+    QList<QBluetoothDeviceInfo> m_refractometerDevices;
+    QString m_savedRefractometerAddress;
+    QString m_savedRefractometerName;
+    DiFluidR2* m_refractometerDevice = nullptr;
 
     // Scale debug log
     QStringList m_scaleLogMessages;

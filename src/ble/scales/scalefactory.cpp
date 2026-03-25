@@ -227,6 +227,8 @@ bool ScaleFactory::isSmartChefScale(const QString& name) {
 }
 
 bool ScaleFactory::isDifluidScale(const QString& name) {
+    // Exclude R2 refractometer — it advertises with "difluid" in its name
+    if (name.contains("r2")) return false;
     return name.contains("difluid") ||
            name.contains("microbalance");
 }

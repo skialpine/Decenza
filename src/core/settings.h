@@ -31,6 +31,11 @@ class Settings : public QObject {
     // Allow user to disable modal scale connection alert dialogs
     Q_PROPERTY(bool showScaleDialogs READ showScaleDialogs WRITE setShowScaleDialogs NOTIFY showScaleDialogsChanged)
 
+    // Refractometer (DiFluid R2) — enabled = auto-read TDS after shot + auto-reconnect
+    Q_PROPERTY(bool refractometerEnabled READ refractometerEnabled WRITE setRefractometerEnabled NOTIFY refractometerEnabledChanged)
+    Q_PROPERTY(QString savedRefractometerAddress READ savedRefractometerAddress WRITE setSavedRefractometerAddress NOTIFY savedRefractometerChanged)
+    Q_PROPERTY(QString savedRefractometerName READ savedRefractometerName WRITE setSavedRefractometerName NOTIFY savedRefractometerChanged)
+
     // Enable USB serial polling for DE1 connection. Off by default to save battery
     // (polling every 2 s). Only needed when connecting the DE1 via USB-C cable.
     Q_PROPERTY(bool usbSerialEnabled READ usbSerialEnabled WRITE setUsbSerialEnabled NOTIFY usbSerialEnabledChanged)
@@ -297,6 +302,14 @@ public:
     // Scale connection alert dialogs
     bool showScaleDialogs() const;
     void setShowScaleDialogs(bool enabled);
+
+    // Refractometer
+    bool refractometerEnabled() const;
+    void setRefractometerEnabled(bool enabled);
+    QString savedRefractometerAddress() const;
+    void setSavedRefractometerAddress(const QString& address);
+    QString savedRefractometerName() const;
+    void setSavedRefractometerName(const QString& name);
 
     // USB serial polling
     bool usbSerialEnabled() const;
@@ -833,6 +846,8 @@ signals:
     void knownScalesChanged();
     void useFlowScaleChanged();
     void showScaleDialogsChanged();
+    void refractometerEnabledChanged();
+    void savedRefractometerChanged();
     void usbSerialEnabledChanged();
     void espressoTemperatureChanged();
     void targetWeightChanged();
