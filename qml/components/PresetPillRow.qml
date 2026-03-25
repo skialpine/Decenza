@@ -56,6 +56,16 @@ FocusScope {
         }
     }
 
+    // Display name for a pill, with modified indicator for selected read-only profiles
+    function pillDisplayName(index) {
+        var name = presets[index] ? (presets[index].name || "") : ""
+        if (index === selectedIndex && ProfileManager.profileModified) {
+            return ProfileManager.isCurrentProfileReadOnly
+                ? name + " (modified)" : "*" + name
+        }
+        return name
+    }
+
     // Calculate how many pills fit per row
     readonly property real pillSpacing: Theme.scaled(12)
     readonly property real pillPadding: Theme.scaled(40)  // Horizontal padding inside pill
@@ -108,8 +118,7 @@ FocusScope {
         var pillWidths = []
         var totalWidth = 0
         for (var i = 0; i < presets.length; i++) {
-            var prefix = (i === selectedIndex && ProfileManager.profileModified) ? "*" : ""
-            var textWidth = measureTextWidth(prefix + (presets[i].name || ""))
+            var textWidth = measureTextWidth(pillDisplayName(i))
             var pillWidth = textWidth + pillPadding
             pillWidths.push(pillWidth)
             totalWidth += pillWidth
@@ -235,7 +244,7 @@ FocusScope {
                         Text {
                             id: pillText
                             anchors.centerIn: parent
-                            text: (pill.isSelected && ProfileManager.profileModified ? "*" : "") + (modelData.preset.name || "")
+                            text: pillDisplayName(modelData.index)
                             color: pill.isSelected ? "white" : Theme.textColor
                             font.pixelSize: Theme.scaled(16)
                             font.bold: true
