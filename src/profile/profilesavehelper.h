@@ -36,7 +36,9 @@ public:
 
     // Compare two profiles for equality (profile-level fields + all frames).
     // Returns false if either profile has no steps.
-    bool compareProfiles(const Profile& a, const Profile& b) const;
+    // Static so callers without a ProfileSaveHelper instance can use it
+    // (e.g., DataMigrationClient, DatabaseBackupManager, migrateReadOnlyProfiles).
+    static bool compareProfiles(const Profile& a, const Profile& b);
 
     // Check if a profile exists locally and whether it's identical
     // Returns map with: exists, identical, source ("D"/"B"), filename

@@ -223,6 +223,17 @@ public:
     // Generate a single frame for direct control mode
     QByteArray toDirectControlFrame(int frameIndex, const ProfileFrame& frame) const;
 
+    // === Read-Only Flag ===
+    // Matches de1app's read_only field (integer):
+    //   0 = not read-only (user-created or edited copy)
+    //   1 = read-only (built-in / author-protected)
+    //   2 = reset to original requested
+    // Built-in profiles are always treated as read-only regardless of this flag
+    // (enforced by ProfileManager).
+    int readOnly() const { return m_readOnly; }
+    void setReadOnly(int readOnly) { m_readOnly = readOnly; }
+    bool isReadOnly() const { return m_readOnly == 1; }
+
     // === AI Knowledge Base ===
     // Persisted in JSON as "knowledge_base_id" — survives Save As and reboots
     QString knowledgeBaseId() const { return m_knowledgeBaseId; }
@@ -301,6 +312,9 @@ private:
     // Recipe mode
     bool m_isRecipeMode = false;
     RecipeParams m_recipeParams;
+
+    // Read-only flag (de1app compatibility: 0=editable, 1=read-only, 2=reset)
+    int m_readOnly = 0;
 };
 
 Q_DECLARE_METATYPE(Profile)

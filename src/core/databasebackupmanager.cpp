@@ -3,6 +3,8 @@
 #include "settingsserializer.h"
 #include "profilestorage.h"
 #include "../history/shothistorystorage.h"
+#include "../profile/profile.h"
+#include "../profile/profilesavehelper.h"
 #include "../screensaver/screensavervideomanager.h"
 #include <QCoreApplication>
 #include <QStandardPaths>
@@ -883,39 +885,67 @@ bool DatabaseBackupManager::restoreBackup(const QString& filename, bool merge,
                 qDebug() << "DatabaseBackupManager: Cleared existing profiles (replace mode)";
             }
 
-            // Restore user profiles
-            QString srcUser = restoreDir + "/profiles/user";
-            if (QDir(srcUser).exists() && !userProfilesPath.isEmpty()) {
-                QDir().mkpath(userProfilesPath);
-                QDir srcDir(srcUser);
+            // Helper: restore profiles from a source dir to a dest dir, with
+            // built-in awareness and content-based duplicate detection.
+            auto restoreProfileDir = [merge](const QString& srcPath, const QString& destPath) -> int {
+                if (!QDir(srcPath).exists() || destPath.isEmpty()) return 0;
+                QDir().mkpath(destPath);
+                QDir srcDir(srcPath);
                 QFileInfoList files = srcDir.entryInfoList(QDir::Files);
                 int restored = 0;
                 for (const QFileInfo& fi : files) {
-                    QString destPath = userProfilesPath + "/" + fi.fileName();
-                    if (merge && QFile::exists(destPath)) continue;
-                    if (QFile::exists(destPath)) QFile::remove(destPath);
-                    if (QFile::copy(fi.absoluteFilePath(), destPath)) restored++;
+                    if (!fi.fileName().endsWith(QLatin1String(".json"))) continue;
+
+                    QString dest = destPath + "/" + fi.fileName();
+
+                    // Skip profiles identical to built-in (no need to shadow)
+                    QString builtinPath = QStringLiteral(":/profiles/") + fi.fileName();
+                    if (QFile::exists(builtinPath)) {
+                        Profile incoming = Profile::loadFromFile(fi.absoluteFilePath());
+                        Profile builtIn = Profile::loadFromFile(builtinPath);
+                        if (incoming.isValid() && builtIn.isValid()
+                            && ProfileSaveHelper::compareProfiles(incoming, builtIn)) {
+                            continue;  // Identical to built-in — skip
+                        }
+                    }
+
+                    if (QFile::exists(dest)) {
+                        if (merge) {
+                            // Content-based duplicate detection
+                            Profile incoming = Profile::loadFromFile(fi.absoluteFilePath());
+                            Profile existing = Profile::loadFromFile(dest);
+                            if (incoming.isValid() && existing.isValid()
+                                && ProfileSaveHelper::compareProfiles(incoming, existing)) {
+                                continue;  // Identical — skip
+                            }
+                            // Different content — use _imported suffix
+                            QString baseName = fi.completeBaseName();
+                            int counter = 1;
+                            do {
+                                dest = destPath + "/" + baseName + "_imported"
+                                    + (counter > 1 ? QString::number(counter) : "") + ".json";
+                                counter++;
+                            } while (QFile::exists(dest));
+                        } else {
+                            QFile::remove(dest);
+                        }
+                    }
+                    if (QFile::copy(fi.absoluteFilePath(), dest)) restored++;
                 }
-                profilesRestored = (restored > 0);
-                qDebug() << "DatabaseBackupManager: Restored" << restored << "user profiles";
-            }
+                return restored;
+            };
+
+            // Restore user profiles
+            QString srcUser = restoreDir + "/profiles/user";
+            int userRestored = restoreProfileDir(srcUser, userProfilesPath);
+            if (userRestored > 0) profilesRestored = true;
+            qDebug() << "DatabaseBackupManager: Restored" << userRestored << "user profiles";
 
             // Restore downloaded profiles
             QString srcDownloaded = restoreDir + "/profiles/downloaded";
-            if (QDir(srcDownloaded).exists() && !downloadedProfilesPath.isEmpty()) {
-                QDir().mkpath(downloadedProfilesPath);
-                QDir srcDir(srcDownloaded);
-                QFileInfoList files = srcDir.entryInfoList(QDir::Files);
-                int restored = 0;
-                for (const QFileInfo& fi : files) {
-                    QString destPath = downloadedProfilesPath + "/" + fi.fileName();
-                    if (merge && QFile::exists(destPath)) continue;
-                    if (QFile::exists(destPath)) QFile::remove(destPath);
-                    if (QFile::copy(fi.absoluteFilePath(), destPath)) restored++;
-                }
-                if (restored > 0) profilesRestored = true;
-                qDebug() << "DatabaseBackupManager: Restored" << restored << "downloaded profiles";
-            }
+            int dlRestored = restoreProfileDir(srcDownloaded, downloadedProfilesPath);
+            if (dlRestored > 0) profilesRestored = true;
+            qDebug() << "DatabaseBackupManager: Restored" << dlRestored << "downloaded profiles";
 
             // In replace mode, profiles were restored even if backup had none (existing were cleared)
             if (!merge) profilesRestored = true;

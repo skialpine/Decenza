@@ -26,6 +26,7 @@ struct ProfileInfo {
     ProfileSource source;
     bool isRecipeMode = false;
     bool hasKnowledgeBase = false;
+    bool readOnly = false;  // From profile JSON read_only field or forced for BuiltIn source
 };
 
 /**
@@ -60,6 +61,7 @@ class ProfileManager : public QObject {
     Q_PROPERTY(double profileTargetWeight READ profileTargetWeight NOTIFY currentProfileChanged)
     Q_PROPERTY(bool profileHasRecommendedDose READ profileHasRecommendedDose NOTIFY currentProfileChanged)
     Q_PROPERTY(double profileRecommendedDose READ profileRecommendedDose NOTIFY currentProfileChanged)
+    Q_PROPERTY(bool isCurrentProfileReadOnly READ isCurrentProfileReadOnly NOTIFY currentProfileChanged)
 
 public:
     explicit ProfileManager(Settings* settings, DE1Device* device,
@@ -114,6 +116,11 @@ public:
     Q_INVOKABLE bool deleteProfile(const QString& filename);
     Q_INVOKABLE QVariantMap getProfileByFilename(const QString& filename) const;
 
+    // === Read-only protection ===
+    Q_INVOKABLE bool isCurrentProfileReadOnly() const;
+    Q_INVOKABLE bool isBuiltInFilename(const QString& filename) const;
+    Q_INVOKABLE bool resetProfileToDefault(const QString& filename);
+
     // === Profile editing ===
     Q_INVOKABLE void uploadRecipeProfile(const QVariantMap& recipeParams);
     Q_INVOKABLE QVariantMap getOrConvertRecipeParams();
@@ -163,6 +170,7 @@ private:
     void migrateProfileFolders();
     void migrateProfileFormat();
     void migrateRecipeFrames();
+    void migrateReadOnlyProfiles();
     void applyRecipeToScalarFields(const RecipeParams& recipe);
     void createNewProfileWithEditorType(EditorType type, const QString& title);
     QString profilesPath() const;

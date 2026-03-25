@@ -729,13 +729,21 @@ Page {
         title: profile ? profile.title : TranslationManager.translate("profileEditor.profile", "Profile")
         onBackClicked: handleBack()
 
+        // Read-only indicator
+        Text {
+            text: TranslationManager.translate("profileEditor.readOnly", "Read-Only")
+            color: Theme.warningColor
+            font: Theme.bodyFont
+            visible: ProfileManager.isCurrentProfileReadOnly
+        }
+
         // Modified indicator
         Tr {
             key: "profileeditor.status.modified"
             fallback: "\u2022 Modified"
             color: Theme.modifiedIndicatorColor
             font: Theme.bodyFont
-            visible: profileModified
+            visible: profileModified && !ProfileManager.isCurrentProfileReadOnly
         }
         Rectangle { width: 1; height: Theme.scaled(30); color: bottomBar.contentColor; opacity: 0.3; visible: profile }
         Text {
@@ -889,6 +897,11 @@ Page {
         function doSave() {
             if (saveAsTitleField.text.length > 0) {
                 var filename = ProfileManager.titleToFilename(saveAsTitleField.text)
+                if (ProfileManager.isBuiltInFilename(filename)) {
+                    saveAsDialog.close()
+                    builtInNameDialog.open()
+                    return
+                }
                 if (ProfileManager.profileExists(filename) && filename !== originalProfileName) {
                     saveAsDialog.pendingFilename = filename
                     saveAsDialog.close()
@@ -986,6 +999,65 @@ Page {
         }
     }
 
+    // Built-in profile name collision dialog
+    Dialog {
+        id: builtInNameDialog
+        parent: Overlay.overlay
+        x: (parent.width - width) / 2
+        y: Theme.scaled(80)
+        width: Math.min(parent.width - Theme.scaled(40), Theme.scaled(400))
+        modal: true
+        padding: 0
+
+        background: Rectangle {
+            color: Theme.surfaceColor
+            radius: Theme.cardRadius
+            border.width: 1
+            border.color: Theme.borderColor
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 0
+
+            Text {
+                text: TranslationManager.translate("profileEditor.reservedName", "Reserved Name")
+                font: Theme.titleFont
+                color: Theme.textColor
+                Accessible.ignored: true
+                Layout.fillWidth: true
+                Layout.topMargin: Theme.scaled(20)
+                Layout.leftMargin: Theme.scaled(20)
+                Layout.rightMargin: Theme.scaled(20)
+            }
+
+            Text {
+                text: TranslationManager.translate("profileEditor.reservedNameMessage", "This name is reserved for a built-in profile. Please choose a different name.")
+                font: Theme.bodyFont
+                color: Theme.textSecondaryColor
+                wrapMode: Text.Wrap
+                Accessible.ignored: true
+                Layout.fillWidth: true
+                Layout.topMargin: Theme.scaled(10)
+                Layout.leftMargin: Theme.scaled(20)
+                Layout.rightMargin: Theme.scaled(20)
+                Layout.bottomMargin: Theme.scaled(20)
+            }
+
+            AccessibleButton {
+                text: TranslationManager.translate("common.button.ok", "OK")
+                accessibleName: TranslationManager.translate("common.accessibility.dismissDialog", "Dismiss dialog")
+                Layout.fillWidth: true
+                Layout.leftMargin: Theme.scaled(20)
+                Layout.rightMargin: Theme.scaled(20)
+                Layout.bottomMargin: Theme.scaled(20)
+                onClicked: {
+                    builtInNameDialog.close()
+                    saveAsDialog.open()
+                }
+            }
+        }
+    }
+
     // Save error dialog
     Dialog {
         id: saveErrorDialog
@@ -1046,7 +1118,7 @@ Page {
     UnsavedChangesDialog {
         id: exitDialog
         itemType: "profile"
-        canSave: originalProfileName !== ""
+        canSave: originalProfileName !== "" && !ProfileManager.isCurrentProfileReadOnly
         showTry: true
         onDiscardClicked: {
             if (originalProfileName) {

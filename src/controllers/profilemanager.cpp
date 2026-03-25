@@ -6,6 +6,7 @@
 #include "../machine/machinestate.h"
 #include "../profile/recipegenerator.h"
 #include "../profile/recipeanalyzer.h"
+#include "../profile/profilesavehelper.h"
 #include "../ai/shotsummarizer.h"
 #include <QDir>
 #include <QFile>
@@ -101,6 +102,9 @@ ProfileManager::ProfileManager(Settings* settings, DE1Device* device,
     // One-time migration: regenerate frames for recipe-mode profiles so weight exits are applied
     migrateRecipeFrames();
 
+    // One-time migration: rename user overrides of built-in profiles, fix broken D-Flow/A-Flow
+    migrateReadOnlyProfiles();
+
     // Check for temp file (modified profile from previous session)
     QString tempPath = profilesPath() + "/_current.json";
     if (QFile::exists(tempPath)) {
@@ -155,6 +159,10 @@ ProfileManager::ProfileManager(Settings* settings, DE1Device* device,
 
 QString ProfileManager::currentProfileName() const {
     if (m_profileModified) {
+        // Read-only profiles get "(modified)" suffix so Visualizer uploads
+        // don't confuse people seeing an altered version of a stock profile.
+        if (isCurrentProfileReadOnly())
+            return m_currentProfile.title() + " (modified)";
         return "*" + m_currentProfile.title();
     }
     return m_currentProfile.title();
@@ -326,6 +334,7 @@ QVariantList ProfileManager::selectedProfiles() const {
             profile["source"] = static_cast<int>(info.source);
             profile["isRecipeMode"] = info.isRecipeMode;
             profile["hasKnowledgeBase"] = info.hasKnowledgeBase;
+            profile["readOnly"] = info.readOnly;
             result.append(profile);
         }
     }
@@ -351,6 +360,7 @@ QVariantList ProfileManager::allBuiltInProfiles() const {
             profile["source"] = static_cast<int>(info.source);
             profile["isRecipeMode"] = info.isRecipeMode;
             profile["hasKnowledgeBase"] = info.hasKnowledgeBase;
+            profile["readOnly"] = info.readOnly;
             result.append(profile);
         }
     }
@@ -377,6 +387,7 @@ QVariantList ProfileManager::cleaningProfiles() const {
             profile["source"] = static_cast<int>(info.source);
             profile["isRecipeMode"] = info.isRecipeMode;
             profile["hasKnowledgeBase"] = info.hasKnowledgeBase;
+            profile["readOnly"] = info.readOnly;
             result.append(profile);
         }
     }
@@ -402,6 +413,7 @@ QVariantList ProfileManager::downloadedProfiles() const {
             profile["source"] = static_cast<int>(info.source);
             profile["isRecipeMode"] = info.isRecipeMode;
             profile["hasKnowledgeBase"] = info.hasKnowledgeBase;
+            profile["readOnly"] = info.readOnly;
             result.append(profile);
         }
     }
@@ -427,6 +439,7 @@ QVariantList ProfileManager::userCreatedProfiles() const {
             profile["source"] = static_cast<int>(info.source);
             profile["isRecipeMode"] = info.isRecipeMode;
             profile["hasKnowledgeBase"] = info.hasKnowledgeBase;
+            profile["readOnly"] = info.readOnly;
             result.append(profile);
         }
     }
@@ -451,6 +464,7 @@ QVariantList ProfileManager::allProfilesList() const {
         profile["source"] = static_cast<int>(info.source);
         profile["isRecipeMode"] = info.isRecipeMode;
         profile["hasKnowledgeBase"] = info.hasKnowledgeBase;
+        profile["readOnly"] = info.readOnly;
         result.append(profile);
     }
 
@@ -652,6 +666,40 @@ bool ProfileManager::deleteProfile(const QString& filename) {
 
     qWarning() << "Failed to delete profile:" << filename;
     return false;
+}
+
+// === Read-only protection ===
+
+bool ProfileManager::isCurrentProfileReadOnly() const {
+    // A profile is read-only if its own read_only flag is set (from TCL/JSON)
+    if (m_currentProfile.isReadOnly()) return true;
+    // Or if it was loaded from built-in resources without a user override
+    for (const ProfileInfo& info : m_allProfiles) {
+        if (info.filename == m_baseProfileName)
+            return info.source == ProfileSource::BuiltIn;
+    }
+    return false;
+}
+
+bool ProfileManager::isBuiltInFilename(const QString& filename) const {
+    return QFile::exists(QStringLiteral(":/profiles/") + filename + QStringLiteral(".json"));
+}
+
+bool ProfileManager::resetProfileToDefault(const QString& filename) {
+    if (!isBuiltInFilename(filename)) return false;
+
+    // Remove user copies from all storage locations
+    if (m_profileStorage && m_profileStorage->isConfigured()) {
+        m_profileStorage->deleteProfile(filename);
+    }
+    QFile::remove(userProfilesPath() + "/" + filename + ".json");
+    QFile::remove(downloadedProfilesPath() + "/" + filename + ".json");
+
+    // Refresh and reload from the built-in QRC resource
+    refreshProfiles();
+    loadProfile(filename);
+    qDebug() << "Reset built-in profile to default:" << filename;
+    return true;
 }
 
 QVariantMap ProfileManager::getProfileByFilename(const QString& filename) const {
@@ -954,7 +1002,8 @@ void ProfileManager::refreshProfiles() {
     m_profileJsonCache.clear();
 
     // Helper to extract profile metadata from a JSON object
-    auto extractProfileMeta = [](const QJsonObject& obj) -> std::tuple<QString, QString, bool, bool, QString> {
+    // Returns: title, beverageType, isRecipeMode, hasKnowledgeBase, editorType, readOnly
+    auto extractProfileMeta = [](const QJsonObject& obj) -> std::tuple<QString, QString, bool, bool, QString, bool> {
         QString editorType;
         bool isRecipeMode = obj["is_recipe_mode"].toBool(false);
         if (isRecipeMode && obj.contains("recipe")) {
@@ -983,22 +1032,23 @@ void ProfileManager::refreshProfiles() {
         if (!hasKb) {
             hasKb = !ShotSummarizer::computeProfileKbId(title, editorType).isEmpty();
         }
+        bool readOnly = (obj["read_only"].toInt(0) == 1);
         return {title, obj["beverage_type"].toString(),
-                isRecipeMode, hasKb, editorType};
+                isRecipeMode, hasKb, editorType, readOnly};
     };
 
     // Helper to load profile metadata from file path
-    auto loadProfileMeta = [&extractProfileMeta](const QString& path) -> std::tuple<QString, QString, bool, bool, QString> {
+    auto loadProfileMeta = [&extractProfileMeta](const QString& path) -> std::tuple<QString, QString, bool, bool, QString, bool> {
         QFile file(path);
         if (file.open(QIODevice::ReadOnly)) {
             QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
             return extractProfileMeta(doc.object());
         }
-        return {QString(), QString(), false, false, QStringLiteral("advanced")};
+        return {QString(), QString(), false, false, QStringLiteral("advanced"), false};
     };
 
     // Helper to load profile metadata from JSON string
-    auto loadProfileMetaFromJson = [&extractProfileMeta](const QString& jsonContent) -> std::tuple<QString, QString, bool, bool, QString> {
+    auto loadProfileMetaFromJson = [&extractProfileMeta](const QString& jsonContent) -> std::tuple<QString, QString, bool, bool, QString, bool> {
         QJsonDocument doc = QJsonDocument::fromJson(jsonContent.toUtf8());
         return extractProfileMeta(doc.object());
     };
@@ -1011,7 +1061,7 @@ void ProfileManager::refreshProfiles() {
     QStringList files = builtInDir.entryList(filters, QDir::Files);
     for (const QString& file : files) {
         QString name = file.left(file.length() - 5);  // Remove .json
-        auto [title, beverageType, isRecipeMode, hasKnowledgeBase, editorType] = loadProfileMeta(":/profiles/" + file);
+        auto [title, beverageType, isRecipeMode, hasKnowledgeBase, editorType, readOnly] = loadProfileMeta(":/profiles/" + file);
 
         ProfileInfo info;
         info.filename = name;
@@ -1021,6 +1071,7 @@ void ProfileManager::refreshProfiles() {
         info.source = ProfileSource::BuiltIn;
         info.isRecipeMode = isRecipeMode || isDFlowTitle(info.title) || isAFlowTitle(info.title);
         info.hasKnowledgeBase = hasKnowledgeBase;
+        info.readOnly = true;  // Built-in profiles are always read-only
         m_allProfiles.append(info);
 
         m_availableProfiles.append(name);
@@ -1041,7 +1092,7 @@ void ProfileManager::refreshProfiles() {
             // Cache for loadProfile() to avoid re-reading from storage
             m_profileJsonCache[name] = jsonContent;
 
-            auto [title, beverageType, isRecipeMode, hasKnowledgeBase, editorType] = loadProfileMetaFromJson(jsonContent);
+            auto [title, beverageType, isRecipeMode, hasKnowledgeBase, editorType, readOnly] = loadProfileMetaFromJson(jsonContent);
 
             ProfileInfo info;
             info.filename = name;
@@ -1051,6 +1102,7 @@ void ProfileManager::refreshProfiles() {
             info.source = ProfileSource::UserCreated;
             info.isRecipeMode = isRecipeMode || isDFlowTitle(info.title) || isAFlowTitle(info.title);
             info.hasKnowledgeBase = hasKnowledgeBase;
+            info.readOnly = readOnly;
 
             if (m_availableProfiles.contains(name)) {
                 // Override built-in entry so list matches what loadProfile() actually loads
@@ -1077,7 +1129,7 @@ void ProfileManager::refreshProfiles() {
             continue;  // Skip if already loaded from ProfileStorage
         }
 
-        auto [title, beverageType, isRecipeMode, hasKnowledgeBase, editorType] = loadProfileMeta(downloadedDir.filePath(file));
+        auto [title, beverageType, isRecipeMode, hasKnowledgeBase, editorType, readOnly] = loadProfileMeta(downloadedDir.filePath(file));
 
         ProfileInfo info;
         info.filename = name;
@@ -1087,6 +1139,7 @@ void ProfileManager::refreshProfiles() {
         info.source = ProfileSource::Downloaded;
         info.isRecipeMode = isRecipeMode || isDFlowTitle(info.title) || isAFlowTitle(info.title);
         info.hasKnowledgeBase = hasKnowledgeBase;
+        info.readOnly = readOnly;
         m_allProfiles.append(info);
 
         m_availableProfiles.append(name);
@@ -1102,7 +1155,7 @@ void ProfileManager::refreshProfiles() {
             continue;  // Skip if already loaded from ProfileStorage
         }
 
-        auto [title, beverageType, isRecipeMode, hasKnowledgeBase, editorType] = loadProfileMeta(userDir.filePath(file));
+        auto [title, beverageType, isRecipeMode, hasKnowledgeBase, editorType, readOnly] = loadProfileMeta(userDir.filePath(file));
 
         ProfileInfo info;
         info.filename = name;
@@ -1112,6 +1165,7 @@ void ProfileManager::refreshProfiles() {
         info.source = ProfileSource::UserCreated;
         info.isRecipeMode = isRecipeMode || isDFlowTitle(info.title) || isAFlowTitle(info.title);
         info.hasKnowledgeBase = hasKnowledgeBase;
+        info.readOnly = readOnly;
         m_allProfiles.append(info);
 
         m_availableProfiles.append(name);
@@ -1327,6 +1381,12 @@ void ProfileManager::uploadProfile(const QVariantMap& profileData) {
 }
 
 bool ProfileManager::saveProfile(const QString& filename) {
+    // Prevent saving over read-only profiles
+    if (isCurrentProfileReadOnly()) {
+        qWarning() << "ProfileManager::saveProfile: Cannot save read-only profile in place:" << filename;
+        return false;
+    }
+
     bool success = false;
 
     // Try ProfileStorage first (SAF on Android), then fall back to local file
@@ -1379,8 +1439,17 @@ bool ProfileManager::saveProfile(const QString& filename) {
 }
 
 bool ProfileManager::saveProfileAs(const QString& filename, const QString& title) {
+    // Prevent saving with a built-in profile filename
+    if (isBuiltInFilename(filename)) {
+        qWarning() << "ProfileManager::saveProfileAs: Cannot overwrite built-in profile filename:" << filename;
+        return false;
+    }
+
     // Remember old filename for favorite update
     QString oldFilename = m_baseProfileName;
+
+    // Clear read-only flag on Save As copies — user copies are always editable
+    m_currentProfile.setReadOnly(0);
 
     // Update the profile title
     m_currentProfile.setTitle(title);
@@ -2310,5 +2379,190 @@ void ProfileManager::migrateRecipeFrames() {
     } else {
         if (m_settings) m_settings->setValue("recipe_frames_migrated", true);
         qDebug() << "Recipe frame migration complete:" << migrated << "profiles updated";
+    }
+}
+
+void ProfileManager::migrateReadOnlyProfiles() {
+    // One-time migration: rename user profiles that shadow built-in profiles,
+    // and detect broken D-Flow/A-Flow profiles with wrong frame counts.
+    if (m_settings && m_settings->value("readonly_profiles_migrated", false).toBool()) {
+        return;
+    }
+
+    int renamed = 0;
+    int broken = 0;
+    int failed = 0;
+
+    // Helper: migrate a single profile file
+    auto migrateFile = [&](const QString& filePath, const QString& filename,
+                           bool isStorage) {
+        // Load profile
+        Profile profile;
+        if (isStorage) {
+            QString jsonContent = m_profileStorage ? m_profileStorage->readProfile(filename) : QString();
+            if (jsonContent.isEmpty()) return;
+            profile = Profile::loadFromJsonString(jsonContent);
+        } else {
+            profile = Profile::loadFromFile(filePath);
+        }
+        if (profile.title().isEmpty()) return;
+
+        bool needsSave = false;
+        QString newFilename = filename;
+        QString newTitle = profile.title();
+
+        // 4b: Handle user copies that shadow built-in profiles
+        if (isBuiltInFilename(filename)) {
+            // Compare user copy against built-in using the unified comparison
+            // (same logic as de1app import and device migration).
+            Profile builtIn = Profile::loadFromFile(QStringLiteral(":/profiles/") + filename + QStringLiteral(".json"));
+            bool isModified = !ProfileSaveHelper::compareProfiles(profile, builtIn);
+            // compareProfiles doesn't check title — check separately
+            if (!isModified && profile.title() != builtIn.title()) isModified = true;
+
+            if (isModified) {
+                // User actually changed something — rename to preserve their edits
+                newTitle = profile.title() + " (user)";
+                profile.setTitle(newTitle);
+                profile.setReadOnly(0);  // User copy is editable
+                newFilename = titleToFilename(newTitle);
+                needsSave = true;
+
+                qDebug() << "migrateReadOnlyProfiles: renamed modified user override:"
+                         << filename << "->" << newFilename;
+                renamed++;
+            } else {
+                // Unmodified copy of built-in — just delete it, built-in will take over
+                if (isStorage && m_profileStorage && m_profileStorage->isConfigured()) {
+                    m_profileStorage->deleteProfile(filename);
+                } else {
+                    QFile::remove(filePath);
+                }
+                qDebug() << "migrateReadOnlyProfiles: deleted unmodified shadow of built-in:"
+                         << filename;
+                return;  // No further processing needed
+            }
+        }
+
+        // 4c: Detect broken D-Flow/A-Flow profiles (wrong frame count)
+        qsizetype stepCount = profile.steps().size();
+        bool isDFlow = isDFlowTitle(newTitle);
+        bool isAFlow = isAFlowTitle(newTitle);
+
+        if (isDFlow && stepCount != 3) {
+            // Strip D-Flow prefix and mark as broken
+            QString stripped = newTitle;
+            if (stripped.startsWith(QLatin1String("D-Flow / ")))
+                stripped = stripped.mid(9);
+            else if (stripped.startsWith(QLatin1String("D-Flow /")))
+                stripped = stripped.mid(8).trimmed();
+            newTitle = stripped + " (broken)";
+            profile.setTitle(newTitle);
+            profile.setRecipeMode(false);
+            newFilename = titleToFilename(newTitle);
+            needsSave = true;
+
+            qWarning() << "migrateReadOnlyProfiles: broken D-Flow profile"
+                       << filename << "has" << stepCount << "frames (expected 3),"
+                       << "renamed to:" << newTitle;
+            broken++;
+        } else if (isAFlow && stepCount != 9) {
+            // Strip A-Flow prefix and mark as broken
+            QString stripped = newTitle;
+            if (stripped.startsWith(QLatin1String("A-Flow / ")))
+                stripped = stripped.mid(9);
+            else if (stripped.startsWith(QLatin1String("A-Flow /")))
+                stripped = stripped.mid(8).trimmed();
+            newTitle = stripped + " (broken)";
+            profile.setTitle(newTitle);
+            profile.setRecipeMode(false);
+            newFilename = titleToFilename(newTitle);
+            needsSave = true;
+
+            qWarning() << "migrateReadOnlyProfiles: broken A-Flow profile"
+                       << filename << "has" << stepCount << "frames (expected 9),"
+                       << "renamed to:" << newTitle;
+            broken++;
+        }
+
+        if (!needsSave) return;
+
+        // Save with new filename
+        bool saved = false;
+        if (isStorage && m_profileStorage && m_profileStorage->isConfigured()) {
+            saved = m_profileStorage->writeProfile(newFilename, profile.toJsonString());
+            if (saved && newFilename != filename) {
+                m_profileStorage->deleteProfile(filename);
+            }
+        } else {
+            QString dir = QFileInfo(filePath).absolutePath();
+            QString newPath = dir + "/" + newFilename + ".json";
+            saved = profile.saveToFile(newPath);
+            if (saved && newFilename != filename) {
+                QFile::remove(filePath);
+            }
+        }
+
+        if (!saved) {
+            qWarning() << "migrateReadOnlyProfiles: failed to save" << newFilename;
+            failed++;
+            return;
+        }
+
+        // Update favorites and currentProfile AFTER all renames are finalized
+        // (fixes issue where shadow-rename + broken-detection would leave
+        // favorites pointing to intermediate filename)
+        if (newFilename != filename) {
+            if (m_settings) {
+                if (m_settings->isFavoriteProfile(filename)) {
+                    m_settings->updateFavoriteProfile(filename, newFilename, newTitle);
+                }
+                if (m_settings->currentProfile() == filename) {
+                    m_settings->setCurrentProfile(newFilename);
+                    qDebug() << "migrateReadOnlyProfiles: updated currentProfile:"
+                             << filename << "->" << newFilename;
+                }
+            }
+        }
+    };
+
+    // Migrate user profiles (legacy local folder)
+    QDir userDir(userProfilesPath());
+    QStringList filters;
+    filters << "*.json";
+    QStringList files = userDir.entryList(filters, QDir::Files);
+    for (const QString& file : files) {
+        QString name = file.left(file.length() - 5);
+        migrateFile(userDir.filePath(file), name, false);
+    }
+
+    // Migrate downloaded profiles (legacy local folder)
+    QDir downloadedDir(downloadedProfilesPath());
+    files = downloadedDir.entryList(filters, QDir::Files);
+    for (const QString& file : files) {
+        QString name = file.left(file.length() - 5);
+        migrateFile(downloadedDir.filePath(file), name, false);
+    }
+
+    // Migrate ProfileStorage (SAF on Android)
+    if (m_profileStorage && m_profileStorage->isConfigured()) {
+        QStringList storageProfiles = m_profileStorage->listProfiles();
+        for (const QString& name : storageProfiles) {
+            migrateFile(QString(), name, true);
+        }
+    }
+
+    if (failed > 0) {
+        qWarning() << "Read-only profile migration incomplete:" << renamed << "renamed,"
+                   << broken << "broken," << failed << "failed. Will retry on next launch.";
+    } else {
+        if (m_settings) m_settings->setValue("readonly_profiles_migrated", true);
+        qDebug() << "Read-only profile migration complete:" << renamed << "renamed,"
+                 << broken << "broken profiles detected";
+
+        // Refresh profiles list after migration
+        if (renamed > 0 || broken > 0) {
+            refreshProfiles();
+        }
     }
 }

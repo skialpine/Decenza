@@ -13,7 +13,7 @@ ProfileSaveHelper::ProfileSaveHelper(MainController* controller, QObject* parent
 {
 }
 
-bool ProfileSaveHelper::compareProfiles(const Profile& a, const Profile& b) const
+bool ProfileSaveHelper::compareProfiles(const Profile& a, const Profile& b)
 {
     // Two profiles with no steps cannot be meaningfully compared
     if (a.steps().isEmpty() || b.steps().isEmpty())

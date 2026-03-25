@@ -16,6 +16,7 @@
 #include "ble/protocol/de1characteristics.h"
 #include "ble/protocol/binarycodec.h"
 #include "profile/recipeparams.h"
+#include "profile/profilesavehelper.h"
 
 using namespace DE1::Characteristic;
 
@@ -1235,6 +1236,233 @@ private slots:
         McpTestFixture f;
         QVariantMap profile = f.profileManager.getProfileByFilename("nonexistent_xyz");
         QVERIFY(profile.isEmpty());
+    }
+
+    // === Read-only profile protection ===
+
+    void readOnlyFieldJsonRoundTrip() {
+        // read_only: 1 survives toJson/fromJson
+        Profile p;
+        p.setTitle("Test Profile");
+        p.setReadOnly(1);
+        QJsonDocument doc = p.toJson();
+        QJsonObject obj = doc.object();
+        QCOMPARE(obj["read_only"].toInt(), 1);
+
+        Profile p2 = Profile::fromJson(doc);
+        QCOMPARE(p2.readOnly(), 1);
+        QVERIFY(p2.isReadOnly());
+
+        // read_only: 0 should not appear in JSON (default)
+        Profile p3;
+        p3.setTitle("Test");
+        p3.setReadOnly(0);
+        QJsonDocument doc3 = p3.toJson();
+        QVERIFY(!doc3.object().contains("read_only"));
+
+        // read_only: 2 should appear in JSON
+        Profile p4;
+        p4.setTitle("Test");
+        p4.setReadOnly(2);
+        QJsonDocument doc4 = p4.toJson();
+        QCOMPARE(doc4.object()["read_only"].toInt(), 2);
+    }
+
+    void readOnlyFieldTclImport() {
+        // TCL profile with read_only 1 should be parsed
+        QString tcl = R"(
+            profile_title {Test Read Only}
+            author {test}
+            beverage_type espresso
+            settings_profile_type settings_2c
+            read_only 1
+            final_desired_shot_weight_advanced 36.0
+            final_desired_shot_volume_advanced 0
+            espresso_temperature 93.0
+            advanced_shot {}
+        )";
+        Profile p = Profile::loadFromTclString(tcl);
+        QCOMPARE(p.readOnly(), 1);
+        QVERIFY(p.isReadOnly());
+    }
+
+    void isCurrentProfileReadOnlyForReadOnlyFlag() {
+        McpTestFixture f;
+        // Load a profile with read_only: 1 — should be detected as read-only
+        loadDFlowProfile(f, "D-Flow / Protected");
+        f.profileManager.m_currentProfile.setReadOnly(1);
+        QVERIFY(f.profileManager.isCurrentProfileReadOnly());
+
+        // Load a profile without read_only — should not be read-only
+        loadDFlowProfile(f, "D-Flow / Editable");
+        f.profileManager.m_currentProfile.setReadOnly(0);
+        QVERIFY(!f.profileManager.isCurrentProfileReadOnly());
+    }
+
+    void saveProfileRejectsReadOnly() {
+        McpTestFixture f;
+        // Load a profile and mark it read-only
+        loadDFlowProfile(f, "D-Flow / Protected");
+        f.profileManager.m_currentProfile.setReadOnly(1);
+        f.profileManager.m_baseProfileName = "test_protected";
+
+        // Attempt to save in place — should fail because read-only
+        QVERIFY(!f.profileManager.saveProfile("test_protected"));
+    }
+
+    void saveProfileAsRejectsBuiltInFilename() {
+        McpTestFixture f;
+        // isBuiltInFilename checks :/profiles/ resources
+        // "default" is a known built-in profile filename
+        bool hasDefault = f.profileManager.isBuiltInFilename("default");
+        if (!hasDefault) {
+            QSKIP("No built-in profiles in test binary QRC");
+        }
+        // Attempt Save As with a built-in filename — should fail
+        loadDFlowProfile(f, "Some Custom Title");
+        QVERIFY(!f.profileManager.saveProfileAs("default", "Some Custom Title"));
+    }
+
+    void isBuiltInFilenameReturnsFalseForUserProfile() {
+        McpTestFixture f;
+        QVERIFY(!f.profileManager.isBuiltInFilename("my_custom_profile_xyz"));
+        QVERIFY(!f.profileManager.isBuiltInFilename(""));
+    }
+
+    void saveProfileAsClearsReadOnlyFlag() {
+        // When saving as a copy, the read_only flag should be cleared
+        McpTestFixture f;
+        loadDFlowProfile(f, "D-Flow / Test");
+        // Manually set read_only on the profile
+        f.profileManager.m_currentProfile.setReadOnly(1);
+        // Save as a new name (non-built-in)
+        bool saved = f.profileManager.saveProfileAs("test_user_copy_xyz", "D-Flow / Test Copy");
+        if (saved) {
+            // The profile's read_only should be cleared to 0
+            QCOMPARE(f.profileManager.currentProfile().readOnly(), 0);
+        }
+        // Cleanup
+        QFile::remove(f.profileManager.userProfilesPath() + "/test_user_copy_xyz.json");
+    }
+
+    // === ProfileSaveHelper::compareProfiles() — unified duplicate detection ===
+
+    void compareProfilesIdentical() {
+        McpTestFixture f;
+        loadDFlowProfile(f, "D-Flow / Test", 36.0, 93.0);
+        Profile a = f.profileManager.currentProfile();
+        Profile b = f.profileManager.currentProfile();
+        QVERIFY(ProfileSaveHelper::compareProfiles(a, b));
+    }
+
+    void compareProfilesDifferentPressure() {
+        McpTestFixture f;
+        loadDFlowProfile(f, "D-Flow / Test");
+        Profile a = f.profileManager.currentProfile();
+        Profile b = a;
+        auto steps = b.steps();
+        steps[0].pressure = steps[0].pressure + 1.0;
+        b.setSteps(steps);
+        QVERIFY(!ProfileSaveHelper::compareProfiles(a, b));
+    }
+
+    void compareProfilesDifferentFlow() {
+        McpTestFixture f;
+        loadDFlowProfile(f, "D-Flow / Test");
+        Profile a = f.profileManager.currentProfile();
+        Profile b = a;
+        auto steps = b.steps();
+        steps[0].flow = steps[0].flow + 0.5;
+        b.setSteps(steps);
+        QVERIFY(!ProfileSaveHelper::compareProfiles(a, b));
+    }
+
+    void compareProfilesDifferentTemperature() {
+        McpTestFixture f;
+        loadDFlowProfile(f, "D-Flow / Test");
+        Profile a = f.profileManager.currentProfile();
+        Profile b = a;
+        auto steps = b.steps();
+        steps[0].temperature = steps[0].temperature + 2.0;
+        b.setSteps(steps);
+        QVERIFY(!ProfileSaveHelper::compareProfiles(a, b));
+    }
+
+    void compareProfilesDifferentStepCount() {
+        McpTestFixture f;
+        loadDFlowProfile(f, "D-Flow / Test");
+        Profile a = f.profileManager.currentProfile();
+        Profile b = a;
+        ProfileFrame extra;
+        extra.name = "extra";
+        extra.temperature = 93.0;
+        extra.pump = "flow";
+        extra.flow = 2.0;
+        extra.seconds = 30.0;
+        b.addStep(extra);
+        QVERIFY(!ProfileSaveHelper::compareProfiles(a, b));
+    }
+
+    void compareProfilesEmptySteps() {
+        Profile a;
+        a.setTitle("Empty A");
+        Profile b;
+        b.setTitle("Empty B");
+        QVERIFY(!ProfileSaveHelper::compareProfiles(a, b));
+    }
+
+    void compareProfilesWithinTolerance() {
+        McpTestFixture f;
+        loadDFlowProfile(f, "D-Flow / Test");
+        Profile a = f.profileManager.currentProfile();
+        Profile b = a;
+        auto steps = b.steps();
+        steps[0].pressure += 0.05;  // Within 0.1 tolerance
+        steps[0].flow -= 0.05;
+        b.setSteps(steps);
+        QVERIFY(ProfileSaveHelper::compareProfiles(a, b));
+    }
+
+    void compareProfilesDifferentExitCondition() {
+        McpTestFixture f;
+        loadDFlowProfile(f, "D-Flow / Test");
+        Profile a = f.profileManager.currentProfile();
+        Profile b = a;
+        auto steps = b.steps();
+        steps[0].exitPressureOver += 2.0;
+        b.setSteps(steps);
+        QVERIFY(!ProfileSaveHelper::compareProfiles(a, b));
+    }
+
+    void compareProfilesDifferentLimiter() {
+        McpTestFixture f;
+        loadDFlowProfile(f, "D-Flow / Test");
+        Profile a = f.profileManager.currentProfile();
+        Profile b = a;
+        auto steps = b.steps();
+        steps[0].maxFlowOrPressure = 5.0;
+        b.setSteps(steps);
+        QVERIFY(!ProfileSaveHelper::compareProfiles(a, b));
+    }
+
+    void compareProfilesIgnoresTitle() {
+        McpTestFixture f;
+        loadDFlowProfile(f, "D-Flow / A");
+        Profile a = f.profileManager.currentProfile();
+        loadDFlowProfile(f, "D-Flow / B");
+        Profile b = f.profileManager.currentProfile();
+        // Same frames, different titles — compareProfiles only checks frames
+        QVERIFY(ProfileSaveHelper::compareProfiles(a, b));
+    }
+
+    void compareProfilesIgnoresReadOnly() {
+        McpTestFixture f;
+        loadDFlowProfile(f, "D-Flow / Test");
+        Profile a = f.profileManager.currentProfile();
+        Profile b = a;
+        a.setReadOnly(1);
+        b.setReadOnly(0);
+        QVERIFY(ProfileSaveHelper::compareProfiles(a, b));
     }
 };
 
