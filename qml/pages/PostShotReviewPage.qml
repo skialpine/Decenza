@@ -141,6 +141,18 @@ Page {
     property string editNotes: ""
     property string editBeverageType: "espresso"
 
+    // Auto-populate TDS from refractometer when a reading arrives
+    Connections {
+        target: (typeof Refractometer !== "undefined" && Refractometer) ? Refractometer : null
+        function onTdsChanged(tds) {
+            if (tds > 0 && isEditMode) {
+                editDrinkTds = tds
+                tdsInput.value = tds
+                calculateEy()
+            }
+        }
+    }
+
     // Auto-calculate EY from TDS, dose weight, and beverage weight
     // Formula: EY(%) = (beverageWeight × TDS%) / doseWeight
     function calculateEy() {
@@ -549,12 +561,29 @@ Page {
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: Theme.scaled(2)
-                        Tr {
-                            key: "postshotreview.label.tds"
-                            fallback: "TDS"
-                            color: Theme.textSecondaryColor
-                            font.pixelSize: Theme.scaled(10)
-                            Accessible.ignored: true
+                        RowLayout {
+                            spacing: Theme.scaled(4)
+                            Tr {
+                                key: "postshotreview.label.tds"
+                                fallback: "TDS"
+                                color: Theme.textSecondaryColor
+                                font.pixelSize: Theme.scaled(10)
+                                Accessible.ignored: true
+                            }
+                            // Refractometer status dot (only when configured)
+                            Rectangle {
+                                width: Theme.scaled(6)
+                                height: Theme.scaled(6)
+                                radius: Theme.scaled(3)
+                                visible: Settings.savedRefractometerAddress !== ""
+                                color: {
+                                    if (typeof Refractometer === "undefined" || !Refractometer) return Theme.textSecondaryColor
+                                    if (Refractometer.connected && Refractometer.tds > 0) return Theme.successColor
+                                    if (Refractometer.connected) return Theme.accentColor
+                                    return Theme.textSecondaryColor
+                                }
+                                Accessible.ignored: true
+                            }
                         }
                         ValueInput {
                             id: tdsInput

@@ -191,6 +191,16 @@ add_decenza_test(tst_scaleprotocol
     ${CMAKE_SOURCE_DIR}/src/ble/scales/bookooscale.cpp
 )
 
+# --- tst_difluidr2: DiFluid R2 refractometer packet parsing and name matching ---
+qt6_wrap_cpp(TST_DIFLUIDR2_MOC_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/ble/transport/scalebletransport.h
+)
+add_decenza_test(tst_difluidr2
+    tst_difluidr2.cpp
+    ${TST_DIFLUIDR2_MOC_SOURCES}
+    ${CMAKE_SOURCE_DIR}/src/ble/refractometers/difluidr2.cpp
+)
+
 # --- tst_weightprocessor: WeightProcessor edge cases (LSLR, oscillation, per-frame) ---
 add_decenza_test(tst_weightprocessor
     tst_weightprocessor.cpp

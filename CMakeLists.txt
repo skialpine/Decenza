@@ -226,6 +226,7 @@ set(SOURCES
     src/ble/scales/bookooscale.cpp
     src/ble/scales/smartchefscale.cpp
     src/ble/scales/difluidscale.cpp
+    src/ble/refractometers/difluidr2.cpp
     src/ble/scales/eurekaprecisascale.cpp
     src/ble/scales/solobaristascale.cpp
     src/ble/scales/atomhearteclairscale.cpp

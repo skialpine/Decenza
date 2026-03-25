@@ -646,8 +646,8 @@ Item {
                     spacing: Theme.scaled(10)
 
                     Tr {
-                        key: "settings.bluetooth.scale"
-                        fallback: "Scale"
+                        key: "settings.bluetooth.scalesRefractometer"
+                        fallback: "Scales / Refractometer"
                         color: Theme.textColor
                         font.pixelSize: Theme.scaled(16)
                         font.bold: true
@@ -694,8 +694,8 @@ Item {
                         Item { Layout.fillWidth: true }
 
                         AccessibleButton {
-                            text: BLEManager.scanning ? TranslationManager.translate("settings.bluetooth.scanning", "Scanning...") : TranslationManager.translate("settings.bluetooth.scanForScales", "Scan for Scales")
-                            accessibleName: BLEManager.scanning ? "Scanning for scales" : "Scan for Bluetooth scales"
+                            text: BLEManager.scanning ? TranslationManager.translate("settings.bluetooth.scanning", "Scanning...") : TranslationManager.translate("settings.bluetooth.scanForDevices", "Scan for Devices")
+                            accessibleName: BLEManager.scanning ? "Scanning for devices" : "Scan for Bluetooth scales and refractometers"
                             enabled: !BLEManager.scanning
                             onClicked: BLEManager.scanForScales()
                         }
@@ -797,15 +797,15 @@ Item {
                         }
                     }
 
-                    // Known Scales picker
+                    // Known Devices picker (scales + refractometer)
                     ColumnLayout {
                         Layout.fillWidth: true
-                        visible: Settings.knownScales.length > 0
+                        visible: Settings.knownScales.length > 0 || Settings.savedRefractometerAddress !== ""
                         spacing: Theme.scaled(4)
 
                         Tr {
-                            key: "settings.bluetooth.knownScales"
-                            fallback: "Known Scales"
+                            key: "settings.bluetooth.knownDevices"
+                            fallback: "Known Devices"
                             color: Theme.textSecondaryColor
                             font.pixelSize: Theme.scaled(13)
                         }
@@ -915,6 +915,142 @@ Item {
                                 }
                             }
                         }
+
+                        // Saved refractometer display (below scale picker)
+                        RowLayout {
+                            Layout.fillWidth: true
+                            visible: Settings.savedRefractometerAddress !== ""
+                            spacing: Theme.scaled(8)
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: Theme.scaled(36)
+                                radius: Theme.scaled(6)
+                                color: Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.12)
+                                border.color: Theme.primaryColor
+                                border.width: 1
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: Theme.scaled(10)
+                                    anchors.rightMargin: Theme.scaled(10)
+                                    spacing: Theme.scaled(6)
+
+                                    // Status dot
+                                    Rectangle {
+                                        width: Theme.scaled(8)
+                                        height: Theme.scaled(8)
+                                        radius: Theme.scaled(4)
+                                        color: BLEManager.refractometerConnected ? Theme.successColor : Theme.textSecondaryColor
+                                        Accessible.ignored: true
+                                    }
+
+                                    Text {
+                                        text: Settings.savedRefractometerName || TranslationManager.translate("connections.refractometer", "Refractometer")
+                                        color: Theme.textColor
+                                        font.pixelSize: Theme.scaled(13)
+                                        Layout.fillWidth: true
+                                        elide: Text.ElideRight
+                                        Accessible.ignored: true
+                                    }
+
+                                    // Type badge
+                                    Rectangle {
+                                        width: refBadgeText.implicitWidth + Theme.scaled(8)
+                                        height: Theme.scaled(18)
+                                        radius: Theme.scaled(9)
+                                        color: Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.2)
+
+                                        Text {
+                                            id: refBadgeText
+                                            anchors.centerIn: parent
+                                            text: TranslationManager.translate("connections.refractometer", "Refractometer")
+                                            color: Theme.primaryColor
+                                            font.pixelSize: Theme.scaled(10)
+                                            font.bold: true
+                                            Accessible.ignored: true
+                                        }
+                                    }
+                                }
+                            }
+
+                            AccessibleButton {
+                                text: TranslationManager.translate("settings.bluetooth.forget", "Forget")
+                                accessibleName: TranslationManager.translate("connections.forgetRefractometer", "Forget refractometer")
+                                onClicked: {
+                                    BLEManager.clearSavedRefractometer()
+                                    Settings.savedRefractometerAddress = ""
+                                    Settings.savedRefractometerName = ""
+                                    Settings.refractometerEnabled = false
+                                }
+                            }
+                        }
+                    }
+
+                    // Refractometer inline settings (only when connected)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: BLEManager.refractometerConnected
+                        spacing: Theme.scaled(15)
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 0
+                            Text {
+                                text: TranslationManager.translate("settings.refractometer.enabled", "Auto-read TDS")
+                                font.pixelSize: Theme.scaled(14)
+                                color: Theme.textColor
+                                Accessible.ignored: true
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                text: TranslationManager.translate("settings.refractometer.enabledDesc", "Automatically read TDS after each shot")
+                                color: Theme.textSecondaryColor
+                                font.pixelSize: Theme.scaled(12)
+                                wrapMode: Text.WordWrap
+                                Accessible.ignored: true
+                            }
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        StyledSwitch {
+                            checked: Settings.refractometerEnabled
+                            accessibleName: TranslationManager.translate("settings.refractometer.autoReadTds", "Auto-read TDS after shot")
+                            onToggled: Settings.refractometerEnabled = checked
+                        }
+                    }
+
+                    // Read TDS Now button (only when connected)
+                    AccessibleButton {
+                        Layout.fillWidth: true
+                        visible: BLEManager.refractometerConnected
+                        text: (typeof Refractometer !== "undefined" && Refractometer && Refractometer.measuring)
+                            ? TranslationManager.translate("settings.refractometer.measuring", "Measuring...")
+                            : TranslationManager.translate("settings.refractometer.readNow", "Read TDS Now")
+                        accessibleName: TranslationManager.translate("settings.refractometer.readTdsNow", "Read TDS from refractometer now")
+                        enabled: typeof Refractometer !== "undefined" && Refractometer && !Refractometer.measuring
+                        onClicked: {
+                            if (typeof Refractometer !== "undefined" && Refractometer)
+                                Refractometer.requestMeasurement()
+                        }
+                    }
+
+                    // Last TDS reading (only when connected and has reading)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: BLEManager.refractometerConnected && typeof Refractometer !== "undefined" && Refractometer && Refractometer.tds > 0
+
+                        Text {
+                            text: TranslationManager.translate("settings.refractometer.lastReading", "Last TDS:")
+                            color: Theme.textSecondaryColor
+                        }
+
+                        Text {
+                            text: (typeof Refractometer !== "undefined" && Refractometer) ? Refractometer.tds.toFixed(2) + "%" : ""
+                            color: Theme.textColor
+                            font: Theme.bodyFont
+                        }
                     }
 
                     // Scale connection alert toggle
@@ -981,25 +1117,72 @@ Item {
                         }
                     }
 
+                    // Unified discovered devices list (scales + refractometers)
                     ListView {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: Theme.scaled(60)
+                        Layout.preferredHeight: Theme.scaled(80)
                         clip: true
                         visible: !ScaleDevice || !ScaleDevice.connected
-                        model: BLEManager.discoveredScales
+
+                        // Combine scales and refractometers into a single model
+                        property var combinedModel: {
+                            var items = []
+                            var scales = BLEManager.discoveredScales
+                            for (var i = 0; i < scales.length; i++) {
+                                items.push({ deviceName: scales[i].name, address: scales[i].address,
+                                             deviceType: scales[i].type, deviceClass: "scale" })
+                            }
+                            var refractometers = BLEManager.discoveredRefractometers
+                            for (var j = 0; j < refractometers.length; j++) {
+                                items.push({ deviceName: refractometers[j].name, address: refractometers[j].address,
+                                             deviceType: refractometers[j].type, deviceClass: "refractometer" })
+                            }
+                            return items
+                        }
+                        model: combinedModel
 
                         delegate: ItemDelegate {
                             width: ListView.view.width
+
+                            Accessible.role: Accessible.Button
+                            Accessible.name: modelData.deviceName + ", " + (modelData.deviceClass === "refractometer"
+                                ? TranslationManager.translate("connections.refractometer", "Refractometer")
+                                : modelData.deviceType)
+                            Accessible.focusable: true
+                            Accessible.onPressAction: {
+                                if (modelData.deviceClass === "refractometer")
+                                    BLEManager.connectToRefractometer(modelData.address)
+                                else
+                                    BLEManager.connectToScale(modelData.address)
+                            }
+
                             contentItem: RowLayout {
                                 Text {
-                                    text: modelData.name
+                                    text: modelData.deviceName
                                     color: Theme.textColor
                                     Layout.fillWidth: true
+                                    Accessible.ignored: true
                                 }
-                                Text {
-                                    text: modelData.type
-                                    color: Theme.textSecondaryColor
-                                    font.pixelSize: Theme.scaled(12)
+                                // Type badge
+                                Rectangle {
+                                    width: badgeText.implicitWidth + Theme.scaled(8)
+                                    height: Theme.scaled(18)
+                                    radius: Theme.scaled(9)
+                                    color: modelData.deviceClass === "refractometer"
+                                        ? Qt.rgba(Theme.primaryColor.r, Theme.primaryColor.g, Theme.primaryColor.b, 0.2)
+                                        : Qt.rgba(Theme.accentColor.r, Theme.accentColor.g, Theme.accentColor.b, 0.2)
+
+                                    Text {
+                                        id: badgeText
+                                        anchors.centerIn: parent
+                                        text: modelData.deviceClass === "refractometer"
+                                            ? TranslationManager.translate("connections.refractometer", "Refractometer")
+                                            : modelData.deviceType
+                                        color: modelData.deviceClass === "refractometer" ? Theme.primaryColor : Theme.accentColor
+                                        font.pixelSize: Theme.scaled(10)
+                                        font.bold: true
+                                        Accessible.ignored: true
+                                    }
                                 }
                             }
                             background: Rectangle {
@@ -1007,14 +1190,17 @@ Item {
                                 radius: Theme.scaled(4)
                             }
                             onClicked: {
-                                BLEManager.connectToScale(modelData.address)
+                                if (modelData.deviceClass === "refractometer")
+                                    BLEManager.connectToRefractometer(modelData.address)
+                                else
+                                    BLEManager.connectToScale(modelData.address)
                             }
                         }
 
                         Tr {
                             anchors.centerIn: parent
-                            key: "settings.bluetooth.noScales"
-                            fallback: "No scales found"
+                            key: "settings.bluetooth.noDevices"
+                            fallback: "No devices found"
                             visible: parent.count === 0
                             color: Theme.textSecondaryColor
                         }

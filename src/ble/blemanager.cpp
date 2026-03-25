@@ -2,6 +2,7 @@
 #include "scaledevice.h"
 #include "protocol/de1characteristics.h"
 #include "scales/scalefactory.h"
+#include "refractometers/difluidr2.h"
 #include <QBluetoothUuid>
 #include <QCoreApplication>
 #include <QDebug>
@@ -229,8 +230,10 @@ void BLEManager::stopScan() {
 void BLEManager::clearDevices() {
     m_de1Devices.clear();
     m_scales.clear();
+    m_refractometerDevices.clear();
     emit devicesChanged();
     emit scalesChanged();
+    emit refractometersChanged();
 }
 
 void BLEManager::onDeviceDiscovered(const QBluetoothDeviceInfo& device) {
@@ -249,8 +252,30 @@ void BLEManager::onDeviceDiscovered(const QBluetoothDeviceInfo& device) {
         return;
     }
 
-    // Only look for scales if user requested it or we're looking for saved scale
+    // Only look for scales/refractometers if user requested it or we're looking for saved device
     if (!m_scanningForScales) {
+        return;
+    }
+
+    // Check if it's a refractometer BEFORE scale detection (prevents R2 misclassification)
+    if (DiFluidR2::isR2Device(device.name())) {
+        // Avoid duplicates
+        for (const auto& existing : m_refractometerDevices) {
+            if (getDeviceIdentifier(existing) == getDeviceIdentifier(device)) {
+                return;
+            }
+        }
+        m_refractometerDevices.append(device);
+        emit refractometersChanged();
+        appendScaleLog(QString("Found refractometer: %1 (%2)").arg(device.name(), getDeviceIdentifier(device)));
+
+        // Auto-connect if this is our saved refractometer
+        if (!m_savedRefractometerAddress.isEmpty()
+            && deviceIdentifiersMatch(device, m_savedRefractometerAddress)) {
+            emit refractometerDiscovered(device);
+        } else if (m_userInitiatedScaleScan) {
+            // User scan — show all devices (emit for UI listing only, not auto-connect)
+        }
         return;
     }
 
@@ -447,6 +472,73 @@ void BLEManager::clearSavedScale() {
     emit scaleConnectionFailedChanged();
     // Stop any pending auto-reconnect timer in main.cpp
     emit disconnectScaleRequested();
+}
+
+// === Refractometer support ===
+
+QVariantList BLEManager::discoveredRefractometers() const {
+    QVariantList result;
+    for (const auto& device : m_refractometerDevices) {
+        QVariantMap map;
+        map["name"] = device.name();
+        map["address"] = getDeviceIdentifier(device);
+        map["type"] = QStringLiteral("DiFluid R2");
+        result.append(map);
+    }
+    return result;
+}
+
+bool BLEManager::isRefractometerConnected() const {
+    return m_refractometerDevice && m_refractometerDevice->isConnected();
+}
+
+QBluetoothDeviceInfo BLEManager::getRefractometerDeviceInfo(const QString& address) const {
+    for (const auto& device : m_refractometerDevices) {
+        if (deviceIdentifiersMatch(device, address)) {
+            return device;
+        }
+    }
+    return QBluetoothDeviceInfo();
+}
+
+void BLEManager::connectToRefractometer(const QString& address) {
+    QBluetoothDeviceInfo info = getRefractometerDeviceInfo(address);
+    if (info.isValid()) {
+        appendScaleLog(QString("Connecting to refractometer: %1 (%2)").arg(info.name(), address));
+        emit refractometerDiscovered(info);
+    }
+}
+
+void BLEManager::setSavedRefractometerAddress(const QString& address, const QString& name) {
+    m_savedRefractometerAddress = address;
+    m_savedRefractometerName = name;
+}
+
+void BLEManager::clearSavedRefractometer() {
+    m_savedRefractometerAddress.clear();
+    m_savedRefractometerName.clear();
+    m_refractometerDevice = nullptr;
+    emit refractometerConnectedChanged();
+    emit disconnectRefractometerRequested();
+}
+
+void BLEManager::setRefractometerDevice(DiFluidR2* device) {
+    m_refractometerDevice = device;
+    if (m_refractometerDevice) {
+        connect(m_refractometerDevice, &DiFluidR2::connectedChanged,
+                this, &BLEManager::refractometerConnectedChanged);
+    }
+    emit refractometerConnectedChanged();
+}
+
+void BLEManager::tryDirectConnectToRefractometer() {
+    if (m_savedRefractometerAddress.isEmpty() || m_disabled) return;
+    // Piggyback on the scale scan infrastructure — set the flag so
+    // onDeviceDiscovered processes refractometer advertisements
+    if (!m_scanningForScales) {
+        m_scanningForScales = true;
+        startScan();
+    }
 }
 
 void BLEManager::setSavedDE1Address(const QString& address, const QString& name) {
