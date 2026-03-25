@@ -1236,6 +1236,113 @@ private slots:
         QVariantMap profile = f.profileManager.getProfileByFilename("nonexistent_xyz");
         QVERIFY(profile.isEmpty());
     }
+
+    // === Read-only profile protection ===
+
+    void readOnlyFieldJsonRoundTrip() {
+        // read_only: 1 survives toJson/fromJson
+        Profile p;
+        p.setTitle("Test Profile");
+        p.setReadOnly(1);
+        QJsonDocument doc = p.toJson();
+        QJsonObject obj = doc.object();
+        QCOMPARE(obj["read_only"].toInt(), 1);
+
+        Profile p2 = Profile::fromJson(doc);
+        QCOMPARE(p2.readOnly(), 1);
+        QVERIFY(p2.isReadOnly());
+
+        // read_only: 0 should not appear in JSON (default)
+        Profile p3;
+        p3.setTitle("Test");
+        p3.setReadOnly(0);
+        QJsonDocument doc3 = p3.toJson();
+        QVERIFY(!doc3.object().contains("read_only"));
+
+        // read_only: 2 should appear in JSON
+        Profile p4;
+        p4.setTitle("Test");
+        p4.setReadOnly(2);
+        QJsonDocument doc4 = p4.toJson();
+        QCOMPARE(doc4.object()["read_only"].toInt(), 2);
+    }
+
+    void readOnlyFieldTclImport() {
+        // TCL profile with read_only 1 should be parsed
+        QString tcl = R"(
+            profile_title {Test Read Only}
+            author {test}
+            beverage_type espresso
+            settings_profile_type settings_2c
+            read_only 1
+            final_desired_shot_weight_advanced 36.0
+            final_desired_shot_volume_advanced 0
+            espresso_temperature 93.0
+            advanced_shot {}
+        )";
+        Profile p = Profile::loadFromTclString(tcl);
+        QCOMPARE(p.readOnly(), 1);
+        QVERIFY(p.isReadOnly());
+    }
+
+    void isCurrentProfileReadOnlyForReadOnlyFlag() {
+        McpTestFixture f;
+        // Load a profile with read_only: 1 — should be detected as read-only
+        loadDFlowProfile(f, "D-Flow / Protected");
+        f.profileManager.m_currentProfile.setReadOnly(1);
+        QVERIFY(f.profileManager.isCurrentProfileReadOnly());
+
+        // Load a profile without read_only — should not be read-only
+        loadDFlowProfile(f, "D-Flow / Editable");
+        f.profileManager.m_currentProfile.setReadOnly(0);
+        QVERIFY(!f.profileManager.isCurrentProfileReadOnly());
+    }
+
+    void saveProfileRejectsReadOnly() {
+        McpTestFixture f;
+        // Load a profile and mark it read-only
+        loadDFlowProfile(f, "D-Flow / Protected");
+        f.profileManager.m_currentProfile.setReadOnly(1);
+        f.profileManager.m_baseProfileName = "test_protected";
+
+        // Attempt to save in place — should fail because read-only
+        QVERIFY(!f.profileManager.saveProfile("test_protected"));
+    }
+
+    void saveProfileAsRejectsBuiltInFilename() {
+        McpTestFixture f;
+        // isBuiltInFilename checks :/profiles/ resources
+        // "default" is a known built-in profile filename
+        bool hasDefault = f.profileManager.isBuiltInFilename("default");
+        if (!hasDefault) {
+            QSKIP("No built-in profiles in test binary QRC");
+        }
+        // Attempt Save As with a built-in filename — should fail
+        loadDFlowProfile(f, "Some Custom Title");
+        QVERIFY(!f.profileManager.saveProfileAs("default", "Some Custom Title"));
+    }
+
+    void isBuiltInFilenameReturnsFalseForUserProfile() {
+        McpTestFixture f;
+        QVERIFY(!f.profileManager.isBuiltInFilename("my_custom_profile_xyz"));
+        QVERIFY(!f.profileManager.isBuiltInFilename(""));
+    }
+
+    void saveProfileAsClearsReadOnlyFlag() {
+        // When saving as a copy, the read_only flag should be cleared
+        McpTestFixture f;
+        loadDFlowProfile(f, "D-Flow / Test");
+        // Manually set read_only on the profile
+        f.profileManager.m_currentProfile.setReadOnly(1);
+        // Save as a new name (non-built-in)
+        bool saved = f.profileManager.saveProfileAs("test_user_copy_xyz", "D-Flow / Test Copy");
+        if (saved) {
+            // The profile's read_only should be cleared to 0
+            QCOMPARE(f.profileManager.currentProfile().readOnly(), 0);
+        }
+        // Cleanup
+        QFile::remove(f.profileManager.userProfilesPath() + "/test_user_copy_xyz.json");
+    }
 };
 
 QTEST_GUILESS_MAIN(tst_ProfileManager)

@@ -399,6 +399,11 @@ QJsonDocument Profile::toJson() const {
         obj["recipe"] = m_recipeParams.toJson();
     }
 
+    // Read-only flag (de1app compatibility: integer 0/1/2)
+    if (m_readOnly != 0) {
+        obj["read_only"] = m_readOnly;
+    }
+
     // AI knowledge base ID (Decenza extension — de1app ignores unknown keys)
     if (!m_knowledgeBaseId.isEmpty()) {
         obj["knowledge_base_id"] = m_knowledgeBaseId;
@@ -511,6 +516,9 @@ Profile Profile::fromJson(const QJsonDocument& doc) {
         // Set preinfuse frame count based on generated preinfusion frames
         profile.m_preinfuseFrameCount = countPreinfuseFrames(profile.m_steps);
     }
+
+    // Read-only flag (de1app compatibility: integer 0/1/2)
+    profile.m_readOnly = obj["read_only"].toInt(0);
 
     // AI knowledge base ID (Decenza extension)
     profile.m_knowledgeBaseId = obj["knowledge_base_id"].toString();
@@ -675,6 +683,12 @@ Profile Profile::loadFromTclString(const QString& content) {
     profile.m_beverageType = extractValue("beverage_type");
     if (profile.m_beverageType.isEmpty()) {
         profile.m_beverageType = "espresso";
+    }
+
+    // Read-only flag (de1app: read_only 0/1/2)
+    {
+        QString roVal = extractValue("read_only");
+        if (!roVal.isEmpty()) profile.m_readOnly = roVal.toInt();
     }
 
     // Determine if this is an advanced profile (settings_2c or settings_2c2)

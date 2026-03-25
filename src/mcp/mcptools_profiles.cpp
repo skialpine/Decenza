@@ -32,6 +32,7 @@ void registerProfileTools(McpToolRegistry* registry, ProfileManager* profileMana
                 p["filename"] = pm["name"].toString();
                 p["title"] = pm["title"].toString();
                 p["editorType"] = pm["editorType"].toString();
+                p["readOnly"] = pm["readOnly"].toBool();
                 profiles.append(p);
             }
             result["profiles"] = profiles;
@@ -51,6 +52,7 @@ void registerProfileTools(McpToolRegistry* registry, ProfileManager* profileMana
 
             result["filename"] = profileManager->baseProfileName();
             result["modified"] = profileManager->isProfileModified();
+            result["readOnly"] = profileManager->isCurrentProfileReadOnly();
 
             QVariantMap profile = profileManager->getCurrentProfile();
             if (!profile.isEmpty()) {
@@ -311,6 +313,11 @@ void registerProfileTools(McpToolRegistry* registry, ProfileManager* profileMana
                     result["error"] = "title is required for Save As";
                     return result;
                 }
+                if (profileManager->isBuiltInFilename(filename)) {
+                    result["error"] = "Cannot save with filename '" + filename +
+                        "' because it conflicts with a built-in profile. Choose a different name.";
+                    return result;
+                }
 
                 // Tool handlers run on the main thread (via ShotServer), so call directly
                 bool success = profileManager->saveProfileAs(filename, title);
@@ -327,6 +334,10 @@ void registerProfileTools(McpToolRegistry* registry, ProfileManager* profileMana
                 QString currentFilename = profileManager->baseProfileName();
                 if (currentFilename.isEmpty()) {
                     result["error"] = "No active profile to save";
+                    return result;
+                }
+                if (profileManager->isCurrentProfileReadOnly()) {
+                    result["error"] = "Cannot save read-only profile in place. Use filename/title params for Save As with a new name.";
                     return result;
                 }
 
