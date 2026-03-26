@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QBluetoothDeviceInfo>
+#include <QTimer>
 
 class ScaleBleTransport;
 
@@ -12,8 +13,8 @@ class ScaleBleTransport;
  * Uses ScaleBleTransport for BLE communication (same abstraction as scale drivers,
  * gives us Qt/CoreBluetooth platform switching for free).
  *
- * Protocol: header 0xDF 0xDF, function byte, data, XOR checksum.
- * Service 0xFF00, characteristic 0xAA01.
+ * Protocol: header 0xDF 0xDF, func, cmd, datalen, data, additive checksum.
+ * Service 0x00FF, characteristic 0xAA01.
  *
  * Emits tdsChanged when a TDS reading arrives. MainController connects this
  * to Settings.setDyeDrinkTds() for auto-populating the post-shot review page.
@@ -80,4 +81,6 @@ private:
     double m_tds = 0.0;
     double m_temperature = 0.0;
     bool m_measuring = false;
+    QTimer m_measurementTimer;
+    QTimer m_initTimer;
 };
