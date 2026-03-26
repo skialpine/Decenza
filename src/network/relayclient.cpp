@@ -226,6 +226,7 @@ QJsonObject RelayClient::buildStatusJson() const
         status["connected"] = m_device->isConnected();
         status["state"] = m_device->stateString();
         status["temperature"] = m_device->temperature();
+        status["goalTemperature"] = m_device->goalTemperature();
         status["waterLevelMl"] = m_device->waterLevelMl();
         bool isAwake = m_device->isConnected() &&
                       (m_device->state() != DE1::State::Sleep &&
