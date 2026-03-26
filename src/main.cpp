@@ -1148,6 +1148,15 @@ int main(int argc, char *argv[])
             return;  // Already connected
         }
 
+        // Clean up old refractometer before replacing — the raw pointers in
+        // MainController/BLEManager/QML would dangle when unique_ptr destroys the old object
+        if (refractometer) {
+            mainController.setRefractometer(nullptr);
+            bleManager.setRefractometerDevice(nullptr);
+            engine.rootContext()->setContextProperty("Refractometer", nullptr);
+            refractometer->disconnectFromDevice();
+        }
+
         // Create transport using the same platform selection as scales
 #if defined(Q_OS_IOS) || defined(Q_OS_MACOS)
         auto* transport = new CoreBluetoothScaleBleTransport();
