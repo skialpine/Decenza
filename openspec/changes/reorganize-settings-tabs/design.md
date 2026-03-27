@@ -160,27 +160,28 @@ Tabs that keep their content still benefit from internal restructuring.
 
 The Device Migration column is the most complex piece: it has 5 distinct states (idle → searching → devices found → TOTP auth prompt → manifest/import with checkboxes and progress). This content expands significantly during operations and should not be squeezed alongside backup/restore.
 
-**Proposed layout:** Four columns — the fourth (Device Migration) gets `Layout.fillWidth: true` so it has room to breathe during operations:
+**Proposed layout:** Three columns ordered by visit frequency, plus a migration dialog button. Device Migration becomes a dialog (see Decision 8) instead of an inline column.
 
-| Shot History (fixed) | Server & Sharing (fixed) | Backup (fixed) | Device Migration (fill) |
-|---|---|---|---|
-| "Shot History →" button | Enable Server toggle | Backup Time dropdown | "Import from Another Device" |
-| Total shots count | Server URL + Copy | Backup status + location | Description text |
-| *divider* | Enable Security toggle | Storage permission (Android) | "Search for Devices" + spinner |
-| Import from DE1 App | TOTP setup / reset | "Backup Now" button | Device list / single card / dropdown |
-| Overwrite toggle | *divider* | *divider* | TOTP auth prompt (when needed) |
-| Import buttons (DE1, ZIP, Folder) | REST API endpoints | "Restore from Backup" | Manifest display (when connected) |
-| Import progress | (from MQTT tab) | Restore button | Import checkboxes + progress |
-| | *divider* | | Manual IP entry |
-| | Data summary (shots/profiles) | | |
-| | *divider* | | |
-| | Factory Reset (bottom) | | |
+| Shot History (fixed) | Backup (fixed) | Server & Sharing (fixed) |
+|---|---|---|
+| "Shot History →" button | Backup Time dropdown | Enable Server toggle |
+| Total shots count | Backup status + location | Server URL + Copy |
+| *divider* | Storage permission (Android) | Enable Security toggle |
+| Import from DE1 App | "Backup Now" button | TOTP setup / reset |
+| Overwrite toggle | *divider* | *divider* |
+| Import buttons (DE1, ZIP, Folder) | "Restore from Backup" | REST API endpoints |
+| Import progress | Restore button | (from MQTT tab) |
+| | | *divider* |
+| | | Data summary (shots/profiles) |
+| | | *divider* |
+| | | "Import from Another Device" button → opens dialog |
+| | | *divider* |
+| | | Factory Reset (bottom) |
 
-**Why:** Each column answers one question:
-- Col 1: "How many shots do I have and how do I import from de1app?"
-- Col 2: "How do I share my data over the network?"
-- Col 3: "How do I back up and restore?"
-- Col 4: "How do I move from another Decenza device?"
+**Why:** Columns ordered by how often users visit them:
+- Col 1: "How many shots do I have and how do I import from de1app?" (most visited)
+- Col 2: "How do I back up and restore?" (periodic)
+- Col 3: "How do I share my data over the network?" (set up once, plus rare operations like migration and factory reset)
 
 Factory Reset stays in the Server column (bottom, after a divider and spacer) — it's a destructive action related to "your data" and should be far from casual reach. Device Migration gets room to show the multi-state workflow without cramming.
 
@@ -325,10 +326,25 @@ Donation dialog (on tap):
 
 **Why:** The About content (credits + donation teaser) fits in the left column's empty space. The QR code — too large for inline display — lives in a tap-to-open dialog where it can be full-size and easily scannable. The dialog provides both scan and link paths. Tab is always visible (not conditional on update checker), so iOS users see version info, release notes, and donation option.
 
+### Ordering Principles
+
+**Tab order** — two clusters, most-used first within each:
+
+1. **Hardware & visual** (visited often): Connections → Machine → Display → Layout → Themes → Screensaver
+2. **Setup-once & meta** (visited rarely): Services → History & Data → Accessibility → Language → About
+
+Related tabs are adjacent: Display → Layout → Themes → Screensaver are all "how the app looks." Connections → Machine are both hardware. Services groups all external integrations. About is always last.
+
+**Within-tab ordering** — most-used items first, rare items last:
+
+- **Machine**: Power & Sleep → Water → General → Calibration
+- **Display**: Theme mode → Extraction View → Per-Screen Scale → Post-Shot Review Close → Shot Map → Launcher Mode (Android-only, last)
+- **Services**: Visualizer → AI Assistant → MCP Server → Home Assistant
+- **History & Data**: Shot History → Backup → Server & Sharing (migration button + Factory Reset at bottom of Server column)
+
 ## Open Questions
 
 1. **Shot Map** — Espresso tab or Sharing tab? (See proposal Decision 3)
 2. **Launcher Mode** — Display or Machine? (See proposal Decision 5)
 3. **Offline/Simulation Mode** — Machine or Advanced? (See proposal Decision 4)
 4. **Should the new Machine tab have sub-sections** (e.g., collapsible groups for "Power & Sleep", "Water", "Calibration") or flat cards like current Preferences?
-5. **Tab ordering** — What order feels most natural? Current proposal puts Connections first (setup flow), then Machine, Display, Themes...

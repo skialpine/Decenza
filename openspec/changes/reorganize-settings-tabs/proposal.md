@@ -40,15 +40,15 @@ A virtual usability study of common user workflows revealed:
 | # | Tab | Contents | Source |
 |---|-----|----------|--------|
 | 0 | **Connections** | Machine BLE/USB, Scale BLE/USB, Refractometer, Virtual Scale. Internal reorg: Active Devices → Known Devices → Find Devices → Log | Connections + Preferences(Virtual Scale) |
-| 1 | **Machine** | Sections: **Power & Sleep** (Auto-Sleep, Auto-Wake, Battery Charging), **Water** (Water Level, Refill Kit, Refill Threshold), **General** (Headless, Offline/Simulation Mode, Ignore SAV with Scale), **Calibration** (Flow Cal, SAW Cal, Heater Cal) | Preferences (hardware items) |
-| 2 | **Display** | Theme mode (follow system, dark/light selectors), Extraction View (Chart/Cup Fill), Per-Screen Scale, Post-Shot Review Close timer, Shot Map, Launcher Mode (Android) | Preferences (display items) |
-| 3 | **Themes** | Color editor, presets (unchanged) | Themes (minus mode selectors) |
-| 4 | **Screensaver** | Unchanged | Screensaver |
-| 5 | **Services** | Four summary cards with status indicators + [Configure...] buttons that open setup dialogs: **Visualizer** (account + upload prefs), **AI Assistant** (provider, API key, model, test connection), **MCP Server** (enable, access level, confirmation, Discuss Shot), **Home Assistant** (MQTT broker, auto-discovery, publish). Each dialog is ~4-6 fields. | AI + Visualizer + MQTT merged |
-| 6 | **History & Data** | Three columns + migration dialog. **Shot History** (history link, DE1 import), **Server & Sharing** (server enable + security + TOTP + REST API docs, Factory Reset at bottom), **Backup** (daily backup, restore). "Import from Another Device" button opens stepped dialog. | History + Data merged, REST API from MQTT |
-| 7 | **Accessibility** | Unchanged | Accessibility |
-| 8 | **Language** | Unchanged | Language |
-| 9 | **Layout** | Unchanged | Layout |
+| 1 | **Machine** | Sections (most-used first): **Power & Sleep** (Auto-Sleep, Auto-Wake, Battery Charging), **Water** (Water Level, Refill Kit, Refill Threshold), **General** (Headless, Offline/Simulation Mode, Ignore SAV with Scale), **Calibration** (Flow Cal, SAW Cal, Heater Cal) | Preferences (hardware items) |
+| 2 | **Display** | Ordered by frequency: Theme mode (follow system, dark/light selectors), Extraction View (Chart/Cup Fill), Per-Screen Scale, Post-Shot Review Close timer, Shot Map, Launcher Mode (Android) | Preferences (display items) |
+| 3 | **Layout** | Unchanged | Layout |
+| 4 | **Themes** | Color editor, presets (unchanged) | Themes (minus mode selectors) |
+| 5 | **Screensaver** | Unchanged | Screensaver |
+| 6 | **Services** | Four summary cards ordered by usage: **Visualizer** (account + upload prefs), **AI Assistant** (provider, API key, model, test connection), **MCP Server** (enable, access level, confirmation, Discuss Shot), **Home Assistant** (MQTT broker, auto-discovery, publish). Each dialog is ~4-6 fields. | AI + Visualizer + MQTT merged |
+| 7 | **History & Data** | Three columns ordered by visit frequency + migration dialog. **Shot History** (history link, DE1 import), **Backup** (daily backup, restore), **Server & Sharing** (server enable + security + TOTP + REST API docs, Factory Reset at bottom). "Import from Another Device" button opens stepped dialog. | History + Data merged, REST API from MQTT |
+| 8 | **Accessibility** | Unchanged | Accessibility |
+| 9 | **Language** | Unchanged | Language |
 | 10 | **About** | Version + update controls + credits + donate | Update + About merged |
 
 ### What Moves Where (complete mapping)
