@@ -119,9 +119,10 @@ Page {
     property real preDestroyRss: 0  // RSS before MediaPlayer destroy (for delta logging)
 
     // Track app suspend state to stop rendering when display is off.
-    // On Android, the EGL surface is destroyed when the display turns off.
-    // If we keep rendering (especially video playback), Qt's render thread
-    // gets stuck on the dead surface and the app freezes (ANR on resume).
+    // On Android, the EGL surface is destroyed when the display turns off
+    // (QTBUG-118231). If we keep rendering (especially video playback),
+    // Qt's render thread gets stuck on the dead surface and the app
+    // freezes (ANR on resume).
     property bool appSuspended: false
 
     Connections {
@@ -142,10 +143,18 @@ Page {
                 console.log("[Screensaver] App resumed — restarting media")
                 if (isVideosMode && ScreensaverManager.enabled) {
                     playNextMedia()
+                    // playNextMedia() may call wake() which navigates away —
+                    // don't touch animation state on a page being torn down
+                    if (!screensaverPage.visible) return
                 }
-                // Restart gradient animation if in fallback mode (no cached media)
+                // Restart gradient animation if in fallback mode (no playable media)
                 if (isVideosMode && !mediaPlaying) {
                     gradientAnimation.running = true
+                }
+                // Restart image rotation if an image was already loaded pre-suspend
+                // (onStatusChanged won't re-fire for an already-loaded source)
+                if (isVideosMode && isCurrentItemImage && mediaPlaying) {
+                    imageDisplayTimer.restart()
                 }
             }
         }

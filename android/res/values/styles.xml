@@ -4,7 +4,7 @@
         <item name="android:windowFullscreen">true</item>
         <!-- Black prevents colored gap at top on devices where immersive mode
              doesn't fully cover the status bar area (e.g. Lenovo Tab One).
-             The app's actual background is rendered by QML Theme.backgroundColor. -->
+             The app's actual background is rendered by QML once the window is ready. -->
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
         <!-- Immersive mode - hide navigation bar -->
