@@ -416,7 +416,7 @@ Page {
     Loader {
         id: pipesLoader
         anchors.fill: parent
-        active: Settings.hasQuick3D && isPipesMode
+        active: Settings.hasQuick3D && isPipesMode && !appSuspended
         visible: isPipesMode
         z: 0
         source: "qrc:/qt/qml/Decenza/qml/components/PipesScreensaver.qml"
@@ -427,7 +427,7 @@ Page {
     Loader {
         id: flipClockLoader
         anchors.fill: parent
-        active: isFlipClockMode
+        active: isFlipClockMode && !appSuspended
         visible: isFlipClockMode
         z: 0
         source: "qrc:/qt/qml/Decenza/qml/components/FlipClockScreensaver.qml"
@@ -438,7 +438,7 @@ Page {
     Loader {
         id: attractorLoader
         anchors.fill: parent
-        active: isAttractorMode
+        active: isAttractorMode && !appSuspended
         visible: isAttractorMode
         z: 0
         source: "qrc:/qt/qml/Decenza/qml/components/StrangeAttractorScreensaver.qml"
@@ -449,7 +449,7 @@ Page {
     Loader {
         id: shotMapLoader
         anchors.fill: parent
-        active: isShotMapMode
+        active: isShotMapMode && !appSuspended
         visible: isShotMapMode
         z: 0
         source: "qrc:/qt/qml/Decenza/qml/components/ShotMapScreensaver.qml"
