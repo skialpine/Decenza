@@ -617,8 +617,8 @@ Profile VisualizerImporter::parseVisualizerProfile(const QJsonObject& json) {
         profile.setTitle(json["title"].toString("Imported Profile"));
     }
 
-    // Safety net: if profile is recipe mode with no steps, generate frames from recipe params
-    if (profile.steps().isEmpty() && profile.isRecipeMode()) {
+    // Safety net: if profile has recipe params with no steps, generate frames
+    if (profile.steps().isEmpty() && profile.editorType() != QLatin1String("advanced")) {
         profile.regenerateFromRecipe();
     }
 
