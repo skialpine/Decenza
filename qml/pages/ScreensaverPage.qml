@@ -118,8 +118,50 @@ Page {
     property string pendingVideoSource: ""  // Source queued for next video after decoder teardown
     property real preDestroyRss: 0  // RSS before MediaPlayer destroy (for delta logging)
 
+    // Track app suspend state to stop rendering when display is off.
+    // On Android, the EGL surface is destroyed when the display turns off
+    // (QTBUG-118231). If we keep rendering (especially video playback),
+    // Qt's render thread gets stuck on the dead surface and the app
+    // freezes (ANR on resume).
+    property bool appSuspended: false
+
+    Connections {
+        target: Qt.application
+        function onStateChanged() {
+            if (Qt.application.state === Qt.ApplicationSuspended) {
+                screensaverPage.appSuspended = true
+                console.log("[Screensaver] App suspended — pausing all rendering")
+                // Destroy video decoder to stop rendering to dead EGL surface
+                if (mediaPlayerLoader.active) {
+                    pendingVideoSource = ""
+                    mediaPlayerLoader.active = false
+                }
+                imageDisplayTimer.stop()
+                gradientAnimation.running = false
+            } else if (Qt.application.state === Qt.ApplicationActive && screensaverPage.appSuspended) {
+                screensaverPage.appSuspended = false
+                console.log("[Screensaver] App resumed — restarting media")
+                if (isVideosMode && ScreensaverManager.enabled) {
+                    playNextMedia()
+                    // playNextMedia() may call wake() which navigates away —
+                    // don't touch animation state on a page being torn down
+                    if (!screensaverPage.visible) return
+                }
+                // Restart gradient animation if in fallback mode (no playable media)
+                if (isVideosMode && !mediaPlaying) {
+                    gradientAnimation.running = true
+                }
+                // Restart image rotation if an image was already loaded pre-suspend
+                // (onStatusChanged won't re-fire for an already-loaded source)
+                if (isVideosMode && isCurrentItemImage && mediaPlaying) {
+                    imageDisplayTimer.restart()
+                }
+            }
+        }
+    }
+
     function playNextMedia() {
-        if (!ScreensaverManager.enabled) {
+        if (!ScreensaverManager.enabled || appSuspended) {
             return
         }
 
@@ -374,44 +416,44 @@ Page {
     Loader {
         id: pipesLoader
         anchors.fill: parent
-        active: Settings.hasQuick3D && isPipesMode
+        active: Settings.hasQuick3D && isPipesMode && !appSuspended
         visible: isPipesMode
         z: 0
         source: "qrc:/qt/qml/Decenza/qml/components/PipesScreensaver.qml"
-        onLoaded: item.running = Qt.binding(function() { return isPipesMode && screensaverPage.visible })
+        onLoaded: item.running = Qt.binding(function() { return isPipesMode && screensaverPage.visible && !appSuspended })
     }
 
     // Flip Clock screensaver
     Loader {
         id: flipClockLoader
         anchors.fill: parent
-        active: isFlipClockMode
+        active: isFlipClockMode && !appSuspended
         visible: isFlipClockMode
         z: 0
         source: "qrc:/qt/qml/Decenza/qml/components/FlipClockScreensaver.qml"
-        onLoaded: item.running = Qt.binding(function() { return isFlipClockMode && screensaverPage.visible })
+        onLoaded: item.running = Qt.binding(function() { return isFlipClockMode && screensaverPage.visible && !appSuspended })
     }
 
     // Strange Attractor screensaver
     Loader {
         id: attractorLoader
         anchors.fill: parent
-        active: isAttractorMode
+        active: isAttractorMode && !appSuspended
         visible: isAttractorMode
         z: 0
         source: "qrc:/qt/qml/Decenza/qml/components/StrangeAttractorScreensaver.qml"
-        onLoaded: item.running = Qt.binding(function() { return isAttractorMode && screensaverPage.visible })
+        onLoaded: item.running = Qt.binding(function() { return isAttractorMode && screensaverPage.visible && !appSuspended })
     }
 
     // Shot Map screensaver (flat map works without Quick3D, globe loaded conditionally)
     Loader {
         id: shotMapLoader
         anchors.fill: parent
-        active: isShotMapMode
+        active: isShotMapMode && !appSuspended
         visible: isShotMapMode
         z: 0
         source: "qrc:/qt/qml/Decenza/qml/components/ShotMapScreensaver.qml"
-        onLoaded: item.running = Qt.binding(function() { return isShotMapMode && screensaverPage.visible })
+        onLoaded: item.running = Qt.binding(function() { return isShotMapMode && screensaverPage.visible && !appSuspended })
     }
 
     // Fallback: show a subtle animation while no cached media (videos mode only)
