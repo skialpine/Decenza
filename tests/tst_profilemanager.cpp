@@ -879,6 +879,32 @@ private slots:
         QCOMPARE(f.profileManager.frameCount(), 2);
     }
 
+    void convertToAdvancedCaseInsensitiveTitle() {
+        // isDFlowTitle matches case-insensitively — stripping must too
+        McpTestFixture f;
+        loadDFlowProfile(f, "d-flow / lowercase test");
+        QCOMPARE(f.profileManager.currentEditorType(), "dflow");
+
+        f.profileManager.convertCurrentProfileToAdvanced();
+
+        QCOMPARE(f.profileManager.currentEditorType(), "advanced");
+        // Title should be "lowercase test", not still contain "d-flow"
+        QVERIFY(!f.profileManager.currentProfileName().contains("flow", Qt::CaseInsensitive));
+    }
+
+    void convertToAdvancedBareDFlowTitle() {
+        // Edge case: title is exactly "D-Flow" with no suffix
+        McpTestFixture f;
+        loadDFlowProfile(f, "D-Flow");
+        QCOMPARE(f.profileManager.currentEditorType(), "dflow");
+
+        f.profileManager.convertCurrentProfileToAdvanced();
+
+        QCOMPARE(f.profileManager.currentEditorType(), "advanced");
+        // currentProfileName() prepends "*" when modified
+        QCOMPARE(f.profileManager.currentProfileName(), "*Advanced Profile");
+    }
+
     // === Signal precision ===
 
     void setTargetWeightSameValueNoSignal() {

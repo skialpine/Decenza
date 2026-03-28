@@ -1709,29 +1709,25 @@ void ProfileManager::convertCurrentProfileToAdvanced() {
     // The frames are already generated and are preserved as-is.
     m_currentProfile.setProfileType(QStringLiteral("settings_2c"));
 
+    // Strip D-Flow/A-Flow prefix (case-insensitive, matching isDFlowTitle/isAFlowTitle).
+    // setTitle() already strips leading '*', so title() never has one.
     QString title = m_currentProfile.title();
+    auto stripPrefix = [&](const QString& prefix) {
+        // title starts with prefix (case-insensitive) — strip it
+        QString after = title.mid(prefix.length());
+        if (after.startsWith(QLatin1String(" / ")))
+            after = after.mid(3);
+        else if (after.startsWith(QLatin1Char('/')))
+            after = after.mid(1).trimmed();
+        else
+            after = after.trimmed();
+        return after.isEmpty() ? QStringLiteral("Advanced Profile") : after;
+    };
+
     if (isDFlowTitle(title)) {
-        QString stripped = title;
-        if (stripped.startsWith(QLatin1Char('*'))) stripped = stripped.mid(1);
-        if (stripped.startsWith(QLatin1String("D-Flow / ")))
-            stripped = stripped.mid(9);
-        else if (stripped.startsWith(QLatin1String("D-Flow /")))
-            stripped = stripped.mid(8).trimmed();
-        else if (stripped.startsWith(QLatin1String("D-Flow")))
-            stripped = stripped.mid(6).trimmed();
-        if (stripped.isEmpty()) stripped = QStringLiteral("Advanced Profile");
-        m_currentProfile.setTitle(stripped);
+        m_currentProfile.setTitle(stripPrefix(QStringLiteral("D-Flow")));
     } else if (isAFlowTitle(title)) {
-        QString stripped = title;
-        if (stripped.startsWith(QLatin1Char('*'))) stripped = stripped.mid(1);
-        if (stripped.startsWith(QLatin1String("A-Flow / ")))
-            stripped = stripped.mid(9);
-        else if (stripped.startsWith(QLatin1String("A-Flow /")))
-            stripped = stripped.mid(8).trimmed();
-        else if (stripped.startsWith(QLatin1String("A-Flow")))
-            stripped = stripped.mid(6).trimmed();
-        if (stripped.isEmpty()) stripped = QStringLiteral("Advanced Profile");
-        m_currentProfile.setTitle(stripped);
+        m_currentProfile.setTitle(stripPrefix(QStringLiteral("A-Flow")));
     }
 
     m_profileModified = true;
