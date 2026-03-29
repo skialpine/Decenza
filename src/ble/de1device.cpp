@@ -466,6 +466,20 @@ void DE1Device::parseMMRResponse(const QByteArray& data) {
             emit isHeadlessChanged();
         }
     }
+    // Firmware build number (address 0x800010) — e.g. 1342 for "v1342"
+    else if (address == 0x800010) {
+        if (data.size() >= 8) {
+            uint32_t buildNumber = (static_cast<uint32_t>(static_cast<uint8_t>(d[7])) << 24) |
+                                   (static_cast<uint32_t>(static_cast<uint8_t>(d[6])) << 16) |
+                                   (static_cast<uint32_t>(static_cast<uint8_t>(d[5])) << 8) |
+                                   static_cast<uint32_t>(static_cast<uint8_t>(d[4]));
+            m_firmwareBuildNumber = static_cast<int>(buildNumber);
+            // Append build number to the version string
+            m_firmwareVersion = QString("%1, v%2").arg(m_firmwareVersion).arg(m_firmwareBuildNumber);
+            emit firmwareVersionChanged();
+            qDebug() << "[BLE DE1] Firmware build number:" << m_firmwareBuildNumber;
+        }
+    }
     // Check if this is REFILL_KIT response (address 0x80385C)
     else if (address == 0x80385C) {
         uint8_t kitStatus = d[4];
@@ -925,6 +939,16 @@ void DE1Device::sendInitialSettings() {
     mmrRead[3] = 0x1C;
 
     m_transport->write(DE1::Characteristic::READ_FROM_MMR, mmrRead);
+
+    // Read firmware build number (CPU firmware, e.g. v1342)
+    {
+        QByteArray req(20, 0);
+        req[0] = 0x00;   // Len = 0 (read 4 bytes)
+        req[1] = 0x80;
+        req[2] = 0x00;
+        req[3] = 0x10;   // Address 0x800010
+        m_transport->write(DE1::Characteristic::READ_FROM_MMR, req);
+    }
 
     // Read refill kit status
     requestRefillKitStatus();

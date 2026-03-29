@@ -245,6 +245,7 @@ private:
     double m_lastEmittedWaterLevel = -1.0;  // Throttle: only emit when change >= 0.5%
     int m_lastEmittedWaterLevelMl = -1;    // Throttle: also emit when ml changes (color thresholds)
     QString m_firmwareVersion;
+    int m_firmwareBuildNumber = 0;
 
     bool m_connecting = false;
     bool m_simulationMode = false;
