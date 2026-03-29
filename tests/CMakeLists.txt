@@ -1,4 +1,3 @@
-enable_testing()
 find_package(Qt6 REQUIRED COMPONENTS Test Core Bluetooth Sql Network)
 
 # Disable AUTOMOC path prefix so MOC includes use plain filenames
