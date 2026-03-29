@@ -161,7 +161,7 @@ void DE1Device::setSimulationMode(bool enabled) {
         m_waterLevel = 75.0;
         m_waterLevelMm = 31.25;
         m_waterLevelMl = 872;
-        m_firmwareVersion = "SIM-1.0";
+        m_firmwareVersion = QStringLiteral("BLE v4.0.0, API v4\nFW v10.5.0, API v250\npcb=1.3, model=DE1PRO, firmware=v1342");
         emit stateChanged();
         emit subStateChanged();
         emit waterLevelChanged();
