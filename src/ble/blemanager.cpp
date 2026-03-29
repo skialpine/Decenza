@@ -267,6 +267,7 @@ void BLEManager::onDeviceDiscovered(const QBluetoothDeviceInfo& device) {
         }
         m_refractometerDevices.append(device);
         emit refractometersChanged();
+        qDebug() << "[BLE] Found refractometer:" << device.name() << "at" << getDeviceIdentifier(device);
         appendScaleLog(QString("Found refractometer: %1 (%2)").arg(device.name(), getDeviceIdentifier(device)));
 
         // Auto-connect if this is our saved refractometer
@@ -290,6 +291,7 @@ void BLEManager::onDeviceDiscovered(const QBluetoothDeviceInfo& device) {
         }
         m_scales.append({device, scaleType});
         emit scalesChanged();
+        qDebug() << "[BLE] Found scale:" << device.name() << "type:" << scaleType << "at" << getDeviceIdentifier(device);
         appendScaleLog(QString("Found %1: %2 (%3)").arg(scaleType).arg(device.name()).arg(getDeviceIdentifier(device)));
 
         // If we're doing a direct wake and this is our saved scale found via scan,
