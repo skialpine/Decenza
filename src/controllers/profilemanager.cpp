@@ -74,7 +74,7 @@ ProfileManager::ProfileManager(Settings* settings, DE1Device* device,
             }
             if (phase == MachineState::Phase::Idle || phase == MachineState::Phase::Ready ||
                 phase == MachineState::Phase::Sleep || phase == MachineState::Phase::Heating) {
-                qWarning() << "Retrying pending profile upload now that phase is" << m_machineState->phaseString();
+                qDebug() << "Retrying pending profile upload now that phase is" << m_machineState->phaseString();
                 uploadCurrentProfile();
             }
         });
@@ -843,7 +843,7 @@ void ProfileManager::loadProfile(const QString& profileName) {
 
     // 5. Fall back to default
     if (!found) {
-        qWarning() << "ProfileManager::loadProfile: Profile not found:" << profileName << "(resolved:" << resolvedName << ")";
+        qWarning() << "ProfileManager::loadProfile: Profile not found:" << profileName << "(resolved:" << resolvedName << ") — loading default";
         loadDefaultProfile();
     }
 

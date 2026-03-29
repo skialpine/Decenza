@@ -32,9 +32,18 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-# Unit tests — build with: cmake -DBUILD_TESTS=ON ...
+# Unit tests — auto-enabled in Debug builds (single-config generators only), opt-in otherwise.
+# Multi-config generators (Visual Studio, Xcode) leave CMAKE_BUILD_TYPE empty at configure
+# time, so tests default to OFF there — pass -DBUILD_TESTS=ON explicitly.
+# Override: cmake -DBUILD_TESTS=ON/OFF ...
 # Run with: ctest --output-on-failure
-option(BUILD_TESTS "Build unit tests" OFF)
+if(NOT DEFINED BUILD_TESTS)
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(BUILD_TESTS ON CACHE BOOL "Build unit tests")
+    else()
+        set(BUILD_TESTS OFF CACHE BOOL "Build unit tests")
+    endif()
+endif()
 
 # Address Sanitizer — catches use-after-free, heap overflow, etc.
 # Enable in Qt Creator: Projects → Build → CMake → add ENABLE_ASAN=ON

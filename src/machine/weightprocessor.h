@@ -1,10 +1,12 @@
 #pragma once
 
 #include <QObject>
+#include <QThread>
 #include <QList>
 #include <QVector>
 #include <QSet>
 #include <QDateTime>
+#include <functional>
 
 // Runs on a dedicated worker thread. Receives weight samples from the scale,
 // computes LSLR flow rates, and makes SAW/per-frame-exit decisions
@@ -17,7 +19,7 @@
 //
 // Output (via QueuedConnection back to main thread):
 //   - stopNow(triggerMs): triggers DE1Device::stopOperationUrgent(triggerMs)
-//   - sawTriggered(): carries context for SAW learning
+//   - sawTriggered(weightAtStop, flowRateAtStop, targetWeight): carries context for SAW learning
 //   - skipFrame(): triggers DE1Device::skipToNextFrame()
 //   - flowRatesReady(): feeds ShotTimingController for graph/settling
 
@@ -40,6 +42,16 @@ public slots:
     void markExtractionStart();  // Called when flow starts (idempotent, espresso-only)
     void stopExtraction();
     void resetForRetare();  // Clear LSLR buffer after auto-tare during preheat
+
+#ifdef DECENZA_TESTING
+public:
+    // Test support: override wall-clock source. Must be called before moveToThread()
+    // because std::function is not thread-safe for concurrent read/write.
+    void setWallClock(std::function<qint64()> fn) {
+        Q_ASSERT(thread() == QThread::currentThread());
+        m_wallClock = std::move(fn);
+    }
+#endif
 
 signals:
     // Emitted when SAW triggers. Includes monotonic timestamp (ms) for latency tracing.
@@ -97,4 +109,7 @@ private:
 
     // Per-frame exit tracking (avoid duplicate skip commands)
     QSet<int> m_frameWeightSkipSent;
+
+    // Wall-clock source (injectable for testing — avoids 77s of QTest::qWait)
+    std::function<qint64()> m_wallClock = [] { return QDateTime::currentMSecsSinceEpoch(); };
 };
