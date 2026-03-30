@@ -38,7 +38,7 @@ ApplicationWindow {
     property string returnToPageName: ""
     property int returnToShotId: 0
 
-    // True while the first-run restore dialog is active (prevents SettingsDataTab from also handling restore signals)
+    // True while the first-run restore dialog is active (prevents SettingsHistoryDataTab from also handling restore signals)
 
     // Global accessibility: find closest Text within radius of tap
     // Use physical units: 10mm (~1cm) converted to pixels
@@ -1151,7 +1151,7 @@ ApplicationWindow {
 
             Tr {
                 key: "main.dialog.noScaleFound.message"
-                fallback: "No Bluetooth scale was detected.\n\nUsing estimated weight from DE1 flow measurement instead.\n\nYou can search for your scale in Settings → Bluetooth."
+                fallback: "No Bluetooth scale was detected.\n\nUsing estimated weight from DE1 flow measurement instead.\n\nYou can search for your scale in Settings → Connections."
                 wrapMode: Text.Wrap
                 width: parent.width
                 font: Theme.bodyFont
@@ -1498,8 +1498,8 @@ ApplicationWindow {
                             MainController.updateChecker.downloadAndInstall()
                         }
                         updateDialog.close()
-                        // Navigate to settings Update tab (index 12)
-                        goToSettings(12)
+                        goToSettings(11)  // Navigate to About tab (has update controls)
+
                     }
                 }
             }
@@ -3115,7 +3115,7 @@ ApplicationWindow {
                     onClicked: {
                         emptyDatabaseDialog.close();
                         startBluetoothScan();
-                        goToSettings(10);  // Navigate to Data tab
+                        goToSettings(3);  // Navigate to History & Data tab
                     }
                 }
             }

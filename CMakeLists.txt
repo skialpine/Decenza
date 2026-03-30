@@ -591,19 +591,19 @@ set(QML_FILES
     qml/pages/FlowCalibrationPage.qml
     qml/pages/ProfileInfoPage.qml
     qml/pages/settings/SettingsConnectionsTab.qml
-    qml/pages/settings/SettingsPreferencesTab.qml
+    qml/pages/settings/SettingsMachineTab.qml
+    qml/pages/settings/SettingsCalibrationTab.qml
     qml/pages/settings/SettingsScreensaverTab.qml
     qml/pages/settings/SettingsVisualizerTab.qml
     qml/pages/settings/SettingsAITab.qml
-    qml/pages/settings/SettingsAccessibilityTab.qml
     qml/pages/settings/SettingsThemesTab.qml
     qml/pages/settings/SettingsLanguageTab.qml
-    qml/pages/settings/SettingsShotHistoryTab.qml
-    qml/pages/settings/SettingsDataTab.qml
+    qml/pages/settings/SettingsHistoryDataTab.qml
     qml/pages/settings/SettingsHomeAutomationTab.qml
     qml/pages/settings/SettingsUpdateTab.qml
-    qml/pages/settings/SettingsAboutTab.qml
     qml/pages/settings/SettingsDebugTab.qml
+    qml/pages/settings/SettingsSearchDialog.qml
+    qml/pages/settings/DeviceMigrationDialog.qml
     qml/pages/settings/SettingsLayoutTab.qml
     qml/pages/settings/LayoutEditorZone.qml
     qml/pages/settings/AddLanguagePage.qml
@@ -673,6 +673,7 @@ set(QML_FILES
     qml/components/CrtShaderEffect.qml
     qml/components/QrCode.qml
     qml/components/qrcode.js
+    qml/components/SettingsSearchIndex.js
 
     qml/components/layout/LayoutItemDelegate.qml
     qml/components/layout/LayoutBarZone.qml
