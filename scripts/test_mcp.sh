@@ -1347,16 +1347,26 @@ delete_session
 create_session
 
 # Category filter
-CAT_PREF_RAW=$(rpc 300 "tools/call" '{"name":"settings_get","arguments":{"category":"preferences"}}')
-CAT_PREF=$(echo "$CAT_PREF_RAW" | parse_tool_result)
-assert_ok "category 'preferences' returns autoSleepMinutes" "$CAT_PREF" \
+CAT_MACHINE_RAW=$(rpc 300 "tools/call" '{"name":"settings_get","arguments":{"category":"machine"}}')
+CAT_MACHINE=$(echo "$CAT_MACHINE_RAW" | parse_tool_result)
+assert_ok "category 'machine' returns autoSleepMinutes" "$CAT_MACHINE" \
     "'autoSleepMinutes' in d"
-assert_ok "category 'preferences' returns themeMode" "$CAT_PREF" \
+assert_ok "category 'machine' returns themeMode" "$CAT_MACHINE" \
     "'themeMode' in d"
-assert_ok "category 'preferences' excludes mqttEnabled" "$CAT_PREF" \
+assert_ok "category 'machine' excludes mqttEnabled" "$CAT_MACHINE" \
     "'mqttEnabled' not in d"
-assert_ok "category 'preferences' excludes screensaverType" "$CAT_PREF" \
+assert_ok "category 'machine' excludes screensaverType" "$CAT_MACHINE" \
     "'screensaverType' not in d"
+
+# Calibration category (split from machine)
+CAT_CAL_RAW=$(rpc 300 "tools/call" '{"name":"settings_get","arguments":{"category":"calibration"}}')
+CAT_CAL=$(echo "$CAT_CAL_RAW" | parse_tool_result)
+assert_ok "category 'calibration' returns useFlowScale" "$CAT_CAL" \
+    "'useFlowScale' in d"
+assert_ok "category 'calibration' returns flowCalibrationMultiplier" "$CAT_CAL" \
+    "'flowCalibrationMultiplier' in d"
+assert_ok "category 'calibration' excludes autoSleepMinutes" "$CAT_CAL" \
+    "'autoSleepMinutes' not in d"
 
 # Accessibility category
 CAT_A11Y_RAW=$(rpc 301 "tools/call" '{"name":"settings_get","arguments":{"category":"accessibility"}}')
