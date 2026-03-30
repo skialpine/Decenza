@@ -27,7 +27,6 @@ KeyboardAwareContainer {
             width: parent.width
             spacing: Theme.scaled(15)
 
-            // ========== LEFT COLUMN ==========
             // ========== LEFT COLUMN: Power & Schedule ==========
             ColumnLayout {
                 Layout.preferredWidth: Theme.scaled(350)

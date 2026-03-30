@@ -516,6 +516,7 @@ Page {
                     doScrollAndHighlight(loader.item, cardId)
                 } else if (loader.status === Loader.Error) {
                     loader.statusChanged.disconnect(conn)
+                    console.warn("SettingsPage: Tab failed to load for cardId:", cardId)
                 }
             }
             loader.statusChanged.connect(conn)
@@ -525,7 +526,10 @@ Page {
     function doScrollAndHighlight(tabItem, cardId) {
         // Find card by objectName recursively
         var card = findChildByObjectName(tabItem, cardId)
-        if (!card) return
+        if (!card) {
+            console.warn("SettingsPage: Could not find card '" + cardId + "' in tab")
+            return
+        }
 
         // Find the Flickable ancestor to scroll
         var flickable = findFlickableParent(card)

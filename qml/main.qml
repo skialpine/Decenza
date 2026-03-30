@@ -1151,7 +1151,7 @@ ApplicationWindow {
 
             Tr {
                 key: "main.dialog.noScaleFound.message"
-                fallback: "No Bluetooth scale was detected.\n\nUsing estimated weight from DE1 flow measurement instead.\n\nYou can search for your scale in Settings → Bluetooth."
+                fallback: "No Bluetooth scale was detected.\n\nUsing estimated weight from DE1 flow measurement instead.\n\nYou can search for your scale in Settings → Connections."
                 wrapMode: Text.Wrap
                 width: parent.width
                 font: Theme.bodyFont

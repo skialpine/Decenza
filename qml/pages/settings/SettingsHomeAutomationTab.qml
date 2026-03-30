@@ -378,7 +378,7 @@ KeyboardAwareContainer {
 
                     Tr {
                         key: "mqtt.restApiDescription"
-                        fallback: "Enable 'Remote Access' in the Shot History tab to use the REST API."
+                        fallback: "Enable 'Remote Access' in the History & Data tab to use the REST API."
                         color: Theme.textSecondaryColor
                         font.pixelSize: Theme.scaled(11)
                         wrapMode: Text.WordWrap

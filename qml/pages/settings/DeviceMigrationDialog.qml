@@ -16,6 +16,12 @@ Dialog {
     closePolicy: Dialog.CloseOnEscape
 
     property bool searchPerformed: false
+    property string importResult: ""
+
+    onOpened: {
+        searchPerformed = false
+        importResult = ""
+    }
 
     Connections {
         target: MainController.dataMigration
@@ -29,6 +35,17 @@ Dialog {
             migrationTotpField.text = ""
             migrationAuthError.text = error
             migrationTotpField.forceActiveFocus()
+        }
+        function onImportComplete(settings, profiles, shots, media, aiConversations) {
+            var parts = []
+            if (settings > 0) parts.push(settings + " settings")
+            if (profiles > 0) parts.push(profiles + " profiles")
+            if (shots > 0) parts.push(shots + " shots")
+            if (media > 0) parts.push(media + " media")
+            if (aiConversations > 0) parts.push(aiConversations + " conversations")
+            migrationDialog.importResult = parts.length > 0
+                ? TranslationManager.translate("settings.data.importComplete", "Import complete:") + " " + parts.join(", ")
+                : TranslationManager.translate("settings.data.importNothingNew", "Import complete — nothing new to import")
         }
     }
 
@@ -476,6 +493,16 @@ Dialog {
                 Layout.fillWidth: true
                 value: MainController.dataMigration.progress
             }
+        }
+
+        // Import result
+        Text {
+            Layout.fillWidth: true
+            visible: migrationDialog.importResult !== ""
+            text: migrationDialog.importResult
+            color: Theme.successColor
+            font.pixelSize: Theme.scaled(12)
+            wrapMode: Text.WordWrap
         }
 
         // Action buttons

@@ -3,7 +3,7 @@
 // tabIndex matches the tab order in SettingsPage.qml:
 //   0=Connections, 1=Machine, 2=Calibration, 3=History & Data,
 //   4=Themes, 5=Layout, 6=Screensaver, 7=Visualizer, 8=AI,
-//   9=MQTT, 10=Language & Access, 11=About
+//   9=MQTT, 10=Language & Access, 11=About, 12=Debug (debug builds only, no search entries)
 // cardId matches the objectName on the card Rectangle in the tab QML
 // title/description are translated; keywords are English fallbacks for cross-language search
 
