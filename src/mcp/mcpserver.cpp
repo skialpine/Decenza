@@ -688,13 +688,14 @@ McpSession* McpServer::findOrCreateSession(const QString& sessionHeader)
     // Clean up orphaned sessions before creating a new one.
     // When mcp-remote's SSE connection drops and it re-initializes (without
     // sending a session header), the old session stays around with no SSE
-    // socket. Over hours this fills the session quota. Remove initialized
-    // sessions whose SSE transport is gone — the client has already moved on.
-    // We check initialized() to avoid killing sessions that were just created
-    // by a concurrent initialize but haven't connected their SSE stream yet.
+    // socket. Over hours this fills the session quota. Remove sessions whose
+    // SSE transport was established and then lost — the client has moved on.
+    // We check hadSseSocket() to avoid killing freshly-created sessions that
+    // haven't connected their SSE stream yet (window between POST initialize
+    // and GET /mcp).
     QStringList orphaned;
     for (auto it = m_sessions.constBegin(); it != m_sessions.constEnd(); ++it) {
-        if (!it.value()->sseSocket() && it.value()->initialized())
+        if (!it.value()->sseSocket() && it.value()->hadSseSocket())
             orphaned.append(it.key());
     }
     for (const QString& id : orphaned) {

@@ -31,7 +31,12 @@ public:
 
     // SSE stream socket (nullable — not all sessions have an active SSE connection)
     QTcpSocket* sseSocket() const { return m_sseSocket.data(); }
-    void setSseSocket(QTcpSocket* socket) { m_sseSocket = socket; }
+    void setSseSocket(QTcpSocket* socket) {
+        m_sseSocket = socket;
+        if (socket)
+            m_hadSseSocket = true;
+    }
+    bool hadSseSocket() const { return m_hadSseSocket; }
 
     // Resource subscriptions
     QSet<QString> subscribedResources() const { return m_subscribedResources; }
@@ -50,6 +55,7 @@ private:
     bool m_initialized = false;
     QJsonObject m_clientCapabilities;
     QPointer<QTcpSocket> m_sseSocket;
+    bool m_hadSseSocket = false;
     QSet<QString> m_subscribedResources;
     int m_controlCallCount = 0;
 };
