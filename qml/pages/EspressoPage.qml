@@ -330,7 +330,7 @@ Page {
         return v === true || v === "true"
     }
 
-    // Sync from Settings changes made elsewhere (e.g. SettingsPreferencesTab)
+    // Sync from Settings changes made elsewhere (e.g. SettingsMachineTab)
     Connections {
         target: Settings
         function onValueChanged(key) {

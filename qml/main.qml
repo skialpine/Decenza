@@ -1498,8 +1498,8 @@ ApplicationWindow {
                             MainController.updateChecker.downloadAndInstall()
                         }
                         updateDialog.close()
-                        // Navigate to settings Update tab (index 12)
-                        goToSettings(12)
+                        // Navigate to settings Update tab (index 13)
+                        goToSettings(13)
                     }
                 }
             }
@@ -3115,7 +3115,7 @@ ApplicationWindow {
                     onClicked: {
                         emptyDatabaseDialog.close();
                         startBluetoothScan();
-                        goToSettings(10);  // Navigate to Data tab
+                        goToSettings(11);  // Navigate to Data tab
                     }
                 }
             }

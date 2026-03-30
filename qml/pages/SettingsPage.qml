@@ -62,7 +62,8 @@ Page {
                 // Build tab names based on which tabs are visible
                 var tabNames = [
                     TranslationManager.translate("settings.tab.connections", "Connections"),
-                    TranslationManager.translate("settings.tab.preferences", "Preferences"),
+                    TranslationManager.translate("settings.tab.machine", "Machine"),
+                    TranslationManager.translate("settings.tab.calibration", "Calibration"),
                     TranslationManager.translate("settings.tab.screensaver", "Screensaver"),
                     TranslationManager.translate("settings.tab.visualizer", "Visualizer"),
                     TranslationManager.translate("settings.tab.ai", "AI"),
@@ -115,9 +116,15 @@ Page {
         }
 
         StyledTabButton {
-            id: preferencesTabButton
-            text: TranslationManager.translate("settings.tab.preferences", "Preferences")
-            tabLabel: TranslationManager.translate("settings.tab.preferences", "Preferences")
+            id: machineTabButton
+            text: TranslationManager.translate("settings.tab.machine", "Machine")
+            tabLabel: TranslationManager.translate("settings.tab.machine", "Machine")
+        }
+
+        StyledTabButton {
+            id: calibrationTabButton
+            text: TranslationManager.translate("settings.tab.calibration", "Calibration")
+            tabLabel: TranslationManager.translate("settings.tab.calibration", "Calibration")
         }
 
         StyledTabButton {
@@ -256,50 +263,58 @@ Page {
             source: "settings/SettingsConnectionsTab.qml"
         }
 
-        // Tab 1: Preferences - lazy loaded on first visit
+        // Tab 1: Machine - lazy loaded on first visit
         Loader {
-            id: preferencesLoader
+            id: machineLoader
             active: 1 in settingsPage.loadedTabs
             asynchronous: true
-            source: "settings/SettingsPreferencesTab.qml"
+            source: "settings/SettingsMachineTab.qml"
         }
 
-        // Tab 2: Screensaver/Network - lazy loaded on first visit
+        // Tab 2: Calibration - lazy loaded on first visit
+        Loader {
+            id: calibrationLoader
+            active: 2 in settingsPage.loadedTabs
+            asynchronous: true
+            source: "settings/SettingsCalibrationTab.qml"
+        }
+
+        // Tab 3: Screensaver/Network - lazy loaded on first visit
         Loader {
             id: screensaverLoader
-            active: 2 in settingsPage.loadedTabs
+            active: 3 in settingsPage.loadedTabs
             asynchronous: true
             source: "settings/SettingsScreensaverTab.qml"
         }
 
-        // Tab 3: Visualizer - lazy loaded on first visit
+        // Tab 4: Visualizer - lazy loaded on first visit
         Loader {
             id: visualizerLoader
-            active: 3 in settingsPage.loadedTabs
+            active: 4 in settingsPage.loadedTabs
             asynchronous: true
             source: "settings/SettingsVisualizerTab.qml"
         }
 
-        // Tab 4: AI - lazy loaded on first visit
+        // Tab 5: AI - lazy loaded on first visit
         Loader {
             id: aiLoader
-            active: 4 in settingsPage.loadedTabs
+            active: 5 in settingsPage.loadedTabs
             asynchronous: true
             source: "settings/SettingsAITab.qml"
         }
 
-        // Tab 5: Accessibility - lazy loaded on first visit
+        // Tab 6: Accessibility - lazy loaded on first visit
         Loader {
             id: accessibilityLoader
-            active: 5 in settingsPage.loadedTabs
+            active: 6 in settingsPage.loadedTabs
             asynchronous: true
             source: "settings/SettingsAccessibilityTab.qml"
         }
 
-        // Tab 6: Themes - lazy loaded on first visit
+        // Tab 7: Themes - lazy loaded on first visit
         Loader {
             id: themesLoader
-            active: 6 in settingsPage.loadedTabs
+            active: 7 in settingsPage.loadedTabs
             asynchronous: true
             source: "settings/SettingsThemesTab.qml"
             onLoaded: {
@@ -309,66 +324,66 @@ Page {
             }
         }
 
-        // Tab 7: Layout - lazy loaded on first visit
+        // Tab 8: Layout - lazy loaded on first visit
         Loader {
             id: layoutLoader
-            active: 7 in settingsPage.loadedTabs
+            active: 8 in settingsPage.loadedTabs
             asynchronous: true
             source: "settings/SettingsLayoutTab.qml"
         }
 
-        // Tab 8: Language - lazy loaded on first visit
+        // Tab 9: Language - lazy loaded on first visit
         Loader {
             id: languageLoader
-            active: 8 in settingsPage.loadedTabs
+            active: 9 in settingsPage.loadedTabs
             asynchronous: true
             source: "settings/SettingsLanguageTab.qml"
         }
 
-        // Tab 9: History - lazy loaded on first visit
+        // Tab 10: History - lazy loaded on first visit
         Loader {
             id: historyLoader
-            active: 9 in settingsPage.loadedTabs
+            active: 10 in settingsPage.loadedTabs
             asynchronous: true
             source: "settings/SettingsShotHistoryTab.qml"
         }
 
-        // Tab 10: Data - lazy loaded on first visit
+        // Tab 11: Data - lazy loaded on first visit
         Loader {
             id: dataLoader
-            active: 10 in settingsPage.loadedTabs
+            active: 11 in settingsPage.loadedTabs
             asynchronous: true
             source: "settings/SettingsDataTab.qml"
         }
 
-        // Tab 11: Home Automation - lazy loaded on first visit
+        // Tab 12: Home Automation - lazy loaded on first visit
         Loader {
             id: homeAutomationLoader
-            active: 11 in settingsPage.loadedTabs
+            active: 12 in settingsPage.loadedTabs
             asynchronous: true
             source: "settings/SettingsHomeAutomationTab.qml"
         }
 
-        // Tab 12: Update - lazy loaded on first visit (not on iOS - App Store handles updates)
+        // Tab 13: Update - lazy loaded on first visit (not on iOS - App Store handles updates)
         Loader {
             id: updateLoader
-            active: MainController.updateChecker.canCheckForUpdates && (12 in settingsPage.loadedTabs)
+            active: MainController.updateChecker.canCheckForUpdates && (13 in settingsPage.loadedTabs)
             asynchronous: true
             source: "settings/SettingsUpdateTab.qml"
         }
 
-        // Tab 13: About - lazy loaded on first visit
+        // Tab 14: About - lazy loaded on first visit
         Loader {
             id: aboutLoader
-            active: 13 in settingsPage.loadedTabs
+            active: 14 in settingsPage.loadedTabs
             asynchronous: true
             source: "settings/SettingsAboutTab.qml"
         }
 
-        // Tab 14: Debug - only in debug builds, lazy loaded on first visit
+        // Tab 15: Debug - only in debug builds, lazy loaded on first visit
         Loader {
             id: debugLoader
-            active: Settings.isDebugBuild && (14 in settingsPage.loadedTabs)
+            active: Settings.isDebugBuild && (15 in settingsPage.loadedTabs)
             asynchronous: true
             source: "settings/SettingsDebugTab.qml"
         }

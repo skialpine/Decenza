@@ -591,7 +591,8 @@ set(QML_FILES
     qml/pages/FlowCalibrationPage.qml
     qml/pages/ProfileInfoPage.qml
     qml/pages/settings/SettingsConnectionsTab.qml
-    qml/pages/settings/SettingsPreferencesTab.qml
+    qml/pages/settings/SettingsMachineTab.qml
+    qml/pages/settings/SettingsCalibrationTab.qml
     qml/pages/settings/SettingsScreensaverTab.qml
     qml/pages/settings/SettingsVisualizerTab.qml
     qml/pages/settings/SettingsAITab.qml
