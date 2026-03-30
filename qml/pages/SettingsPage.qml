@@ -51,10 +51,10 @@ Page {
         anchors.topMargin: Theme.pageTopMargin
         anchors.right: parent.right
         anchors.rightMargin: Theme.standardMargin
-        width: Theme.scaled(36)
+        width: Theme.scaled(44)
         height: tabBar.height
-        color: searchMouseArea.containsMouse ? Theme.backgroundColor : "transparent"
-        radius: Theme.scaled(6)
+        color: searchMouseArea.containsMouse ? Theme.surfaceColor : "transparent"
+        radius: Theme.scaled(8)
         z: 3
 
         Accessible.role: Accessible.Button
@@ -65,8 +65,8 @@ Page {
         Image {
             anchors.centerIn: parent
             source: "qrc:/icons/search.svg"
-            sourceSize.width: Theme.scaled(18)
-            sourceSize.height: Theme.scaled(18)
+            sourceSize.width: Theme.scaled(20)
+            sourceSize.height: Theme.scaled(20)
             Accessible.ignored: true
         }
 
@@ -87,7 +87,7 @@ Page {
         anchors.left: parent.left
         anchors.leftMargin: Theme.standardMargin
         anchors.right: searchButton.left
-        anchors.rightMargin: Theme.scaled(4)
+        anchors.rightMargin: Theme.scaled(8)
         z: 2
 
         property bool accessibilityCustomHandler: true
