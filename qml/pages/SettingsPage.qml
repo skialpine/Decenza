@@ -64,14 +64,14 @@ Page {
                     TranslationManager.translate("settings.tab.connections", "Connections"),
                     TranslationManager.translate("settings.tab.machine", "Machine"),
                     TranslationManager.translate("settings.tab.calibration", "Calibration"),
+                    TranslationManager.translate("settings.tab.historyData", "History & Data"),
+                    TranslationManager.translate("settings.tab.themes", "Themes"),
+                    TranslationManager.translate("settings.tab.layout", "Layout"),
                     TranslationManager.translate("settings.tab.screensaver", "Screensaver"),
                     TranslationManager.translate("settings.tab.visualizer", "Visualizer"),
                     TranslationManager.translate("settings.tab.ai", "AI"),
-                    TranslationManager.translate("settings.tab.themes", "Themes"),
-                    TranslationManager.translate("settings.tab.layout", "Layout"),
-                    TranslationManager.translate("settings.tab.languageAccess", "Language & Access"),
-                    TranslationManager.translate("settings.tab.historyData", "History & Data"),
-                    TranslationManager.translate("settings.tab.mqtt", "MQTT")
+                    TranslationManager.translate("settings.tab.mqtt", "MQTT"),
+                    TranslationManager.translate("settings.tab.languageAccess", "Language & Access")
                 ]
                 tabNames.push(TranslationManager.translate("settings.tab.about", "About"))
                 if (Settings.isDebugBuild) tabNames.push(TranslationManager.translate("settings.tab.debug", "Debug"))
@@ -125,6 +125,24 @@ Page {
         }
 
         StyledTabButton {
+            id: historyDataTabButton
+            text: TranslationManager.translate("settings.tab.historyData", "History & Data")
+            tabLabel: TranslationManager.translate("settings.tab.historyData", "History & Data")
+        }
+
+        StyledTabButton {
+            id: themesTabButton
+            text: TranslationManager.translate("settings.tab.themes", "Themes")
+            tabLabel: TranslationManager.translate("settings.tab.themes", "Themes")
+        }
+
+        StyledTabButton {
+            id: layoutTabButton
+            text: TranslationManager.translate("settings.tab.layout", "Layout")
+            tabLabel: TranslationManager.translate("settings.tab.layout", "Layout")
+        }
+
+        StyledTabButton {
             id: screensaverTab
             text: TranslationManager.translate("settings.tab.screensaver", "Screensaver")
             tabLabel: TranslationManager.translate("settings.tab.screensaver", "Screensaver")
@@ -143,18 +161,12 @@ Page {
         }
 
         StyledTabButton {
-            id: themesTabButton
-            text: TranslationManager.translate("settings.tab.themes", "Themes")
-            tabLabel: TranslationManager.translate("settings.tab.themes", "Themes")
+            id: mqttTabButton
+            text: TranslationManager.translate("settings.tab.mqtt", "MQTT")
+            tabLabel: TranslationManager.translate("settings.tab.mqtt", "MQTT")
         }
 
-        StyledTabButton {
-            id: layoutTabButton
-            text: TranslationManager.translate("settings.tab.layout", "Layout")
-            tabLabel: TranslationManager.translate("settings.tab.layout", "Layout")
-        }
-
-        // Language tab with badge for untranslated strings
+        // Language & Access tab with badge for untranslated strings
         StyledTabButton {
             id: languageTabButton
             text: TranslationManager.translate("settings.tab.languageAccess", "Lang & Access")
@@ -189,18 +201,6 @@ Page {
                     }
                 }
             }
-        }
-
-        StyledTabButton {
-            id: historyDataTabButton
-            text: TranslationManager.translate("settings.tab.historyData", "History & Data")
-            tabLabel: TranslationManager.translate("settings.tab.historyData", "History & Data")
-        }
-
-        StyledTabButton {
-            id: mqttTabButton
-            text: TranslationManager.translate("settings.tab.mqtt", "MQTT")
-            tabLabel: TranslationManager.translate("settings.tab.mqtt", "MQTT")
         }
 
         StyledTabButton {
@@ -256,34 +256,18 @@ Page {
             source: "settings/SettingsCalibrationTab.qml"
         }
 
-        // Tab 3: Screensaver/Network - lazy loaded on first visit
+        // Tab 3: History & Data - lazy loaded on first visit
         Loader {
-            id: screensaverLoader
+            id: historyDataLoader
             active: 3 in settingsPage.loadedTabs
             asynchronous: true
-            source: "settings/SettingsScreensaverTab.qml"
+            source: "settings/SettingsHistoryDataTab.qml"
         }
 
-        // Tab 4: Visualizer - lazy loaded on first visit
-        Loader {
-            id: visualizerLoader
-            active: 4 in settingsPage.loadedTabs
-            asynchronous: true
-            source: "settings/SettingsVisualizerTab.qml"
-        }
-
-        // Tab 5: AI - lazy loaded on first visit
-        Loader {
-            id: aiLoader
-            active: 5 in settingsPage.loadedTabs
-            asynchronous: true
-            source: "settings/SettingsAITab.qml"
-        }
-
-        // Tab 6: Themes - lazy loaded on first visit
+        // Tab 4: Themes - lazy loaded on first visit
         Loader {
             id: themesLoader
-            active: 6 in settingsPage.loadedTabs
+            active: 4 in settingsPage.loadedTabs
             asynchronous: true
             source: "settings/SettingsThemesTab.qml"
             onLoaded: {
@@ -293,36 +277,52 @@ Page {
             }
         }
 
-        // Tab 7: Layout - lazy loaded on first visit
+        // Tab 5: Layout - lazy loaded on first visit
         Loader {
             id: layoutLoader
-            active: 7 in settingsPage.loadedTabs
+            active: 5 in settingsPage.loadedTabs
             asynchronous: true
             source: "settings/SettingsLayoutTab.qml"
         }
 
-        // Tab 8: Language & Access - lazy loaded on first visit
+        // Tab 6: Screensaver - lazy loaded on first visit
         Loader {
-            id: languageLoader
+            id: screensaverLoader
+            active: 6 in settingsPage.loadedTabs
+            asynchronous: true
+            source: "settings/SettingsScreensaverTab.qml"
+        }
+
+        // Tab 7: Visualizer - lazy loaded on first visit
+        Loader {
+            id: visualizerLoader
+            active: 7 in settingsPage.loadedTabs
+            asynchronous: true
+            source: "settings/SettingsVisualizerTab.qml"
+        }
+
+        // Tab 8: AI - lazy loaded on first visit
+        Loader {
+            id: aiLoader
             active: 8 in settingsPage.loadedTabs
             asynchronous: true
-            source: "settings/SettingsLanguageTab.qml"
+            source: "settings/SettingsAITab.qml"
         }
 
-        // Tab 9: History & Data - lazy loaded on first visit
-        Loader {
-            id: historyDataLoader
-            active: 9 in settingsPage.loadedTabs
-            asynchronous: true
-            source: "settings/SettingsHistoryDataTab.qml"
-        }
-
-        // Tab 10: Home Automation - lazy loaded on first visit
+        // Tab 9: MQTT / Home Automation - lazy loaded on first visit
         Loader {
             id: homeAutomationLoader
-            active: 10 in settingsPage.loadedTabs
+            active: 9 in settingsPage.loadedTabs
             asynchronous: true
             source: "settings/SettingsHomeAutomationTab.qml"
+        }
+
+        // Tab 10: Language & Access - lazy loaded on first visit
+        Loader {
+            id: languageLoader
+            active: 10 in settingsPage.loadedTabs
+            asynchronous: true
+            source: "settings/SettingsLanguageTab.qml"
         }
 
         // Tab 11: About (merged Update + About) - lazy loaded on first visit

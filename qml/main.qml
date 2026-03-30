@@ -1500,6 +1500,7 @@ ApplicationWindow {
                         updateDialog.close()
                         // Navigate to settings Update tab (index 13)
                         goToSettings(11)  // Navigate to About tab (has update controls)
+
                     }
                 }
             }
@@ -3115,7 +3116,7 @@ ApplicationWindow {
                     onClicked: {
                         emptyDatabaseDialog.close();
                         startBluetoothScan();
-                        goToSettings(9);  // Navigate to History & Data tab
+                        goToSettings(3);  // Navigate to History & Data tab
                     }
                 }
             }
