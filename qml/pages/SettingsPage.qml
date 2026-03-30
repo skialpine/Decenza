@@ -74,7 +74,6 @@ Page {
                     TranslationManager.translate("settings.tab.historyData", "History & Data"),
                     TranslationManager.translate("settings.tab.mqtt", "MQTT")
                 ]
-                if (MainController.updateChecker.canCheckForUpdates) tabNames.push(TranslationManager.translate("settings.tab.update", "Update"))
                 tabNames.push(TranslationManager.translate("settings.tab.about", "About"))
                 if (Settings.isDebugBuild) tabNames.push(TranslationManager.translate("settings.tab.debug", "Debug"))
                 if (currentIndex >= 0 && currentIndex < tabNames.length) {
@@ -212,14 +211,6 @@ Page {
         }
 
         StyledTabButton {
-            id: updateTabButton
-            visible: MainController.updateChecker.canCheckForUpdates
-            text: TranslationManager.translate("settings.tab.update", "Update")
-            tabLabel: TranslationManager.translate("settings.tab.update", "Update")
-            width: visible ? implicitWidth : 0
-        }
-
-        StyledTabButton {
             id: aboutTabButton
             text: TranslationManager.translate("settings.tab.about", "About")
             tabLabel: TranslationManager.translate("settings.tab.about", "About")
@@ -349,26 +340,18 @@ Page {
             source: "settings/SettingsHomeAutomationTab.qml"
         }
 
-        // Tab 12: Update - lazy loaded on first visit (not on iOS - App Store handles updates)
+        // Tab 12: About (merged Update + About) - lazy loaded on first visit
         Loader {
-            id: updateLoader
-            active: MainController.updateChecker.canCheckForUpdates && (12 in settingsPage.loadedTabs)
+            id: aboutLoader
+            active: 12 in settingsPage.loadedTabs
             asynchronous: true
             source: "settings/SettingsUpdateTab.qml"
         }
 
-        // Tab 13: About - lazy loaded on first visit
-        Loader {
-            id: aboutLoader
-            active: 13 in settingsPage.loadedTabs
-            asynchronous: true
-            source: "settings/SettingsAboutTab.qml"
-        }
-
-        // Tab 14: Debug - only in debug builds, lazy loaded on first visit
+        // Tab 13: Debug - only in debug builds, lazy loaded on first visit
         Loader {
             id: debugLoader
-            active: Settings.isDebugBuild && (14 in settingsPage.loadedTabs)
+            active: Settings.isDebugBuild && (13 in settingsPage.loadedTabs)
             asynchronous: true
             source: "settings/SettingsDebugTab.qml"
         }

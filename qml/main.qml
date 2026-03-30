@@ -1499,7 +1499,7 @@ ApplicationWindow {
                         }
                         updateDialog.close()
                         // Navigate to settings Update tab (index 13)
-                        goToSettings(12)
+                        goToSettings(12)  // Navigate to About tab (has update controls)
                     }
                 }
             }

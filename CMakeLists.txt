@@ -602,7 +602,6 @@ set(QML_FILES
     qml/pages/settings/SettingsHistoryDataTab.qml
     qml/pages/settings/SettingsHomeAutomationTab.qml
     qml/pages/settings/SettingsUpdateTab.qml
-    qml/pages/settings/SettingsAboutTab.qml
     qml/pages/settings/SettingsDebugTab.qml
     qml/pages/settings/SettingsLayoutTab.qml
     qml/pages/settings/LayoutEditorZone.qml

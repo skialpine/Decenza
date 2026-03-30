@@ -181,6 +181,96 @@ Item {
                     }
                 }
 
+                // Divider
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: Theme.borderColor
+                    Layout.topMargin: Theme.spacingSmall
+                    Layout.bottomMargin: Theme.spacingSmall
+                }
+
+                // About section
+                Text {
+                    Layout.fillWidth: true
+                    text: "Built by Michael Holm (Kulitorum) during Christmas 2025. Three weeks, lots of coffee, one app."
+                    font: Theme.bodyFont
+                    color: Theme.textColor
+                    wrapMode: Text.Wrap
+                    lineHeight: 1.4
+                }
+
+                Tr {
+                    Layout.fillWidth: true
+                    key: "about.donationMessage"
+                    fallback: "If you find this app useful, donations are welcome but never expected."
+                    font: Theme.bodyFont
+                    color: Theme.textColor
+                    wrapMode: Text.Wrap
+                    lineHeight: 1.4
+                }
+
+                // Donation button
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.topMargin: Theme.spacingSmall
+                    height: Theme.scaled(56)
+                    radius: Theme.buttonRadius
+                    color: "#0070BA"  // PayPal blue
+
+                    Accessible.role: Accessible.Button
+                    Accessible.name: TranslationManager.translate("about.donateViaPaypal", "Donate via PayPal")
+                    Accessible.focusable: true
+                    Accessible.onPressAction: donateArea.clicked(null)
+
+                    MouseArea {
+                        id: donateArea
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: Qt.openUrlExternally("https://www.paypal.com/donate?business=paypal@kulitorum.com")
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: TranslationManager.translate("about.donateViaPaypal", "Donate via PayPal")
+                        font.pixelSize: Theme.scaled(16)
+                        font.bold: true
+                        color: "white"
+                        Accessible.ignored: true
+                    }
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.topMargin: Theme.spacingSmall
+                    text: "paypal@kulitorum.com"
+                    font: Theme.captionFont
+                    color: Theme.textSecondaryColor
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                Image {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: Theme.spacingMedium
+                    source: "qrc:/qrcode.png"
+                    width: Theme.scaled(150)
+                    height: Theme.scaled(150)
+                    fillMode: Image.PreserveAspectFit
+                    sourceSize.width: 150
+                    sourceSize.height: 150
+                }
+
+                // Credits
+                Text {
+                    Layout.fillWidth: true
+                    Layout.topMargin: Theme.spacingSmall
+                    text: "Thanks to the Decent community and the de1app developers for inspiration."
+                    font: Theme.bodyFont
+                    color: Theme.textSecondaryColor
+                    wrapMode: Text.Wrap
+                    lineHeight: 1.4
+                }
+
                 Item { Layout.fillHeight: true }
             }
         }
