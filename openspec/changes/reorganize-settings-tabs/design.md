@@ -1,16 +1,17 @@
 ## Context
 
-The Settings page has 13+ tabs that grew organically. The Preferences tab became a dumping ground for anything that didn't obviously belong elsewhere, accumulating 12+ cards spanning hardware, display, scheduling, and calibration. Server controls are duplicated across History and Data tabs. Theme mode selectors are separated from the theme editor. Users can't find settings intuitively.
+The Settings page has 14 tabs that grew organically. The Preferences tab became a dumping ground for anything that didn't obviously belong elsewhere, accumulating ~19 cards spanning hardware, display, calibration, app modes, and features. Server controls are duplicated across History and Data tabs. There is no way to search for a setting — users must scan through tabs linearly.
 
-This is a UI-only reorganization. No settings are added or removed — only moved between tabs. The C++ Settings class and all Q_PROPERTY bindings remain unchanged.
+This is primarily a UI reorganization. No settings are added or removed — only moved between tabs. The C++ Settings class and all Q_PROPERTY bindings remain unchanged. The one new feature is a settings search dialog.
 
 ## Goals / Non-Goals
 
 - **Goals:**
   - Every setting has exactly one home (eliminate duplication)
   - Each tab has a clear mental model (a user can predict which tab holds a given setting)
-  - No tab requires scrolling past 3 screens of content (break up oversized tabs)
   - Tab names are self-explanatory without domain knowledge
+  - Users can find any setting via search without knowing which tab it's in
+  - Don't degrade well-designed, already-full tabs by dumping overflow into them
 
 - **Non-Goals:**
   - Adding new settings or removing existing ones
@@ -18,341 +19,202 @@ This is a UI-only reorganization. No settings are added or removed — only move
   - Redesigning individual setting cards/widgets
   - Changing navigation patterns (still tab-based)
   - Mobile-specific layout changes (responsive layout is a separate concern)
+  - Moving settings into Connections, Themes, Layout, or other already-full tabs
 
 ## Decisions
 
-### Decision: Move settings by mental model, not by technical category
+### Decision: Rename Preferences → Machine, extract Calibration
 
-Users think in terms of "what am I configuring?" not "what C++ class does this touch?" Group by user intent:
-- **Connections** = "How does the app talk to devices?"
-- **Machine** = "How does the espresso machine behave when idle?"
-- **Display** = "How does the app look on screen?"
-- **Espresso** = "How does the shot workflow behave?"
-- **Sharing & Data** = "Where does my data go?"
+The Preferences tab's core problem is its name (tells users nothing) and the mix of unrelated concerns. Rather than creating multiple thin tabs, we:
 
-### Decision: Decompose Preferences into Machine + Display + Espresso
+1. **Rename** Preferences to Machine — most content is already machine behavior
+2. **Extract** the 5 calibration/measurement cards into a new Calibration tab
+3. **Keep** Theme Mode, Per-Screen Scale, and other app-behavior cards in Machine
 
-The current Preferences tab mixes three distinct mental models:
+This leaves Machine with ~12 cards across 3 columns — manageable with search, and coherent under the "Machine" label.
 
-| Setting | Mental model | New home |
-|---------|-------------|----------|
-| Theme mode (follow system, dark/light) | Display | Display or Themes |
-| Auto-Sleep | Machine behavior | Machine |
-| Post-Shot Review Close | Shot workflow | Espresso |
-| Refill Kit | Machine hardware | Machine |
-| Offline Mode | Machine connection | Machine |
-| Launcher Mode | Device display | Display or Machine |
-| Shot Map | Shot metadata | Espresso or Sharing |
-| Per-Screen Scale | Display zoom | Display |
-| Battery Charging | Machine hardware | Machine |
-| Flow Calibration | Machine calibration | Machine |
-| Ignore SAV with Scale | Shot workflow | Espresso |
-| Water Level | Machine hardware | Machine |
-| Water Refill Threshold | Machine hardware | Machine |
-| Headless Machine | Machine hardware | Machine |
-| Extraction View | Display | Display |
-| Steam Heater | Machine hardware | Machine |
-| Virtual Scale | Device connection | Connections |
-| Auto-Wake Timer | Machine scheduling | Machine |
-| SAW Calibration | Machine calibration | Machine |
-| Heater Calibration | Machine calibration | Machine |
+**What moves to Calibration:**
+
+| Setting | Why it's calibration |
+|---------|---------------------|
+| Flow Calibration | Measures flow accuracy |
+| Stop-at-Weight Calibration | SAW lag tuning |
+| Heater Calibration | Temperature accuracy |
+| Virtual Scale (FlowScale) | Fallback measurement device |
+| Ignore SAV with Scale | Which measurement wins |
+
+### Decision: Don't move settings into already-full tabs
+
+Connections, Themes, Layout, and About are well-designed and dense. Moving Preferences overflow into them solves one problem by creating others. With settings search, perfect organizational placement matters less — users who know what they want find it instantly.
+
+### Decision: Settings search via modal Dialog
+
+A dropdown list is not accessible — TalkBack/VoiceOver cannot trap focus inside it. A modal Dialog solves this naturally.
+
+**Placement:** Search icon on the right end of the tab bar.
+
+**Flow:**
+1. User taps search icon → modal Dialog opens
+2. Text field at top of dialog, scrollable results list below
+3. Results filter live as user types
+4. Each result is an `AccessibleButton` showing setting name + parent tab badge
+5. Tapping a result → dialog closes → switches to tab → scrolls to card → briefly highlights it
+6. Standard dialog close / back gesture to dismiss
+
+**Search index:** A static JS array in `SettingsSearchIndex.js`:
+```js
+[
+    { tabIndex: 1, cardId: "autoSleepCard",
+      title: "Auto-Sleep",
+      description: "Put the machine to sleep after inactivity",
+      keywords: ["timeout", "power", "idle", "sleep"] },
+    // ...
+]
+```
+
+The `keywords` field catches synonyms — searching "power" finds Auto-Sleep even though "power" isn't in the title. When someone adds a new setting card, they add one entry to the index.
+
+**Why navigate-to-card instead of rendering settings inline:** Rendering actual setting widgets outside their tab context is complex (bindings, state, lazy loading). Navigate + highlight is simple, maintainable, and matches iOS/Android Settings.
 
 ### Decision: Merge History + Data, eliminate duplicate server toggle
 
-Current state: `shotServerEnabled` toggle exists in both History tab ("Remote Access") and Data tab ("Share Data"). The Data tab additionally has security (TOTP) and the History tab has shot import. These are two halves of the same concern.
+Current state: `shotServerEnabled` toggle exists in both History tab ("Remote Access") and Data tab ("Share Data"). Merging eliminates the duplicate.
 
-Merged tab layout:
-- Left column: Shot History link + DE1 Import + Server enable + Security
-- Middle column: Backup + Restore
-- Right column: Device Migration + Factory Reset
+**Merged layout — three columns ordered by visit frequency:**
 
-### Decision: Move REST API docs from MQTT to the server/sharing section
-
-The REST API endpoints are part of the HTTP server, not MQTT. They should live next to the server enable toggle.
-
-### Decision: Move theme mode selectors to Display tab (not Themes)
-
-Theme mode selection (follow system, pick dark/light theme) is about display preferences. The Themes tab is a specialized color editor. Users who just want to switch between light and dark mode shouldn't need to find the color editor.
-
-Alternative considered: Move to Themes tab. Rejected because the Themes tab is a creative tool (designing custom color schemes) — mode switching is a simpler display preference.
-
-## Risks / Trade-offs
-
-- **Muscle memory disruption**: Existing users know where settings are. Mitigation: this is a pre-1.0 beta app with ~30 active users; better to fix now than after wider adoption.
-- **Tab count change**: Moving from 13 to 9 tabs changes the tab bar scroll behavior. Mitigation: fewer tabs means less scrolling to find the right one.
-- **Large diff**: Many QML files are touched. Mitigation: the changes are purely structural (cut-paste of existing card components between files). No logic changes.
-- **Merge conflicts with in-flight work**: Other proposals may add settings. Mitigation: this is a reorganization of containers, not content — new settings added before this lands just move to the right tab.
-
-## Migration Plan
-
-1. Create new tab files (Machine, Display)
-2. Move card components from Preferences to new tabs (cut-paste, preserve property bindings)
-3. Merge History + Data into one tab, remove duplicate server toggle
-4. Move Virtual Scale to Connections
-5. Move theme mode to Display
-6. Move REST API from MQTT to Sharing/Data
-7. Create Services tab with summary cards + setup dialogs (AI, MCP, Visualizer, Home Assistant)
-8. Merge Update + About (About content in left column of Update, below toggles)
-9. Delete emptied tabs (Preferences, About, AI, Visualizer, Home Automation)
-10. Update SettingsPage.qml tab bar
-11. Test all settings still bind correctly
-
-Each step is independently testable — settings bindings don't change, only which .qml file contains the UI.
-
-## Internal Reorganization
-
-Tabs that keep their content still benefit from internal restructuring.
-
-### Services Tab — Four summary cards with setup dialogs
-
-**Current layout:** AI, Visualizer, and Home Assistant (MQTT) are three separate tabs. All are "connect to an external service" workflows configured once and rarely revisited. AI additionally mixes two unrelated concerns (AI provider for shot analysis vs MCP server for Claude Desktop).
-
-**Proposed layout:** A single Services tab with four status cards. Each card shows connection status and a [Configure...] button that opens a focused setup dialog.
-
-```
-┌─ Visualizer ──────────────┐  ┌─ AI Assistant ─────────────┐
-│ ● Connected               │  │ ● OpenRouter (GPT-4o)      │
-│ user@visualizer.coffee    │  │                            │
-│ [Configure...]            │  │ [Configure...]             │
-└───────────────────────────┘  └────────────────────────────┘
-
-┌─ MCP Server ──────────────┐  ┌─ Home Assistant ───────────┐
-│ ● Enabled (read-only)     │  │ ○ Not configured           │
-│                           │  │                            │
-│ [Configure...]            │  │ [Set Up...]                │
-└───────────────────────────┘  └────────────────────────────┘
-```
-
-**Dialog contents (~4-6 fields each):**
-
-| Dialog | Fields |
-|--------|--------|
-| **Visualizer** | Account login, upload preferences |
-| **AI Assistant** | Provider picker, API key, provider-specific fields (model, endpoint), cost info, Test Connection + Continue Chat |
-| **MCP Server** | Enable toggle, access level, confirmation settings, Discuss Shot (app picker + custom URL), MCP status |
-| **Home Assistant** | MQTT broker config, auto-discovery toggle, Publish Discovery |
-
-**Why:** These services share a common pattern: configure credentials/settings once, then forget about them. Giving each its own tab wastes tab bar space for content users visit maybe twice. Summary cards let users see at a glance which services are connected. Separating AI from MCP into distinct cards/dialogs keeps each dialog focused — AI provider setup is for shot analysis users, MCP is for Claude Desktop power users.
-
-### Connections Tab — Group by device status, not device type
-
-**Current layout:** Two columns: Machine (left), Scale/Refractometer (right). The right column mixes connected device status, discovery, known devices, inline refractometer settings, and the scan log into one long scroll. Virtual Scale (moving here from Preferences) would add to the clutter.
-
-**Proposed layout:** Keep two columns but restructure the right column into clear sections:
-
-**Left column (Machine) — unchanged:**
-- USB/BLE status, scan button, firmware version (3 lines, matching de1app format — see below), discovered devices, connection log
-
-**Firmware version display:** The firmware field now shows 3 lines matching de1app's format:
-```
-BLE v4.0.0, API v4
-FW v10.5.0, API v250
-pcb=1.3, model=DE1PRO, firmware=v1342
-```
-This is taller than the previous single-line `"FW 250.10.5, BLE 4.0.0"`. The Machine column layout should accommodate multi-line firmware text without clipping. The third line (pcb/model/firmware build) populates asynchronously after BLE MMR reads complete.
-
-**Right column (Scales & Refractometer) — reorganized:**
-
-| Section | Contents |
-|---|---|
-| **Active Devices** | Connected scale (name + battery + tare), Connected refractometer (name + status + auto-read toggle + Read TDS button), Virtual Scale enable toggle |
-| **Known Devices** | Saved scale picker (star icon, dropdown, forget), Saved refractometer (name, type badge, forget) |
-| **Find Devices** | Scan button, discovered devices list with type badges, scale connection alerts toggle |
-| **Log** | Scrolling scan log, Clear + Share Log buttons |
-
-**Why:** Users have three distinct intents when visiting Connections: "check what's connected" (Active), "switch between saved devices" (Known), "pair something new" (Find). The current layout intermixes all three. Clear section headers with dividers make each intent findable.
-
-### Merged History & Data Tab — Four columns, Device Migration gets full space
-
-**Current state:** History tab has shot history + import (left) and server enable + port (right). Data tab has server enable + security (left), backup (middle), device migration (right, 2086 lines total including 6 dialogs). Server toggle is duplicated.
-
-The Device Migration column is the most complex piece: it has 5 distinct states (idle → searching → devices found → TOTP auth prompt → manifest/import with checkboxes and progress). This content expands significantly during operations and should not be squeezed alongside backup/restore.
-
-**Proposed layout:** Three columns ordered by visit frequency, plus a migration dialog button. Device Migration becomes a dialog (see Decision 8) instead of an inline column.
-
-| Shot History (fixed) | Backup (fixed) | Server & Sharing (fixed) |
+| Shot History | Backup | Server & Data |
 |---|---|---|
-| "Shot History →" button | Backup Time dropdown | Enable Server toggle |
-| Total shots count | Backup status + location | Server URL + Copy |
-| *divider* | Storage permission (Android) | Enable Security toggle |
-| Import from DE1 App | "Backup Now" button | TOTP setup / reset |
-| Overwrite toggle | *divider* | *divider* |
-| Import buttons (DE1, ZIP, Folder) | "Restore from Backup" | REST API endpoints |
-| Import progress | Restore button | (from MQTT tab) |
+| "Shot History →" button | Daily Backup config | Enable Server toggle |
+| Total shots count | Backup time selector | Server URL + status |
+| *divider* | Backup location | Enable Security toggle |
+| Import from DE1 App | Storage permission (Android) | TOTP setup / reset |
+| Overwrite toggle | "Backup Now" button | *divider* |
+| Import buttons (DE1, ZIP, Folder) | *divider* | Data summary (shots/profiles) |
+| Import progress | "Restore from Backup" | *divider* |
+| | Restore button | "Import from Another Device" → dialog |
 | | | *divider* |
-| | | Data summary (shots/profiles) |
-| | | *divider* |
-| | | "Import from Another Device" button → opens dialog |
-| | | *divider* |
-| | | Factory Reset (bottom) |
+| | | Factory Reset (bottom, destructive) |
 
-**Why:** Columns ordered by how often users visit them:
-- Col 1: "How many shots do I have and how do I import from de1app?" (most visited)
-- Col 2: "How do I back up and restore?" (periodic)
-- Col 3: "How do I share my data over the network?" (set up once, plus rare operations like migration and factory reset)
+Note: This is a set-it-and-forget-it tab. Once configured, users go to History and Favorites pages directly to view data. The tab is positioned in the Setup cluster accordingly.
 
-Factory Reset stays in the Server column (bottom, after a divider and spacer) — it's a destructive action related to "your data" and should be far from casual reach. Device Migration gets room to show the multi-state workflow without cramming.
+### Decision: Device Migration as dialog flow
 
-**Alternative considered:** Keep Data and History as separate tabs but just fix the duplicate server toggle. Rejected because the mental models overlap too much ("where is my data?") and users still have to check two tabs.
+The 5-state wizard (idle → searching → devices found → TOTP auth → manifest/import) is a rare operation. A dialog matches existing patterns (TOTP setup, ZIP extraction) and keeps the common case clean (just a button in the Server & Data column).
 
-**Alternative considered:** Three columns with Backup + Migration merged. Rejected because the migration column alone has 5 states with auth prompts, manifests, and import progress — combining it with backup/restore would recreate the "too much in one column" problem.
+### Decision: Merge Update + About
 
-### Decision: Device Migration as a dialog flow (preferred) vs inline column
-
-The migration workflow has 5 sequential states:
-1. **Idle** — "Import from Another Device" button
-2. **Searching** — spinner + "Searching..."
-3. **Devices found** — single device card or multi-device dropdown + manual IP entry
-4. **Authenticating** — TOTP code input (when remote device has security enabled)
-5. **Connected** — manifest card with counts, import checkboxes, Import All/Cancel buttons, progress bar
-
-**Option A — Dialog flow (recommended):**
-
-The merged tab shows three columns (Shot History, Server & Sharing, Backup). Below the Backup column or spanning the full width at the bottom, a single card:
-
-```
-┌─────────────────────────────────────────────┐
-│  Import from Another Device                 │
-│  Connect to another Decenza device on your  │
-│  WiFi to import settings, profiles, shots.  │
-│                                             │
-│  [Import from Another Device...]            │
-│                                             │
-│  Factory Reset (destructive, at bottom)     │
-└─────────────────────────────────────────────┘
-```
-
-Clicking the button opens a modal `Dialog` that walks through the 5 states:
-
-```
-Step 1: Search + device selection
-  ┌─────────────────────────────────────┐
-  │  Import from Another Device         │
-  │                                     │
-  │  [Search for Devices]  (spinner)    │
-  │                                     │
-  │  ┌─ Device Card ──────────────────┐ │
-  │  │ Decenza Tablet • 192.168.1.50  │ │
-  │  └────────────────────────────────┘ │
-  │                                     │
-  │  Manual: [192.168.1.x:8888] [Go]   │
-  │                                     │
-  │              [Cancel]               │
-  └─────────────────────────────────────┘
-
-Step 2 (if needed): Authentication
-  ┌─────────────────────────────────────┐
-  │  Authentication Required            │
-  │                                     │
-  │  Enter 6-digit code from your       │
-  │  authenticator app:                 │
-  │                                     │
-  │  [ _ _ _ _ _ _ ]  [Verify]         │
-  │                                     │
-  │        [Cancel]                     │
-  └─────────────────────────────────────┘
-
-Step 3: Review + import
-  ┌─────────────────────────────────────┐
-  │  Connected to: Decenza Tablet       │
-  │                                     │
-  │  ☑ Profiles (42)                   │
-  │  ☑ Shots (1,203)                   │
-  │  ☑ Settings                        │
-  │  ☑ Media (15)                      │
-  │  ☐ AI Conversations (3)            │
-  │                                     │
-  │  [Import Selected]     [Cancel]     │
-  │                                     │
-  │  ████████████░░░░  67%  Importing.. │
-  └─────────────────────────────────────┘
-```
-
-**Advantages:**
-- Common case is clean: one button, not an empty column
-- Dialog can be sized to the content (wider during manifest, narrower during search)
-- Consistent with existing patterns: TOTP setup and ZIP extraction already use modal dialogs
-- The multi-step flow naturally maps to a wizard/dialog mental model
-- Backup settings remain visible behind the dialog
-
-**Option B — Inline column (current approach, adapted to 4-column layout):**
-
-As described in the four-column layout above. The migration column starts with just the button and description, then grows as the user progresses through states.
-
-**Advantages:**
-- No new dialog component needed
-- User sees everything at once without mode switches
-- Consistent with how the tab currently works
-
-**Disadvantage:**
-- The column is mostly empty (just a button + description text) 99% of the time, wasting horizontal space in the common case
-- When active, the column dominates attention and the other three columns become irrelevant context
-
-### Merged About Tab — About content in Update's left column
-
-**Current layout:** Update tab has two columns (version + toggles on left, release notes on right), conditionally hidden on iOS. About tab is a separate full-width page with app name, version, credits, donate button, PayPal QR code.
-
-**Proposed layout:** Merge About content into the bottom of Update's left column, separated by a divider. Release notes keep the full right column. Tab renamed to "About" and always visible. Auto-update controls (check now, beta toggle, status) are conditionally shown via `MainController.updateChecker.canCheckForUpdates` — hidden on iOS where Apple handles updates. Release notes are always shown regardless of platform.
-
-Tapping anywhere in the donation area opens a dialog with the full-size PayPal QR code + an "Open PayPal" link, keeping the left column compact.
+About content (credits, donation) goes in the left column below update toggles. Release notes keep the full right column — no shrinkage. Tab renamed to "About."
 
 ```
 Left column                    Right column
 ┌─────────────────────┐       ┌──────────────────────────────┐
 │ Decenza v1.6.1      │       │ Software Updates (if avail.) │
 │ Build 3194          │       │ ● You're up to date          │
-│                     │       │ [Check Now] [What's New?]    │
+│                     │       │ [Check Now]                  │
 │ Auto-check  [toggle]│       │                              │
 │ Beta        [toggle]│       │ Release Notes — v1.6.1       │
 │ (hidden on iOS)     │       │ ┌────────────────────────────┐│
 │                     │       │ │ ## Changes                 ││
 │   ── divider ──     │       │ │ ...                        ││
-│                     │       │ │ (scrollable)               ││
+│                     │       │ │ (scrollable, full height)  ││
 │ Built by Michael    │       │ │                            ││
 │ Holm (Kulitorum)... │       │ │                            ││
 │                     │       │ └────────────────────────────┘│
 │ Donations welcome   │       │                              │
 │ but never expected. │       │                              │
-│ (tap to donate)     │       │                              │
+│ [Donate via PayPal] │       │                              │
+│ PayPal QR code      │       │                              │
+│                     │       │                              │
+│ Credits text        │       │                              │
 └─────────────────────┘       └──────────────────────────────┘
-
-Donation dialog (on tap):
-┌─────────────────────────────────┐
-│  Donate via PayPal              │
-│                                 │
-│  ┌───────────────────────────┐  │
-│  │                           │  │
-│  │        [QR code]          │  │
-│  │                           │  │
-│  └───────────────────────────┘  │
-│                                 │
-│  paypal@kulitorum.com           │
-│                                 │
-│  [Open PayPal]       [Close]    │
-└─────────────────────────────────┘
 ```
 
-**Why:** The About content (credits + donation teaser) fits in the left column's empty space. The QR code — too large for inline display — lives in a tap-to-open dialog where it can be full-size and easily scannable. The dialog provides both scan and link paths. Tab is always visible (not conditional on update checker), so iOS users see version info, release notes, and donation option.
+### Decision: Merge Language + Accessibility → Language & Access
 
-### Ordering Principles
+Both are set-once, low-traffic tabs. Neither is large enough to justify prime tab-bar real estate. Combined tab name "Language & Access" preserves discoverability for both concerns. With settings search, users typing "TalkBack" or "screen reader" find it regardless.
 
-**Tab order** — two clusters, most-used first within each:
+**Layout:** Language selection on one side, accessibility toggles on the other. Language content is the primary section (more users visit it), accessibility below or in the right column.
 
-1. **Hardware & visual** (visited often): Connections → Machine → Display → Layout → Themes → Screensaver
-2. **Setup-once & meta** (visited rarely): Services → History & Data → Accessibility → Language → About
+## Tab Ordering
 
-Related tabs are adjacent: Display → Layout → Themes → Screensaver are all "how the app looks." Connections → Machine are both hardware. Services groups all external integrations. About is always last.
+Tabs are grouped by user mental model into four clusters, most-used first within each:
 
-**Within-tab ordering** — most-used items first, rare items last:
+| Position | Tab | Cluster | Rationale |
+|---|---|---|---|
+| 0 | Connections | Setup | First thing every user needs |
+| 1 | Machine | Setup | Primary settings after connecting |
+| 2 | Calibration | Setup | Fine-tuning after basics work |
+| 3 | History & Data | Setup | Set-once data configuration |
+| 4 | Themes | Customize | Most popular customization |
+| 5 | Layout | Customize | Related to Themes |
+| 6 | Screensaver | Customize | Related to Layout |
+| 7 | Visualizer | Services | External integration |
+| 8 | AI | Services | External integration |
+| 9 | MQTT | Services | External integration |
+| 10 | Language & Access | System | Set once, rarely revisited |
+| 11 | About | System | Least visited, natural end |
+| 12 | Debug | (debug only) | Always last when visible |
 
-- **Machine**: Power & Sleep → Water → General → Calibration
-- **Display**: Theme mode → Extraction View → Per-Screen Scale → Post-Shot Review Close → Shot Map → Launcher Mode (Android-only, last)
-- **Services**: Visualizer → AI Assistant → MCP Server → Home Assistant
-- **History & Data**: Shot History → Backup → Server & Sharing (migration button + Factory Reset at bottom of Server column)
+Key changes from current order:
+- **History & Data moves up** (from positions 9-10 to 3) — it's in the Setup cluster, configured early then forgotten
+- **Accessibility moves down and merges** — important but set-once; current position 5 is prime real estate wasted on a tab most users visit once
+- **Screensaver moves next to Layout** — both are "how my idle screen looks"
+- **Services cluster together** (Visualizer, AI, MQTT) instead of being scattered
+
+## Within-Tab Card Ordering
+
+### Machine Tab (~12 cards, 3 columns)
+
+Grouped by column theme, most-used at top of each:
+
+| Left: Power & Schedule | Middle: App Behavior | Right: Water & Features |
+|---|---|---|
+| Auto-Sleep | Theme Mode | Water Level Status |
+| Auto-wake Schedule | Shot Review Timer | Water Refill Threshold |
+| Battery/Charging | Screen Zoom | Refill Kit |
+| | Simulation Mode | Shot Map |
+| | Launcher Mode (Android) | |
+
+### Calibration Tab (5 cards)
+
+Ordered by adjustment frequency:
+
+1. **Flow Calibration** — most frequently adjusted, has auto-cal toggle
+2. **Weight Stop Timing** (was "Stop-at-Weight Calibration") — SAW lag, tuned as users dial in
+3. **Heater Calibration** — set once, rarely revisited
+4. **Virtual Scale** — fallback device config, set and forget
+5. **Prefer Weight over Volume** (was "Ignore Stop-at-Volume with Scale") — behavioral override, single toggle
+
+### History & Data Tab (3 columns)
+
+See merged layout table above. Columns ordered left-to-right by visit frequency.
+
+### About Tab (merged)
+
+Left column: Version info → update toggles → divider → About content (story, donate, credits). Right column: Update status + release notes (full height, scrollable, unchanged).
+
+### Language & Access Tab
+
+Language selection as the primary section (visited by more users), accessibility settings as secondary section. Both small enough to fit without scrolling.
+
+## Setting Card Renames
+
+Five setting cards are renamed for clarity. The underlying Q_PROPERTY names and Settings keys are unchanged — only the user-facing labels and translation keys change.
+
+| Current Name | New Name | Problem | Fix |
+|---|---|---|---|
+| Per-Screen Scale | **Screen Zoom** | "Scale" means weighing device throughout the app | Use unambiguous "Zoom" |
+| Close Shot Review Screen | **Shot Review Timer** | Reads like an action button, not a setting | Describe what it is (a timer) |
+| Unlock GUI | **Simulation Mode** | Cryptic — "unlock" what? | Match the card title the toggle lives inside |
+| Ignore Stop-at-Volume with Scale | **Prefer Weight over Volume** | Long, requires understanding SAV + scale interaction | Describe the behavior from user perspective |
+| Stop-at-Weight Calibration | **Weight Stop Timing** | "Calibration" implies adjusting accuracy; it's actually lag timing | Say what you're actually tuning |
+
+## Risks / Trade-offs
+
+- **Muscle memory disruption**: Existing users know where settings are. Mitigation: pre-1.0 beta app with ~30 active users; better to fix now than after wider adoption. Settings search provides an escape hatch for users who can't find something.
+- **Search index maintenance**: New settings require a search index entry. Mitigation: one line per setting, simple format, easy to forget but low consequence (setting still exists in its tab, just not searchable until indexed).
+- **Tab count still 12**: Not dramatically fewer than 14. Mitigation: the real win is search + coherent naming, not count reduction. The two merges (History+Data, Language+Access) eliminate genuine problems (duplicate toggle, wasted tab-bar space).
 
 ## Open Questions
 
-1. **Shot Map** — Espresso tab or Sharing tab? (See proposal Decision 3)
-2. **Launcher Mode** — Display or Machine? (See proposal Decision 5)
-3. **Offline/Simulation Mode** — Machine or Advanced? (See proposal Decision 4)
-4. **Should the new Machine tab have sub-sections** (e.g., collapsible groups for "Power & Sleep", "Water", "Calibration") or flat cards like current Preferences?
+None — all decisions finalized through review.

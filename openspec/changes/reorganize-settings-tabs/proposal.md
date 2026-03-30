@@ -1,95 +1,81 @@
-# Change: Reorganize Settings Tabs for Clarity and Discoverability
+# Change: Reorganize Settings Tabs and Add Settings Search
 
 ## Why
 
-The Settings page has grown to 13+ tabs with settings placed wherever there was room rather than where users would look for them. The Preferences tab alone has become a catch-all with 12+ cards spanning machine hardware, display, scheduling, and calibration. Settings like "Enable Server" appear in two tabs (History and Data). Theme mode selection is in Preferences, not Themes. Scale-related settings are split across Connections and Preferences.
+The Settings page has 14 tabs with settings placed wherever there was room rather than where users would look for them. The Preferences tab alone has become a catch-all with ~19 cards spanning machine hardware, display, calibration, app modes, and services. Settings like "Enable Server" appear in two tabs (History and Data). The tab count (14) exceeds what users can scan without scrolling, and there's no way to search for a specific setting.
 
-A virtual usability study of common user workflows revealed:
-- Users who want to switch dark/light theme go to Themes first, then have to backtrack to Preferences
-- Virtual Scale is in Preferences, not with other scales in Connections
-- "Enable Server" in two tabs (History and Data) confuses users about which is canonical
-- REST API docs are in the MQTT tab, but the HTTP server is enabled in History/Data
-- Device Migration has a 5-state wizard crammed into a column that's empty 99% of the time
-- Steam heater idle behavior is in Preferences, but all other steam settings are on SteamPage
-- The proposed Espresso tab would have only 2 items — too thin for its own tab
+Adding a settings search is the single highest-impact improvement — it makes organizational questions secondary because users who know what they want bypass tabs entirely.
 
 ## What Changes
 
-### Current Tab Structure (13 tabs + 2 conditional)
+### Current Tab Structure (14 tabs + 1 conditional)
 
 | # | Tab | Items | Problem |
 |---|-----|-------|---------|
-| 0 | Connections | Machine BLE/USB, Scale BLE/USB, Refractometer | Missing Virtual Scale |
-| 1 | Preferences | Theme mode, Auto-Sleep, Post-Shot Review, Refill Kit, Offline Mode, Launcher Mode, Shot Map, Per-Screen Scale, Battery Charging, Flow Cal, Ignore SAV, Water Level, Headless toggle, Extraction View, Steam Heater, Virtual Scale, Auto-Wake, SAW Cal, Heater Cal | **Catch-all; 12+ unrelated cards** |
+| 0 | Connections | Machine BLE/USB, Scale BLE/USB, Refractometer | Already full |
+| 1 | Preferences | Theme mode, Auto-Sleep, Post-Shot Review, Refill Kit, Offline Mode, Launcher Mode, Shot Map, Per-Screen Scale, Battery Charging, Flow Cal, Ignore SAV, Water Level, Virtual Scale, Auto-Wake, SAW Cal, Heater Cal, etc. | **Catch-all; ~19 unrelated cards** |
 | 2 | Screensaver | Screensaver type + per-type config | OK |
 | 3 | Visualizer | Account + upload settings | OK |
 | 4 | AI | Provider, MCP server, Discuss Shot | OK |
-| 5 | Accessibility | TTS, tick sounds, extraction announcements | OK |
-| 6 | Themes | Color editor, presets | Missing theme mode selectors |
-| 7 | Layout | Idle page widget editor | OK |
-| 8 | Language | Language picker + translation tools | OK |
+| 5 | Accessibility | TTS, tick sounds, extraction announcements | Small, rarely visited |
+| 6 | Themes | Color editor, presets | Already busy |
+| 7 | Layout | Idle page widget editor | Already busy |
+| 8 | Language | Language picker + translation tools | Small, rarely visited |
 | 9 | History | Shot history link, DE1 import, **Remote Access** | Server toggle duplicated from Data |
 | 10 | Data | **Server toggle (duplicate)**, Security, Backup, Device Migration, Factory Reset | Overlaps History |
-| 11 | MQTT | MQTT config, Home Assistant, **REST API docs** | REST API doesn't belong here |
-| 12 | Update | Version, auto-update, beta toggle | OK |
-| 13 | About | Credits, donate | Too small for own tab |
-| 14 | Debug | Resolution, simulation, profile converter | OK (debug only) |
+| 11 | MQTT | MQTT config, Home Assistant | OK |
+| 12 | Update | Version, auto-update, beta toggle, release notes | OK but small |
+| 13 | About | Credits, donate | OK but small |
+| 14 | Debug | Resolution, simulation (debug builds only) | OK |
 
-### Proposed Tab Structure (9 tabs)
+### Proposed Tab Structure (12 tabs + 1 conditional)
 
 | # | Tab | Contents | Source |
 |---|-----|----------|--------|
-| 0 | **Connections** | Machine BLE/USB, Scale BLE/USB, Refractometer, Virtual Scale. Internal reorg: Active Devices → Known Devices → Find Devices → Log | Connections + Preferences(Virtual Scale) |
-| 1 | **Machine** | Sections (most-used first): **Power & Sleep** (Auto-Sleep, Auto-Wake, Battery Charging), **Water** (Water Level, Refill Kit, Refill Threshold), **General** (Headless, Offline/Simulation Mode, Ignore SAV with Scale), **Calibration** (Flow Cal, SAW Cal, Heater Cal) | Preferences (hardware items) |
-| 2 | **Display** | Ordered by frequency: Theme mode (follow system, dark/light selectors), Extraction View (Chart/Cup Fill), Per-Screen Scale, Post-Shot Review Close timer, Shot Map, Launcher Mode (Android) | Preferences (display items) |
-| 3 | **Layout** | Unchanged | Layout |
-| 4 | **Themes** | Color editor, presets (unchanged) | Themes (minus mode selectors) |
-| 5 | **Screensaver** | Unchanged | Screensaver |
-| 6 | **Services** | Four summary cards ordered by usage: **Visualizer** (account + upload prefs), **AI Assistant** (provider, API key, model, test connection), **MCP Server** (enable, access level, confirmation, Discuss Shot), **Home Assistant** (MQTT broker, auto-discovery, publish). Each dialog is ~4-6 fields. | AI + Visualizer + MQTT merged |
-| 7 | **History & Data** | Three columns ordered by visit frequency + migration dialog. **Shot History** (history link, DE1 import), **Backup** (daily backup, restore), **Server & Sharing** (server enable + security + TOTP + REST API docs, Factory Reset at bottom). "Import from Another Device" button opens stepped dialog. | History + Data merged, REST API from MQTT |
-| 8 | **Accessibility** | Unchanged | Accessibility |
-| 9 | **Language** | Unchanged | Language |
-| 10 | **About** | Version + update controls + credits + donate | Update + About merged |
+| 0 | **Connections** | Unchanged | Connections |
+| 1 | **Machine** | Renamed from Preferences. Calibration items removed, rest stays: Theme Mode, Auto-Sleep, Auto-Wake, Shot Review Timer, Refill Kit, Simulation Mode, Launcher Mode, Shot Map, Screen Zoom, Battery Charging, Water Level, Water Refill Threshold | Preferences (minus calibration) |
+| 2 | **Calibration** | Flow Calibration, Weight Stop Timing, Heater Calibration, Virtual Scale, Prefer Weight over Volume | Preferences (calibration items) |
+| 3 | **History & Data** | Three columns: Shot History, Backup, Server & Data. Single server toggle. Device Migration as dialog. | History + Data merged |
+| 4 | **Themes** | Unchanged | Themes |
+| 5 | **Layout** | Unchanged | Layout |
+| 6 | **Screensaver** | Unchanged | Screensaver |
+| 7 | **Visualizer** | Unchanged | Visualizer |
+| 8 | **AI** | Unchanged | AI |
+| 9 | **MQTT** | Unchanged | MQTT |
+| 10 | **Language & Access** | Language picker + translation tools + Accessibility settings (TTS, tick sounds, extraction announcements) | Language + Accessibility merged |
+| 11 | **About** | Version + update controls + release notes (full width) + credits + donate | Update + About merged |
+| 12 | **Debug** | Unchanged (debug builds only, always last) | Debug |
 
 ### What Moves Where (complete mapping)
 
 | Setting | From | To | Rationale |
 |---------|------|----|-----------|
-| Theme mode (follow system, dark/light) | Preferences | **Display** | Users try Themes tab first; this is a display preference |
-| Auto-Sleep | Preferences | **Machine** | Machine power behavior |
-| Auto-Wake Timer | Preferences | **Machine** | Machine scheduling |
-| Battery Charging | Preferences | **Machine** | Machine hardware |
-| Water Level + Refill Threshold | Preferences | **Machine** | Machine hardware |
-| Refill Kit | Preferences | **Machine** | Machine hardware |
-| Headless Machine toggle | Preferences | **Machine** | Machine hardware |
-| Offline/Simulation Mode | Preferences | **Machine** | Replaces machine connection |
-| Ignore SAV with Scale | Preferences | **Machine** | How the machine stops extraction |
-| Flow Calibration | Preferences | **Machine** | Machine calibration |
-| SAW Calibration | Preferences | **Machine** | Machine calibration |
-| Heater Calibration | Preferences | **Machine** | Machine calibration |
-| Extraction View (Chart/Cup) | Preferences | **Display** | Visual preference |
-| Per-Screen Scale | Preferences | **Display** | Visual preference |
-| Post-Shot Review Close timer | Preferences | **Display** | How long a UI element stays visible |
-| Shot Map | Preferences | **Display** | Shot metadata display; screensaver tie-in |
-| Launcher Mode (Android) | Preferences | **Display** | How the app presents on home screen |
-| Virtual Scale (FlowScale) | Preferences | **Connections** | Scale alternative belongs with scales |
-| REST API docs | MQTT | **History & Data** | Part of HTTP server, not MQTT |
+| Flow Calibration | Preferences | **Calibration** | Measurement tuning |
+| SAW Calibration (→ "Weight Stop Timing") | Preferences | **Calibration** | Measurement tuning |
+| Heater Calibration | Preferences | **Calibration** | Measurement tuning |
+| Virtual Scale (FlowScale) | Preferences | **Calibration** | Fallback measurement device |
+| Ignore SAV with Scale (→ "Prefer Weight over Volume") | Preferences | **Calibration** | Measurement override behavior |
+| All other Preferences items | Preferences | **Machine** (renamed) | Stay in place, tab renamed |
 | Server toggle (duplicate) | History + Data | **History & Data** (single) | Eliminate duplication |
 | About content | About tab | **About** (merged with Update) | Too small for own tab |
+| Accessibility settings | Accessibility tab | **Language & Access** | Both set-once, rarely visited |
 
-### What Moves OUT of Settings Entirely
+### Setting Card Renames (clarity improvements)
 
-| Setting | From | To | Rationale |
-|---------|------|----|-----------|
-| `keepSteamHeaterOn` | Preferences (→ would go to Machine) | **SteamPage** settings view | Steam behavior preference; all other steam settings are on SteamPage |
-| `steamAutoFlushSeconds` | Preferences (→ would go to Machine) | **SteamPage** settings view | "What happens after steaming" belongs with steam controls |
+| Current Name | New Name | Rationale |
+|---|---|---|
+| Per-Screen Scale | **Screen Zoom** | "Scale" means weighing device in this app — ambiguous |
+| Close Shot Review Screen | **Shot Review Timer** | Describes what it is (a timer), not an action |
+| Unlock GUI | **Simulation Mode** | Match the card title, say what it does |
+| Ignore Stop-at-Volume with Scale | **Prefer Weight over Volume** | User-facing behavior, not technical jargon |
+| Stop-at-Weight Calibration | **Weight Stop Timing** | It's about timing lag, not measurement accuracy |
 
-### What Gets Removed
+### What Gets Added
 
-| Item | Action | Rationale |
-|------|--------|-----------|
-| `AISettingsPage.qml` | Remove; deep-link to Settings → AI instead | Stale duplicate of AI tab, missing OpenRouter fields |
-| Duplicate server toggle in History tab | Remove | Single source of truth in merged History & Data tab |
+| Item | Description |
+|------|-------------|
+| **Settings Search** | Search icon in tab bar opens a modal Dialog with text field and filtered results. Tapping a result navigates to the correct tab and highlights the target card. |
+| **Search Index** | JS array of `{ tabIndex, cardId, title, description, keywords }` for all searchable settings |
 
 ### What Stays on Operation Pages (confirmed correct)
 
@@ -100,62 +86,54 @@ A virtual usability study of common user workflows revealed:
 | Flush presets (flow, duration) | FlushPage | Contextual adjustment during operation |
 | Bean/DYE metadata | BeanInfoPage, PostShotReviewPage | Pre/post-shot workflow, not a preference |
 | Profile selection | IdlePage, ProfileSelectorPage | Changes per shot |
-| Shot history sort | ShotHistoryPage | Display preference for that specific page |
-| AutoFavorites preferences (groupBy, maxItems) | AutoFavoritesPage gear popup | Niche feature preferences, in-context |
 
-## Decisions (finalized from usability study)
+## Decisions
 
-**Decision 1: Screensaver — own tab.** 6 screensaver types with unique sub-settings. Too much for Display.
+**Decision 1: Rename Preferences → Machine, don't create Display or Espresso tabs.** The Preferences tab's problem is its name and the calibration clutter, not its size. With calibration items extracted and search added, ~12 coherent machine/app-behavior cards under a clear name is fine. Creating thin tabs (Display with 2-3 cards, Espresso with 2 cards) introduces new problems.
 
-**Decision 2: AI, Visualizer, and Home Assistant — merge into Services tab.** All three are "connect to an external service" flows set up once and rarely revisited. Each gets a summary card (status + configure button) on the tab, with full configuration in a focused dialog. AI API setup and MCP Server setup are separate cards/dialogs since they serve different audiences (shot analysis vs Claude Desktop power users). ~4-6 fields per dialog keeps them manageable.
+**Decision 2: New Calibration tab.** Flow Cal, SAW Cal, Heater Cal, Virtual Scale, and Ignore SAV with Scale are all "dialing in measurement accuracy." They're the most technical cards in Preferences and the same user visits all of them during setup. Extracting them makes Machine more approachable.
 
-**Decision 3: Shot Map — Display tab.** It has screensaver tie-in (Shot Map screensaver type) and is a display/metadata preference. The Espresso tab was eliminated (too thin).
+**Decision 3: Don't move settings into already-full tabs.** Connections, Themes, Layout, and About are already well-designed and dense. Moving overflow into them degrades pages that work. Settings search reduces the importance of perfect placement.
 
-**Decision 4: Offline/Simulation Mode — Machine tab.** It replaces the machine connection.
+**Decision 4: Settings Search via modal Dialog.** A search icon in the tab bar opens a modal Dialog (not a dropdown — dropdowns are inaccessible with TalkBack/VoiceOver). Results are `AccessibleButton` delegates. Tapping a result closes the dialog, switches to the tab, scrolls to the card, and briefly highlights it. A static JS search index keeps maintenance simple.
 
-**Decision 5: Launcher Mode — Display tab.** It's how the app presents on the Android home screen.
+**Decision 5: Merge History + Data.** Eliminates duplicate server toggle. Three-column layout: Shot History | Backup | Server & Data. Device Migration as dialog (matches existing TOTP/ZIP extraction patterns).
 
-**Decision 6: Update + About — merge into "About" tab.** About content (credits, donation teaser) goes in the left column below the update toggles. PayPal QR code opens in a dialog on tap (too large for inline). Tab renamed to "About" and always visible — auto-update controls are conditionally hidden on iOS, but release notes and donation are always shown.
+**Decision 6: Merge Update + About.** About content (credits, donation) in the left column below update toggles. Release notes keep the full right column — no shrinkage. Tab renamed to "About."
 
-**Decision 7: History + Data — merge.** Eliminates duplicate server toggle. Four-section layout with migration as dialog.
+**Decision 7: Merge Language + Accessibility → Language & Access.** Both are set-once, low-traffic tabs. Combined tab uses the existing short label "Access" from the Accessibility tab. With search, users typing "screen reader" or "TalkBack" find it regardless of tab name.
 
-**Decision 8: Device Migration — dialog flow.** The 5-state wizard is a rare operation that clutters the common case. A stepped modal matches existing patterns (TOTP setup, ZIP extraction).
+**Decision 8: Tab ordering by user mental model.** Four clusters: Setup (Connections → Machine → Calibration → History & Data), Customize (Themes → Layout → Screensaver), Services (Visualizer → AI → MQTT), System (Language & Access → About). Most-visited tabs first within each cluster. Debug always last when visible.
 
-**Decision 9: Screensaver video categories — keep as-is.** Clean binary toggle.
+**Decision 9: Within-tab card ordering by frequency.** Machine: Power & Schedule (left) → App Behavior (middle) → Water & Features (right). Calibration: Flow Cal → Weight Stop Timing → Heater Cal → Virtual Scale → Prefer Weight over Volume. Most-adjusted settings at top of each column.
 
-**Decision 10 (new): Espresso tab — eliminated.** Only 2 items (Post-Shot Review timer, Ignore SAV) didn't justify a tab. Post-Shot Review timer → Display (UI duration), Ignore SAV → Machine (extraction behavior).
-
-**Decision 11 (new): Steam heater settings — move to SteamPage.** `keepSteamHeaterOn` and `steamAutoFlushSeconds` are steam behavior preferences. All other steam settings already live on SteamPage.
-
-**Decision 12 (new): AISettingsPage duplicate — remove.** Deep-link to Settings → AI tab instead. Current duplicate is missing OpenRouter fields.
+**Decision 10: Rename confusing setting cards.** Five cards get clearer names: "Per-Screen Scale" → "Screen Zoom" (avoids confusion with weighing scales), "Close Shot Review Screen" → "Shot Review Timer", "Unlock GUI" → "Simulation Mode", "Ignore Stop-at-Volume with Scale" → "Prefer Weight over Volume", "Stop-at-Weight Calibration" → "Weight Stop Timing". Translation keys updated accordingly.
 
 ## Cross-Tab References to Update
 
-These user-visible strings reference old tab names and need updating:
-
 | File | Current text | New text |
 |------|-------------|----------|
-| `main.qml` | "Settings → Bluetooth" | "Settings → Connections" (already correct?) |
 | `ConversationOverlay.qml` | "Settings → Shot History" | "Settings → History & Data" |
-| `SettingsHomeAutomationTab.qml` | "Shot History tab" | Remove (REST API moves to History & Data) |
 | `SettingsDataTab.qml` | "Shot History settings" | "History & Data" |
+| Any reference to "Preferences" tab | "Preferences" | "Machine" |
+| Any reference to "Accessibility" tab | "Accessibility" | "Language & Access" |
 
 ## Impact
 
 - Affected code:
-  - `qml/pages/SettingsPage.qml` — tab bar restructure (13 → 9 tabs)
-  - `qml/pages/settings/SettingsPreferencesTab.qml` — decomposed into Machine + Display
+  - `qml/pages/SettingsPage.qml` — tab bar restructure (14 → 12 tabs), add search icon + search dialog
+  - `qml/pages/settings/SettingsPreferencesTab.qml` — renamed to `SettingsMachineTab.qml`, calibration cards removed
+  - `qml/pages/settings/SettingsCalibrationTab.qml` — new file with 5 calibration cards
   - `qml/pages/settings/SettingsShotHistoryTab.qml` — merged with Data
-  - `qml/pages/settings/SettingsDataTab.qml` — merged with History, remove duplicate server toggle, migration becomes dialog
-  - `qml/pages/settings/SettingsConnectionsTab.qml` — receive Virtual Scale, internal reorg (Active → Known → Find → Log)
-  - `qml/pages/settings/SettingsAITab.qml` — replaced by Services tab card + AI setup dialog
-  - `qml/pages/settings/SettingsVisualizerTab.qml` — replaced by Services tab card + Visualizer setup dialog
-  - `qml/pages/settings/SettingsHomeAutomationTab.qml` — replaced by Services tab card + Home Assistant setup dialog
-  - `qml/pages/settings/SettingsUpdateTab.qml` — merge with About (About content in left column below toggles)
+  - `qml/pages/settings/SettingsDataTab.qml` — merged with History, remove duplicate server toggle
+  - `qml/pages/settings/SettingsUpdateTab.qml` — merge with About
   - `qml/pages/settings/SettingsAboutTab.qml` — merge into About
-  - `qml/pages/SteamPage.qml` — receive `keepSteamHeaterOn` + `steamAutoFlushSeconds`
-  - `qml/pages/AISettingsPage.qml` — remove, replace with deep-link to Settings → Services
-  - New files: `SettingsMachineTab.qml`, `SettingsDisplayTab.qml`, `SettingsServicesTab.qml`, `DeviceMigrationDialog.qml`, `AISetupDialog.qml`, `MCPSetupDialog.qml`, `VisualizerSetupDialog.qml`, `HomeAssistantSetupDialog.qml`, `DonateDialog.qml`
-  - Removed files: `SettingsPreferencesTab.qml` (split), `SettingsAboutTab.qml` (merged), `SettingsAITab.qml` (moved to Services), `SettingsVisualizerTab.qml` (moved to Services), `SettingsHomeAutomationTab.qml` (moved to Services), `AISettingsPage.qml` (duplicate removed)
-  - String updates: 3-4 cross-tab reference strings in QML files
-  - `qml/main.qml` — update `goToSettings()` tab indices for deep-links (Data restore, Update notification)
+  - `qml/pages/settings/SettingsLanguageTab.qml` — receive Accessibility content
+  - `qml/pages/settings/SettingsAccessibilityTab.qml` — merged into Language & Access
+  - `qml/pages/settings/SettingsSearchDialog.qml` — new search dialog
+  - `qml/components/SettingsSearchIndex.js` — new search index
+  - `qml/main.qml` — update `goToSettings()` tab indices for deep-links
+  - New files: `SettingsCalibrationTab.qml`, `SettingsSearchDialog.qml`, `SettingsSearchIndex.js`
+  - Renamed files: `SettingsPreferencesTab.qml` → `SettingsMachineTab.qml`
+  - Removed files: `SettingsAboutTab.qml` (merged), `SettingsAccessibilityTab.qml` (merged)
+  - String updates: cross-tab reference strings in QML files
