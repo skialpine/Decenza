@@ -2,7 +2,6 @@
 #include "scalelogging.h"
 #include "../protocol/de1characteristics.h"
 #include <algorithm>
-#include <QDateTime>
 #include <QTimer>
 
 #define DECENT_LOG(msg)  SCALE_LOG("DecentScale", msg)
@@ -36,6 +35,7 @@ DecentScale::DecentScale(ScaleBleTransport* transport, QObject* parent)
 }
 
 DecentScale::~DecentScale() {
+    stopWatchdog();
     stopHeartbeat();
     if (m_transport) {
         m_transport->disconnectFromDevice();
@@ -61,9 +61,8 @@ void DecentScale::onTransportConnected() {
 
 void DecentScale::onTransportDisconnected() {
     DECENT_WARN("Transport disconnected");
+    stopWatchdog();
     stopHeartbeat();
-    m_lastNotificationEnableMs = 0;
-    m_lastScalePacketMs = 0;
     setConnected(false);
 }
 
@@ -98,19 +97,18 @@ void DecentScale::onCharacteristicsDiscoveryFinished(const QBluetoothUuid& servi
 
     DECENT_LOG("Characteristics discovered");
     m_characteristicsReady = true;
-    m_lastScalePacketMs = QDateTime::currentMSecsSinceEpoch();
     setConnected(true);
 
     // Start periodic heartbeat to keep connection alive
     startHeartbeat();
 
-    // Follow de1app sequence EXACTLY:
+    // Follow de1app sequence EXACTLY (temporal order):
     // 1. Heartbeat immediately
-    // 2. Heartbeat at 2000ms
-    // 3. LCD at 200ms
-    // 4. Enable notifications at 300ms
-    // 5. Enable notifications at 400ms (again for reliability)
-    // 6. LCD at 500ms (in case first was dropped)
+    // 2. LCD at 200ms
+    // 3. Enable notifications at 300ms
+    // 4. Enable notifications at 400ms (again for reliability)
+    // 5. LCD at 500ms (in case first was dropped)
+    // 6. Heartbeat at 2000ms
 
     DECENT_LOG("Starting de1app-style wake sequence");
 
@@ -127,13 +125,13 @@ void DecentScale::onCharacteristicsDiscoveryFinished(const QBluetoothUuid& servi
     // Enable BLE notifications at 300ms
     QTimer::singleShot(300, this, [this]() {
         if (!m_transport || !m_characteristicsReady) return;
-        enableWeightNotifications("300ms", true);
+        enableWeightNotifications("300ms");
     });
 
     // Enable BLE notifications again at 400ms (de1app does this twice for reliability)
     QTimer::singleShot(400, this, [this]() {
         if (!m_transport || !m_characteristicsReady) return;
-        enableWeightNotifications("400ms retry", true);
+        enableWeightNotifications("400ms retry");
     });
 
     // LCD enable again at 500ms (in case first was dropped)
@@ -142,6 +140,9 @@ void DecentScale::onCharacteristicsDiscoveryFinished(const QBluetoothUuid& servi
         DECENT_LOG("Sending wake/LCD command again (500ms)");
         wake();
     });
+
+    // Start watchdog (1s timeout allows pending 300/400ms notification enables to trigger data flow)
+    startWatchdog();
 
     // Heartbeat at 2000ms
     QTimer::singleShot(2000, this, [this]() {
@@ -153,8 +154,8 @@ void DecentScale::onCharacteristicsDiscoveryFinished(const QBluetoothUuid& servi
 
 void DecentScale::onCharacteristicChanged(const QBluetoothUuid& characteristicUuid,
                                           const QByteArray& value) {
-    m_lastScalePacketMs = QDateTime::currentMSecsSinceEpoch();
     if (characteristicUuid == Scale::Decent::READ) {
+        tickleWatchdog();
         parseWeightData(value);
     }
 }
@@ -189,38 +190,77 @@ void DecentScale::parseWeightData(const QByteArray& data) {
 }
 
 void DecentScale::sendKeepAlive() {
-    enableWeightNotifications("periodic keepalive");
+    // Base class 30s timer still fires, but this override intentionally does nothing.
+    // The 1s heartbeat handles keep-alive, and the watchdog handles stale data detection.
 }
 
-void DecentScale::enableWeightNotifications(const QString& reason, bool force) {
+void DecentScale::enableWeightNotifications(const QString& reason) {
     if (!m_transport || !m_characteristicsReady) return;
+    DECENT_LOG(QString("Enabling notifications (%1)").arg(reason));
+    m_transport->enableNotifications(Scale::Decent::SERVICE, Scale::Decent::READ);
+}
 
-    // Base class calls sendKeepAlive() every 30s. We throttle actual BLE
-    // notification re-enables to every 5 minutes since they're disruptive
-    // (causes a brief gap in data). If no scale packets arrive within 45s
-    // (missing ~1.5 keepalive cycles), re-enable immediately as notifications
-    // may have been silently dropped by the BLE stack.
-    constexpr qint64 kMinRefreshMs = 5 * 60 * 1000;
-    constexpr qint64 kStaleDataMs = 45 * 1000;
-    const qint64 now = QDateTime::currentMSecsSinceEpoch();
-
-    const bool dataStale = (m_lastScalePacketMs > 0) && ((now - m_lastScalePacketMs) >= kStaleDataMs);
-    const bool recentRefresh = (m_lastNotificationEnableMs > 0) && ((now - m_lastNotificationEnableMs) < kMinRefreshMs);
-
-    if (dataStale) {
-        DECENT_WARN(QString("Weight data STALE for %1 ms - re-enabling notifications")
-                    .arg(now - m_lastScalePacketMs));
+void DecentScale::startWatchdog() {
+    if (!m_watchdogTimer) {
+        m_watchdogTimer = new QTimer(this);
+        m_watchdogTimer->setSingleShot(true);
+        connect(m_watchdogTimer, &QTimer::timeout, this, &DecentScale::onWatchdogFired);
     }
+    m_watchdogUpdatesSeen = false;
+    m_watchdogRetries = 0;
+    // Initial timeout: verify weight data starts flowing within 1s
+    m_watchdogTimer->start(kWatchdogFirstTimeoutMs);
+    DECENT_LOG(QString("Watchdog started (initial %1ms timeout)").arg(kWatchdogFirstTimeoutMs));
+}
 
-    if (!force && recentRefresh && !dataStale) {
+void DecentScale::stopWatchdog() {
+    if (m_watchdogTimer) {
+        m_watchdogTimer->stop();
+    }
+    m_watchdogUpdatesSeen = false;
+    m_watchdogRetries = 0;
+}
+
+void DecentScale::tickleWatchdog() {
+    if (!m_watchdogTimer) return;
+    m_watchdogUpdatesSeen = true;
+    m_watchdogRetries = 0;
+    // Reset to subsequent timeout: 2s until next expected update
+    m_watchdogTimer->start(kWatchdogTickleTimeoutMs);
+}
+
+void DecentScale::onWatchdogFired() {
+    if (!m_transport || !m_characteristicsReady) {
+        DECENT_WARN("Watchdog fired but transport/characteristics not ready — stopping watchdog");
+        stopWatchdog();
         return;
     }
 
-    if (dataStale || force) {
-        DECENT_LOG(QString("Enabling notifications (%1)").arg(reason));
+    m_watchdogRetries++;
+
+    if (!m_watchdogUpdatesSeen) {
+        // Never received any weight data since connection
+        DECENT_WARN(QString("Watchdog: no initial weight data (retry %1/%2)")
+                    .arg(m_watchdogRetries).arg(kWatchdogMaxRetries));
+    } else {
+        // Was receiving data but it stopped
+        DECENT_WARN(QString("Watchdog: weight data stale for >%1ms (retry %2/%3)")
+                    .arg(kWatchdogTickleTimeoutMs).arg(m_watchdogRetries).arg(kWatchdogMaxRetries));
     }
-    m_transport->enableNotifications(Scale::Decent::SERVICE, Scale::Decent::READ);
-    m_lastNotificationEnableMs = now;
+
+    if (m_watchdogRetries >= kWatchdogMaxRetries) {
+        DECENT_WARN("Watchdog: max retries exhausted, disconnecting scale for reconnection");
+        stopWatchdog();
+        stopHeartbeat();
+        m_transport->disconnectFromDevice();
+        return;
+    }
+
+    // Re-enable notifications and restart watchdog
+    enableWeightNotifications(QString("watchdog retry %1").arg(m_watchdogRetries));
+    if (m_watchdogTimer) {
+        m_watchdogTimer->start(m_watchdogUpdatesSeen ? kWatchdogTickleTimeoutMs : kWatchdogFirstTimeoutMs);
+    }
 }
 
 void DecentScale::sendCommand(const QByteArray& command) {
@@ -263,6 +303,7 @@ void DecentScale::resetTimer() {
 }
 
 void DecentScale::sleep() {
+    stopWatchdog();
     stopHeartbeat();
     if (!m_transport || !m_characteristicsReady) {
         emit sleepCompleted();
@@ -279,6 +320,12 @@ void DecentScale::wake() {
     // Command 0A 01 01 00 01 enables LCD (grams mode)
     // Must match official de1app: 03 0A 01 01 00 01 [xor]
     sendCommand(QByteArray::fromHex("0A01010001"));
+
+    // Restart heartbeat and watchdog if they were stopped by sleep()
+    if (m_characteristicsReady) {
+        startHeartbeat();
+        startWatchdog();
+    }
 }
 
 void DecentScale::disableLcd() {
