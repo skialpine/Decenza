@@ -253,7 +253,7 @@ Dialog {
                     StyledTextField {
                         id: manualIpField
                         Layout.fillWidth: true
-                        placeholderText: "192.168.1.100:8888"
+                        placeholder: "192.168.1.100:8888"
 
                         // Auto-focus when visible
                         onVisibleChanged: {
@@ -338,7 +338,7 @@ Dialog {
                     font.pixelSize: Theme.scaled(16)
                     font.bold: true
                     font.letterSpacing: Theme.scaled(3)
-                    placeholderText: ""
+                    placeholder: ""
                     accessibleName: TranslationManager.translate("settings.data.migrationTotpFieldAccessible",
                         "Six digit authenticator code for remote device")
 
