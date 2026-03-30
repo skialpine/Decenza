@@ -602,6 +602,7 @@ set(QML_FILES
     qml/pages/settings/SettingsHomeAutomationTab.qml
     qml/pages/settings/SettingsUpdateTab.qml
     qml/pages/settings/SettingsDebugTab.qml
+    qml/pages/settings/SettingsSearchDialog.qml
     qml/pages/settings/SettingsLayoutTab.qml
     qml/pages/settings/LayoutEditorZone.qml
     qml/pages/settings/AddLanguagePage.qml
@@ -671,6 +672,7 @@ set(QML_FILES
     qml/components/CrtShaderEffect.qml
     qml/components/QrCode.qml
     qml/components/qrcode.js
+    qml/components/SettingsSearchIndex.js
 
     qml/components/layout/LayoutItemDelegate.qml
     qml/components/layout/LayoutBarZone.qml

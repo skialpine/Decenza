@@ -44,6 +44,41 @@ Page {
         }
     }
 
+    // Search button (right end of tab bar)
+    Rectangle {
+        id: searchButton
+        anchors.top: parent.top
+        anchors.topMargin: Theme.pageTopMargin
+        anchors.right: parent.right
+        anchors.rightMargin: Theme.standardMargin
+        width: Theme.scaled(36)
+        height: tabBar.height
+        color: searchMouseArea.containsMouse ? Theme.backgroundColor : "transparent"
+        radius: Theme.scaled(6)
+        z: 3
+
+        Accessible.role: Accessible.Button
+        Accessible.name: TranslationManager.translate("settings.search.button", "Search settings")
+        Accessible.focusable: true
+        Accessible.onPressAction: searchMouseArea.clicked(null)
+
+        Image {
+            anchors.centerIn: parent
+            source: "qrc:/icons/search.svg"
+            sourceSize.width: Theme.scaled(18)
+            sourceSize.height: Theme.scaled(18)
+            Accessible.ignored: true
+        }
+
+        MouseArea {
+            id: searchMouseArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: settingsSearchDialog.open()
+        }
+    }
+
     // Tab bar at top
     TabBar {
         id: tabBar
@@ -51,6 +86,8 @@ Page {
         anchors.topMargin: Theme.pageTopMargin
         anchors.left: parent.left
         anchors.leftMargin: Theme.standardMargin
+        anchors.right: searchButton.left
+        anchors.rightMargin: Theme.scaled(4)
         z: 2
 
         property bool accessibilityCustomHandler: true
@@ -444,6 +481,15 @@ Page {
                     }
                 }
             }
+        }
+    }
+
+    // Settings search dialog
+    SettingsSearchDialog {
+        id: settingsSearchDialog
+        onResultSelected: function(tabIndex) {
+            settingsPage.markTabLoaded(tabIndex)
+            tabBar.currentIndex = tabIndex
         }
     }
 
