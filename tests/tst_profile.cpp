@@ -107,7 +107,7 @@ private slots:
         QCOMPARE(p2.targetVolume(), 0.0);
         QCOMPARE(p2.espressoTemperature(), 88.0);  // Synced from first frame for advanced profiles
         QCOMPARE(p2.steps().size(), 1);
-        QCOMPARE(p2.preinfuseFrameCount(), 1);
+        QCOMPARE(p2.preinfuseFrameCount(), 1);  // Explicit value from makeAdvancedProfileJson()
     }
 
     void jsonLegacyFlatFieldsFallback() {
