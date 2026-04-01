@@ -354,7 +354,7 @@ Dialog {
             spacing: Theme.scaled(4)
 
             Text {
-                text: TranslationManager.translate("brewDialog.roastDateLabel", "Roast date:")
+                text: TranslationManager.translate("brewDialog.roastDateLabel", "Roasted:")
                 font: Theme.bodyFont
                 color: Theme.textSecondaryColor
                 Layout.alignment: Qt.AlignVCenter
