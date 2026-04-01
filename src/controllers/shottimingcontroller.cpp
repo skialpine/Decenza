@@ -68,13 +68,14 @@ void ShotTimingController::setCurrentProfile(const Profile* profile)
 
 void ShotTimingController::startShot()
 {
-    // Cancel settling timer if running (user started new shot before settling completed)
+    // Cancel settling if in progress (user started new shot before settling completed)
     // Emit shotProcessingReady so the previous shot is saved before we reset state.
     // IMPORTANT: m_extractionEndTime must not be reset until after shotProcessingReady
     // is fully handled, because onShotEnded() reads extractionDuration() synchronously.
-    if (m_settlingTimer.isActive()) {
+    if (m_sawSettling) {
         qWarning() << "[SAW] Cancelling settling timer - new shot started, saving previous shot";
         m_sawTriggeredThisShot = false;
+        m_sawSettling = false;
         m_settlingTimer.stop();
         m_displayTimer.stop();
         emit sawSettlingChanged();
@@ -99,6 +100,7 @@ void ShotTimingController::startShot()
     m_extractionStarted = false;
 
     // Reset SAW learning state
+    m_sawSettling = false;
     m_sawTriggeredThisShot = false;
     m_flowRateAtStop = 0.0;
     m_weightAtStop = 0.0;
@@ -149,7 +151,7 @@ void ShotTimingController::onShotSample(const ShotSample& sample, double pressur
                                          int frameNumber, bool isFlowMode)
 {
     // Keep capturing samples during settling (shows pressure/flow declining after stop)
-    bool isSettling = m_settlingTimer.isActive();
+    bool isSettling = m_sawSettling;
     if (!m_shotActive && !isSettling) {
         return;
     }
@@ -193,8 +195,8 @@ void ShotTimingController::onShotSample(const ShotSample& sample, double pressur
 
 void ShotTimingController::onWeightSample(double weight, double flowRate, double flowRateShort)
 {
-    // Keep updating weight while settling timer is running (for SAW learning)
-    if (m_settlingTimer.isActive()) {
+    // Keep updating weight while settling is active (for SAW learning)
+    if (m_sawSettling) {
         // Track peak weight during settling for cup removal detection
         if (weight > m_settlingPeakWeight) {
             m_settlingPeakWeight = weight;
@@ -215,6 +217,7 @@ void ShotTimingController::onWeightSample(double weight, double flowRate, double
             // valid pre-removal reading so the saved shot preserves the correct
             // final weight. The corrupted `weight` parameter is discarded.
             m_sawTriggeredThisShot = false;  // Prevent stale SAW state on next operation
+            m_sawSettling = false;
             m_settlingTimer.stop();
             m_displayTimer.stop();
             emit sawSettlingChanged();
@@ -357,7 +360,7 @@ void ShotTimingController::onDisplayTimerTick()
     // shotTimeChanged deferred to ShotDataModel's 33ms flush timer
 
     // Check settling stability here (in case scale stops sending samples)
-    if (m_settlingTimer.isActive() && m_lastWeightChangeTime > 0) {
+    if (m_sawSettling && m_lastWeightChangeTime > 0) {
         qint64 now = QDateTime::currentMSecsSinceEpoch();
 
         // Fast path: no weight samples at all for 1 second
@@ -417,6 +420,7 @@ void ShotTimingController::startSettlingTimer()
     m_lastSettlingAvg = m_weight;
     m_settlingAvgStableSince = 0;
 
+    m_sawSettling = true;
     m_settlingTimer.setInterval(10000);  // 10 second max timeout
     m_settlingTimer.start();
     emit sawSettlingChanged();
@@ -424,8 +428,9 @@ void ShotTimingController::startSettlingTimer()
 
 void ShotTimingController::onSettlingComplete()
 {
-    // Reset flag FIRST to prevent re-triggering if another operation ends (e.g., steaming)
+    // Reset flags FIRST to prevent re-triggering if another operation ends (e.g., steaming)
     m_sawTriggeredThisShot = false;
+    m_sawSettling = false;
 
     // Settling is done - stop display timer and notify UI
     m_displayTimer.stop();

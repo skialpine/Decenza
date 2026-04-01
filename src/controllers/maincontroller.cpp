@@ -1097,7 +1097,20 @@ void MainController::onEspressoCycleStarted() {
         }
     }
 
-    // Clear the graph when entering espresso preheating (new cycle from idle)
+    // Save previous shot if settling is still in progress — startShot() emits
+    // shotProcessingReady synchronously, which triggers onShotEnded(). This must
+    // happen BEFORE clearing the model or resetting m_extractionStarted, otherwise
+    // the previous shot's data is lost.
+    if (m_timingController) {
+        m_timingController->setTargetWeight(m_profileManager->targetWeight());
+        m_timingController->setCurrentProfile(m_profileManager->currentProfilePtr());
+        m_timingController->startShot();
+        m_timingController->tare();
+    } else {
+        qWarning() << "No timing controller!";
+    }
+
+    // Clear the graph for the new espresso cycle (previous shot is now saved)
     m_shotStartTime = 0;
     m_lastShotTime = 0;
     m_extractionStarted = false;
@@ -1122,16 +1135,6 @@ void MainController::onEspressoCycleStarted() {
         m_flowScale->reset();
         double dose = m_settings ? m_settings->dyeBeanWeight() : 0.0;
         m_flowScale->setDose(dose);
-    }
-
-    // Start timing controller and tare via it
-    if (m_timingController) {
-        m_timingController->setTargetWeight(m_profileManager->targetWeight());
-        m_timingController->setCurrentProfile(m_profileManager->currentProfilePtr());
-        m_timingController->startShot();
-        m_timingController->tare();
-    } else {
-        qWarning() << "No timing controller!";
     }
 
     // Clear any pending BLE commands to prevent stale profile uploads
@@ -1201,11 +1204,14 @@ void MainController::onShotEnded() {
     if (doseWeight <= 0 && m_profileManager->currentProfile().hasRecommendedDose())
         doseWeight = m_profileManager->currentProfile().recommendedDose();
 
-    // Get final weight — use actual scale data if available, estimate from volume only
-    // when no scale data was recorded at all (no scale connected)
+    // Get final weight from timing controller (post-settling weight for SAW shots includes
+    // drip after stop; for non-SAW shots this is the instantaneous weight at stop time).
+    // Fall back to last recorded scale data, then estimate from volume.
     double finalWeight = 0;
     const auto& cumulativeWeight = m_shotDataModel->cumulativeWeightData();
-    if (!cumulativeWeight.isEmpty()) {
+    if (m_timingController && m_timingController->currentWeight() > 0) {
+        finalWeight = m_timingController->currentWeight();
+    } else if (!cumulativeWeight.isEmpty()) {
         finalWeight = cumulativeWeight.last().y();
     } else if (m_machineState) {
         // No scale data at all — estimate weight from volume: ml - 5 - dose*0.5
@@ -1221,7 +1227,15 @@ void MainController::onShotEnded() {
     if (finalWeight <= 0 && m_profileManager->currentProfile().targetWeight() > 0)
         finalWeight = m_profileManager->currentProfile().targetWeight();
 
-    // Smooth weight flow rate before saving (centered moving average over 7 points ≈ 1.4s at 5Hz).
+    // Trim trailing zero-pressure samples from SAW settling period before saving.
+    // During settling the DE1 reports 0 pressure/flow while the scale settles — these
+    // cause a vertical drop to 0 at the end of the graph. Weight data is preserved.
+    // NOTE: Must run before smoothWeightFlowRate() — smoothWeightFlowRate() snapshots
+    // m_weightFlowRatePoints as the raw export copy before smoothing. Running trim first
+    // ensures neither the smoothed nor raw copy includes trailing zeros.
+    m_shotDataModel->trimSettlingData();
+
+    // Smooth weight flow rate before saving (centered moving average, window=5, ≈ 2.2s at 5Hz).
     // The raw LSLR data from recording has staircase artifacts from 0.1g scale quantization;
     // this post-processing matches de1app's smoothing level for storage and visualizer export.
     m_shotDataModel->smoothWeightFlowRate();
@@ -1778,6 +1792,14 @@ void MainController::onShotSampleReceived(const ShotSample& sample) {
                                           sample.frameNumber, isFlowMode);
         // Use timing controller's time for graph data (ensures weight and other curves align)
         time = m_timingController->shotTime();
+    }
+
+    // Skip adding sensor data to graph during settling — DE1 reports 0 pressure/flow
+    // while the scale settles, which draws a vertical drop to 0 on the live graph.
+    // Weight data still flows — ShotTimingController::weightSampleReady connects
+    // directly to ShotDataModel::addWeightSample in main.cpp, bypassing this function.
+    if (isSettling) {
+        return;
     }
 
     // Add sample data to graph
