@@ -23,8 +23,16 @@ Item {
     // Optional Flickable to scroll on Android (adjustPan can't scroll inside Flickables)
     property Flickable targetFlickable: null
 
+    // Set true when inside a Dialog/Popup overlay where Android adjustPan
+    // doesn't work. Uses keyboard-height-aware scrolling instead.
+    property bool inOverlay: false
+
     // Current shift amount
     property real keyboardOffset: 0
+
+    // Estimated keyboard height for use in Flickable contentHeight bindings.
+    // Updated when a text field gains focus in overlay mode.
+    property real estimatedKeyboardHeight: 0
 
     // True when a registered text field has focus
     property bool textFieldFocused: false
@@ -58,7 +66,9 @@ Item {
         // Android uses adjustPan which handles keyboard avoidance at the OS level.
         // Skip container shift to avoid double-shifting, but scroll the Flickable
         // since adjustPan can't scroll inside Qt Flickables.
-        if (Qt.platform.os === "android") {
+        // Exception: adjustPan doesn't work for Dialogs/Popups in the Qt overlay,
+        // so inOverlay mode falls through to the keyboard-height-aware path below.
+        if (Qt.platform.os === "android" && !inOverlay) {
             if (targetFlickable)
                 ensureFieldVisibleInFlickable(focusedField)
             keyboardOffset = 0
@@ -76,6 +86,24 @@ Item {
 
         if (kbHeight <= 0) {
             keyboardOffset = 0
+            return
+        }
+
+        // For overlays with a Flickable, scroll instead of shifting the container.
+        // This keeps the dialog in place and scrolls content within it.
+        if (inOverlay && targetFlickable) {
+            keyboardOffset = 0
+            estimatedKeyboardHeight = kbHeight
+            // Use mapToItem for both top and bottom to handle scaled parents correctly
+            var overlayFieldTop = focusedField.mapToItem(targetFlickable.contentItem, 0, 0)
+            var overlayFieldBottom = focusedField.mapToItem(targetFlickable.contentItem, 0, focusedField.height)
+            var overlayMargin = 20
+            var overlayVisibleHeight = root.height - kbHeight
+            var overlayMaxContentY = Math.max(0, targetFlickable.contentHeight - targetFlickable.height)
+            if (overlayFieldBottom.y + overlayMargin > targetFlickable.contentY + overlayVisibleHeight) {
+                targetFlickable.contentY = Math.min(
+                    overlayFieldBottom.y + overlayMargin - overlayVisibleHeight, overlayMaxContentY)
+            }
             return
         }
 
@@ -128,7 +156,16 @@ Item {
         if (textFieldFocused) {
             updateKeyboardOffset()
         } else if (wasFocused) {
-            keyboardOffset = 0
+            // Defer reset: Qt fires activeFocusChanged(false) on the old field
+            // before activeFocusChanged(true) on the new field. Without deferral,
+            // estimatedKeyboardHeight resets to 0 between fields, causing the
+            // Flickable contentHeight to shrink and contentY to clamp.
+            Qt.callLater(function() {
+                if (!hasActiveFocus()) {
+                    keyboardOffset = 0
+                    estimatedKeyboardHeight = 0
+                }
+            })
         }
     }
 
