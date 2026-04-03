@@ -1529,6 +1529,14 @@ int main(int argc, char *argv[])
     engine.load(url);
     checkpoint("engine.load(main.qml) returned");
 
+    // Give RelayClient a handle to the main window for screen capture
+    if (!engine.rootObjects().isEmpty()) {
+        QQuickWindow* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        if (window) {
+            relayClient.setWindow(window);
+        }
+    }
+
     // Simulator engine (all debug builds) and GHC window (desktop debug only)
     // NOTE: These must be declared outside the if-block so they survive through
     // app.exec(). Otherwise the if-block scope destroys them before the event

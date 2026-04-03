@@ -4,10 +4,13 @@
 #include <QWebSocket>
 #include <QTimer>
 #include <QJsonObject>
+#include <memory>
 
 class DE1Device;
 class MachineState;
 class Settings;
+class ScreenCaptureService;
+class QQuickWindow;
 
 class RelayClient : public QObject {
     Q_OBJECT
@@ -21,6 +24,7 @@ public:
     bool isConnected() const;
     bool isEnabled() const { return m_enabled; }
     void setEnabled(bool enabled);
+    void setWindow(QQuickWindow* window);
 
 signals:
     void connectedChanged();
@@ -33,6 +37,7 @@ private slots:
     void onStateChanged();
     void onReconnectTimer();
     void onPingTimer();
+    void onBinaryMessageReceived(const QByteArray& data);
 
 private:
     void connectToRelay();
@@ -50,4 +55,6 @@ private:
     bool m_enabled = false;
     int m_reconnectAttempts = 0;
     QString m_lastStatusJson; // Deduplicate status pushes
+    QQuickWindow* m_window = nullptr;
+    std::unique_ptr<ScreenCaptureService> m_captureService;
 };

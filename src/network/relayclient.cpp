@@ -1,4 +1,5 @@
 #include "relayclient.h"
+#include "network/screencaptureservice.h"
 #include "../ble/de1device.h"
 #include "../machine/machinestate.h"
 #include "../core/settings.h"
@@ -6,6 +7,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSysInfo>
+#include <QQuickWindow>
 
 static constexpr int kReconnectBaseMs = 5000;
 static constexpr int kReconnectMaxMs = 60000;
@@ -23,6 +25,7 @@ RelayClient::RelayClient(DE1Device* device, MachineState* machineState,
     connect(&m_socket, &QWebSocket::connected, this, &RelayClient::onConnected);
     connect(&m_socket, &QWebSocket::disconnected, this, &RelayClient::onDisconnected);
     connect(&m_socket, &QWebSocket::textMessageReceived, this, &RelayClient::onTextMessageReceived);
+    connect(&m_socket, &QWebSocket::binaryMessageReceived, this, &RelayClient::onBinaryMessageReceived);
 
     m_reconnectTimer.setSingleShot(true);
     connect(&m_reconnectTimer, &QTimer::timeout, this, &RelayClient::onReconnectTimer);
@@ -118,6 +121,7 @@ void RelayClient::onDisconnected()
     qDebug() << "RelayClient: WebSocket disconnected";
     m_pingTimer.stop();
     m_statusPushTimer.stop();
+    m_captureService.reset();
     emit connectedChanged();
 
     if (m_enabled) {
@@ -183,6 +187,13 @@ void RelayClient::handleCommand(const QString& commandId, const QString& command
         if (m_device) m_device->goToSleep();
     } else if (command == "status") {
         // No action needed, status is pushed separately
+    } else if (command == "start_remote") {
+        if (m_window && !m_captureService) {
+            double scale = 0.5;
+            m_captureService = std::make_unique<ScreenCaptureService>(m_window, &m_socket, scale);
+        }
+    } else if (command == "stop_remote") {
+        m_captureService.reset();
     } else {
         qDebug() << "RelayClient: Unknown command:" << command;
     }
@@ -239,4 +250,15 @@ QJsonObject RelayClient::buildStatusJson() const
         status["isReady"] = m_machineState->isReady();
     }
     return status;
+}
+
+void RelayClient::setWindow(QQuickWindow* window) { m_window = window; }
+
+void RelayClient::onBinaryMessageReceived(const QByteArray& data)
+{
+    if (data.isEmpty()) return;
+    quint8 type = static_cast<quint8>(data[0]);
+    if (type == 0x02 && m_captureService) {
+        m_captureService->handleTouchEvent(data);
+    }
 }

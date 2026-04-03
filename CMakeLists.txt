@@ -304,6 +304,7 @@ set(SOURCES
     src/network/crashreporter.cpp
     src/network/librarysharing.cpp
     src/network/relayclient.cpp
+    src/network/screencaptureservice.cpp
     src/core/settingsserializer.cpp
     src/core/datamigrationclient.cpp
     src/core/databasebackupmanager.cpp
@@ -424,6 +425,7 @@ set(HEADERS
     src/network/crashreporter.h
     src/network/librarysharing.h
     src/network/relayclient.h
+    src/network/screencaptureservice.h
     src/mcp/mcpserver.h
     src/mcp/mcpsession.h
     src/mcp/mcptoolregistry.h
