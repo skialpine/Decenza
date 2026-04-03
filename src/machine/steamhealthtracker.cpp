@@ -45,8 +45,10 @@ void SteamHealthTracker::onSessionComplete(SteamDataModel* model, int steamFlowS
     if (!model) return;
 
     int samples = model->sampleCount();
-    if (samples < MIN_SAMPLES_FOR_ANALYSIS) {
-        qDebug() << "SteamHealth [skip] only" << samples << "samples (need" << MIN_SAMPLES_FOR_ANALYSIS << ")";
+    int duration = static_cast<int>(model->rawTime());
+    if (samples < MIN_SAMPLES_FOR_ANALYSIS || duration < MIN_DURATION_FOR_ANALYSIS) {
+        qDebug() << "SteamHealth [skip]" << samples << "samples" << duration << "s"
+                 << "(need" << MIN_SAMPLES_FOR_ANALYSIS << "samples," << MIN_DURATION_FOR_ANALYSIS << "s)";
         return;
     }
 

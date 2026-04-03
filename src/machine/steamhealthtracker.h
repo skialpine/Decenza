@@ -95,7 +95,8 @@ private:
     static constexpr double PRESSURE_WARN_MULTIPLIER = 3.0;  // warn when pressure reaches this multiple of baseline
     static constexpr double TEMPERATURE_THRESHOLD = 180.0;   // °C
     static constexpr int CLOG_SAMPLE_THRESHOLD = 10;         // samples exceeding threshold
-    static constexpr int MIN_SAMPLES_FOR_ANALYSIS = 30;      // minimum session length
+    static constexpr int MIN_SAMPLES_FOR_ANALYSIS = 30;      // minimum sample count
+    static constexpr int MIN_DURATION_FOR_ANALYSIS = 20;     // minimum seconds — filters aborted cycles
     static constexpr int MIN_SESSIONS_FOR_TREND = 5;         // minimum comparable sessions
     static constexpr int MAX_HISTORY_SIZE = 150;             // sessions to keep
     static constexpr double TREND_PROGRESS_THRESHOLD = 0.6;   // warn at 60% of the way from baseline to flow-relative threshold
