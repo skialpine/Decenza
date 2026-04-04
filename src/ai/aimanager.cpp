@@ -3,6 +3,7 @@
 #include "aiconversation.h"
 #include "shotsummarizer.h"
 #include "../core/settings.h"
+#include "../core/grinderaliases.h"
 #include "../models/shotdatamodel.h"
 #include "../profile/profile.h"
 #include "../network/visualizeruploader.h"
@@ -489,20 +490,25 @@ void AIManager::requestRecentShotContext(const QString& beanBrand, const QString
 
         // Query grinder context on background thread using the shared helper (also used by MCP dialing_get_context)
         GrinderContext grinderCtx;
+        QString grinderBrand;
         withTempDb(dbPath, "ai_grinder_ctx", [&](QSqlDatabase& db) {
             QSqlQuery q(db);
-            q.prepare("SELECT grinder_model, beverage_type FROM shots WHERE id = ?");
+            q.prepare("SELECT grinder_brand, grinder_model, beverage_type "
+                      "FROM shots WHERE id = ?");
             q.bindValue(0, static_cast<qint64>(excludeShotId));
             if (q.exec() && q.next()) {
-                QString model = q.value(0).toString();
-                QString bev = q.value(1).toString();
+                grinderBrand = q.value(0).toString();
+                QString model = q.value(1).toString();
+                QString bev = q.value(2).toString();
                 if (!model.isEmpty())
                     grinderCtx = ShotHistoryStorage::queryGrinderContext(db, model, bev);
             }
         });
 
         // Summarization runs on main thread (ShotSummarizer is owned by AIManager)
-        QMetaObject::invokeMethod(qApp, [self, serial, qualifiedShots = std::move(qualifiedShots), grinderCtx = std::move(grinderCtx)]() mutable {
+        QMetaObject::invokeMethod(qApp, [self, serial, qualifiedShots = std::move(qualifiedShots),
+                                         grinderCtx = std::move(grinderCtx),
+                                         grinderBrand = std::move(grinderBrand)]() mutable {
             if (!self) return;
             if (serial != self->m_contextSerial) {
                 // Stale request superseded by a newer one — emit empty so QML clears contextLoading.
@@ -535,6 +541,12 @@ void AIManager::requestRecentShotContext(const QString& beanBrand, const QString
                 QString section = "\n\n## Grinder Context\n\n"
                     "From the user's own shot history with this grinder:\n\n";
                 section += "- **Model**: " + grinderCtx.model + "\n";
+
+                // Burr specs are already shown per-shot in buildUserPrompt().
+                // Only add swappability here — it's grinder-level info not in per-shot data.
+                if (GrinderAliases::isBurrSwappable(grinderBrand, grinderCtx.model))
+                    section += "- **Burr-swappable**: yes (aftermarket burrs available for this grinder)\n";
+
                 section += "- **Settings used for " + grinderCtx.beverageType + "**: "
                          + grinderCtx.settingsObserved.join(", ") + "\n";
                 if (grinderCtx.allNumeric && grinderCtx.maxSetting > grinderCtx.minSetting) {
