@@ -3,8 +3,11 @@
 #include <QQuickWindow>
 #include <QWebSocket>
 #include <QBuffer>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QDebug>
-#include <QtGui/qpa/qwindowsysteminterface.h>
+#include <QGuiApplication>
+#include <QMouseEvent>
 
 ScreenCaptureService::ScreenCaptureService(QQuickWindow* window, QWebSocket* socket,
                                            double scaleFactor, QObject* parent)
@@ -13,15 +16,18 @@ ScreenCaptureService::ScreenCaptureService(QQuickWindow* window, QWebSocket* soc
     , m_socket(socket)
     , m_scaleFactor(qBound(0.1, scaleFactor, 1.0))
 {
-    connect(m_window, &QQuickWindow::frameSwapped,
-            this, &ScreenCaptureService::onFrameSwapped);
+    // Periodic capture timer — doesn't rely on frameSwapped which stops
+    // firing when the screen is static
+    m_captureTimer.setInterval(kCaptureIntervalMs);
+    connect(&m_captureTimer, &QTimer::timeout,
+            this, &ScreenCaptureService::onCaptureTimer);
+    m_captureTimer.start();
 
-    m_heartbeatTimer.setInterval(kHeartbeatMs);
-    connect(&m_heartbeatTimer, &QTimer::timeout,
-            this, &ScreenCaptureService::onHeartbeatTimer);
-    m_heartbeatTimer.start();
+    m_byteCounterTimer.start();
 
-    m_throttleTimer.start();
+    // Capture initial frame immediately
+    QMetaObject::invokeMethod(this, &ScreenCaptureService::captureAndSend,
+                              Qt::QueuedConnection);
 
     qDebug() << "ScreenCaptureService: started, scale:" << m_scaleFactor;
 }
@@ -31,30 +37,23 @@ ScreenCaptureService::~ScreenCaptureService()
     qDebug() << "ScreenCaptureService: stopped";
 }
 
-void ScreenCaptureService::onFrameSwapped()
+void ScreenCaptureService::onCaptureTimer()
 {
-    if (m_captureScheduled) return;
-    m_captureScheduled = true;
+    // Don't send if WebSocket has a large outgoing buffer (prevents disconnect)
+    if (m_socket->bytesToWrite() > 50000) return;
 
-    if (m_throttleTimer.elapsed() >= 1000) {
+    // Byte throttle: reset counter each second
+    if (m_byteCounterTimer.elapsed() >= 1000) {
         m_bytesSentThisSecond = 0;
-        m_throttleTimer.restart();
+        m_byteCounterTimer.restart();
     }
-    if (m_bytesSentThisSecond > 500000) return;
+    if (m_bytesSentThisSecond > 200000) return;
 
-    QMetaObject::invokeMethod(this, &ScreenCaptureService::captureAndSend,
-                              Qt::QueuedConnection);
-}
-
-void ScreenCaptureService::onHeartbeatTimer()
-{
     captureAndSend();
 }
 
 void ScreenCaptureService::captureAndSend()
 {
-    m_captureScheduled = false;
-
     QImage frame = m_window->grabWindow();
     if (frame.isNull()) return;
 
@@ -99,7 +98,6 @@ void ScreenCaptureService::captureAndSend()
 
     if (!changedTiles.isEmpty()) {
         sendTiles(changedTiles, scaled);
-        m_heartbeatTimer.start();
     }
 
     m_previousFrame = scaled;
@@ -163,8 +161,14 @@ void ScreenCaptureService::sendTiles(const QVector<QPair<int,int>>& changedTiles
         }
 
         msg[countPos] = static_cast<char>(tileCount);
-        m_socket->sendBinaryMessage(msg);
-        m_bytesSentThisSecond += msg.size();
+
+        // Wrap binary in JSON for API Gateway routing
+        QJsonObject envelope;
+        envelope["action"] = QStringLiteral("binary_relay");
+        envelope["data"] = QString::fromLatin1(msg.toBase64());
+        QByteArray jsonMsg = QJsonDocument(envelope).toJson(QJsonDocument::Compact);
+        m_socket->sendTextMessage(QString::fromUtf8(jsonMsg));
+        m_bytesSentThisSecond += jsonMsg.size();
 
         qDebug() << "ScreenCaptureService: sent" << tileCount << "tiles,"
                  << msg.size() << "bytes";
@@ -178,12 +182,12 @@ void ScreenCaptureService::handleTouchEvent(const QByteArray& data)
     quint8 touchType = static_cast<quint8>(data[1]);
     quint16 normX = (static_cast<quint8>(data[2]) << 8) | static_cast<quint8>(data[3]);
     quint16 normY = (static_cast<quint8>(data[4]) << 8) | static_cast<quint8>(data[5]);
-    quint8 pointId = static_cast<quint8>(data[6]);
 
     qreal x = (normX / 65535.0) * m_window->width();
     qreal y = (normY / 65535.0) * m_window->height();
 
-    QPointF pos(x, y);
+    QPointF localPos(x, y);
+    QPointF globalPos = m_window->mapToGlobal(localPos);
 
     QEvent::Type eventType;
     switch (touchType) {
@@ -193,12 +197,11 @@ void ScreenCaptureService::handleTouchEvent(const QByteArray& data)
     default: return;
     }
 
-    Q_UNUSED(pointId)
-
     Qt::MouseButton button = (eventType == QEvent::MouseMove) ? Qt::NoButton : Qt::LeftButton;
-    Qt::MouseButtons buttons = (eventType == QEvent::MouseButtonRelease) ? Qt::NoButton : Qt::LeftButton;
+    Qt::MouseButtons buttons = (eventType == QEvent::MouseButtonRelease)
+                                   ? Qt::NoButton : Qt::LeftButton;
 
-    QWindowSystemInterface::handleMouseEvent(
-        m_window, pos, m_window->mapToGlobal(pos),
-        buttons, button, eventType);
+    // Create and deliver mouse event directly to the window
+    QMouseEvent mouseEvent(eventType, localPos, globalPos, button, buttons, Qt::NoModifier);
+    QGuiApplication::sendEvent(m_window, &mouseEvent);
 }

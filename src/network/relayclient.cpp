@@ -43,6 +43,8 @@ RelayClient::RelayClient(DE1Device* device, MachineState* machineState,
     }
 }
 
+RelayClient::~RelayClient() = default;
+
 bool RelayClient::isConnected() const
 {
     return m_socket.state() == QAbstractSocket::ConnectedState;
@@ -148,6 +150,10 @@ void RelayClient::onTextMessageReceived(const QString& message)
         handleCommand(commandId, command);
     } else if (type == "registered") {
         qDebug() << "RelayClient: Successfully registered with relay";
+    } else if (type == "binary_relay") {
+        // Decode base64 data and handle as binary
+        QByteArray binaryData = QByteArray::fromBase64(obj["data"].toString().toLatin1());
+        onBinaryMessageReceived(binaryData);
     } else {
         qDebug() << "RelayClient: Received message type:" << type;
     }

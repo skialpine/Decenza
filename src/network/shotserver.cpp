@@ -1,4 +1,5 @@
 #include "shotserver.h"
+#include "relayclient.h"
 #include "webdebuglogger.h"
 #include "webtemplates.h"
 #include "webtemplates/auth_page.h"
@@ -2960,7 +2961,7 @@ void ShotServer::handlePocketPair(QTcpSocket* socket, const QByteArray& body)
 
     // Enable relay client if available
     if (m_relayClient) {
-        // RelayClient::setEnabled(true) will be called externally or via signal
+        m_relayClient->setEnabled(true);
     }
 
     QJsonObject result;

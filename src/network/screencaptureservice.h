@@ -20,13 +20,12 @@ public:
     void handleTouchEvent(const QByteArray& data);
 
 private slots:
-    void onFrameSwapped();
-    void onHeartbeatTimer();
+    void onCaptureTimer();
 
 private:
     static constexpr int kTileSize = 64;
-    static constexpr int kMaxMessageSize = 120000;
-    static constexpr int kHeartbeatMs = 30000;
+    static constexpr int kMaxMessageSize = 22000; // ~29KB after base64+JSON, under 32KB API Gateway limit
+    static constexpr int kCaptureIntervalMs = 500; // ~2fps
 
     void captureAndSend();
     QByteArray encodeTile(const QImage& image, int x, int y, int w, int h);
@@ -36,9 +35,8 @@ private:
     QWebSocket* m_socket;
     double m_scaleFactor;
     QImage m_previousFrame;
-    QTimer m_heartbeatTimer;
-    QElapsedTimer m_throttleTimer;
+    QTimer m_captureTimer;
+    QElapsedTimer m_byteCounterTimer;
     qint64 m_bytesSentThisSecond = 0;
-    bool m_captureScheduled = false;
     bool m_initialFrameSent = false;
 };

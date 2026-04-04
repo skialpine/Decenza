@@ -20,6 +20,7 @@ class RelayClient : public QObject {
 public:
     explicit RelayClient(DE1Device* device, MachineState* machineState,
                          Settings* settings, QObject* parent = nullptr);
+    ~RelayClient();
 
     bool isConnected() const;
     bool isEnabled() const { return m_enabled; }
