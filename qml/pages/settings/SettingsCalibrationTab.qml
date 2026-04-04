@@ -373,7 +373,7 @@ Item {
                         Text {
                             Layout.fillWidth: true
                             text: TranslationManager.translate("settings.calibration.steamHealthDesc",
-                                "Tracks steam pressure and temperature trends across sessions to detect scale buildup before it becomes critical.")
+                                "Rising pressure or temperature over time can indicate scale buildup. The bars show how far your latest session has drifted from your clean-machine baseline toward the warning level.")
                             color: Theme.textSecondaryColor
                             font.family: Theme.bodyFont.family
                             font.pixelSize: Theme.scaled(12)
@@ -401,30 +401,12 @@ Item {
                             Layout.fillWidth: true
                             spacing: Theme.scaled(4)
 
-                            Text {
-                                text: TranslationManager.translate("settings.calibration.steamPressure", "Pressure")
-                                color: Theme.textColor
-                                font.family: Theme.bodyFont.family
-                                font.pixelSize: Theme.scaled(14)
-                                font.bold: true
-                                Accessible.ignored: true
-                            }
-
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: Theme.spacingMedium
 
                                 Text {
-                                    text: TranslationManager.translate("settings.calibration.baseline", "Baseline") +
-                                          ": " + SteamHealthTracker.baselinePressure.toFixed(1) + " bar"
-                                    color: Theme.textSecondaryColor
-                                    font.family: Theme.bodyFont.family
-                                    font.pixelSize: Theme.scaled(12)
-                                    Accessible.ignored: true
-                                }
-
-                                Text {
-                                    text: TranslationManager.translate("settings.calibration.current", "Current") +
+                                    text: TranslationManager.translate("settings.calibration.steamPressure", "Pressure") +
                                           ": " + SteamHealthTracker.currentPressure.toFixed(1) + " bar"
                                     color: {
                                         var range = SteamHealthTracker.pressureThreshold - SteamHealthTracker.baselinePressure
@@ -435,7 +417,19 @@ Item {
                                         return Theme.textColor
                                     }
                                     font.family: Theme.bodyFont.family
-                                    font.pixelSize: Theme.scaled(12)
+                                    font.pixelSize: Theme.scaled(14)
+                                    font.bold: true
+                                    Accessible.ignored: true
+                                }
+
+                                Item { Layout.fillWidth: true }
+
+                                Text {
+                                    text: SteamHealthTracker.baselinePressure.toFixed(1) + " — " +
+                                          SteamHealthTracker.pressureThreshold.toFixed(1) + " bar"
+                                    color: Theme.textSecondaryColor
+                                    font.family: Theme.bodyFont.family
+                                    font.pixelSize: Theme.scaled(11)
                                     Accessible.ignored: true
                                 }
                             }
@@ -475,30 +469,12 @@ Item {
                             Layout.fillWidth: true
                             spacing: Theme.scaled(4)
 
-                            Text {
-                                text: TranslationManager.translate("settings.calibration.steamTemperature", "Temperature")
-                                color: Theme.textColor
-                                font.family: Theme.bodyFont.family
-                                font.pixelSize: Theme.scaled(14)
-                                font.bold: true
-                                Accessible.ignored: true
-                            }
-
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: Theme.spacingMedium
 
                                 Text {
-                                    text: TranslationManager.translate("settings.calibration.target", "Target") +
-                                          ": " + SteamHealthTracker.baselineTemperature.toFixed(0) + "°C"
-                                    color: Theme.textSecondaryColor
-                                    font.family: Theme.bodyFont.family
-                                    font.pixelSize: Theme.scaled(12)
-                                    Accessible.ignored: true
-                                }
-
-                                Text {
-                                    text: TranslationManager.translate("settings.calibration.actual", "Actual") +
+                                    text: TranslationManager.translate("settings.calibration.steamTemperature", "Temperature") +
                                           ": " + SteamHealthTracker.currentTemperature.toFixed(0) + "°C"
                                     color: {
                                         var range = SteamHealthTracker.temperatureThreshold - SteamHealthTracker.baselineTemperature
@@ -509,7 +485,19 @@ Item {
                                         return Theme.textColor
                                     }
                                     font.family: Theme.bodyFont.family
-                                    font.pixelSize: Theme.scaled(12)
+                                    font.pixelSize: Theme.scaled(14)
+                                    font.bold: true
+                                    Accessible.ignored: true
+                                }
+
+                                Item { Layout.fillWidth: true }
+
+                                Text {
+                                    text: SteamHealthTracker.baselineTemperature.toFixed(0) + " — " +
+                                          SteamHealthTracker.temperatureThreshold.toFixed(0) + "°C"
+                                    color: Theme.textSecondaryColor
+                                    font.family: Theme.bodyFont.family
+                                    font.pixelSize: Theme.scaled(11)
                                     Accessible.ignored: true
                                 }
                             }
