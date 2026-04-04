@@ -15,14 +15,10 @@ Page {
         if (editShotId > 0) {
             loadShotForEditing()
         }
-        // Scan for refractometer if configured but not connected
-        if (Settings.savedRefractometerAddress !== "" && !BLEManager.refractometerConnected) {
-            BLEManager.tryDirectConnectToRefractometer()
-        }
     }
     StackView.onActivated: {
         root.currentPageTitle = TranslationManager.translate("postshotreview.title", "Shot Review")
-        // Reconnect refractometer when returning to this page
+        // Reconnect refractometer when entering/returning to this page
         if (Settings.savedRefractometerAddress !== "" && !BLEManager.refractometerConnected) {
             BLEManager.tryDirectConnectToRefractometer()
         }
@@ -30,7 +26,7 @@ Page {
 
     // Disconnect refractometer when leaving to save battery (requires physical wake to reconnect)
     Component.onDestruction: {
-        if (typeof Refractometer !== "undefined" && Refractometer && Refractometer.connected) {
+        if (Refractometer && Refractometer.connected) {
             Refractometer.disconnectFromDevice()
         }
     }
