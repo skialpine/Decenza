@@ -2022,6 +2022,13 @@ int main(int argc, char *argv[])
         // This matches de1app's app_exit behavior - always leave charger ON for safety
         batteryManager.ensureChargerOn();
 
+        // Disconnect DE1 signals FIRST — otherwise de1Device.disconnect() below
+        // fires the disconnected signal, which triggers the auto-reconnect lambda
+        // and schedules a 5s QTimer. That timer stays alive through stack unwinding
+        // and hangs the event dispatcher on Android when it tries to fire after teardown.
+        qDebug() << "[ShutdownTrace] Disconnecting DE1 signals (before BLE disconnect)";
+        QObject::disconnect(&de1Device, nullptr, nullptr, nullptr);
+
         // Explicitly disconnect BLE so the GATT connection is released cleanly.
         // Without this, if the app is force-killed (e.g. after a hang), Android's
         // Bluetooth stack keeps the stale GATT connection — on Samsung devices this
@@ -2053,11 +2060,7 @@ int main(int argc, char *argv[])
     int result = app.exec();
     qDebug() << "[ShutdownTrace] app.exec() returned";
 
-    // Disconnect DE1 signals before stack destruction — the reconnect lambda
-    // tries to start a QTimer after the event dispatcher is torn down, crashing
-    // in QThreadData::hasEventDispatcher() during ~DE1Device::disconnect()
-    qDebug() << "[ShutdownTrace] Disconnecting DE1 signals";
-    QObject::disconnect(&de1Device, nullptr, nullptr, nullptr);
+    // DE1 signals already disconnected in aboutToQuit handler before BLE disconnect.
 
     // Disable crash handler before cleanup - crashes during C++ runtime destruction
     // are not actionable and shouldn't prompt users to submit bug reports
