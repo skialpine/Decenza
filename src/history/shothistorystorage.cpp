@@ -668,7 +668,9 @@ bool ShotHistoryStorage::runMigrations()
     }
 
     // Migration 10: Add quality flags for shot review badges.
-    // Computed at save time from ShotSummarizer; recomputed on-the-fly for legacy shots.
+    // Computed at save time by saveShotData() using ShotAnalysis helpers directly
+    // (avoids a ShotSummarizer dependency); recomputed on-the-fly inside
+    // loadShotRecordStatic() for shots that predate this migration.
     if (currentVersion < 10) {
         qDebug() << "ShotHistoryStorage: Running migration to version 10 (quality flags)";
 
@@ -724,7 +726,7 @@ QByteArray ShotHistoryStorage::compressSampleData(ShotDataModel* shotData, const
     // Weight-based flow rate (g/s) for visualizer export
     root["weightFlowRate"] = pointsToJsonObject(shotData->weightFlowRateData());
 
-    // Phase summaries for UI display (pre-computed by ShotSummarizer)
+    // Phase summaries for UI display (pre-computed by saveShotData() via computePhaseSummaries)
     if (!phaseSummariesJson.isEmpty()) {
         root["phaseSummaries"] = QJsonDocument::fromJson(phaseSummariesJson.toUtf8()).array();
     }
@@ -876,23 +878,15 @@ qint64 ShotHistoryStorage::saveShot(ShotDataModel* shotData,
             }
         }
 
+        // Channeling detection uses dC/dt (the Gaussian-smoothed conductance
+        // derivative) — it catches channels invisible to flow/pressure alone
+        // and works regardless of frame mode. computeConductanceDerivative()
+        // above populates the series we read here.
         data.channelingDetected = false;
         if (!ShotAnalysis::shouldSkipChannelingCheck(data.beverageType, flowPts, pourStart, pourEnd)) {
-            for (const auto& phase : tmpRecord.phases) {
-                if (!phase.isFlowMode || phase.label == "Start" || phase.label == "End") continue;
-                double phaseEnd = 0;
-                for (qsizetype pi = 0; pi < tmpRecord.phases.size(); ++pi) {
-                    if (tmpRecord.phases[pi].time == phase.time && pi + 1 < tmpRecord.phases.size()) {
-                        phaseEnd = tmpRecord.phases[pi + 1].time;
-                        break;
-                    }
-                }
-                if (phaseEnd - phase.time < ShotAnalysis::CHANNELING_MIN_PHASE_DURATION) continue;
-                if (ShotAnalysis::detectChannelingInRange(flowPts, phase.time, phaseEnd)) {
-                    data.channelingDetected = true;
-                    break;
-                }
-            }
+            auto severity = ShotAnalysis::detectChannelingFromDerivative(
+                shotData->conductanceDerivativeData(), pourStart, pourEnd);
+            data.channelingDetected = (severity == ShotAnalysis::ChannelingSeverity::Sustained);
         }
 
         // Temperature stability using shared ShotAnalysis helpers
@@ -2040,24 +2034,12 @@ ShotRecord ShotHistoryStorage::loadShotRecordStatic(QSqlDatabase& db, qint64 sho
             }
         }
 
-        // Channeling
+        // Channeling (dC/dt — conductanceDerivative was just filled by computeDerivedCurves)
         record.channelingDetected = false;
         if (!ShotAnalysis::shouldSkipChannelingCheck(record.summary.beverageType, record.flow, pourStart, pourEnd)) {
-            for (const auto& phase : record.phases) {
-                if (!phase.isFlowMode || phase.label == "Start" || phase.label == "End") continue;
-                double phaseEnd = 0;
-                for (qsizetype pi = 0; pi < record.phases.size(); ++pi) {
-                    if (record.phases[pi].time == phase.time && pi + 1 < record.phases.size()) {
-                        phaseEnd = record.phases[pi + 1].time;
-                        break;
-                    }
-                }
-                if (phaseEnd - phase.time < ShotAnalysis::CHANNELING_MIN_PHASE_DURATION) continue;
-                if (ShotAnalysis::detectChannelingInRange(record.flow, phase.time, phaseEnd)) {
-                    record.channelingDetected = true;
-                    break;
-                }
-            }
+            auto severity = ShotAnalysis::detectChannelingFromDerivative(
+                record.conductanceDerivative, pourStart, pourEnd);
+            record.channelingDetected = (severity == ShotAnalysis::ChannelingSeverity::Sustained);
         }
 
         // Temperature stability
