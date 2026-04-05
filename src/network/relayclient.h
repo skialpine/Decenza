@@ -26,6 +26,7 @@ public:
     bool isEnabled() const { return m_enabled; }
     void setEnabled(bool enabled);
     void setWindow(QQuickWindow* window);
+    void shutdown();
 
 signals:
     void connectedChanged();
