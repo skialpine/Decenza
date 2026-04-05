@@ -70,10 +70,30 @@ void RelayClient::setEnabled(bool enabled)
         m_pingTimer.stop();
         m_statusPushTimer.stop();
         m_reconnectAttempts = 0;
+        // Destroy capture service synchronously BEFORE closing the socket.
+        // m_socket.close() is async — onDisconnected() fires later, but by then
+        // the capture timer may have already fired grabWindow() during a nested
+        // event loop (e.g. the BLE drain wait in aboutToQuit), deadlocking the
+        // render thread on Android.
+        m_captureService.reset();
         if (m_socket.state() != QAbstractSocket::UnconnectedState) {
             m_socket.close();
         }
     }
+}
+
+void RelayClient::shutdown()
+{
+    // Unconditional teardown for app exit — works even if setEnabled(false) is a
+    // no-op (already disabled). Destroys capture service synchronously and aborts
+    // the socket immediately (no close handshake) so no async work remains that
+    // could fire during BLE drain wait or stack unwinding.
+    m_captureService.reset();
+    m_reconnectTimer.stop();
+    m_pingTimer.stop();
+    m_statusPushTimer.stop();
+    m_enabled = false;
+    m_socket.abort();
 }
 
 void RelayClient::connectToRelay()

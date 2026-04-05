@@ -1944,7 +1944,10 @@ int main(int argc, char *argv[])
         // frames from the render thread. If it fires during the BLE drain wait
         // loop below, grabWindow() can deadlock against a stopping render thread,
         // freezing the app on quit (especially on Android/Samsung A8).
-        relayClient.setEnabled(false);
+        // Use shutdown() instead of setEnabled(false) because setEnabled(false) is
+        // a no-op when already disabled, and uses async socket close. shutdown()
+        // unconditionally destroys the capture service and aborts the socket.
+        relayClient.shutdown();
 
         // Set QML shuttingDown flag to prevent screensaver from activating.
         // Qt.quit() does NOT trigger ApplicationWindow.onClosing, so the QML-side
@@ -2007,6 +2010,15 @@ int main(int argc, char *argv[])
         // IMPORTANT: Ensure charger is ON before exiting
         // This matches de1app's app_exit behavior - always leave charger ON for safety
         batteryManager.ensureChargerOn();
+
+        // Explicitly disconnect BLE so the GATT connection is released cleanly.
+        // Without this, if the app is force-killed (e.g. after a hang), Android's
+        // Bluetooth stack keeps the stale GATT connection — on Samsung devices this
+        // can prevent the app from reconnecting until the device is rebooted.
+        de1Device.disconnect();
+        if (physicalScale) {
+            physicalScale->disconnectFromScale();
+        }
 
         // Note: No need to null context properties here. All C++ objects are
         // stack-allocated before the QML engine, so reverse destruction order
