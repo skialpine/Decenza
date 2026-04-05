@@ -846,9 +846,18 @@ int main(int argc, char *argv[])
     // Relay client for Pocket app remote control via AWS WebSocket
     RelayClient relayClient(&de1Device, &machineState, &settings);
     mainController.shotServer()->setRelayClient(&relayClient);
-    if (!settings.pocketPairingToken().isEmpty()) {
+    if (!settings.pocketPairingToken().isEmpty() && settings.screenCaptureEnabled()) {
         relayClient.setEnabled(true);
     }
+
+    // React to setting changes at runtime
+    QObject::connect(&settings, &Settings::screenCaptureEnabledChanged, [&relayClient, &settings]() {
+        if (settings.screenCaptureEnabled() && !settings.pocketPairingToken().isEmpty()) {
+            relayClient.setEnabled(true);
+        } else {
+            relayClient.setEnabled(false);
+        }
+    });
 
     // Weather forecast manager (hourly updates, region-aware API selection)
     WeatherManager weatherManager(&sharedNetworkManager);
