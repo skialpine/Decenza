@@ -38,8 +38,9 @@ public:
     double averageTemperature() const;
     double peakTemperature() const;
 
-    // Raw data access for post-session threshold counting
+    // Raw data access for post-session threshold counting and calibration analysis
     const QVector<QPointF>& pressureData() const { return m_pressurePoints; }
+    const QVector<QPointF>& flowData() const { return m_flowPoints; }
     const QVector<QPointF>& temperatureData() const { return m_temperaturePoints; }
 
 public slots:

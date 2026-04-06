@@ -551,6 +551,21 @@ void DE1Device::parseMMRResponse(const QByteArray& data) {
             rebuildVersionLine3();
         }
     }
+    // Heater voltage (address 0x803834) — e.g. 110, 120, 220, 230
+    else if (address == DE1::MMR::HEATER_VOLTAGE) {
+        if (data.size() >= 8) {
+            uint32_t val = (static_cast<uint32_t>(static_cast<uint8_t>(d[7])) << 24) |
+                           (static_cast<uint32_t>(static_cast<uint8_t>(d[6])) << 16) |
+                           (static_cast<uint32_t>(static_cast<uint8_t>(d[5])) << 8) |
+                           static_cast<uint32_t>(static_cast<uint8_t>(d[4]));
+            int voltage = static_cast<int>(val);
+            if (voltage != m_heaterVoltage) {
+                m_heaterVoltage = voltage;
+                qDebug() << "Heater voltage:" << m_heaterVoltage << "V";
+                emit heaterVoltageChanged();
+            }
+        }
+    }
     // Check if this is REFILL_KIT response (address 0x80385C)
     else if (address == 0x80385C) {
         uint8_t kitStatus = d[4];
@@ -1014,7 +1029,7 @@ void DE1Device::sendInitialSettings() {
     // Read machine identity MMRs (CPU board model, machine model, firmware build)
     // These populate the third line of the firmware version string
     for (uint32_t addr : {DE1::MMR::CPU_BOARD_MODEL, DE1::MMR::MACHINE_MODEL,
-                          DE1::MMR::FIRMWARE_VERSION}) {
+                          DE1::MMR::FIRMWARE_VERSION, DE1::MMR::HEATER_VOLTAGE}) {
         QByteArray req(20, 0);
         req[0] = 0x00;
         req[1] = static_cast<char>((addr >> 16) & 0xFF);

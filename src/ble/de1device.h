@@ -72,6 +72,8 @@ class DE1Device : public QObject {
     Q_PROPERTY(bool isHeadless READ isHeadless NOTIFY isHeadlessChanged)
     Q_PROPERTY(int refillKitDetected READ refillKitDetected NOTIFY refillKitDetectedChanged)
     Q_PROPERTY(QString connectionType READ connectionType NOTIFY connectedChanged)
+    Q_PROPERTY(int machineModel READ machineModel NOTIFY firmwareVersionChanged)
+    Q_PROPERTY(int heaterVoltage READ heaterVoltage NOTIFY heaterVoltageChanged)
 
 public:
     explicit DE1Device(QObject* parent = nullptr);
@@ -104,6 +106,8 @@ public:
     bool isHeadless() const { return m_isHeadless; }
     Q_INVOKABLE void setIsHeadless(bool headless);  // Debug toggle
     int refillKitDetected() const { return m_refillKitDetected; }  // -1=unknown, 0=not detected, 1=detected
+    int machineModel() const { return m_machineModel; }  // 0=unknown, 1=DE1, 2=DE1+, 3=PRO, 4=XL, 5=CAFE, 6=XXL, 7=XXXL
+    int heaterVoltage() const { return m_heaterVoltage; }  // 0=unknown, otherwise volts (e.g. 110, 220)
 
     // Transport abstraction
     void setTransport(DE1Transport* transport);
@@ -200,6 +204,7 @@ signals:
     void usbChargerOnChanged();
     void isHeadlessChanged();
     void refillKitDetectedChanged();
+    void heaterVoltageChanged();
     void logMessage(const QString& message);
 
 protected:
@@ -248,6 +253,7 @@ private:
     QString m_firmwareVersion;
     int m_firmwareBuildNumber = 0;
     int m_machineModel = 0;
+    int m_heaterVoltage = 0;  // 0=unknown, read from MMR HEATER_VOLTAGE
     uint32_t m_cpuBoardModel = 0;
 
     bool m_connecting = false;
