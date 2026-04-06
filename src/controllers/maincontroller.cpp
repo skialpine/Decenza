@@ -1656,6 +1656,10 @@ void MainController::onShotSampleReceived(const ShotSample& sample) {
 
     MachineState::Phase phase = m_machineState->phase();
 
+    // Update steam calibrator with heater temp (needed for recovery detection between steps)
+    if (m_steamCalibrator)
+        m_steamCalibrator->updateHeaterTemp(sample.steamTemp);
+
     // Forward flow samples to MachineState for FlowScale during any dispensing phase
     bool isDispensingPhase = (phase == MachineState::Phase::Preinfusion ||
                               phase == MachineState::Phase::Pouring ||

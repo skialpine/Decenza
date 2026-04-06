@@ -53,6 +53,8 @@ class SteamCalibrator : public QObject {
     Q_PROPERTY(int phase READ phase NOTIFY stepChanged)
     Q_PROPERTY(double steamingElapsed READ steamingElapsed NOTIFY steamingElapsedChanged)
     Q_PROPERTY(bool hasEnoughData READ hasEnoughData NOTIFY hasEnoughDataChanged)
+    Q_PROPERTY(bool heaterReady READ heaterReady NOTIFY heaterReadyChanged)
+    Q_PROPERTY(double currentHeaterTemp READ currentHeaterTemp NOTIFY currentHeaterTempChanged)
     Q_PROPERTY(int recommendedFlow READ recommendedFlow NOTIFY calibrationComplete)
     Q_PROPERTY(int recommendedTemp READ recommendedTemp NOTIFY calibrationComplete)
     Q_PROPERTY(double recommendedDilution READ recommendedDilution NOTIFY calibrationComplete)
@@ -88,6 +90,8 @@ public:
     int phase() const { return static_cast<int>(m_phase); }
     double steamingElapsed() const { return m_steamingElapsed; }
     bool hasEnoughData() const { return m_hasEnoughData; }
+    bool heaterReady() const { return m_heaterReady; }
+    double currentHeaterTemp() const { return m_currentHeaterTemp; }
     int recommendedFlow() const;
     int recommendedTemp() const;
     double recommendedDilution() const;
@@ -114,6 +118,10 @@ public:
     // Called by MainController on each steam sample (~5Hz) to track elapsed time
     // and auto-stop when enough data is collected
     void onSteamSample(double elapsed);
+
+    // Called by MainController on each shot sample to update heater temperature.
+    // Used to detect heater recovery between calibration steps.
+    void updateHeaterTemp(double steamTempC);
 
     // Static analysis function — computes stability metrics from raw pressure data.
     static CalibrationStepResult analyzeStability(
@@ -162,6 +170,8 @@ signals:
     void statusMessageChanged();
     void steamingElapsedChanged();
     void hasEnoughDataChanged();
+    void heaterReadyChanged();
+    void currentHeaterTempChanged();
 
 private:
     struct SweepStep {
@@ -187,6 +197,8 @@ private:
     double m_steamingElapsed = 0.0;     // Seconds since steam started (for UI countdown)
     bool m_hasEnoughData = false;       // True when enough samples collected
     bool m_autoStopRequested = false;   // Prevents double-stop
+    bool m_heaterReady = true;          // True when steam temp is near set point
+    double m_currentHeaterTemp = 0.0;   // Current steam heater temperature
     QString m_statusMessage;
 
     CalibrationResult m_calibrationResult;

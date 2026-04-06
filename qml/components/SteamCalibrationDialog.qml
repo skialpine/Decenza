@@ -119,6 +119,34 @@ Dialog {
                 Accessible.ignored: true
             }
 
+            // Heater recovery indicator (visible when waiting and heater not ready)
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin: Theme.scaled(16)
+                Layout.rightMargin: Theme.scaled(16)
+                visible: SteamCalibrator.state === 2 /* WaitingToStart */
+                spacing: Theme.scaled(8)
+
+                Text {
+                    text: SteamCalibrator.heaterReady
+                        ? TranslationManager.translate("steamCal.heaterReady", "Heater ready — start steaming now")
+                        : TranslationManager.translate("steamCal.heaterRecovering", "Waiting for heater to recover...")
+                    color: SteamCalibrator.heaterReady ? Theme.primaryColor : Theme.warningColor
+                    font.family: Theme.bodyFont.family
+                    font.pixelSize: Theme.scaled(14)
+                    font.bold: true
+                    Accessible.ignored: true
+                }
+
+                Text {
+                    text: SteamCalibrator.currentHeaterTemp.toFixed(0) + "°C"
+                    color: Theme.textSecondaryColor
+                    font.family: Theme.bodyFont.family
+                    font.pixelSize: Theme.scaled(14)
+                    Accessible.ignored: true
+                }
+            }
+
             // Steaming progress (visible during Steaming state)
             ColumnLayout {
                 Layout.fillWidth: true

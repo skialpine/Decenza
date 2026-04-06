@@ -268,12 +268,17 @@ void SteamCalibrator::advanceToNextStep()
     m_settings->setSteamFlow(step.flowRate);
     m_settings->setSteamTemperature(step.steamTemp);
 
+    // Mark heater as not ready — updateHeaterTemp() will set it to true
+    // once the steam temp reaches the target
+    m_heaterReady = false;
+    emit heaterReadyChanged();
+
     QString phaseLabel = (m_phase == FlowSweep)
         ? QStringLiteral("Phase 1 — Flow")
         : QStringLiteral("Phase 2 — Temperature");
 
     setState(WaitingToStart);
-    setStatusMessage(QStringLiteral("%1: Step %2 of %3\nFlow: %4 mL/s at %5°C\nStart steaming water now")
+    setStatusMessage(QStringLiteral("%1: Step %2 of %3\nFlow: %4 mL/s at %5°C\nWaiting for heater...")
                          .arg(phaseLabel)
                          .arg(m_currentStep + 1)
                          .arg(m_sweepPlan.size())
@@ -468,6 +473,29 @@ void SteamCalibrator::finishCalibration()
     emit calibrationComplete();
 }
 
+void SteamCalibrator::updateHeaterTemp(double steamTempC)
+{
+    if (m_currentHeaterTemp != steamTempC) {
+        m_currentHeaterTemp = steamTempC;
+        emit currentHeaterTempChanged();
+    }
+
+    // Check heater readiness when waiting between steps
+    if (m_state == WaitingToStart) {
+        int targetTemp = currentSteamTemp();
+        // Ready when within 10°C of target (heater recovered enough)
+        bool ready = (steamTempC >= targetTemp - 10);
+        if (ready != m_heaterReady) {
+            m_heaterReady = ready;
+            emit heaterReadyChanged();
+            if (ready) {
+                setStatusMessage(QStringLiteral("Heater ready (%1°C). Start steaming now.")
+                                     .arg(static_cast<int>(steamTempC)));
+            }
+        }
+    }
+}
+
 void SteamCalibrator::applyRecommendation()
 {
     if (!hasCalibration()) return;
@@ -494,15 +522,39 @@ CalibrationStepResult SteamCalibrator::analyzeStability(
     result.flowRate = flowRate;
     result.steamTemp = steamTemp;
 
-    // Collect samples after trim period
+    // Collect samples after trim period, excluding:
+    // - Negative or discontinuous timestamps (timer wrap bug)
+    // - Heater exhaustion tail (3+ consecutive samples below 0.3 bar)
     QVector<double> values;
     double startTime = -1;
     double endTime = 0;
+    double prevTime = -1;
+    int lowPressureRun = 0;
+    constexpr double EXHAUST_THRESHOLD = 0.3;  // bar — below this = heater exhausted
+    constexpr int EXHAUST_COUNT = 3;           // consecutive samples to confirm exhaustion
 
     for (const auto& pt : pressureData) {
-        if (pt.x() < trimSeconds) continue;
-        if (startTime < 0) startTime = pt.x();
-        endTime = pt.x();
+        double t = pt.x();
+        // Skip negative timestamps and large time jumps (timer wrap bug)
+        if (t < trimSeconds) continue;
+        if (t < 0 || (prevTime >= 0 && (t - prevTime) > 5.0 || t < prevTime)) break;
+        prevTime = t;
+
+        // Detect heater exhaustion: 3+ consecutive samples below threshold
+        if (pt.y() < EXHAUST_THRESHOLD) {
+            lowPressureRun++;
+            if (lowPressureRun >= EXHAUST_COUNT) {
+                // Trim back to before the exhaustion started
+                qsizetype trimCount = qMin(static_cast<qsizetype>(EXHAUST_COUNT), values.size());
+                values.resize(values.size() - trimCount);
+                break;
+            }
+        } else {
+            lowPressureRun = 0;
+        }
+
+        if (startTime < 0) startTime = t;
+        endTime = t;
         values.append(pt.y());
     }
 
