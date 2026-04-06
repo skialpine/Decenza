@@ -273,6 +273,7 @@ void SteamCalibrator::advanceToNextStep()
     auto& step = m_sweepPlan[m_currentStep];
     m_settings->setSteamFlow(step.flowRate);
     m_settings->setSteamTemperature(step.steamTemp);
+    emit settingsApplied();  // Tell MainController to re-send to machine
 
     // Mark heater as not ready — updateHeaterTemp() will set it to true
     // once the steam temp reaches the target

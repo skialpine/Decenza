@@ -172,6 +172,7 @@ signals:
     void hasEnoughDataChanged();
     void heaterReadyChanged();
     void currentHeaterTempChanged();
+    void settingsApplied();  // Emitted when flow/temp changed — MainController should re-send to machine
 
 private:
     struct SweepStep {

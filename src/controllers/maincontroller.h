@@ -102,7 +102,12 @@ public:
     SteamCalibrator* steamCalibrator() const { return m_steamCalibrator; }
     void setSteamDataModel(SteamDataModel* model) { m_steamDataModel = model; }
     void setSteamHealthTracker(SteamHealthTracker* tracker) { m_steamHealthTracker = tracker; }
-    void setSteamCalibrator(SteamCalibrator* calibrator) { m_steamCalibrator = calibrator; }
+    void setSteamCalibrator(SteamCalibrator* calibrator) {
+        m_steamCalibrator = calibrator;
+        if (calibrator) {
+            connect(calibrator, &SteamCalibrator::settingsApplied, this, &MainController::sendMachineSettings);
+        }
+    }
     bool isSawSettling() const;
     QString currentFrameName() const { return m_currentFrameName; }
     ShotHistoryStorage* shotHistory() const { return m_shotHistory; }
