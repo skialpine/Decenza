@@ -194,8 +194,23 @@ Page {
                 }
             }
 
+            // Parse quality flag keywords (channeling:yes, temp:yes, grind:yes)
+            var flagKeywords = [
+                { pattern: /\bchanneling:yes\b/gi, filterKey: "filterChanneling" },
+                { pattern: /\btemp:yes\b/gi, filterKey: "filterTemperatureUnstable" },
+                { pattern: /\bgrind:yes\b/gi, filterKey: "filterGrindIssue" }
+            ]
+            for (var j = 0; j < flagKeywords.length; j++) {
+                var fk = flagKeywords[j]
+                if (fk.pattern.test(searchText)) {
+                    filter[fk.filterKey] = true
+                    searchText = searchText.replace(fk.pattern, "")
+                }
+            }
+
             // Strip any remaining keyword tokens (e.g. duplicate dose:18 dose:20)
             searchText = searchText.replace(/\b(rating|dose|yield|time|tds|ey):\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?|\+)?/g, "")
+            searchText = searchText.replace(/\b(channeling|temp|grind):yes\b/gi, "")
 
             // Pass remaining text as FTS search (skipped when exact initialFilter is active)
             searchText = searchText.trim().replace(/\s+/g, " ")
@@ -572,6 +587,11 @@ Page {
                     if (doseVal > 0 && yieldVal > 0)
                         parts.push(doseVal.toFixed(1) + "g to " + yieldVal.toFixed(1) + "g")
                     if (shotDelegate.shotEnjoyment > 0) parts.push(shotDelegate.shotEnjoyment + "%")
+                    var issues = []
+                    if (model.channelingDetected) issues.push("channeling")
+                    if (model.temperatureUnstable) issues.push("temp unstable")
+                    if (model.grindIssueDetected) issues.push("grind issue")
+                    if (issues.length > 0) parts.push(issues.join(", "))
                     return parts.join(", ")
                 }
                 Accessible.focusable: true
@@ -699,6 +719,26 @@ Page {
                                 sourceSize.width: Theme.scaled(16)
                                 sourceSize.height: Theme.scaled(16)
                                 visible: model.hasVisualizerUpload
+                                Accessible.ignored: true
+                            }
+
+                            // Quality issue indicator dots
+                            Rectangle {
+                                width: Theme.scaled(8); height: Theme.scaled(8); radius: Theme.scaled(4)
+                                color: Theme.errorColor
+                                visible: model.channelingDetected ?? false
+                                Accessible.ignored: true
+                            }
+                            Rectangle {
+                                width: Theme.scaled(8); height: Theme.scaled(8); radius: Theme.scaled(4)
+                                color: Theme.warningColor
+                                visible: model.temperatureUnstable ?? false
+                                Accessible.ignored: true
+                            }
+                            Rectangle {
+                                width: Theme.scaled(8); height: Theme.scaled(8); radius: Theme.scaled(4)
+                                color: Theme.warningColor
+                                visible: model.grindIssueDetected ?? false
                                 Accessible.ignored: true
                             }
                         }
@@ -1238,12 +1278,58 @@ Page {
                 }
                 Text { text: TranslationManager.translate("shothistory.helpey", "Extraction yield (%)"); font.pixelSize: Theme.labelFont.pixelSize; color: Theme.textSecondaryColor; Accessible.ignored: true }
                 Text { text: "ey:18-22"; font.pixelSize: Theme.labelFont.pixelSize; color: Theme.textSecondaryColor; Accessible.ignored: true }
+
+                // Quality flag keywords
+                Rectangle {
+                    color: channelingArea.pressed ? Theme.surfaceColor : "transparent"
+                    radius: Theme.scaled(4)
+                    implicitWidth: channelingLabel.implicitWidth + Theme.scaled(8)
+                    implicitHeight: channelingLabel.implicitHeight + Theme.scaled(4)
+                    Accessible.role: Accessible.Button
+                    Accessible.name: TranslationManager.translate("shothistory.insertKeyword", "Insert %1").arg("channeling:yes")
+                    Accessible.focusable: true
+                    Accessible.onPressAction: channelingArea.clicked(null)
+                    Text { id: channelingLabel; text: "channeling:yes"; anchors.centerIn: parent; font.pixelSize: Theme.labelFont.pixelSize; color: Theme.primaryColor; font.bold: true; Accessible.ignored: true }
+                    MouseArea { id: channelingArea; anchors.fill: parent; onClicked: insertSearchKeyword("channeling:yes") }
+                }
+                Text { text: TranslationManager.translate("shothistory.helpchanneling", "Channeling detected"); font.pixelSize: Theme.labelFont.pixelSize; color: Theme.textSecondaryColor; Accessible.ignored: true }
+                Text { text: "channeling:yes"; font.pixelSize: Theme.labelFont.pixelSize; color: Theme.textSecondaryColor; Accessible.ignored: true }
+
+                Rectangle {
+                    color: tempArea.pressed ? Theme.surfaceColor : "transparent"
+                    radius: Theme.scaled(4)
+                    implicitWidth: tempLabel.implicitWidth + Theme.scaled(8)
+                    implicitHeight: tempLabel.implicitHeight + Theme.scaled(4)
+                    Accessible.role: Accessible.Button
+                    Accessible.name: TranslationManager.translate("shothistory.insertKeyword", "Insert %1").arg("temp:yes")
+                    Accessible.focusable: true
+                    Accessible.onPressAction: tempArea.clicked(null)
+                    Text { id: tempLabel; text: "temp:yes"; anchors.centerIn: parent; font.pixelSize: Theme.labelFont.pixelSize; color: Theme.primaryColor; font.bold: true; Accessible.ignored: true }
+                    MouseArea { id: tempArea; anchors.fill: parent; onClicked: insertSearchKeyword("temp:yes") }
+                }
+                Text { text: TranslationManager.translate("shothistory.helptemp", "Temp unstable"); font.pixelSize: Theme.labelFont.pixelSize; color: Theme.textSecondaryColor; Accessible.ignored: true }
+                Text { text: "temp:yes"; font.pixelSize: Theme.labelFont.pixelSize; color: Theme.textSecondaryColor; Accessible.ignored: true }
+
+                Rectangle {
+                    color: grindArea.pressed ? Theme.surfaceColor : "transparent"
+                    radius: Theme.scaled(4)
+                    implicitWidth: grindLabel.implicitWidth + Theme.scaled(8)
+                    implicitHeight: grindLabel.implicitHeight + Theme.scaled(4)
+                    Accessible.role: Accessible.Button
+                    Accessible.name: TranslationManager.translate("shothistory.insertKeyword", "Insert %1").arg("grind:yes")
+                    Accessible.focusable: true
+                    Accessible.onPressAction: grindArea.clicked(null)
+                    Text { id: grindLabel; text: "grind:yes"; anchors.centerIn: parent; font.pixelSize: Theme.labelFont.pixelSize; color: Theme.primaryColor; font.bold: true; Accessible.ignored: true }
+                    MouseArea { id: grindArea; anchors.fill: parent; onClicked: insertSearchKeyword("grind:yes") }
+                }
+                Text { text: TranslationManager.translate("shothistory.helpgrind", "Grind issue"); font.pixelSize: Theme.labelFont.pixelSize; color: Theme.textSecondaryColor; Accessible.ignored: true }
+                Text { text: "grind:yes"; font.pixelSize: Theme.labelFont.pixelSize; color: Theme.textSecondaryColor; Accessible.ignored: true }
             }
 
             // Syntax explanation
             Text {
                 text: TranslationManager.translate("shothistory.searchhelpsyntax",
-                    "Syntax: N (exact), N-M (range), N+ (minimum)\nCombine keywords with text: ethiopia dose:18 rating:70+")
+                    "Syntax: N (exact), N-M (range), N+ (minimum)\nQuality flags: channeling:yes, temp:yes, grind:yes\nCombine keywords with text: ethiopia dose:18 channeling:yes")
                 font: Theme.captionFont
                 color: Theme.textSecondaryColor
                 wrapMode: Text.Wrap
