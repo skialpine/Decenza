@@ -301,4 +301,39 @@ void registerMachineTools(McpToolRegistry* registry, DE1Device* device,
             return result;
         },
         "read");
+
+    // steam_calibration_log
+    registry->registerTool(
+        "steam_calibration_log",
+        "Get the detailed steam calibration log with full time-series data for every "
+        "calibration step. Each step includes raw pressure, flow, and temperature arrays "
+        "sampled at ~5Hz. Use this to analyze pressure curves, compare steaming into air "
+        "vs. water, or plot stability patterns. Returns the last calibration run's data.",
+        QJsonObject{{"type", "object"}, {"properties", QJsonObject{}}},
+        [](const QJsonObject&) -> QJsonObject {
+            QJsonObject result;
+            QString path = SteamCalibrator::logFilePath();
+
+            QFile file(path);
+            if (!file.exists()) {
+                result["error"] = QStringLiteral("No calibration log found. Run a calibration first.");
+                return result;
+            }
+            if (!file.open(QIODevice::ReadOnly)) {
+                result["error"] = QStringLiteral("Failed to read log: ") + file.errorString();
+                return result;
+            }
+
+            QJsonParseError err;
+            QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &err);
+            file.close();
+
+            if (err.error != QJsonParseError::NoError) {
+                result["error"] = QStringLiteral("Log file parse error: ") + err.errorString();
+                return result;
+            }
+
+            return doc.object();
+        },
+        "read");
 }
