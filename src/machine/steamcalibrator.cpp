@@ -526,6 +526,7 @@ CalibrationStepResult SteamCalibrator::analyzeStability(
     // - Negative or discontinuous timestamps (timer wrap bug)
     // - Heater exhaustion tail (3+ consecutive samples below 0.3 bar)
     QVector<double> values;
+    QVector<double> times;   // parallel to values — for slope regression
     double startTime = -1;
     double endTime = 0;
     double prevTime = -1;
@@ -535,18 +536,22 @@ CalibrationStepResult SteamCalibrator::analyzeStability(
 
     for (const auto& pt : pressureData) {
         double t = pt.x();
-        // Skip negative timestamps and large time jumps (timer wrap bug)
+        // Skip samples before trim period
         if (t < trimSeconds) continue;
-        if (t < 0 || (prevTime >= 0 && (t - prevTime) > 5.0 || t < prevTime)) break;
+        // Stop at negative timestamps or large time discontinuities (timer wrap bug)
+        if (t < 0) break;
+        if (prevTime >= 0 && ((t - prevTime) > 5.0 || t < prevTime)) break;
         prevTime = t;
 
         // Detect heater exhaustion: 3+ consecutive samples below threshold
         if (pt.y() < EXHAUST_THRESHOLD) {
             lowPressureRun++;
             if (lowPressureRun >= EXHAUST_COUNT) {
-                // Trim back to before the exhaustion started
-                qsizetype trimCount = qMin(static_cast<qsizetype>(EXHAUST_COUNT), values.size());
+                // The 3rd low sample triggered this but hasn't been appended yet.
+                // Remove the (EXHAUST_COUNT - 1) already-appended low samples.
+                qsizetype trimCount = qMin(static_cast<qsizetype>(EXHAUST_COUNT - 1), values.size());
                 values.resize(values.size() - trimCount);
+                times.resize(times.size() - trimCount);
                 break;
             }
         } else {
@@ -556,6 +561,7 @@ CalibrationStepResult SteamCalibrator::analyzeStability(
         if (startTime < 0) startTime = t;
         endTime = t;
         values.append(pt.y());
+        times.append(t);
     }
 
     result.sampleCount = static_cast<int>(values.size());
@@ -596,20 +602,16 @@ CalibrationStepResult SteamCalibrator::analyzeStability(
                                  ? crossings / result.durationSeconds
                                  : 0.0;
 
-    // Linear regression slope
+    // Linear regression slope — uses the same filtered values/times as other stats
     double sumT = 0, sumP = 0, sumTP = 0, sumTT = 0;
     qsizetype n = values.size();
-    qsizetype valIdx = 0;
-    for (const auto& pt : pressureData) {
-        if (pt.x() < trimSeconds) continue;
-        double t = pt.x() - startTime;
-        double p = pt.y();
+    for (qsizetype i = 0; i < n; i++) {
+        double t = times[i] - startTime;
+        double p = values[i];
         sumT += t;
         sumP += p;
         sumTP += t * p;
         sumTT += t * t;
-        valIdx++;
-        if (valIdx >= n) break;
     }
     double denom = n * sumTT - sumT * sumT;
     result.pressureSlope = (qAbs(denom) > 1e-10)
