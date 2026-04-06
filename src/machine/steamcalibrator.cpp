@@ -480,16 +480,19 @@ void SteamCalibrator::updateHeaterTemp(double steamTempC)
         emit currentHeaterTempChanged();
     }
 
-    // Check heater readiness when waiting between steps
+    // Check heater readiness when waiting between steps.
+    // The steam heater only actively heats during Steam state — in Ready/Idle
+    // it just holds residual heat. So we consider the heater "ready" when:
+    // 1. The machine is in a non-steaming state (can accept a steam start), AND
+    // 2. The steam temp is above a minimum threshold (heater not completely cold)
+    // The machine will heat to the target once steam actually starts.
     if (m_state == WaitingToStart) {
-        int targetTemp = currentSteamTemp();
-        // Ready when within 10°C of target (heater recovered enough)
-        bool ready = (steamTempC >= targetTemp - 10);
+        bool ready = (steamTempC >= 100.0);  // Above 100°C = heater has residual heat
         if (ready != m_heaterReady) {
             m_heaterReady = ready;
             emit heaterReadyChanged();
             if (ready) {
-                setStatusMessage(QStringLiteral("Heater ready (%1°C). Start steaming now.")
+                setStatusMessage(QStringLiteral("Ready (%1°C). Start steaming now.")
                                      .arg(static_cast<int>(steamTempC)));
             }
         }
