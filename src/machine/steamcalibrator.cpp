@@ -212,9 +212,14 @@ void SteamCalibrator::startCalibration()
     int voltage = m_device ? m_device->heaterVoltage() : 0;
     m_heaterWatts = heaterWattsForModel(model, voltage);
 
-    // Save original settings to restore on cancel
+    // Save original settings to restore on cancel/completion
     m_originalFlow = m_settings->steamFlow();
     m_originalTemp = static_cast<int>(m_settings->steamTemperature());
+    m_originalKeepHeaterOn = m_settings->keepSteamHeaterOn();
+
+    // Enable keepSteamHeaterOn during calibration so the heater actively
+    // maintains temperature between steps instead of cooling down
+    m_settings->setKeepSteamHeaterOn(true);
 
     m_calibrationResult = CalibrationResult();
     m_calibrationResult.machineModel = model;
@@ -242,6 +247,7 @@ void SteamCalibrator::cancelCalibration()
 
     m_settings->setSteamFlow(m_originalFlow);
     m_settings->setSteamTemperature(m_originalTemp);
+    m_settings->setKeepSteamHeaterOn(m_originalKeepHeaterOn);
 
     setState(Idle);
     setStatusMessage(QString());
@@ -449,6 +455,7 @@ void SteamCalibrator::finishCalibration()
     // Restore original settings (user applies recommendation explicitly)
     m_settings->setSteamFlow(m_originalFlow);
     m_settings->setSteamTemperature(m_originalTemp);
+    m_settings->setKeepSteamHeaterOn(m_originalKeepHeaterOn);
 
     saveCalibration();
     saveDetailedLog();
@@ -481,13 +488,11 @@ void SteamCalibrator::updateHeaterTemp(double steamTempC)
     }
 
     // Check heater readiness when waiting between steps.
-    // The steam heater only actively heats during Steam state — in Ready/Idle
-    // it just holds residual heat. So we consider the heater "ready" when:
-    // 1. The machine is in a non-steaming state (can accept a steam start), AND
-    // 2. The steam temp is above a minimum threshold (heater not completely cold)
-    // The machine will heat to the target once steam actually starts.
+    // keepSteamHeaterOn is enabled during calibration, so the heater actively
+    // maintains temperature between steps. Wait until within 15°C of target.
     if (m_state == WaitingToStart) {
-        bool ready = (steamTempC >= 100.0);  // Above 100°C = heater has residual heat
+        int targetTemp = currentSteamTemp();
+        bool ready = (steamTempC >= targetTemp - 15);
         if (ready != m_heaterReady) {
             m_heaterReady = ready;
             emit heaterReadyChanged();

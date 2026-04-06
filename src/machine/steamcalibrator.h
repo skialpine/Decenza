@@ -193,6 +193,7 @@ private:
     QVector<SweepStep> m_sweepPlan;
     int m_originalFlow = 0;             // User's flow before calibration started
     int m_originalTemp = 0;             // User's temp before calibration started
+    bool m_originalKeepHeaterOn = false; // User's keepSteamHeaterOn before calibration
     double m_heaterWatts = 0.0;         // Looked up from model at start
     double m_steamingElapsed = 0.0;     // Seconds since steam started (for UI countdown)
     bool m_hasEnoughData = false;       // True when enough samples collected
