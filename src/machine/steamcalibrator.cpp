@@ -540,9 +540,9 @@ CalibrationStepResult SteamCalibrator::analyzeStability(
 double SteamCalibrator::computeStabilityScore(const CalibrationStepResult& step)
 {
     constexpr double W_CV = 4.0;
-    constexpr double W_OSC = 0.15;
-    constexpr double W_RANGE = 0.8;
-    constexpr double W_SLOPE = 2.0;
+    constexpr double W_OSC = 0.05;   // Light weight — zero-crossings are noisy even in stable signals
+    constexpr double W_RANGE = 0.4;  // Moderate — range grows with duration, not just instability
+    constexpr double W_SLOPE = 1.5;
 
     double penalty = W_CV * step.pressureCV
                    + W_OSC * step.oscillationRate
