@@ -1692,6 +1692,10 @@ void MainController::onShotSampleReceived(const ShotSample& sample) {
         double t = sample.timer - m_steamStartTime;
         m_steamDataModel->addSample(t, sample.groupPressure, sample.groupFlow, sample.steamTemp);
 
+        // Steam calibration: track elapsed time and auto-stop when enough data
+        if (m_steamCalibrator)
+            m_steamCalibrator->onSteamSample(t);
+
         // Live threshold warnings
         if (m_steamHealthTracker)
             m_steamHealthTracker->onSample(sample.groupPressure, sample.steamTemp);

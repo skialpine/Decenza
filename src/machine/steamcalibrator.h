@@ -51,6 +51,8 @@ class SteamCalibrator : public QObject {
     Q_PROPERTY(int currentFlowRate READ currentFlowRate NOTIFY stepChanged)
     Q_PROPERTY(int currentSteamTemp READ currentSteamTemp NOTIFY stepChanged)
     Q_PROPERTY(int phase READ phase NOTIFY stepChanged)
+    Q_PROPERTY(double steamingElapsed READ steamingElapsed NOTIFY steamingElapsedChanged)
+    Q_PROPERTY(bool hasEnoughData READ hasEnoughData NOTIFY hasEnoughDataChanged)
     Q_PROPERTY(int recommendedFlow READ recommendedFlow NOTIFY calibrationComplete)
     Q_PROPERTY(int recommendedTemp READ recommendedTemp NOTIFY calibrationComplete)
     Q_PROPERTY(double recommendedDilution READ recommendedDilution NOTIFY calibrationComplete)
@@ -84,6 +86,8 @@ public:
     int currentFlowRate() const;
     int currentSteamTemp() const;
     int phase() const { return static_cast<int>(m_phase); }
+    double steamingElapsed() const { return m_steamingElapsed; }
+    bool hasEnoughData() const { return m_hasEnoughData; }
     int recommendedFlow() const;
     int recommendedTemp() const;
     double recommendedDilution() const;
@@ -106,6 +110,10 @@ public:
     // Called by MainController when steam phase starts/ends
     void onSteamStarted();
     void onSteamEnded(const SteamDataModel* model);
+
+    // Called by MainController on each steam sample (~5Hz) to track elapsed time
+    // and auto-stop when enough data is collected
+    void onSteamSample(double elapsed);
 
     // Static analysis function — computes stability metrics from raw pressure data.
     static CalibrationStepResult analyzeStability(
@@ -152,6 +160,8 @@ signals:
     void stepAnalyzed();
     void calibrationComplete();
     void statusMessageChanged();
+    void steamingElapsedChanged();
+    void hasEnoughDataChanged();
 
 private:
     struct SweepStep {
@@ -174,6 +184,9 @@ private:
     int m_originalFlow = 0;             // User's flow before calibration started
     int m_originalTemp = 0;             // User's temp before calibration started
     double m_heaterWatts = 0.0;         // Looked up from model at start
+    double m_steamingElapsed = 0.0;     // Seconds since steam started (for UI countdown)
+    bool m_hasEnoughData = false;       // True when enough samples collected
+    bool m_autoStopRequested = false;   // Prevents double-stop
     QString m_statusMessage;
 
     CalibrationResult m_calibrationResult;
@@ -181,6 +194,7 @@ private:
     static constexpr double TRIM_SECONDS = 2.0;
     static constexpr int MIN_SAMPLES = 30;
     static constexpr double MIN_DURATION = 10.0;  // seconds after trim
+    static constexpr double TARGET_DURATION = 20.0; // seconds after trim — auto-stop target
     static constexpr double GOOD_SCORE_THRESHOLD = 75.0;
 
     // Thermodynamic constants

@@ -119,6 +119,53 @@ Dialog {
                 Accessible.ignored: true
             }
 
+            // Steaming progress (visible during Steaming state)
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin: Theme.scaled(16)
+                Layout.rightMargin: Theme.scaled(16)
+                visible: SteamCalibrator.state === 3 /* Steaming */
+                spacing: Theme.scaled(8)
+
+                // Countdown text
+                Text {
+                    Layout.fillWidth: true
+                    text: {
+                        var remaining = Math.max(0, 22 - SteamCalibrator.steamingElapsed)
+                        if (SteamCalibrator.hasEnoughData)
+                            return TranslationManager.translate("steamCal.stopping", "Stopping...")
+                        else if (remaining > 0)
+                            return TranslationManager.translate("steamCal.countdown", "Collecting data: %1s remaining")
+                                .arg(Math.ceil(remaining))
+                        else
+                            return TranslationManager.translate("steamCal.stopping", "Stopping...")
+                    }
+                    color: SteamCalibrator.hasEnoughData ? Theme.primaryColor : Theme.textColor
+                    font.family: Theme.bodyFont.family
+                    font.pixelSize: Theme.scaled(16)
+                    font.bold: true
+                    horizontalAlignment: Text.AlignHCenter
+                    Accessible.ignored: true
+                }
+
+                // Progress bar
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: Theme.scaled(8)
+                    radius: Theme.scaled(4)
+                    color: Theme.backgroundColor
+
+                    Rectangle {
+                        width: parent.width * Math.min(1, SteamCalibrator.steamingElapsed / 22)
+                        height: parent.height
+                        radius: Theme.scaled(4)
+                        color: SteamCalibrator.hasEnoughData ? Theme.primaryColor : Theme.warningColor
+
+                        Behavior on width { NumberAnimation { duration: 200 } }
+                    }
+                }
+            }
+
             // Instructions (visible during Instructions state)
             Text {
                 Layout.fillWidth: true

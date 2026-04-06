@@ -287,16 +287,17 @@ void SteamCalibrator::buildPhase2Plan()
     m_phase = TempSweep;
     m_sweepPlan.clear();
 
-    // Find the top 2 flow rates from Phase 1 by stability score
+    // Find the top 2 stable flow rates from Phase 1, preferring higher flow.
+    // Higher flow = stronger vortex = better microfoam, as long as the heater keeps up.
     QVector<CalibrationStepResult> sorted = m_calibrationResult.steps;
     std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
-        return a.stabilityScore > b.stabilityScore;
+        return a.flowRate > b.flowRate;  // Highest flow first
     });
 
     QVector<int> bestFlows;
     for (const auto& s : sorted) {
         if (bestFlows.size() >= 2) break;
-        if (s.stabilityScore >= GOOD_SCORE_THRESHOLD * 0.7)  // At least 52.5 to be worth testing
+        if (s.stabilityScore >= GOOD_SCORE_THRESHOLD * 0.7)  // At least ~52 to be worth testing
             bestFlows.append(s.flowRate);
     }
 
@@ -323,10 +324,39 @@ void SteamCalibrator::onSteamStarted()
 {
     if (m_state != WaitingToStart) return;
 
+    m_steamingElapsed = 0;
+    m_hasEnoughData = false;
+    m_autoStopRequested = false;
+
     setState(Steaming);
-    setStatusMessage(QStringLiteral("Steaming at %1 mL/s, %2°C — steam for at least 15 seconds")
+    setStatusMessage(QStringLiteral("Steaming at %1 mL/s, %2°C...")
                          .arg(currentFlowRate() / 100.0, 0, 'f', 2)
                          .arg(currentSteamTemp()));
+    emit steamingElapsedChanged();
+    emit hasEnoughDataChanged();
+}
+
+void SteamCalibrator::onSteamSample(double elapsed)
+{
+    if (m_state != Steaming) return;
+
+    m_steamingElapsed = elapsed;
+    emit steamingElapsedChanged();
+
+    double usableTime = elapsed - TRIM_SECONDS;
+    if (usableTime >= TARGET_DURATION && !m_hasEnoughData) {
+        m_hasEnoughData = true;
+        emit hasEnoughDataChanged();
+    }
+
+    // Auto-stop: request machine stop after TARGET_DURATION + small buffer
+    if (usableTime >= TARGET_DURATION + 2.0 && !m_autoStopRequested) {
+        m_autoStopRequested = true;
+        if (m_device && m_device->isConnected()) {
+            qDebug() << "SteamCalibrator: auto-stopping steam after" << elapsed << "s";
+            m_device->requestState(DE1::State::Idle);
+        }
+    }
 }
 
 void SteamCalibrator::onSteamEnded(const SteamDataModel* model)
@@ -380,12 +410,19 @@ void SteamCalibrator::onSteamEnded(const SteamDataModel* model)
 
 void SteamCalibrator::finishCalibration()
 {
-    // Find best combination: lowest dilution among stable steps
+    // Find best combination: highest flow rate with good stability.
+    // Among stable steps, prefer higher flow (stronger vortex, faster steaming)
+    // while keeping estimated dilution reasonable.
+    //
+    // Why highest stable flow, not lowest dilution:
+    // - Too-low flow = weak vortex, poor microfoam texture, slow steaming
+    // - Dilution differences between stable steps are small (1-2%, negligible in the cup)
+    // - The real goal is: fastest steaming with dry, stable steam
     const CalibrationStepResult* best = nullptr;
     for (const auto& step : m_calibrationResult.steps) {
         if (step.stabilityScore < GOOD_SCORE_THRESHOLD * 0.7)
             continue;  // Skip clearly unstable
-        if (!best || step.estimatedDilution < best->estimatedDilution)
+        if (!best || step.flowRate > best->flowRate)
             best = &step;
     }
 
