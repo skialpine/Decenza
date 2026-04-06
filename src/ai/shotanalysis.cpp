@@ -257,9 +257,11 @@ QVariantList ShotAnalysis::generateSummary(const QVector<QPointF>& pressure,
     // --- Flow vs goal (grind direction) ---
     // Only analyze during the pour phase where flow goal is meaningful (> FLOW_GOAL_MIN_AVG).
     // A consistent gap between actual and goal flow indicates grind is off.
+    // Skip for turbo/filter shots — same guard as channeling and detectGrindIssue().
     double flowGrindDelta = 0.0;  // positive = flow above goal (coarse), negative = below (fine)
     bool hasFlowGoalData = false;
-    if (pourStart < pourEnd && !flow.isEmpty() && !flowGoal.isEmpty()) {
+    bool skipGrind = shouldSkipChannelingCheck(beverageType, flow, pourStart, pourEnd);
+    if (!skipGrind && pourStart < pourEnd && !flow.isEmpty() && !flowGoal.isEmpty()) {
         double actualSum = 0, goalSum = 0;
         int count = 0;
         for (const auto& fp : flow) {

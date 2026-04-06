@@ -914,9 +914,13 @@ qint64 ShotHistoryStorage::saveShot(ShotDataModel* shotData,
             }
         }
 
-        // Grind issue detection: flow persistently above or below goal during pour
-        data.grindIssueDetected = ShotAnalysis::detectGrindIssue(
-            flowPts, shotData->flowGoalData(), pourStart, pourEnd);
+        // Grind issue detection: flow persistently above or below goal during pour.
+        // Skip for turbo/filter shots (same guard as channeling) — high-flow profiles
+        // have wide natural flow variation that would cause false positives.
+        if (!ShotAnalysis::shouldSkipChannelingCheck(data.beverageType, flowPts, pourStart, pourEnd)) {
+            data.grindIssueDetected = ShotAnalysis::detectGrindIssue(
+                flowPts, shotData->flowGoalData(), pourStart, pourEnd);
+        }
     }
 
     // Compress sample data on main thread (reads QObject data vectors)
@@ -2089,8 +2093,10 @@ ShotRecord ShotHistoryStorage::loadShotRecordStatic(QSqlDatabase& db, qint64 sho
                 if (pm.label.toLower().contains("infus") || pm.label == "Start") { pourStart = pm.time; break; }
             }
         }
-        record.grindIssueDetected = ShotAnalysis::detectGrindIssue(
-            record.flow, record.flowGoal, pourStart, pourEnd);
+        if (!ShotAnalysis::shouldSkipChannelingCheck(record.summary.beverageType, record.flow, pourStart, pourEnd)) {
+            record.grindIssueDetected = ShotAnalysis::detectGrindIssue(
+                record.flow, record.flowGoal, pourStart, pourEnd);
+        }
     }
 
     return record;
