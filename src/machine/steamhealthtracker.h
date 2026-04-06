@@ -67,13 +67,14 @@ signals:
     void sessionHistoryChanged();
 
 private:
-    // Returns true if session matches current settings within tolerance
-    bool isComparable(const SteamSessionSummary& s, int steamFlow, int steamTemp) const;
+    // Normalize pressure to REFERENCE_FLOW for cross-setting comparison.
+    // Clamped to 0.1 bar minimum to prevent negative baselines at extreme flows.
+    double normalizePressure(double avgPressure, int steamFlow) const;
 
     QList<SteamSessionSummary> loadHistory() const;
     void saveHistory(const QList<SteamSessionSummary>& history);
     void checkTrend(QList<SteamSessionSummary>& history, int steamFlow, int steamTemp);
-    void updateCachedStats(const QList<SteamSessionSummary>& history, int steamFlow, int steamTemp);
+    void updateCachedStats(const QList<SteamSessionSummary>& history, int steamTemp);
 
     QSettings m_settings;
     int m_sessionCount = 0;
@@ -100,11 +101,11 @@ private:
     static constexpr int MIN_DURATION_FOR_ANALYSIS = 20;     // minimum seconds — filters aborted cycles
     static constexpr int MIN_SESSIONS_FOR_TREND = 5;         // minimum comparable sessions
     static constexpr int MAX_HISTORY_SIZE = 150;             // sessions to keep
-    static constexpr double TREND_PROGRESS_THRESHOLD = 0.6;   // warn at 60% of the way from baseline to flow-relative threshold
+    static constexpr double TREND_PROGRESS_THRESHOLD = 0.6;   // warn at 60% of the way from baseline to warn level
     static constexpr double AUTO_RESET_DROP_THRESHOLD = 0.3;  // auto-reset baseline if drop >= 30% of range (likely descale)
     static constexpr int AUTO_RESET_KEEP_SESSIONS = 3;       // sessions to keep after auto-reset
     static constexpr double TRIM_SECONDS = 2.0;              // skip first 2s of samples
-    static constexpr int FLOW_TOLERANCE = 10;                // ±0.10 mL/s for settings comparison
-    static constexpr int TEMP_TOLERANCE = 2;                 // ±2°C for settings comparison
+    static constexpr int REFERENCE_FLOW = 150;               // 1.5 mL/s — normalization reference
+    static constexpr double PRESSURE_PER_FLOW_UNIT = 0.012;  // bar per 0.01 mL/s (from RO-water baseline data)
     static constexpr int WARN_COOLDOWN_SESSIONS = 5;         // re-warn at most every N sessions
 };
