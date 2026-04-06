@@ -117,6 +117,28 @@ double ShotAnalysis::findValueAtTime(const QVector<QPointF>& data, double time)
     return data.last().y();
 }
 
+bool ShotAnalysis::detectGrindIssue(const QVector<QPointF>& flow,
+                                     const QVector<QPointF>& flowGoal,
+                                     double pourStart, double pourEnd)
+{
+    if (pourStart >= pourEnd || flow.isEmpty() || flowGoal.isEmpty())
+        return false;
+    double actualSum = 0, goalSum = 0;
+    int count = 0;
+    for (const auto& fp : flow) {
+        if (fp.x() < pourStart || fp.x() > pourEnd) continue;
+        double goal = findValueAtTime(flowGoal, fp.x());
+        if (goal < FLOW_GOAL_MIN_AVG) continue;
+        actualSum += fp.y();
+        goalSum += goal;
+        ++count;
+    }
+    if (count < 5)
+        return false;
+    double delta = (actualSum / count) - (goalSum / count);
+    return std::abs(delta) > FLOW_DEVIATION_THRESHOLD;
+}
+
 QVariantList ShotAnalysis::generateSummary(const QVector<QPointF>& pressure,
                                              const QVector<QPointF>& flow,
                                              const QVector<QPointF>& weight,
@@ -235,9 +257,14 @@ QVariantList ShotAnalysis::generateSummary(const QVector<QPointF>& pressure,
     // --- Flow vs goal (grind direction) ---
     // Only analyze during the pour phase where flow goal is meaningful (> FLOW_GOAL_MIN_AVG).
     // A consistent gap between actual and goal flow indicates grind is off.
+    // Skip for profiles where high flow is intentional (grind_check_skip AnalysisFlag),
+    // and for filter/pourover beverage types where espresso grind signals don't apply.
     double flowGrindDelta = 0.0;  // positive = flow above goal (coarse), negative = below (fine)
     bool hasFlowGoalData = false;
-    if (pourStart < pourEnd && !flow.isEmpty() && !flowGoal.isEmpty()) {
+    bool skipGrind = analysisFlags.contains(QStringLiteral("grind_check_skip"))
+        || beverageType.toLower() == QStringLiteral("filter")
+        || beverageType.toLower() == QStringLiteral("pourover");
+    if (!skipGrind && pourStart < pourEnd && !flow.isEmpty() && !flowGoal.isEmpty()) {
         double actualSum = 0, goalSum = 0;
         int count = 0;
         for (const auto& fp : flow) {

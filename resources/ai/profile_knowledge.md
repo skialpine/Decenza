@@ -63,7 +63,7 @@ This is the hardest profile to dial in — requires lots of beans to experiment.
 ## Blooming Allonge
 Also matches: "Blooming Allongé"
 Category: Blooming/Allonge hybrid
-AnalysisFlags: flow_trend_ok
+AnalysisFlags: flow_trend_ok, grind_check_skip
 How it works: Fast fill at 4.5 ml/s until pressure peaks, ramp down to 2.0 ml/s, then bloom (zero flow, pressure decays), then ramp up to 3.5 ml/s percolation with an 8.6 bar pressure limiter.
 Expected curves: Pressure spike, bloom decay, then low pressure (<6 bar) during percolation at 3.5 ml/s.
 Temperature: 91-95°C (declining across phases)
@@ -84,7 +84,7 @@ Grind: Coarsest of espresso profiles
 Temperature: High — produces hottest coffee of any profile due to fast flow (puck doesn't cool water)
 Roast: Best for ultralight/light. Excellent with natural/fermented/fruity beans. Less impressive with clean washed coffees.
 DO NOT flag high ratio, low pressure, or minor channeling as problems — all are expected.
-AnalysisFlags: channeling_expected
+AnalysisFlags: channeling_expected, grind_check_skip
 
 ## Default
 Category: Lever
@@ -124,6 +124,7 @@ Grind: Coarse — much coarser than traditional espresso. Best with large flat b
 Flavor: Extremely clean, high-clarity, high aroma, acidity and fruited sweetness, moderate body. EY competitive with non-blooming profiles at high temperature (~22–24%). Less suited to dark roasts.
 Roast: Light and medium primarily. High-extraction flat burr grinders excel here.
 DO NOT flag short shot time, high flow, high temperature, or high ratio as problems — these are all defining features of the Turbo approach.
+AnalysisFlags: grind_check_skip
 
 ## Filter 2.0
 Also matches: "Filter 2.1"
@@ -376,7 +377,7 @@ DO NOT flag variable curves or unexpected path-switching as problems — the ada
 
 ## TurboBloom
 Category: Blooming/Turbo hybrid
-AnalysisFlags: flow_trend_ok
+AnalysisFlags: flow_trend_ok, grind_check_skip
 How it works: Created by Collin as a companion to TurboTurbo. Dynamic bloom into high-flow pressure extraction, targeting high-extraction grinders with flat burrs. Fast fill at 8 ml/s, then dynamic bloom until pressure drops to 2.2 bar (approximately 5s — very short bloom by design), then ramps to 6 bar extraction with a 4.5 ml/s flow limiter. The short, fast bloom is intentional: the fast fill saturates the puck quickly, allowing the bloom to be brief while still achieving even extraction, which in turn permits a higher flow rate during extraction.
 Expected curves: Fill spike, then bloom decay (zero flow, declining pressure), then 6 bar extraction with high flow (3–4.5 ml/s). Zero flow during bloom is INTENTIONAL. High flow during extraction is EXPECTED.
 Temperature: 86°C fill, drops to 70°C during bloom (intentional to reduce harshness), ramps to 80°C extraction — these temperature variations are all intentional.
@@ -390,7 +391,7 @@ DO NOT flag zero flow during bloom, low bloom temperature, high extraction flow,
 ## TurboTurbo
 Also matches: "Turboturbo"
 Category: Turbo (no bloom)
-AnalysisFlags: flow_trend_ok
+AnalysisFlags: flow_trend_ok, grind_check_skip
 How it works: Created by Collin and Jan. High-extraction turbo shot without a bloom phase. Rapid fill/preinfusion at 96°C to saturate the puck, then 6 bar extraction at 93°C with a 4.5 ml/s flow limiter. Companion to TurboBloom for when bloom-style is not wanted. The original design used 97°C/8ml/s preinfusion, refined to 96°C/4ml/s for better consistency. The high temperature is justified by the coarse grind: coarser grounds have more exposed surface area and less thermal mass to heat, so higher water temperature is needed to achieve the same extraction temperature at the puck.
 Expected curves: Fast preinfusion pressure rise, then 6 bar with high flow (3–4.5 ml/s). Shot is fast and high-flow by design.
 Temperature: 96°C preinfusion, 93°C extraction — high temperatures are intentional and appropriate for the coarse grind.
