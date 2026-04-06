@@ -3,6 +3,7 @@
 #include "../ble/de1device.h"
 #include "../machine/machinestate.h"
 #include "../machine/steamhealthtracker.h"
+#include "../machine/steamcalibrator.h"
 #include "../models/shotdatamodel.h"
 #include "../controllers/maincontroller.h"
 #include "../controllers/profilemanager.h"
@@ -241,6 +242,60 @@ void registerMachineTools(McpToolRegistry* registry, DE1Device* device,
                 result["temperatureScaleBuildupProgress0to1"] = info.temperatureProgress;
                 result["warnThresholdProgress0to1"] = tracker->trendProgressThreshold();
             }
+
+            return result;
+        },
+        "read");
+
+    // steam_calibration_status
+    registry->registerTool(
+        "steam_calibration_status",
+        "Get steam calibration results: recommended flow rate and temperature, "
+        "estimated dilution percentage, and detailed per-step data including "
+        "stability scores, pressure CV, oscillation rates, and dryness estimates. "
+        "Use this after running a steam calibration to review results, or to check "
+        "if a calibration has been performed.",
+        QJsonObject{{"type", "object"}, {"properties", QJsonObject{}}},
+        [mainController](const QJsonObject&) -> QJsonObject {
+            QJsonObject result;
+            auto* calibrator = mainController ? mainController->steamCalibrator() : nullptr;
+            if (!calibrator) {
+                result["hasCalibration"] = false;
+                return result;
+            }
+
+            const auto& cal = calibrator->calibrationResult();
+            result["hasCalibration"] = calibrator->hasCalibration();
+            result["state"] = calibrator->state();
+
+            if (!calibrator->hasCalibration()) return result;
+
+            result["timestamp"] = cal.timestamp.toOffsetFromUtc(cal.timestamp.offsetFromUtc())
+                                      .toString(Qt::ISODate);
+            result["machineModel"] = cal.machineModel;
+            result["heaterVoltage"] = cal.heaterVoltage;
+            result["recommendedFlowMlPerSec"] = cal.recommendedFlow / 100.0;
+            result["recommendedTemperatureC"] = cal.recommendedTemp;
+            result["recommendedDilutionPct"] = cal.recommendedDilution;
+
+            QJsonArray steps;
+            for (const auto& step : cal.steps) {
+                QJsonObject s;
+                s["flowMlPerSec"] = step.flowRate / 100.0;
+                s["steamTemperatureC"] = step.steamTemp;
+                s["avgPressureBar"] = step.avgPressure;
+                s["pressureCV"] = step.pressureCV;
+                s["oscillationRateHz"] = step.oscillationRate;
+                s["peakToPeakRangeBar"] = step.peakToPeakRange;
+                s["pressureSlopeBarPerSec"] = step.pressureSlope;
+                s["stabilityScore0to100"] = step.stabilityScore;
+                s["estimatedDryness0to1"] = step.estimatedDryness;
+                s["estimatedDilutionPct"] = step.estimatedDilution;
+                s["sampleCount"] = step.sampleCount;
+                s["durationSec"] = step.durationSeconds;
+                steps.append(s);
+            }
+            result["steps"] = steps;
 
             return result;
         },
