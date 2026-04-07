@@ -2322,7 +2322,7 @@ QString ShotServer::generateLayoutPage() const
         {type:"batteryLevel",label:"Battery Level"},
         {type:"scaleBattery",label:"Scale Battery"},
         {type:"machineStatus",label:"Machine Status"},
-        {type:"ghcSimulator",label:"GHC Simulator"},
+        {type:"ghcSimulator",label:"Mini GHC"},
         {type:"discuss",label:"Discuss"},
         {type:"waterLevel",label:"Water Level"},
         // Utility (orange)
@@ -2350,7 +2350,9 @@ QString ShotServer::generateLayoutPage() const
         screensaverFlipClock:"Flip Clock",screensaverPipes:"3D Pipes",
         screensaverAttractor:"Attractor",screensaverShotMap:"Shot Map",
         lastShot:"Last Shot",
-        discuss:"Discuss"
+        discuss:"Discuss",
+        ghcSimulator:"Mini GHC",
+        machineStatus:"Status"
     };
 
     var ACTIONS = [
