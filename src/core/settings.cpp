@@ -682,8 +682,8 @@ void Settings::updateSteamPitcherPreset(int index, const QString& name, int dura
     QJsonDocument doc = QJsonDocument::fromJson(data);
     QJsonArray arr = doc.array();
 
-    if (index >= 0 && index < arr.size()) {
-        QJsonObject preset;
+    if (index >= 0 && index < static_cast<int>(arr.size())) {
+        QJsonObject preset = arr[index].toObject();  // Read existing to preserve pitcherWeightG
         preset["name"] = name;
         preset["duration"] = duration;
         preset["flow"] = flow;
@@ -734,6 +734,20 @@ void Settings::moveSteamPitcherPreset(int from, int to) {
             setSelectedSteamCup(selected + 1);
         }
 
+        emit steamPitcherPresetsChanged();
+    }
+}
+
+void Settings::setSteamPitcherWeight(int index, double weightG) {
+    QByteArray data = m_settings.value("steam/pitcherPresets").toByteArray();
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    QJsonArray arr = doc.array();
+
+    if (index >= 0 && index < static_cast<int>(arr.size())) {
+        QJsonObject preset = arr[index].toObject();
+        preset["pitcherWeightG"] = weightG;
+        arr[index] = preset;
+        m_settings.setValue("steam/pitcherPresets", QJsonDocument(arr).toJson());
         emit steamPitcherPresetsChanged();
     }
 }
