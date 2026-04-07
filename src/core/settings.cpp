@@ -815,6 +815,12 @@ void Settings::addFavoriteProfile(const QString& name, const QString& filename) 
     arr.append(favorite);
 
     m_settings.setValue("profile/favorites", QJsonDocument(arr).toJson());
+
+    // If the newly added favorite is the currently active profile, sync the selected index
+    if (currentProfile() == filename) {
+        setSelectedFavoriteProfile(static_cast<int>(arr.size()) - 1);
+    }
+
     emit favoriteProfilesChanged();
 }
 
