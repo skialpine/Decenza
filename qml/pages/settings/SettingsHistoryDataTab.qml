@@ -846,12 +846,15 @@ KeyboardAwareContainer {
         Connections {
             target: MainController.shotImporter
             function onImportComplete(imported, skipped, failed) {
-                importResultDialog.title = TranslationManager.translate("shotimporter.title.importComplete", "Import Complete")
-                importResultDialog.resultMessage =
+                const shotMsg =
                     TranslationManager.translate("shotimporter.result.imported", "Imported") + ": " + imported + " " + TranslationManager.translate("shotimporter.result.shots", "shots") + "\n" +
                     TranslationManager.translate("shotimporter.result.skipped", "Skipped (duplicates)") + ": " + skipped + "\n" +
                     TranslationManager.translate("shotimporter.result.failed", "Failed") + ": " + failed + "\n\n" +
                     TranslationManager.translate("shotimporter.result.totalShots", "Total shots") + ": " + (MainController.shotHistory ? MainController.shotHistory.totalShots : "?")
+                importResultDialog.title = TranslationManager.translate("shotimporter.title.importComplete", "Import Complete")
+                importResultDialog.resultMessage = importResultDialog.resultMessage
+                    ? importResultDialog.resultMessage + "\n\n" + shotMsg
+                    : shotMsg
                 importResultDialog.isError = failed > 0 && imported === 0
                 importResultDialog.open()
             }
