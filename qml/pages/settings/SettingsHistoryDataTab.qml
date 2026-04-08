@@ -12,6 +12,20 @@ KeyboardAwareContainer {
     // Track backup operation state
     property bool backupInProgress: false
     property bool restoreInProgress: false
+
+    // Track concurrent imports — dialog shown only when both complete
+    property bool _shotImportPending: false
+    property bool _profileImportPending: false
+    property string _pendingImportMessage: ""
+    property bool _pendingImportError: false
+
+    function _showImportResultIfDone() {
+        if (_shotImportPending || _profileImportPending) return
+        importResultDialog.title = TranslationManager.translate("shotimporter.title.importComplete", "Import Complete")
+        importResultDialog.resultMessage = _pendingImportMessage
+        importResultDialog.isError = _pendingImportError
+        importResultDialog.open()
+    }
     // Cache hasStoragePermission()
     property bool hasStoragePerm: Qt.platform.os !== "android" ||
         (MainController.backupManager ? MainController.backupManager.hasStoragePermission() : false)
@@ -190,12 +204,14 @@ KeyboardAwareContainer {
                         accessibleName: TranslationManager.translate("settings.history.importFromDE1Desc", "Auto-detect and import from DE1 tablet app")
                         visible: de1AppStatus.detectedPath !== ""
                         onClicked: {
-                            if (MainController.shotImporter) {
+                            _pendingImportMessage = ""
+                            _pendingImportError = false
+                            _shotImportPending = !!MainController.shotImporter
+                            _profileImportPending = !!MainController.profileImporter
+                            if (MainController.shotImporter)
                                 MainController.shotImporter.importFromDE1App(overwriteSwitch.checked)
-                            }
-                            if (MainController.profileImporter) {
+                            if (MainController.profileImporter)
                                 MainController.profileImporter.importFromDE1App(overwriteSwitch.checked)
-                            }
                         }
                     }
 
@@ -851,17 +867,16 @@ KeyboardAwareContainer {
                     TranslationManager.translate("shotimporter.result.skipped", "Skipped (duplicates)") + ": " + skipped + "\n" +
                     TranslationManager.translate("shotimporter.result.failed", "Failed") + ": " + failed + "\n\n" +
                     TranslationManager.translate("shotimporter.result.totalShots", "Total shots") + ": " + (MainController.shotHistory ? MainController.shotHistory.totalShots : "?")
-                importResultDialog.title = TranslationManager.translate("shotimporter.title.importComplete", "Import Complete")
-                importResultDialog.resultMessage = importResultDialog.resultMessage
-                    ? importResultDialog.resultMessage + "\n\n" + shotMsg
-                    : shotMsg
-                importResultDialog.isError = failed > 0 && imported === 0
-                importResultDialog.open()
+                _pendingImportMessage = _pendingImportMessage ? _pendingImportMessage + "\n\n" + shotMsg : shotMsg
+                _pendingImportError = _pendingImportError || (failed > 0 && imported === 0)
+                _shotImportPending = false
+                _showImportResultIfDone()
             }
             function onImportError(translationKey, fallbackMessage) {
                 importResultDialog.title = TranslationManager.translate("shotimporter.title.importFailed", "Import Failed")
                 importResultDialog.resultMessage = TranslationManager.translate(translationKey, fallbackMessage)
                 importResultDialog.isError = true
+                _shotImportPending = false
                 importResultDialog.open()
             }
         }
@@ -874,12 +889,9 @@ KeyboardAwareContainer {
                     TranslationManager.translate("profileimporter.result.imported", "Profiles imported") + ": " + imported + "\n" +
                     TranslationManager.translate("profileimporter.result.skipped", "Profiles skipped") + ": " + skipped + "\n" +
                     TranslationManager.translate("profileimporter.result.failed", "Profiles failed") + ": " + failed
-                importResultDialog.title = TranslationManager.translate("shotimporter.title.importComplete", "Import Complete")
-                importResultDialog.resultMessage = importResultDialog.resultMessage
-                    ? importResultDialog.resultMessage + "\n\n" + profileMsg
-                    : profileMsg
-                if (!importResultDialog.opened)
-                    importResultDialog.open()
+                _pendingImportMessage = _pendingImportMessage ? _pendingImportMessage + "\n\n" + profileMsg : profileMsg
+                _profileImportPending = false
+                _showImportResultIfDone()
             }
         }
 
