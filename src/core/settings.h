@@ -255,8 +255,6 @@ class Settings : public QObject {
     Q_PROPERTY(QString discussShotCustomUrl READ discussShotCustomUrl WRITE setDiscussShotCustomUrl NOTIFY discussShotCustomUrlChanged)
     Q_PROPERTY(int discussAppNone READ discussAppNone CONSTANT)
 
-    int discussAppNone() const { return 6; }
-
     // MQTT settings (Home Automation)
     Q_PROPERTY(bool mqttEnabled READ mqttEnabled WRITE setMqttEnabled NOTIFY mqttEnabledChanged)
     Q_PROPERTY(QString mqttBrokerHost READ mqttBrokerHost WRITE setMqttBrokerHost NOTIFY mqttBrokerHostChanged)
@@ -271,6 +269,8 @@ class Settings : public QObject {
 
 public:
     explicit Settings(QObject* parent = nullptr);
+
+    int discussAppNone() const { return 6; }
 
     // Platform capabilities (compile-time)
     bool hasQuick3D() const {
@@ -778,6 +778,7 @@ public:
     QString discussShotCustomUrl() const;
     void setDiscussShotCustomUrl(const QString& url);
     Q_INVOKABLE QString discussShotUrl() const;
+    int discussAppNone() const { return 6; }
 
     // MQTT settings (Home Automation)
     bool mqttEnabled() const;
