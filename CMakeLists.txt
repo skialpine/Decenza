@@ -68,6 +68,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     Bluetooth
     Charts
     Svg
+    ImageFormats
     Multimedia
     TextToSpeech
     Network
@@ -498,6 +499,7 @@ target_link_libraries(Decenza PRIVATE
     Qt6::Bluetooth
     Qt6::Charts
     Qt6::Svg
+    Qt6::ImageFormats
     Qt6::Multimedia
     Qt6::TextToSpeech
     Qt6::Network
