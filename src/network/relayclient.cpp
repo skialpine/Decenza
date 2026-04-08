@@ -212,7 +212,10 @@ void RelayClient::handleCommand(const QString& commandId, const QString& command
     } else if (command == "sleep") {
         if (m_device) m_device->goToSleep();
     } else if (command == "status") {
-        // No action needed, status is pushed separately
+        // Controller just connected and needs current state — clear dedup
+        // cache so the next pushStatus() actually sends.
+        m_lastStatusJson.clear();
+        pushStatus();
     } else if (command == "start_remote") {
         if (m_window && !m_captureService) {
             double scale = 0.5;
