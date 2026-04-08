@@ -6,6 +6,8 @@
 #include <QJsonObject>
 #include <QUuid>
 #include <QCryptographicHash>
+#include <QDateTime>
+#include <QTimeZone>
 #include <QDebug>
 
 ShotFileParser::ParseResult ShotFileParser::parse(const QByteArray& fileContents, const QString& filename)
@@ -13,16 +15,26 @@ ShotFileParser::ParseResult ShotFileParser::parse(const QByteArray& fileContents
     ParseResult result;
     QString content = QString::fromUtf8(fileContents);
 
-    // Extract timestamp
+    // Extract timestamp from clock field, falling back to the filename
+    // (de1app names files YYYYMMDDTHHMMSS.shot, so the name is always a valid timestamp)
     QString clockStr = extractValue(content, "clock");
-    if (clockStr.isEmpty()) {
-        result.errorMessage = "Missing clock timestamp";
-        return result;
+    qint64 timestamp = clockStr.toLongLong();
+
+    if (timestamp == 0) {
+        // Try to parse timestamp from filename: YYYYMMDDTHHMMSS[.shot]
+        QString base = filename.section('.', 0, 0);  // strip extension
+        QDateTime dt = QDateTime::fromString(base, "yyyyMMddTHHmmss");
+        if (dt.isValid()) {
+            // Interpret the parsed date+time as UTC (de1app filenames are UTC-based).
+            // setTimeZone() relabels without converting; construct explicitly as UTC instead.
+            QDateTime utcDt(dt.date(), dt.time(), QTimeZone::utc());
+            timestamp = utcDt.toSecsSinceEpoch();
+            qDebug() << "ShotFileParser: no clock field in" << filename << "- derived timestamp from filename:" << timestamp;
+        }
     }
 
-    qint64 timestamp = clockStr.toLongLong();
     if (timestamp == 0) {
-        result.errorMessage = "Invalid clock timestamp";
+        result.errorMessage = clockStr.isEmpty() ? "Missing clock timestamp" : "Invalid clock timestamp";
         return result;
     }
 

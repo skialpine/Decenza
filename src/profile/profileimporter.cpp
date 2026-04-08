@@ -78,6 +78,24 @@ QString ProfileImporter::detectDE1AppPath() const
     return QString();
 }
 
+void ProfileImporter::importFromDE1App(bool overwriteExisting)
+{
+    if (m_scanning || m_importing) {
+        qDebug() << "ProfileImporter: importFromDE1App - already busy";
+        return;
+    }
+    QString path = detectDE1AppPath();
+    if (path.isEmpty()) {
+        setStatus("DE1 app profile folder not found");
+        emit batchImportComplete(0, 0, 0);
+        return;
+    }
+    qDebug() << "ProfileImporter: importFromDE1App - scanning" << path << "overwrite:" << overwriteExisting;
+    m_autoImportAfterScan = true;
+    m_autoImportOverwrite = overwriteExisting;
+    scanProfilesFromPath(path);
+}
+
 void ProfileImporter::scanProfiles()
 {
     QString de1plusPath = detectDE1AppPath();
@@ -158,6 +176,7 @@ void ProfileImporter::scanProfilesFromPath(const QString& path)
     if (m_pendingFiles.isEmpty()) {
         setStatus("No profiles found");
         m_scanning = false;
+        m_autoImportAfterScan = false;  // reset — no scan will complete to clear this
         emit isScanningChanged();
         emit availableProfilesChanged();
         emit scanComplete(0);
@@ -187,6 +206,18 @@ void ProfileImporter::onProcessNextScan()
         setStatus(QString("Found %1 profiles").arg(m_availableProfiles.size()));
         emit availableProfilesChanged();
         emit scanComplete(static_cast<int>(m_availableProfiles.size()));
+
+        if (m_autoImportAfterScan) {
+            m_autoImportAfterScan = false;
+            bool overwrite = m_autoImportOverwrite;
+            m_autoImportOverwrite = false;
+            if (!m_availableProfiles.isEmpty()) {
+                qDebug() << "ProfileImporter: auto-importing from" << m_availableProfiles.size() << "scanned profiles, overwrite:" << overwrite;
+                importAll(overwrite);
+            } else {
+                qDebug() << "ProfileImporter: no new profiles to import";
+            }
+        }
         return;
     }
 
@@ -489,8 +520,12 @@ void ProfileImporter::importAll(bool overwriteExisting)
 
         if (status == "new") {
             m_importQueue.append(entry["sourcePath"].toString());
-        } else if (status == "different" && overwriteExisting) {
-            m_importQueue.append(entry["sourcePath"].toString());
+        } else if (status == "different") {
+            if (overwriteExisting || entry["source"].toString() == "B") {
+                // Built-in "different" profiles are always queued — they need
+                // a rename on the way in rather than an overwrite.
+                m_importQueue.append(entry["sourcePath"].toString());
+            }
         }
         // Skip identical profiles
     }
@@ -605,6 +640,18 @@ void ProfileImporter::onProcessNextImport()
     ProfileStorage* storage = m_controller ? m_controller->profileStorage() : nullptr;
     bool inStorage = storage && storage->isConfigured() && storage->profileExists(filename);
     bool inDownloaded = QFile::exists(downloadedPath);
+    bool inBuiltin = QFile::exists(":/profiles/" + filename + ".json");
+
+    // Built-in profiles are read-only. If this profile's filename matches a
+    // built-in, rename it before saving so we never write a downloaded file
+    // with the same name as a built-in.
+    if (inBuiltin && !inStorage && !inDownloaded) {
+        profile.setTitle(profile.title() + " (imported)");
+        filename = m_saveHelper->titleToFilename(profile.title());
+        downloadedPath = ProfileSaveHelper::downloadedProfilesPath() + "/" + filename + ".json";
+        inDownloaded = QFile::exists(downloadedPath);
+        qDebug() << "ProfileImporter: renaming built-in collision to" << profile.title();
+    }
 
     qDebug() << "ProfileImporter: batch processing" << profile.title()
              << "- inStorage:" << inStorage << "inDownloaded:" << inDownloaded;

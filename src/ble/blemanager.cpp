@@ -3,6 +3,7 @@
 #include "protocol/de1characteristics.h"
 #include "scales/scalefactory.h"
 #include "refractometers/difluidr2.h"
+#include <QBluetoothLocalDevice>
 #include <QBluetoothUuid>
 #include <QCoreApplication>
 #include <QDebug>
@@ -32,12 +33,35 @@ BLEManager::BLEManager(QObject* parent)
     // initializing CoreBluetooth (and triggering TCC privacy checks) when
     // BLE is disabled (e.g. simulation mode on Mac debug builds).
 
+    // Track Bluetooth adapter power state.
+    // QBluetoothLocalDevice is not available on iOS — CoreBluetooth manages state there.
+#ifndef Q_OS_IOS
+    m_localDevice = new QBluetoothLocalDevice(this);
+    connect(m_localDevice, &QBluetoothLocalDevice::hostModeStateChanged,
+            this, &BLEManager::onHostModeStateChanged);
+#endif
+
     // Timer for scale connection timeout (20 seconds)
     m_scaleConnectionTimer = new QTimer(this);
     m_scaleConnectionTimer->setSingleShot(true);
     m_scaleConnectionTimer->setInterval(20000);
     connect(m_scaleConnectionTimer, &QTimer::timeout, this, &BLEManager::onScaleConnectionTimeout);
+}
 
+bool BLEManager::isBluetoothAvailable() const
+{
+    if (m_disabled) return true;  // simulator mode — always report available
+#ifdef Q_OS_IOS
+    return true;  // CoreBluetooth manages state; QBluetoothLocalDevice not available on iOS
+#else
+    return m_localDevice->hostMode() != QBluetoothLocalDevice::HostPoweredOff;
+#endif
+}
+
+void BLEManager::onHostModeStateChanged(QBluetoothLocalDevice::HostMode mode)
+{
+    qDebug() << "BLEManager: Bluetooth host mode changed to" << mode;
+    emit bluetoothAvailableChanged();
 }
 
 void BLEManager::ensureDiscoveryAgent() {
@@ -139,6 +163,11 @@ void BLEManager::startScan() {
     }
 
     if (m_scanning) {
+        return;
+    }
+
+    if (!isBluetoothAvailable()) {
+        qDebug() << "BLEManager: Scan request ignored (Bluetooth is powered off)";
         return;
     }
 
@@ -567,6 +596,11 @@ void BLEManager::tryDirectConnectToDE1() {
         return;
     }
 
+    if (!isBluetoothAvailable()) {
+        qDebug() << "BLEManager: tryDirectConnectToDE1 - Bluetooth is powered off, skipping";
+        return;
+    }
+
     // Don't attempt if already connected or connecting
     // (the de1Discovered handler in main.cpp checks this before connecting)
 
@@ -617,6 +651,11 @@ void BLEManager::scanForScales() {
     m_flowScaleFallbackEmitted = false;  // User-initiated scan resets the dialog guard
     emit scaleConnectionFailedChanged();
 
+    if (!isBluetoothAvailable()) {
+        qDebug() << "BLEManager: scanForScales - Bluetooth is powered off, skipping";
+        return;
+    }
+
     // Disconnect any currently connected scale before scanning for new ones
     emit disconnectScaleRequested();
 
@@ -639,6 +678,11 @@ void BLEManager::tryDirectConnectToScale() {
 
     if (m_savedScaleAddress.isEmpty() || m_savedScaleType.isEmpty()) {
         qDebug() << "BLEManager: tryDirectConnectToScale - no saved scale address/type";
+        return;
+    }
+
+    if (!isBluetoothAvailable()) {
+        qDebug() << "BLEManager: tryDirectConnectToScale - Bluetooth is powered off, skipping";
         return;
     }
 

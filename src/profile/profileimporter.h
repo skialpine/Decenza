@@ -60,6 +60,9 @@ public:
     Q_INVOKABLE void importProfileWithName(const QString& sourcePath, const QString& newName);
     Q_INVOKABLE void forceImportProfile(const QString& sourcePath);  // Overwrite without asking
 
+    // Auto-detect and import all new profiles from DE1 app folder (one-shot convenience)
+    Q_INVOKABLE void importFromDE1App(bool overwriteExisting = false);
+
     // Import all new profiles (skip existing unless overwrite is true)
     Q_INVOKABLE void importAllNew();
     Q_INVOKABLE void importAll(bool overwriteExisting);
@@ -116,4 +119,7 @@ private:
     int m_batchImported = 0;
     int m_batchSkipped = 0;
     int m_batchFailed = 0;
+
+    bool m_autoImportAfterScan = false;       // Set by importFromDE1App() to trigger import after scan
+    bool m_autoImportOverwrite = false;       // Overwrite flag for the auto-import triggered by importFromDE1App()
 };
