@@ -871,7 +871,7 @@ ApplicationWindow {
             anchors.right: parent.right
             height: Theme.statusBarHeight
             z: 600
-            visible: !screensaverActive
+            visible: !root.screensaverActive
         }
     }
 
