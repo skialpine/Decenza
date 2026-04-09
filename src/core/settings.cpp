@@ -789,6 +789,7 @@ void Settings::setSelectedFavoriteProfile(int index) {
 }
 
 void Settings::addFavoriteProfile(const QString& name, const QString& filename) {
+    qWarning() << "Settings: addFavoriteProfile name=" << name << "filename=" << filename;
     QByteArray data = m_settings.value("profile/favorites").toByteArray();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     QJsonArray arr = doc.array();
