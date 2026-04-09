@@ -830,6 +830,8 @@ void Settings::removeFavoriteProfile(int index) {
     QJsonArray arr = doc.array();
 
     if (index >= 0 && index < arr.size()) {
+        QString filename = arr[index].toObject()["filename"].toString();
+        qWarning() << "Settings: removeFavoriteProfile index=" << index << "filename=" << filename;
         arr.removeAt(index);
         m_settings.setValue("profile/favorites", QJsonDocument(arr).toJson());
 
