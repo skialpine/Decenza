@@ -87,7 +87,7 @@ jobs:
         id: openssl
         shell: powershell
         run: |
-          choco install openssl -y --no-progress --ignore-package-exit-codes
+          choco install openssl -y --no-progress
 
           # Find libssl-3-x64.dll - Chocolatey may install to different paths
           $candidates = @(
