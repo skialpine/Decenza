@@ -18,6 +18,9 @@ Page {
     // Persisted graph height (like PostShotReviewPage)
     property real graphHeight: Settings.value("shotDetail/graphHeight", Theme.scaled(250))
     property bool advancedMode: Settings.boolValue("shotReview/advancedMode", false)
+    property int swipeDirection: 0  // 1 = going older, -1 = going newer; swipeDirection: 1 exits left, enters from right; -1 exits right, enters from left
+    property bool m_navigating: false  // true only during a navigateToShot transition; guards enterAnimation from firing on non-navigation loads
+    property bool m_reloadingFromVisualizer: false  // true when loadShot() was called from onVisualizerInfoUpdated; suppresses duplicate badge reanalysis
 
     // Pick up toggle changes made on any other page sharing this setting
     // (Post-Shot Review, Shot Comparison, Espresso view selector).
@@ -52,8 +55,21 @@ Page {
         function onShotReady(id, shot) {
             if (id !== shotDetailPage.shotId) return
             shotData = shot
-            // Force ScrollView coordinate recalculation after data populates layout
-            Qt.callLater(function() { scrollView.contentItem.returnToBounds() })
+            var wasNavigating = shotDetailPage.m_navigating
+            shotDetailPage.m_navigating = false
+            // Defer both calls until after layout has updated: returnToBounds() needs
+            // final content bounds, and enterAnimation must start after new content is laid out.
+            Qt.callLater(function() {
+                scrollView.contentItem.returnToBounds()
+                if (wasNavigating)
+                    enterAnimation.start()
+            })
+            // Recompute quality badges in background (handles stale values after KB updates).
+            // Skip when reloading after a visualizer update — badges didn't change and the
+            // visualizer path already triggers a second onShotReady via loadShot().
+            if (!shotDetailPage.m_reloadingFromVisualizer)
+                MainController.shotHistory.requestReanalyzeBadges(id)
+            shotDetailPage.m_reloadingFromVisualizer = false
         }
         function onShotDeleted(deletedId) {
             if (deletedId === shotDetailPage.shotId)
@@ -61,18 +77,30 @@ Page {
         }
         function onVisualizerInfoUpdated(id, success) {
             if (id !== shotDetailPage.shotId) return
-            if (success)
+            if (success) {
+                shotDetailPage.m_reloadingFromVisualizer = true
                 loadShot()
-            else
+            } else {
                 console.warn("ShotDetailPage: Failed to save visualizer info for shot", id)
+            }
+        }
+        function onShotBadgesUpdated(id, channeling, tempUnstable, grindIssue) {
+            if (id !== shotDetailPage.shotId) return
+            var updated = Object.assign({}, shotData)
+            updated.channelingDetected = channeling
+            updated.temperatureUnstable = tempUnstable
+            updated.grindIssueDetected = grindIssue
+            shotData = updated
         }
     }
 
     function navigateToShot(index) {
         if (index >= 0 && index < shotIds.length) {
-            currentIndex = index
-            shotId = shotIds[index]
-            loadShot()
+            enterAnimation.stop()
+            exitAnimation.stop()
+            swipeDirection = index > currentIndex ? 1 : -1
+            exitAnimation.targetIndex = index
+            exitAnimation.start()
         }
     }
 
@@ -119,6 +147,45 @@ Page {
         }
     }
 
+    // Exit: slide + fade out, then load new shot; Enter: slide + fade in on data ready
+    SequentialAnimation {
+        id: exitAnimation
+        property int targetIndex: 0
+
+        ParallelAnimation {
+            NumberAnimation {
+                target: scrollView; property: "opacity"
+                to: 0; duration: 140; easing.type: Easing.InQuad
+            }
+            NumberAnimation {
+                target: contentSlide; property: "x"
+                to: shotDetailPage.swipeDirection * -Theme.scaled(50)
+                duration: 140; easing.type: Easing.InQuad
+            }
+        }
+        ScriptAction {
+            script: {
+                currentIndex = exitAnimation.targetIndex
+                shotId = shotIds[currentIndex]
+                contentSlide.x = shotDetailPage.swipeDirection * Theme.scaled(50)
+                shotDetailPage.m_navigating = true
+                loadShot()
+            }
+        }
+    }
+
+    ParallelAnimation {
+        id: enterAnimation
+        NumberAnimation {
+            target: scrollView; property: "opacity"
+            from: 0; to: 1; duration: 180; easing.type: Easing.OutQuad
+        }
+        NumberAnimation {
+            target: contentSlide; property: "x"
+            to: 0; duration: 180; easing.type: Easing.OutQuad
+        }
+    }
+
     ScrollView {
         id: scrollView
         anchors.left: parent.left
@@ -129,6 +196,7 @@ Page {
         anchors.leftMargin: Theme.standardMargin
         anchors.rightMargin: Theme.standardMargin
         contentWidth: availableWidth
+        transform: Translate { id: contentSlide; x: 0 }
 
         ColumnLayout {
             width: parent.width
@@ -143,29 +211,123 @@ Page {
                     Layout.fillWidth: true
                     spacing: Theme.scaled(2)
 
-                    Text {
-                        textFormat: Text.RichText
-                        text: {
-                            var name = shotData.profileName || "Shot Detail"
-                            var t = shotData.temperatureOverride
-                            var result
-                            if (t !== undefined && t !== null && t > 0) {
-                                result = name + " (" + Math.round(t) + "\u00B0C)"
-                            } else {
-                                result = name
-                            }
-                            return Theme.replaceEmojiWithImg(result, Theme.titleFont.pixelSize)
-                        }
-                        font: Theme.titleFont
-                        color: Theme.textColor
+                    RowLayout {
                         Layout.fillWidth: true
-                        elide: Text.ElideRight
+                        spacing: Theme.spacingSmall
+
+                        Text {
+                            textFormat: Text.RichText
+                            text: {
+                                var name = shotData.profileName || TranslationManager.translate("shotdetail.title", "Shot Detail")
+                                var t = shotData.temperatureOverride
+                                var result
+                                if (t !== undefined && t !== null && t > 0) {
+                                    result = name + " (" + Math.round(t) + "\u00B0C)"
+                                } else {
+                                    result = name
+                                }
+                                return Theme.replaceEmojiWithImg(result, Theme.titleFont.pixelSize)
+                            }
+                            font: Theme.titleFont
+                            color: Theme.textColor
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                        }
+
+                        Text {
+                            text: shotData.dateTime || ""
+                            font: Theme.labelFont
+                            color: Theme.textSecondaryColor
+                            elide: Text.ElideRight
+                            Layout.maximumWidth: shotDetailPage.width * 0.35
+                        }
+
+                        QualityBadges {
+                            visible: !!(shotData.profileKbId)
+                            Layout.fillWidth: false
+                            Layout.maximumWidth: shotDetailPage.width * 0.5
+                            channelingDetected: shotData.channelingDetected ?? false
+                            temperatureUnstable: shotData.temperatureUnstable ?? false
+                            grindIssueDetected: shotData.grindIssueDetected ?? false
+                            onSummaryRequested: detailAnalysisDialog.open()
+                        }
+
+                        ShotAnalysisDialog {
+                            id: detailAnalysisDialog
+                            shotData: shotDetailPage.shotData
+                        }
+                    }
+                }
+
+                // KB sparkle button — opens the profile knowledge base
+                Image {
+                    id: headerSparkle
+                    visible: !!(shotData.profileKbId)
+                    source: "qrc:/icons/sparkle.svg"
+                    sourceSize.width: Theme.scaled(18)
+                    sourceSize.height: Theme.scaled(18)
+                    Layout.alignment: Qt.AlignVCenter
+                    opacity: headerSparkleArea.containsMouse ? 1.0 : 0.6
+                    Accessible.ignored: true
+
+                    layer.enabled: true
+                    layer.smooth: true
+                    layer.effect: MultiEffect {
+                        colorization: 1.0
+                        colorizationColor: Theme.textSecondaryColor
                     }
 
-                    Text {
-                        text: shotData.dateTime || ""
-                        font: Theme.labelFont
-                        color: Theme.textSecondaryColor
+                    AccessibleMouseArea {
+                        id: headerSparkleArea
+                        anchors.fill: parent
+                        anchors.margins: Theme.scaled(-8)
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        accessibleName: TranslationManager.translate("profileselector.accessible.view_knowledge", "View AI knowledge base")
+                        accessibleItem: headerSparkle
+                        onAccessibleClicked: {
+                            shotKnowledgeDialog.profileTitle = shotData.profileName || ""
+                            shotKnowledgeDialog.content = ProfileManager.profileKnowledgeContent(shotData.profileName)
+                            shotKnowledgeDialog.open()
+                        }
+                    }
+                }
+
+                // Edit shot button
+                Rectangle {
+                    Layout.preferredWidth: Theme.scaled(36)
+                    Layout.preferredHeight: Theme.scaled(36)
+                    Layout.alignment: Qt.AlignVCenter
+                    radius: Theme.scaled(18)
+                    color: Theme.surfaceColor
+                    border.color: Theme.borderColor
+                    border.width: Theme.scaled(1)
+
+                    Accessible.ignored: true
+
+                    Image {
+                        anchors.centerIn: parent
+                        source: "qrc:/icons/edit.svg"
+                        sourceSize.width: Theme.scaled(18)
+                        sourceSize.height: Theme.scaled(18)
+                        Accessible.ignored: true
+
+                        layer.enabled: true
+                        layer.smooth: true
+                        layer.effect: MultiEffect {
+                            colorization: 1.0
+                            colorizationColor: Theme.textColor
+                        }
+                    }
+
+                    AccessibleMouseArea {
+                        anchors.fill: parent
+                        accessibleName: TranslationManager.translate("shotdetail.button.edit", "Edit shot")
+                        accessibleItem: parent
+                        onAccessibleClicked: {
+                            pageStack.push(Qt.resolvedUrl("PostShotReviewPage.qml"),
+                                { editShotId: shotDetailPage.shotId, autoClose: false })
+                        }
                     }
                 }
 
@@ -341,20 +503,6 @@ Page {
             GraphLegend {
                 graph: shotGraph
                 advancedMode: shotDetailPage.advancedMode
-            }
-
-            QualityBadges {
-                Layout.fillWidth: true
-                visible: !!(shotData.profileKbId)
-                channelingDetected: shotData.channelingDetected ?? false
-                temperatureUnstable: shotData.temperatureUnstable ?? false
-                grindIssueDetected: shotData.grindIssueDetected ?? false
-                onSummaryRequested: detailAnalysisDialog.open()
-            }
-
-            ShotAnalysisDialog {
-                id: detailAnalysisDialog
-                shotData: shotDetailPage.shotData
             }
 
             // Shot navigation buttons (list is newest-first, so lower index = newer)
@@ -961,6 +1109,124 @@ Page {
         }
     }
 
+    // Profile AI knowledge base dialog
+    Dialog {
+        id: shotKnowledgeDialog
+        anchors.centerIn: parent
+        width: Math.min(Theme.scaled(500), parent.width - Theme.scaled(40))
+        height: Math.min(shotKbContent.implicitHeight + Theme.scaled(120), parent.height - Theme.scaled(80))
+        padding: 0
+        modal: true
+
+        property string profileTitle: ""
+        property string content: ""
+
+        function formatContent(raw) {
+            var lines = raw.split('\n')
+            var parts = []
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i]
+                if (!line.trim()) continue
+                if (line.startsWith('Also matches:') || line.startsWith('AnalysisFlags:')) continue
+                var colonIdx = line.indexOf(': ')
+                if (colonIdx > 0 && colonIdx <= 35 && !line.startsWith('DO NOT') && !line.startsWith('-')) {
+                    var label = line.substring(0, colonIdx).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                    var value = line.substring(colonIdx + 2).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                    parts.push('<b>' + label + ':</b> ' + value)
+                } else if (line.startsWith('DO NOT')) {
+                    parts.push('<i>' + line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</i>')
+                } else {
+                    parts.push(line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))
+                }
+            }
+            return parts.join('<br>')
+        }
+
+        header: Item {
+            implicitHeight: Theme.scaled(50)
+
+            Row {
+                anchors.left: parent.left
+                anchors.leftMargin: Theme.scaled(20)
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Theme.scaled(8)
+
+                Image {
+                    source: "qrc:/icons/sparkle.svg"
+                    sourceSize.width: Theme.scaled(18)
+                    sourceSize.height: Theme.scaled(18)
+                    anchors.verticalCenter: parent.verticalCenter
+                    layer.enabled: true
+                    layer.smooth: true
+                    layer.effect: MultiEffect {
+                        colorization: 1.0
+                        colorizationColor: Theme.primaryColor
+                    }
+                }
+
+                Text {
+                    text: shotKnowledgeDialog.profileTitle
+                    font: Theme.titleFont
+                    color: Theme.textColor
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+
+            Rectangle {
+                anchors.bottom: parent.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 1
+                color: Theme.borderColor
+            }
+        }
+
+        contentItem: Flickable {
+            clip: true
+            contentHeight: shotKbContent.implicitHeight + Theme.scaled(30)
+            flickableDirection: Flickable.VerticalFlick
+            boundsBehavior: Flickable.StopAtBounds
+
+            Text {
+                id: shotKbContent
+                width: parent.width - Theme.scaled(40)
+                x: Theme.scaled(20)
+                y: Theme.scaled(15)
+                text: shotKnowledgeDialog.formatContent(shotKnowledgeDialog.content)
+                textFormat: Text.RichText
+                color: Theme.textColor
+                font: Theme.bodyFont
+                wrapMode: Text.WordWrap
+                lineHeight: 1.5
+            }
+        }
+
+        footer: Item {
+            implicitHeight: Theme.scaled(55)
+
+            Rectangle {
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 1
+                color: Theme.borderColor
+            }
+
+            AccessibleButton {
+                anchors.centerIn: parent
+                width: Theme.scaled(100)
+                text: TranslationManager.translate("common.button.ok", "OK")
+                accessibleName: TranslationManager.translate("common.accessibility.dismissDialog", "Dismiss dialog")
+                onClicked: shotKnowledgeDialog.close()
+            }
+        }
+
+        background: Rectangle {
+            color: Theme.surfaceColor
+            radius: Theme.cardRadius
+        }
+    }
+
     ConversationOverlay {
         id: conversationOverlay
         anchors.fill: parent
@@ -972,6 +1238,35 @@ Page {
         id: bottomBar
         title: TranslationManager.translate("shotdetail.title", "Shot Detail")
         onBackClicked: root.goBack()
+
+        // Profile name + date in the bottom bar remain visible while the user scrolls,
+        // providing context when the header is off-screen.
+        ColumnLayout {
+            visible: !!(shotData.profileName)
+            spacing: 0
+            Layout.alignment: Qt.AlignVCenter
+            Accessible.role: Accessible.StaticText
+            Accessible.name: (shotData.profileName || "") + (shotData.dateTime ? ", " + shotData.dateTime : "")
+            Accessible.focusable: true
+
+            Text {
+                text: shotData.profileName || ""
+                font: Theme.labelFont
+                color: Theme.textColor
+                elide: Text.ElideRight
+                Layout.maximumWidth: shotDetailPage.width * 0.3
+                Accessible.ignored: true
+            }
+
+            Text {
+                text: shotData.dateTime || ""
+                font: Theme.captionFont
+                color: Theme.textSecondaryColor
+                elide: Text.ElideRight
+                Layout.maximumWidth: shotDetailPage.width * 0.3
+                Accessible.ignored: true
+            }
+        }
 
         // Upload / Re-Upload to Visualizer button
         Rectangle {
