@@ -1590,7 +1590,7 @@ ApplicationWindow {
 
     Timer {
         id: completionTimer
-        interval: 3000
+        interval: 1500  // 1.5s: short enough not to feel slow (reduced from 3s per user feedback)
         onTriggered: {
             completionPending = false
             completionOverlay.opacity = 0
@@ -1803,6 +1803,10 @@ ApplicationWindow {
                     console.warn("Post-shot navigation: no valid pendingShotId, going to idle")
                     goToIdle()
                 }
+            } else {
+                // pendingMetadataNavigation is only set by onShotEndedShowMetadata (Edit After
+                // Shot ON). If false here, post-shot review is disabled — go straight to idle.
+                goToIdle()
             }
         }
     }
