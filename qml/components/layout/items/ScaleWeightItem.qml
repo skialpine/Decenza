@@ -35,7 +35,7 @@ Item {
 
     Accessible.role: Accessible.Button
     Accessible.name: root._accessibleName
-    // Long-press for brew settings is only available in compact mode (fullContent has no MouseArea).
+    // Long-press for brew settings is only available in compact mode (scaleMouseArea).
     // Long-press is also gated on accessibilityEnabled — safe to advertise to screen reader users.
     Accessible.description: root.isCompact && root.scaleConnected
         ? TranslationManager.translate("idle.accessible.scale.hint", "Long-press for brew settings.")
@@ -263,10 +263,20 @@ Item {
 
             Tr {
                 Layout.alignment: Qt.AlignHCenter
-                visible: root.showScaleWarning
+                visible: root.showScaleWarning && BLEManager.scaleConnectionFailed
                 key: "statusbar.scale_not_found_tap"
                 fallback: "Scale not found. Tap to scan"
-                color: BLEManager.scaleConnectionFailed ? Theme.errorColor : Theme.textSecondaryColor
+                color: Theme.errorColor
+                font: Theme.labelFont
+                Accessible.ignored: true
+            }
+
+            Tr {
+                Layout.alignment: Qt.AlignHCenter
+                visible: root.showScaleWarning && !BLEManager.scaleConnectionFailed
+                key: "statusbar.scale_ellipsis"
+                fallback: "Scale..."
+                color: Theme.textSecondaryColor
                 font: Theme.labelFont
                 Accessible.ignored: true
             }
