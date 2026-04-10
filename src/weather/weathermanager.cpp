@@ -59,8 +59,14 @@ void WeatherManager::setLocationProvider(LocationProvider* provider)
     m_locationProvider = provider;
 
     if (m_locationProvider) {
+        // Use QueuedConnection to prevent re-entrant QML binding evaluation:
+        // locationChanged can fire during QML incubation (e.g. GPS update at startup),
+        // which synchronously triggers fetchWeather() → setLoading() → loadingChanged().
+        // If loadingChanged fires while a Connections element is being set up in
+        // connectSignalsToMethods, the V4 SharedArrayBuffer is not yet ready → SIGSEGV.
+        // Queuing ensures onLocationChanged runs after the current event (and incubation) completes.
         connect(m_locationProvider, &LocationProvider::locationChanged,
-                this, &WeatherManager::onLocationChanged);
+                this, &WeatherManager::onLocationChanged, Qt::QueuedConnection);
 
         // If location is already available (cached from previous session), fetch on next event loop tick
         if (m_locationProvider->hasLocation()) {
@@ -167,8 +173,26 @@ WeatherProvider WeatherManager::selectProvider() const
 
 // ─── Fetch orchestration ─────────────────────────────────────────────────────
 
+void WeatherManager::setQmlReady()
+{
+    m_qmlReady = true;
+    if (m_pendingFetch) {
+        m_pendingFetch = false;
+        qDebug() << "WeatherManager: QML ready, running deferred fetch";
+        // Use QueuedConnection so the fetch runs after the current event (engine.load()
+        // aftermath) completes — async sub-component incubation may still be in-flight.
+        QMetaObject::invokeMethod(this, &WeatherManager::fetchWeather, Qt::QueuedConnection);
+    }
+}
+
 void WeatherManager::fetchWeather()
 {
+    if (!m_qmlReady) {
+        qDebug() << "WeatherManager: QML not ready, deferring fetch";
+        m_pendingFetch = true;
+        return;
+    }
+
     if (!m_locationProvider || !m_locationProvider->hasLocation()) {
         qDebug() << "WeatherManager: No location available, skipping fetch";
         return;
