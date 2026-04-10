@@ -25,9 +25,10 @@ preferred architecture.
 2. **The KB + Telemetry approach (§3) is preferred.** Instead of calibration shots, use the
    existing Profile Knowledge Base (what "dialed in" looks like per profile) combined with live
    shot telemetry to give immediate, zero-friction guidance. The infrastructure is mostly
-   already built: `dialing_get_context` MCP tool, `ShotSummarizer`, phase markers, and 29
-   profiles with KB entries. The LLM interprets qualitative KB guidance in context — better
-   than rigid JSON thresholds.
+   already built: `dialing_get_context` MCP tool, `ShotSummarizer`, phase markers, and
+   39 KB sections covering the major profile families (23 of 93 profiles have
+   `knowledge_base_id` explicitly wired up; the rest match by title). The LLM interprets
+   qualitative KB guidance in context — better than rigid JSON thresholds.
 
 3. **UGS's most valuable artifact is its grind ordering table** (16 profiles on a 0--8 scale),
    not its calibration method. This table seeds cross-profile direction hints ("grind much
@@ -42,13 +43,21 @@ preferred architecture.
 - **Tier 3 — UGS / explicit calibration (opt-in):** Pull two anchor shots for full-range
   immediate calibration. Deprioritized — most users won't need it once Tier 1 is running.
 
-**What to build next (§4 priority order):**
-1. Cross-profile grind ordering table (data file, ~1 day)
-2. Enrich the qualitative KB with more profile dial-in entries (keep as prose, not JSON rules)
-3. Surface in-app AI dial-in feedback after shots on a new profile
-4. ~~Add conductance derivative to `ShotDataModel`~~ — already done (`P/F`, `F²/P`, `P/F²`,
-   and `dC/dt` with 9-point Gaussian smoothing are all computed and exposed)
-5. Per-user resistance baselines per profile
+**What's been done (April 2026):**
+- ~~Add conductance derivative to `ShotDataModel`~~ — `P/F`, `F²/P`, `P/F²`, and `dC/dt`
+  (9-point Gaussian smoothed) all computed and exposed
+- ~~Dial-in reference tables~~ — loaded from Qt resource, included in system prompt (PR #635)
+- ~~Profile catalog for cross-profile awareness~~ — `buildProfileCatalog()` generates compact
+  one-liners per KB profile, included in `shotAnalysisSystemPrompt()` (PR #635/#647)
+- ~~Cross-profile recommendation guidance~~ — "When to Suggest a Different Profile" section
+  added to espresso system prompt (April 2026)
+- ~~Enrich the qualitative KB~~ — 39 KB sections (covering all major profile families) have
+  curated entries with community-sourced creator info, dial-in tips, and AnalysisFlags to
+  suppress false-positive warnings (batches 1–5, complete April 2026)
+
+**What remains (§4 priority order):**
+1. Cross-profile grind ordering table (data file mapping KB IDs to relative grind positions)
+2. Per-user resistance baselines per profile
 
 **Open decisions:** Which resistance formula to use for per-user baseline comparisons
 in dial-in guidance (`P/F`, `P/F²`, or `F²/P` — all three are already tracked);
@@ -207,65 +216,82 @@ appropriate profiles before grind adjustment is even needed.
 | `ShotSummarizer` | `src/ai/shotsummarizer.h/cpp` | Per-phase metrics (avg/max/min pressure, flow, temp, weight), channeling detection, temp stability |
 | Resistance metrics | `src/models/shotdatamodel.cpp` | `P/F`, `F²/P`, `P/F²`, and `dC/dt` (9-point Gaussian smoothed, matching Visualizer.coffee) — all computed and exposed |
 | Phase detection | `src/controllers/maincontroller.cpp:1758` | Phase markers with transition reasons stored in `shot_phases` |
-| Profile KB system | `docs/PROFILE_KNOWLEDGE_BASE.md` | 29 of 93 profiles (31%) with KB entries; three-tier matching; queryable by `profile_kb_id` |
+| Profile KB system | `docs/PROFILE_KNOWLEDGE_BASE.md` | 39 KB sections covering all major profile families (batches 1--5 complete); 23 of 93 profiles have `knowledge_base_id` wired up; three-tier matching |
+| Profile catalog | `src/ai/shotsummarizer.cpp` | `buildProfileCatalog()` — compact one-liner per KB profile in system prompt for cross-profile awareness (PR #635/#647) |
+| Cross-profile guidance | `shotAnalysisSystemPrompt()` | "When to Suggest a Different Profile" section; guards against premature switching (April 2026) |
+| Dial-in reference tables | `espresso_dial_in_reference.md` (Qt resource) | Loaded into system prompt (PR #635) |
 | `shots_compare` | MCP tool | Side-by-side comparison with deltas between consecutive shots |
 
 ### What Remains to Be Built
 
 1. **Cross-profile grind ordering table.** A data file mapping profile KB IDs to relative
    grind positions, seeded from the KB's documented relationships and the UGS 0--8 profile
-   mapping. Enables "grind much finer/coarser" for both AI paths. ~1 day.
+   mapping. Enables "grind much finer/coarser" magnitude hints for both AI paths. ~1 day.
 
-2. **Keep the KB qualitative — do not formalize into rigid JSON rules.** The LLM interprets
-   qualitative guidance in context far better than hard thresholds. A threshold-based system
-   (e.g., `"extractionPressure": { "min": 6.0, "max": 9.0 }`) caused incorrect D-Flow advice
-   in March 2026. Invest in enriching the prose KB instead.
-
-3. **Per-user resistance baselines per profile.** Track mean and IQR of steady-state
+2. **Per-user resistance baselines per profile.** Track mean and IQR of steady-state
    resistance for each profile the user has pulled. Enables "your resistance is unusually low
    for this profile" feedback. **Per-user only** — do not aggregate across users. With 40%
    resistance variation from puck prep alone, community baselines will have too much noise.
 
-### Scaling to Profiles Without KB Entries
+3. **Keep the KB qualitative — do not formalize into rigid JSON rules.** The LLM interprets
+   qualitative guidance in context far better than hard thresholds. A threshold-based system
+   (e.g., `"extractionPressure": { "min": 6.0, "max": 9.0 }`) caused incorrect D-Flow advice
+   in March 2026. Invest in enriching the prose KB instead.
 
-Of 93 profiles, ~64 lack curated KB data. Fallback strategies:
+### Coverage
+
+All 93 built-in profiles match a KB section — the 39 sections cover complete families (D-Flow
+covers 7 Damian variants, Pour Over Basket covers 6 profiles, Tea covers 16 profiles, etc.).
+23 profiles have `knowledge_base_id` explicitly wired up; the rest match by title prefix/fuzzy
+matching. Three community profiles (Nu Skool, Idan's Strega Plus, Hendon Turbo variants) have
+KB entries but are not shipped as built-ins — entries are ready for when users load them.
+
+For profiles with no KB match (future additions or user-imported profiles), fallback strategies:
 - **Editor type heuristic**: Profiles of the same editor type share general behavior.
 - **Frame analysis**: The AI can read profile frames (`profiles_get_detail`) and infer
   expected behavior from pressure/flow targets directly.
-- **Community contribution**: Qualitative prose entries as the KB grows.
 
 ---
 
 ## 4. Recommendations and Prioritization
 
-### High Impact, Low Effort (Do First)
+### Done (April 2026)
 
-1. **Cross-profile grind ordering table.** ~1 day of work. Immediately enables direction
-   hints for both AI paths.
+- ~~**Conductance derivative (`dC/dt`) in `ShotDataModel`.**~~ All four resistance metrics
+  (`P/F`, `F²/P`, `P/F²`, `dC/dt`) computed and exposed.
+- ~~**Dial-in reference tables.**~~ Loaded from `espresso_dial_in_reference.md` Qt resource,
+  included in `shotAnalysisSystemPrompt()` (PR #635).
+- ~~**Profile catalog for cross-profile awareness.**~~ `buildProfileCatalog()` generates a
+  compact one-liner per KB profile (39 sections), included in the system prompt (PR #635/#647).
+- ~~**Cross-profile recommendation guidance.**~~ "When to Suggest a Different Profile" section
+  in espresso system prompt. Guards against premature switching (2--3 shots minimum).
+- ~~**Enrich the qualitative KB.**~~ 39 sections now have curated community-sourced entries:
+  creator attributions, dial-in tips, AnalysisFlags to suppress false-positive warnings
+  (batches 1–5, Basecamp research complete April 2026).
 
-2. **Enrich the qualitative KB.** Add dial-in guidance for the most-pulled profiles that
-   lack it. Prose format, not JSON rules.
+### Remaining: High Impact, Low Effort
 
-3. **Surface dial-in feedback in the in-app AI.** Infrastructure exists. Remaining work is
-   UX: when and how to prompt users for AI feedback after a shot on a new profile.
+1. **Cross-profile grind ordering table.** A data file mapping profile KB IDs to relative
+   grind positions, seeded from the KB's documented relationships and the UGS 0--8 profile
+   mapping. Enables "grind much finer/coarser" magnitude hints for both AI paths. ~1 day.
 
-### Medium Impact, Medium Effort (Do Next)
+### Remaining: Medium Impact, Medium Effort
 
-4. **Per-user resistance baselines per profile.** Mean and IQR of steady-state resistance
-   per profile. Per-user only.
+2. **Per-user resistance baselines per profile.** Mean and IQR of steady-state resistance
+   per profile. Per-user only (not community-aggregated — 40% puck-prep variation makes
+   cross-user baselines too noisy).
 
 ### Low Impact or High Uncertainty (Defer)
 
-5. **Community resistance baselines.** Signal-to-noise ratio too low due to 40% puck-prep
-   variation and equipment differences. Defer until per-user baselines prove the concept.
+3. **Community resistance baselines.** Defer until per-user baselines prove the concept.
 
-6. **UGS calibration workflow (Tier 3).** KB + Telemetry covers most users. Keep the UGS
+4. **UGS calibration workflow (Tier 3).** KB + Telemetry covers most users. Keep the UGS
    profile ordering data (valuable); deprioritize the calibration UI.
 
-7. **Diagnostic sweep shot.** Rejected — fundamental puck-erosion problems make the data
+5. **Diagnostic sweep shot.** Rejected — fundamental puck-erosion problems make the data
    unreliable. See [Appendix C](#appendix-c-rejected-alternatives).
 
-8. **Cross-profile resistance normalization.** May not converge. Start with same-profile
+6. **Cross-profile resistance normalization.** May not converge. Start with same-profile
    comparison only. See [Appendix C](#appendix-c-rejected-alternatives).
 
 ---
