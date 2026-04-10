@@ -101,7 +101,9 @@ void VisualizerUploader::uploadShot(ShotDataModel* shotData,
                                      double duration,
                                      double finalWeight,
                                      double doseWeight,
-                                     const ShotMetadata& metadata)
+                                     const ShotMetadata& metadata,
+                                     const QString& debugLog,
+                                     qint64 shotEpoch)
 {
     if (!shotData) {
         emit uploadFailed("No shot data available");
@@ -112,7 +114,7 @@ void VisualizerUploader::uploadShot(ShotDataModel* shotData,
     if (!validateUpload(beverageType, duration))
         return;
 
-    QByteArray jsonData = buildShotJson(shotData, profile, finalWeight, doseWeight, metadata);
+    QByteArray jsonData = buildShotJson(shotData, profile, finalWeight, doseWeight, metadata, debugLog, shotEpoch);
     sendUpload(jsonData);
 }
 
@@ -380,7 +382,9 @@ QByteArray VisualizerUploader::buildShotJson(ShotDataModel* shotData,
                                               const Profile* profile,
                                               double finalWeight,
                                               double doseWeight,
-                                              const ShotMetadata& metadata)
+                                              const ShotMetadata& metadata,
+                                              const QString& debugLog,
+                                              qint64 shotEpoch)
 {
     QJsonObject root;
 
@@ -391,14 +395,15 @@ QByteArray VisualizerUploader::buildShotJson(ShotDataModel* shotData,
     const auto& pressureGoalData = shotData->pressureGoalData();
     const auto& flowGoalData = shotData->flowGoalData();
     const auto& temperatureGoalData = shotData->temperatureGoalData();
-    const auto& weightFlowRateData = shotData->weightFlowRateData();  // Flow rate from scale (g/s)
-    const auto& cumulativeWeightData = shotData->cumulativeWeightData();  // Cumulative weight (g)
+    const auto& weightFlowRateData = shotData->weightFlowRateData();   // Scale flow rate (g/s)
+    const auto& darcyResistanceData = shotData->darcyResistanceData(); // P/flow² (Darcy formula, matches de1app)
+    const auto& cumulativeWeightData = shotData->cumulativeWeightData(); // Cumulative weight (g)
 
     // Use de1app version 2 format
     root["version"] = 2;
 
-    // Timestamps
-    qint64 clockTime = QDateTime::currentSecsSinceEpoch();
+    // Timestamps — use the caller-supplied shot epoch so pending uploads don't use upload time
+    qint64 clockTime = shotEpoch > 0 ? shotEpoch : QDateTime::currentSecsSinceEpoch();
     root["clock"] = clockTime;
     root["timestamp"] = clockTime;
     root["date"] = QDateTime::currentDateTime().toString(Qt::ISODate);
@@ -463,19 +468,39 @@ QByteArray VisualizerUploader::buildShotJson(ShotDataModel* shotData,
         // Interpolate cumulative weight to match elapsed timestamps
         totals["weight"] = interpolateGoalData(cumulativeWeightData, pressureData);
     }
-    // Water dispensed (cumulative flow volume in ml)
+    // Water dispensed: de1app stores espresso_water_dispensed at 0.1× scale (tenths of ml),
+    // so Visualizer expects values ~4.0 for a 40ml shot, not 40.0. Apply the same scaling.
     const auto& waterDispensedData = shotData->waterDispensedData();
     if (!waterDispensedData.isEmpty()) {
-        totals["water_dispensed"] = interpolateGoalData(waterDispensedData, pressureData);
+        QJsonArray waterDispensedRaw = interpolateGoalData(waterDispensedData, pressureData);
+        QJsonArray waterDispensedScaled;
+        for (const auto& v : waterDispensedRaw)
+            waterDispensedScaled.append(v.toDouble() * 0.1);
+        totals["water_dispensed"] = waterDispensedScaled;
     }
     root["totals"] = totals;
 
-    // Resistance object (pressure / flow²)
-    const auto& resistanceData = shotData->resistanceData();
-    if (!resistanceData.isEmpty()) {
+    // Resistance object: P/flow² (Darcy formula, matches de1app's espresso_resistance) and
+    // P/flow_weight² (scale flow, de1app calls this espresso_resistance_weight → by_weight)
+    const auto& resistanceData = darcyResistanceData;  // use Darcy P/flow² to match de1app
+    {
         QJsonObject resistance;
-        resistance["resistance"] = interpolateGoalData(resistanceData, pressureData);
-        root["resistance"] = resistance;
+        if (!resistanceData.isEmpty())
+            resistance["resistance"] = interpolateGoalData(resistanceData, pressureData);
+        if (!weightFlowRateData.isEmpty() && !pressureData.isEmpty()) {
+            QJsonArray fwInterp = interpolateGoalData(weightFlowRateData, pressureData);
+            QJsonArray resByWeight;
+            for (qsizetype i = 0; i < pressureData.size(); ++i) {
+                double fw = fwInterp[i].toDouble();
+                double res = 0.0;
+                if (fw > 0.05)
+                    res = qMin(pressureData[i].y() / (fw * fw), 19.0);
+                resByWeight.append(res);
+            }
+            resistance["by_weight"] = resByWeight;
+        }
+        if (!resistance.isEmpty())
+            root["resistance"] = resistance;
     }
 
     // State change array (de1app format: alternating sign value at each frame transition)
@@ -499,6 +524,30 @@ QByteArray VisualizerUploader::buildShotJson(ShotDataModel* shotData,
             stateChange.append(stateVal);
         }
         root["state_change"] = stateChange;
+    }
+
+    // Scale object: raw weight series at native sample times (for connectivity debugging)
+    // de1app sends scale_raw_weight/arrival (raw BLE readings); we send processed cumulative weight.
+    // Only emit if there is actual scale data.
+    if (!cumulativeWeightData.isEmpty() || !weightFlowRateData.isEmpty()) {
+        QJsonObject scale;
+        scale["espresso_start"] = clockTime;  // shot-end epoch (consistent with history path)
+        if (!cumulativeWeightData.isEmpty()) {
+            QJsonArray weights, arrivals;
+            for (const auto& pt : cumulativeWeightData) {
+                arrivals.append(pt.x());
+                weights.append(pt.y());
+            }
+            scale["weight_arrival"] = arrivals;
+            scale["weight"] = weights;
+        }
+        if (!weightFlowRateData.isEmpty()) {
+            QJsonArray flows;
+            for (const auto& pt : weightFlowRateData)
+                flows.append(pt.y());
+            scale["weight_flow"] = flows;
+        }
+        root["scale"] = scale;
     }
 
     // Meta object (de1app format)
@@ -541,7 +590,13 @@ QByteArray VisualizerUploader::buildShotJson(ShotDataModel* shotData,
 
     // Weights
     double beanWeight = metadata.beanWeight > 0 ? metadata.beanWeight : doseWeight;
+    // Use user-entered weight first, then scale weight, then app's flow-integrated volume (ml ≈ g for espresso)
     double drinkWeight = metadata.drinkWeight > 0 ? metadata.drinkWeight : finalWeight;
+    if (drinkWeight <= 0) {
+        const auto& wdData = shotData->waterDispensedData();
+        if (!wdData.isEmpty())
+            drinkWeight = wdData.last().y();  // actual ml from flow integration, not scaled
+    }
     if (beanWeight > 0)
         meta["in"] = beanWeight;
     if (drinkWeight > 0)
@@ -605,6 +660,8 @@ QByteArray VisualizerUploader::buildShotJson(ShotDataModel* shotData,
         machineState["headless"] = m_device->isHeadless() ? 1 : 0;
         data["machine_state"] = machineState;
     }
+    if (!debugLog.isEmpty())
+        data["debug_log"] = debugLog;
     app["data"] = data;
 
     root["app"] = app;
@@ -981,12 +1038,67 @@ QByteArray VisualizerUploader::buildHistoryShotJson(const QVariantMap& shotData)
     temperature["goal"] = interpolateGoalData(tempGoalData, pressureData);
     root["temperature"] = temperature;
 
-    // Totals object (weight)
+    // Totals object
     QJsonObject totals;
     if (!weightData.isEmpty()) {
         totals["weight"] = interpolateGoalData(weightData, pressureData);
     }
+    // Water dispensed: scale by 0.1 to match de1app's espresso_water_dispensed convention
+    QVector<QPointF> waterDispensedData = toPointVector(shotData["waterDispensed"].toList());
+    if (!waterDispensedData.isEmpty()) {
+        QJsonArray waterDispensedRaw = interpolateGoalData(waterDispensedData, pressureData);
+        QJsonArray waterDispensedScaled;
+        for (const auto& v : waterDispensedRaw)
+            waterDispensedScaled.append(v.toDouble() * 0.1);
+        totals["water_dispensed"] = waterDispensedScaled;
+    }
     root["totals"] = totals;
+
+    // Resistance object: P/flow² (Darcy, matches de1app's espresso_resistance) and
+    // P/flow_weight² (scale flow, de1app calls this espresso_resistance_weight → by_weight)
+    QVector<QPointF> histWeightFlowData = toPointVector(shotData["weightFlowRate"].toList());
+    {
+        QVector<QPointF> histResData = toPointVector(shotData["darcyResistance"].toList());
+        QJsonObject resistance;
+        if (!histResData.isEmpty())
+            resistance["resistance"] = interpolateGoalData(histResData, pressureData);
+        if (!histWeightFlowData.isEmpty() && !pressureData.isEmpty()) {
+            QJsonArray fwInterp = interpolateGoalData(histWeightFlowData, pressureData);
+            QJsonArray resByWeight;
+            for (qsizetype i = 0; i < pressureData.size(); ++i) {
+                double fw = fwInterp[i].toDouble();
+                double res = 0.0;
+                if (fw > 0.05)
+                    res = qMin(pressureData[i].y() / (fw * fw), 19.0);
+                resByWeight.append(res);
+            }
+            resistance["by_weight"] = resByWeight;
+        }
+        if (!resistance.isEmpty())
+            root["resistance"] = resistance;
+    }
+
+    // Scale object: raw weight series at native sample times. Only emit if there is scale data.
+    if (!weightData.isEmpty() || !histWeightFlowData.isEmpty()) {
+        QJsonObject scale;
+        scale["espresso_start"] = shotData["timestamp"].toDouble();
+        if (!weightData.isEmpty()) {
+            QJsonArray weights, arrivals;
+            for (const auto& pt : weightData) {
+                arrivals.append(pt.x());
+                weights.append(pt.y());
+            }
+            scale["weight_arrival"] = arrivals;
+            scale["weight"] = weights;
+        }
+        if (!histWeightFlowData.isEmpty()) {
+            QJsonArray flows;
+            for (const auto& pt : histWeightFlowData)
+                flows.append(pt.y());
+            scale["weight_flow"] = flows;
+        }
+        root["scale"] = scale;
+    }
 
     // State change array from history phase markers
     QVariantList phases = shotData["phases"].toList();
@@ -1051,9 +1163,11 @@ QByteArray VisualizerUploader::buildHistoryShotJson(const QVariantMap& shotData)
     if (!grinderSetting.isEmpty()) grinder["setting"] = grinderSetting;
     meta["grinder"] = grinder;
 
-    // Weights
+    // Weights: use stored final weight from history; fall back to flow-integrated volume if missing
     double doseWeight = shotData["doseWeight"].toDouble();
     double finalWeight = shotData["finalWeight"].toDouble();
+    if (finalWeight <= 0 && !waterDispensedData.isEmpty())
+        finalWeight = waterDispensedData.last().y();  // actual ml (normalized at import)
     if (doseWeight > 0) meta["in"] = doseWeight;
     if (finalWeight > 0) meta["out"] = finalWeight;
     meta["time"] = shotData["duration"].toDouble();
@@ -1103,6 +1217,9 @@ QByteArray VisualizerUploader::buildHistoryShotJson(const QVariantMap& shotData)
 
     QJsonObject data;
     data["settings"] = settings;
+    QString debugLog = shotData["debugLog"].toString();
+    if (!debugLog.isEmpty())
+        data["debug_log"] = debugLog;
     app["data"] = data;
 
     root["app"] = app;
