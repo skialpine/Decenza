@@ -70,7 +70,9 @@ FocusScope {
     function pillLayoutName(index) {
         var name = presets[index] ? (presets[index].name || "") : ""
         if (modified && index === selectedIndex) {
-            name = modifiedIsReadOnly ? name + " (modified)" : "*" + name
+            name = modifiedIsReadOnly
+                ? name + " " + TranslationManager.translate("presets.modified", "(modified)")
+                : "*" + name
         }
         return name
     }
@@ -106,7 +108,7 @@ FocusScope {
         return textMetrics.width
     }
 
-    // Recalculate when presets, width, profile modified state, or suffix changes (deferred
+    // Recalculate when presets, width, modified state, or suffix changes (deferred
     // via timer to avoid destroying Repeater delegates during signal handler chains)
     onPresetsChanged: recalcTimer.restart()
     onEffectiveMaxWidthChanged: recalcTimer.restart()

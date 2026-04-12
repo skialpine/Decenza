@@ -1505,7 +1505,7 @@ void Settings::updateBeanPreset(int index, const QString& name, const QString& b
                                 const QString& grinderSetting, const QString& barista) {
     QJsonArray arr = getBeanPresetsArray();
 
-    if (index >= 0 && index < arr.size()) {
+    if (index >= 0 && index < static_cast<int>(arr.size())) {
         // Preserve showOnIdle from existing entry (default true for legacy)
         QJsonObject existing = arr[index].toObject();
         bool showOnIdle = existing.contains("showOnIdle") ? existing["showOnIdle"].toBool() : true;
@@ -1532,13 +1532,13 @@ void Settings::updateBeanPreset(int index, const QString& name, const QString& b
 void Settings::removeBeanPreset(int index) {
     QJsonArray arr = getBeanPresetsArray();
 
-    if (index >= 0 && index < arr.size()) {
+    if (index >= 0 && index < static_cast<int>(arr.size())) {
         arr.removeAt(index);
         m_settings.setValue("bean/presets", QJsonDocument(arr).toJson());
 
         // Adjust selected if needed
         int selected = selectedBeanPreset();
-        if (selected >= arr.size() && arr.size() > 0) {
+        if (selected >= static_cast<int>(arr.size()) && arr.size() > 0) {
             setSelectedBeanPreset(static_cast<int>(arr.size()) - 1);
         } else if (arr.size() == 0) {
             setSelectedBeanPreset(-1);
@@ -1553,7 +1553,7 @@ void Settings::removeBeanPreset(int index) {
 void Settings::moveBeanPreset(int from, int to) {
     QJsonArray arr = getBeanPresetsArray();
 
-    if (from >= 0 && from < arr.size() && to >= 0 && to < arr.size() && from != to) {
+    if (from >= 0 && from < static_cast<int>(arr.size()) && to >= 0 && to < static_cast<int>(arr.size()) && from != to) {
         QJsonValue item = arr[from];
         arr.removeAt(from);
         arr.insert(to, item);
@@ -1576,7 +1576,7 @@ void Settings::moveBeanPreset(int from, int to) {
 void Settings::setBeanPresetShowOnIdle(int index, bool show) {
     QJsonArray arr = getBeanPresetsArray();
 
-    if (index >= 0 && index < arr.size()) {
+    if (index >= 0 && index < static_cast<int>(arr.size())) {
         QJsonObject preset = arr[index].toObject();
         if (preset["showOnIdle"].toBool(true) != show) {
             preset["showOnIdle"] = show;
@@ -1693,8 +1693,9 @@ void Settings::saveBeanPresetFromCurrent(const QString& name) {
                         dyeGrinderBurrs(),
                         dyeGrinderSetting(),
                         dyeBarista());
+        setSelectedBeanPreset(existingIndex);
     } else {
-        // Add new preset
+        // Add new preset (appends to the end)
         addBeanPreset(name,
                      dyeBeanBrand(),
                      dyeBeanType(),
@@ -1705,6 +1706,7 @@ void Settings::saveBeanPresetFromCurrent(const QString& name) {
                      dyeGrinderBurrs(),
                      dyeGrinderSetting(),
                      dyeBarista());
+        setSelectedBeanPreset(static_cast<int>(getBeanPresetsArray().size()) - 1);
     }
 }
 
