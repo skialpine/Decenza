@@ -764,13 +764,15 @@ void MainController::computeAutoFlowCalibration() {
     bool isFlowProfile = false;
     {
         const auto& steps = m_profileManager->currentProfile().steps();
+        int preinfuseCount = m_profileManager->currentProfile().preinfuseFrameCount();
+
+        // Only check extraction frames (skip preinfusion). Preinfusion frames
+        // are almost always flow-controlled even in pressure profiles, and the
+        // steady window (t > 10s) is always past preinfusion anyway.
         int flowFrameCount = 0;
-        double flowSum = 0;
-        for (const auto& frame : steps) {
-            if (frame.isFlowControl() && frame.flow > 0.1) {
+        for (qsizetype i = preinfuseCount; i < steps.size(); ++i) {
+            if (steps[i].isFlowControl() && steps[i].flow > 0.1)
                 flowFrameCount++;
-                flowSum += frame.flow;
-            }
         }
         // Consider it a flow profile if any extraction frame uses flow control
         if (flowFrameCount > 0) {
@@ -778,7 +780,8 @@ void MainController::computeAutoFlowCalibration() {
             // Use the flow target closest to what the machine reported during
             // the window — this handles profiles with multiple flow targets
             double bestDist = 1e9;
-            for (const auto& frame : steps) {
+            for (qsizetype i = preinfuseCount; i < steps.size(); ++i) {
+                const auto& frame = steps[i];
                 if (frame.isFlowControl() && frame.flow > 0.1) {
                     double dist = qAbs(frame.flow - meanMachineFlow);
                     if (dist < bestDist) {
