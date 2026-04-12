@@ -166,6 +166,7 @@ Item {
             id: beansPillRow
             maxWidth: Theme.scaled(600)
             presets: Settings.idleBeanPresets
+            modified: Settings.beansModified
             // selectedIndex refers to position within the filtered list
             selectedIndex: {
                 var list = Settings.idleBeanPresets

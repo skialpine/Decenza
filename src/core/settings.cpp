@@ -284,6 +284,22 @@ Settings::Settings(QObject* parent)
     if (m_settings.value("mcp/apiKey", "").toString().isEmpty()) {
         m_settings.setValue("mcp/apiKey", QUuid::createUuid().toString(QUuid::WithoutBraces));
     }
+
+    // Beans-modified tracking: recompute whenever any DYE bean/grinder field or the
+    // selected preset / preset list changes. Fields tracked here must stay in sync
+    // with those compared in recomputeBeansModified() and written by applyBeanPreset().
+    connect(this, &Settings::dyeBeanBrandChanged,     this, &Settings::recomputeBeansModified);
+    connect(this, &Settings::dyeBeanTypeChanged,      this, &Settings::recomputeBeansModified);
+    connect(this, &Settings::dyeRoastDateChanged,     this, &Settings::recomputeBeansModified);
+    connect(this, &Settings::dyeRoastLevelChanged,    this, &Settings::recomputeBeansModified);
+    connect(this, &Settings::dyeGrinderBrandChanged,  this, &Settings::recomputeBeansModified);
+    connect(this, &Settings::dyeGrinderModelChanged,  this, &Settings::recomputeBeansModified);
+    connect(this, &Settings::dyeGrinderBurrsChanged,  this, &Settings::recomputeBeansModified);
+    connect(this, &Settings::dyeGrinderSettingChanged, this, &Settings::recomputeBeansModified);
+    connect(this, &Settings::dyeBaristaChanged,       this, &Settings::recomputeBeansModified);
+    connect(this, &Settings::selectedBeanPresetChanged, this, &Settings::recomputeBeansModified);
+    connect(this, &Settings::beanPresetsChanged,      this, &Settings::recomputeBeansModified);
+    recomputeBeansModified();  // Seed initial state from persisted values
 }
 
 // Machine settings
@@ -1636,6 +1652,29 @@ void Settings::applyBeanPreset(int index) {
     setDyeGrinderBurrs(burrs);
     setDyeGrinderSetting(preset.value("grinderSetting").toString());
     setDyeBarista(preset.value("barista").toString());
+}
+
+void Settings::recomputeBeansModified() {
+    bool modified = false;
+    const int idx = selectedBeanPreset();
+    if (idx >= 0) {
+        const QVariantMap preset = getBeanPreset(idx);
+        if (!preset.isEmpty()) {
+            modified = dyeBeanBrand()      != preset.value("brand").toString()
+                    || dyeBeanType()       != preset.value("type").toString()
+                    || dyeRoastDate()      != preset.value("roastDate").toString()
+                    || dyeRoastLevel()     != preset.value("roastLevel").toString()
+                    || dyeGrinderBrand()   != preset.value("grinderBrand").toString()
+                    || dyeGrinderModel()   != preset.value("grinderModel").toString()
+                    || dyeGrinderBurrs()   != preset.value("grinderBurrs").toString()
+                    || dyeGrinderSetting() != preset.value("grinderSetting").toString()
+                    || dyeBarista()        != preset.value("barista").toString();
+        }
+    }
+    if (modified != m_beansModified) {
+        m_beansModified = modified;
+        emit beansModifiedChanged();
+    }
 }
 
 void Settings::saveBeanPresetFromCurrent(const QString& name) {

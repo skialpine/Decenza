@@ -13,9 +13,13 @@ FocusScope {
     property var pillSuffixFn: null  // Optional: function(index) => string suffix appended to pill text (e.g. " (125g)")
     property int pillSuffixVersion: 0  // Increment from outside to force pill text refresh without full layout recalc
     property real pillSuffixMaxWidth: 0  // Reserve extra horizontal space per pill for the suffix
-    property bool showProfileModified: false  // Only the espresso row reflects ProfileManager.profileModified;
-                                               // steam/flush/hot-water/bean rows share this component but are
-                                               // unrelated to the espresso profile's dirty state.
+    // When true AND a pill is selected, append an "unsaved" marker to that pill.
+    // Callers opt in by binding this to their own dirty state — e.g. ProfileManager.profileModified
+    // for the espresso row or Settings.beansModified for the beans row. Rows that have no
+    // dirty-state concept (steam / flush / hot water) leave this at the default false.
+    property bool modified: false
+    // When modified, format as "Name (modified)" for read-only presets; otherwise "*Name".
+    property bool modifiedIsReadOnly: false
 
     // Effective max width - ensures we never exceed parent width even if maxWidth is larger
     readonly property real effectiveMaxWidth: {
@@ -56,17 +60,17 @@ FocusScope {
     function announceCurrentPill() {
         if (typeof AccessibilityManager !== "undefined" && AccessibilityManager.enabled && presets.length > 0) {
             var name = presets[focusedIndex].name || ""
-            var modified = (showProfileModified && focusedIndex === selectedIndex && ProfileManager.profileModified) ? ", " + TranslationManager.translate("presets.unsaved", "unsaved changes") : ""
+            var modifiedText = (root.modified && focusedIndex === selectedIndex) ? ", " + TranslationManager.translate("presets.unsaved", "unsaved changes") : ""
             var status = focusedIndex === selectedIndex ? ", " + TranslationManager.translate("presets.selected", "selected") : ""
-            AccessibilityManager.announce(name + modified + status)
+            AccessibilityManager.announce(name + modifiedText + status)
         }
     }
 
     // Base name for layout calculation (no live suffix — avoids layout recalc on every scale tick)
     function pillLayoutName(index) {
         var name = presets[index] ? (presets[index].name || "") : ""
-        if (showProfileModified && index === selectedIndex && ProfileManager.profileModified) {
-            name = ProfileManager.isCurrentProfileReadOnly ? name + " (modified)" : "*" + name
+        if (modified && index === selectedIndex) {
+            name = modifiedIsReadOnly ? name + " (modified)" : "*" + name
         }
         return name
     }
@@ -107,11 +111,12 @@ FocusScope {
     onPresetsChanged: recalcTimer.restart()
     onEffectiveMaxWidthChanged: recalcTimer.restart()
     onPillSuffixFnChanged: recalcTimer.restart()
-    Connections {
-        target: ProfileManager
-        enabled: root.showProfileModified
-        function onProfileModifiedChanged() { recalcTimer.restart() }
-    }
+    // Dirty-state changes alter pill widths ("*Name" / " (modified)") so they trigger a
+    // layout recalc. Because `modified` is a bindable property, we get changes from any
+    // upstream source (ProfileManager, Settings, etc.) via the QML binding system without
+    // a direct signal subscription here.
+    onModifiedChanged: recalcTimer.restart()
+    onModifiedIsReadOnlyChanged: recalcTimer.restart()
 
     // All model recalculations go through this timer to coalesce rapid changes
     // and ensure delegates aren't destroyed while their signal handlers run
@@ -280,9 +285,9 @@ FocusScope {
                             accessibleName: {
                                 if (!modelData || !modelData.preset) return ""
                                 var name = pillDisplayName(modelData.index)
-                                var modified = (root.showProfileModified && modelData.index === root.selectedIndex && ProfileManager.profileModified) ? ", " + TranslationManager.translate("presets.unsaved", "unsaved changes") : ""
+                                var modifiedText = (root.modified && modelData.index === root.selectedIndex) ? ", " + TranslationManager.translate("presets.unsaved", "unsaved changes") : ""
                                 var status = modelData.index === root.selectedIndex ? ", " + TranslationManager.translate("presets.selected", "selected") : ""
-                                return name + modified + status
+                                return name + modifiedText + status
                             }
                             accessibleItem: pill
 

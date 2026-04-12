@@ -329,7 +329,8 @@ Page {
                         presets: Settings.favoriteProfiles
                         selectedIndex: Settings.selectedFavoriteProfile
                         supportLongPress: true
-                        showProfileModified: true
+                        modified: ProfileManager.profileModified
+                        modifiedIsReadOnly: ProfileManager.isCurrentProfileReadOnly
 
                         onPresetSelected: function(index) {
                             var wasAlreadySelected = (index === Settings.selectedFavoriteProfile)
@@ -500,6 +501,7 @@ Page {
                     id: inlineBeanPresetRow
                     maxWidth: beanPresetLoader.width
                     presets: Settings.idleBeanPresets
+                    modified: Settings.beansModified
                     selectedIndex: {
                         var list = Settings.idleBeanPresets
                         for (var i = 0; i < list.length; ++i) {
