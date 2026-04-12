@@ -1862,8 +1862,6 @@ int main(int argc, char *argv[])
         static bool wasSuspended = false;
 
         if (state == Qt::ApplicationSuspended) {
-            // App is being suspended (mobile) - sleep scale to save battery
-            qDebug() << "App suspended - sleeping scale (DE1 stays awake)";
             wasSuspended = true;
 
 #ifdef Q_OS_ANDROID
@@ -1875,17 +1873,11 @@ int main(int argc, char *argv[])
             QAccessible::setActive(false);
 #endif
 
-            if (physicalScale && physicalScale->isConnected()) {
-                QEventLoop waitLoop;
-                bool scaleDone = false;
-                QObject::connect(physicalScale.get(), &ScaleDevice::sleepCompleted,
-                                 &waitLoop, [&]() { scaleDone = true; waitLoop.quit(); });
-                physicalScale->sleep();
-                if (!scaleDone) {
-                    QTimer::singleShot(1500, &waitLoop, &QEventLoop::quit);
-                    waitLoop.exec();
-                }
-            }
+            // Scale is NOT put to sleep when the app is backgrounded — scale sleep
+            // is tied to the machine going to sleep, not the app lifecycle. Users
+            // frequently switch to other apps (e.g., Claude) and expect the scale
+            // to remain connected when they return.
+
             // DE1 intentionally NOT put to sleep - user may be checking other apps
             // while machine heats up
 
@@ -1899,8 +1891,7 @@ int main(int argc, char *argv[])
             batteryManager.ensureChargerOn();
         }
         else if (state == Qt::ApplicationActive && wasSuspended) {
-            // App resumed from suspended state - wake scale
-            qDebug() << "App resumed - waking scale";
+            qDebug() << "App resumed from suspended state";
             wasSuspended = false;
 
 #ifdef Q_OS_ANDROID
@@ -1921,9 +1912,10 @@ int main(int argc, char *argv[])
                 }
             }
 
-            // Try to reconnect/wake scale
+            // Scale was not put to sleep on suspend, so it should still be connected.
+            // If the OS dropped the BLE connection anyway, start the reconnect sequence.
             if (physicalScale && physicalScale->isConnected()) {
-                physicalScale->wake();
+                qDebug() << "App resumed - scale still connected";
             } else if (!settings.scaleAddress().isEmpty() && !scaleReconnectTimer.isActive()) {
                 // Scale disconnected while suspended - restart reconnect sequence
                 scaleReconnectAttempt = 0;
