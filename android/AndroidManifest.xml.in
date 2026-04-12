@@ -55,6 +55,12 @@
             </intent-filter>
 
             <meta-data android:name="android.app.lib_name" android:value="Decenza" />
+            <!-- Keep Qt event loop running when app is backgrounded. Without this,
+                 Qt freezes the event loop when the activity is suspended (no EGL surface),
+                 which kills the HTTP/MCP server. Users switch to Claude for remote control
+                 and need the server to stay responsive. The render thread safely handles
+                 the missing EGL surface (non-fatal "makeCurrent: no EGLSurface" warnings). -->
+            <meta-data android:name="android.app.background_running" android:value="true"/>
             <meta-data
                 android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
                 android:resource="@xml/device_filter" />
