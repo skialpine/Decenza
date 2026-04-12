@@ -743,7 +743,8 @@ void MainController::computeAutoFlowCalibration() {
              << bestCount << "samples)"
              << "meanMachineFlow=" << meanMachineFlow
              << "meanWeightFlow=" << meanWeightFlow
-             << "ratio=" << windowRatio;
+             << "ratio=" << windowRatio
+             << "currentFactor=" << m_settings->effectiveFlowCalibration(m_profileManager->baseProfileName());
 
     // Guard against division by zero. Should be impossible since every sample
     // in the window passed the kMinWeightFlow (0.5 g/s) check.
@@ -753,26 +754,85 @@ void MainController::computeAutoFlowCalibration() {
         return;
     }
 
-    // Window-level ratio sanity check. Reject windows where machine flow and
-    // scale-derived weight flow diverge too much. A healthy ratio is ~0.9-1.1
-    // (matching what de1app GFC users see when the curves overlap). Ratios
-    // outside [0.75, 1.35] indicate scale data quality problems: smoothing
-    // lag, stale weight readings, or the scale capturing a non-representative
-    // period. Without this check, bad windows drag the per-profile calibration
-    // down to ~0.6 when the correct value is ~0.9.
-    if (windowRatio > kMaxWindowRatio || windowRatio < kMinWindowRatio) {
+    // Check if the profile's extraction frames are flow-controlled.
+    // For flow profiles the DE1's PID locks reported flow to the target regardless
+    // of the calibration factor, which creates a feedback loop if we use reported
+    // flow in the calibration formula (each adjustment changes how much the machine
+    // pumps, but the reported flow stays the same → factor keeps drifting down).
+    // For these profiles, use the profile's target flow directly.
+    double profileTargetFlow = 0;
+    bool isFlowProfile = false;
+    {
+        const auto& steps = m_profileManager->currentProfile().steps();
+        int preinfuseCount = m_profileManager->currentProfile().preinfuseFrameCount();
+
+        // Only check extraction frames (skip preinfusion). Preinfusion frames
+        // are almost always flow-controlled even in pressure profiles, and the
+        // steady window (t > 10s) is always past preinfusion anyway.
+        int flowFrameCount = 0;
+        for (qsizetype i = preinfuseCount; i < steps.size(); ++i) {
+            if (steps[i].isFlowControl() && steps[i].flow > 0.1)
+                flowFrameCount++;
+        }
+        // Consider it a flow profile if any extraction frame uses flow control
+        if (flowFrameCount > 0) {
+            isFlowProfile = true;
+            // Use the flow target closest to what the machine reported during
+            // the window — this handles profiles with multiple flow targets
+            double bestDist = 1e9;
+            for (qsizetype i = preinfuseCount; i < steps.size(); ++i) {
+                const auto& frame = steps[i];
+                if (frame.isFlowControl() && frame.flow > 0.1) {
+                    double dist = qAbs(frame.flow - meanMachineFlow);
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        profileTargetFlow = frame.flow;
+                    }
+                }
+            }
+        }
+    }
+
+    // Window-level ratio sanity check. For flow profiles, compare weight flow
+    // against the profile's known target flow (density-adjusted) instead of
+    // the machine's reported flow (which is PID-locked to target and useless
+    // for ratio checking). For pressure profiles, compare machine vs weight flow.
+    // Reject windows where the ratio is outside [0.75, 1.35] — indicates
+    // channeling, scale issues, or other extraction anomalies.
+    if (isFlowProfile) {
+        double flowProfileRatio = (profileTargetFlow * kWaterDensity93C) / meanWeightFlow;
+        if (flowProfileRatio > kMaxWindowRatio || flowProfileRatio < kMinWindowRatio) {
+            qDebug() << "Auto flow cal: flow profile ratio" << flowProfileRatio
+                     << "(target" << profileTargetFlow << "vs weight" << meanWeightFlow << ")"
+                     << "outside bounds [" << kMinWindowRatio << "," << kMaxWindowRatio << "]"
+                     << "- skipping (extraction anomaly)";
+            return;
+        }
+    } else if (windowRatio > kMaxWindowRatio || windowRatio < kMinWindowRatio) {
         qDebug() << "Auto flow cal: window ratio" << windowRatio
                  << "outside bounds [" << kMinWindowRatio << "," << kMaxWindowRatio << "]"
                  << "- skipping (scale data suspect)";
         return;
     }
 
-    // The machine's reported flow includes the active calibration multiplier.
-    // To find the ideal multiplier: ideal = weight_flow / (raw_flow * density).
-    // Since raw = reported / current_multiplier, this simplifies to:
-    // ideal = current_multiplier * weight_flow / (reported_flow * density)
     double currentEffective = m_settings->effectiveFlowCalibration(m_profileManager->baseProfileName());
-    double ideal = currentEffective * meanWeightFlow / (meanMachineFlow * kWaterDensity93C);
+    double ideal;
+    if (isFlowProfile) {
+        // Flow profile: use the profile's target flow (independent of calibration).
+        // ideal = weightFlow / (targetFlow * density)
+        // This has no dependency on the current calibration factor, preventing
+        // the feedback loop where lowering the factor → less pumping → lower
+        // weight flow → factor keeps drifting down.
+        ideal = meanWeightFlow / (profileTargetFlow * kWaterDensity93C);
+        qDebug() << "Auto flow cal: flow profile — using target flow"
+                 << profileTargetFlow << "ml/s (reported:" << meanMachineFlow << ")";
+    } else {
+        // Pressure profile: the machine doesn't control flow, so reported flow
+        // reflects actual sensor readings (already multiplied by the calibration
+        // factor). Divide out the current factor to get raw sensor flow.
+        // ideal = currentFactor * weightFlow / (reportedFlow * density)
+        ideal = currentEffective * meanWeightFlow / (meanMachineFlow * kWaterDensity93C);
+    }
 
     if (!std::isfinite(ideal)) {
         qWarning() << "Auto flow cal: computed non-finite value" << ideal
@@ -811,7 +871,8 @@ void MainController::computeAutoFlowCalibration() {
     qDebug() << "Auto flow cal: updated" << m_profileManager->baseProfileName()
              << "from" << oldValue << "to" << computed
              << "(ideal:" << ideal << "EMA alpha:" << kEmaAlpha
-             << "window:" << windowDuration << "s," << bestCount << "samples)";
+             << "window:" << windowDuration << "s," << bestCount << "samples"
+             << "mode:" << (isFlowProfile ? "flow" : "pressure") << ")";
 
     emit flowCalibrationAutoUpdated(m_profileManager->currentProfile().title(), oldValue, computed);
 

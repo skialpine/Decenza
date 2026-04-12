@@ -191,6 +191,20 @@ Settings::Settings(QObject* parent)
         qDebug() << "Settings: Reset all flow calibrations to 1.0 (v2 ratio guard migration)";
     }
 
+    // One-time reset: clear all per-profile flow calibrations and reset global to 1.0.
+    // The v2 algorithm had a feedback loop for flow-controlled profiles: the DE1's PID
+    // holds reported flow at the target regardless of calibration, so the formula
+    // ideal = factor * weightFlow / (reportedFlow * density) made ideal proportional
+    // to the current factor — it could only decrease, never converge. The v3 algorithm
+    // uses the profile's target flow directly for flow profiles, breaking the loop.
+    // Users who ran v2 may have factors drifted to ~0.6-0.8 instead of ~0.9-1.0.
+    if (!m_settings.contains("calibration/v3FlowProfileReset")) {
+        savePerProfileFlowCalMap(QJsonObject());
+        setFlowCalibrationMultiplier(1.0);
+        m_settings.setValue("calibration/v3FlowProfileReset", true);
+        qDebug() << "Settings: Reset all flow calibrations to 1.0 (v3 flow profile feedback loop fix)";
+    }
+
     // Migrate legacy DYE grinder field: split combined model into brand/model/burrs
     if (!m_settings.contains("dye/grinderBrand") || m_settings.value("dye/grinderBrand").toString().isEmpty()) {
         QString oldModel = m_settings.value("dye/grinderModel").toString();
