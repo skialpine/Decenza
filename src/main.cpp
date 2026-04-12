@@ -1854,9 +1854,9 @@ int main(int argc, char *argv[])
     settings.setLauncherMode(settings.launcherMode());
 #endif
 
-    // Cross-platform lifecycle handling: manage scale when app is suspended/resumed
-    // Note: DE1 is NOT put to sleep when backgrounded - users may switch apps while
-    // the machine is heating up and expect it to continue (e.g., checking Visualizer)
+    // Cross-platform lifecycle handling: manage BLE connections and system state
+    // when app is suspended/resumed. Neither DE1 nor scale are put to sleep when
+    // backgrounded — users may switch apps while the machine heats up.
     QObject::connect(&app, &QGuiApplication::applicationStateChanged,
                      [&physicalScale, &bleManager, &settings, &batteryManager, &de1Device, &scaleReconnectTimer, &scaleReconnectAttempt, &reconnectDelays, &de1ReconnectTimer, &de1ReconnectAttempt](Qt::ApplicationState state) {
         static bool wasSuspended = false;
@@ -1876,7 +1876,11 @@ int main(int argc, char *argv[])
             // Scale is NOT put to sleep when the app is backgrounded — scale sleep
             // is tied to the machine going to sleep, not the app lifecycle. Users
             // frequently switch to other apps (e.g., Claude) and expect the scale
-            // to remain connected when they return.
+            // to remain connected when they return. On Android, the scale BLE
+            // connection stays alive only while the DE1 foreground service is
+            // running (provides the wake lock); without it the OS may freeze
+            // the event loop and drop the scale. The reconnect-on-resume path
+            // below handles that case.
 
             // DE1 intentionally NOT put to sleep - user may be checking other apps
             // while machine heats up

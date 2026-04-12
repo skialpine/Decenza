@@ -19,10 +19,13 @@ Automatic per-profile flow calibration using scale data as ground truth. After e
    - Scale data is recent (nearest weight flow point within 1 second)
    - Per-sample machine/weight flow ratio is within [0.4, 2.5] (rejects scale data glitches)
    - Window lasts at least 1.5 seconds with at least 7 samples
-3. **Ratio guard**: Window-mean machine/weight flow ratio must be within [0.75, 1.35] — rejects windows where scale data is systematically unreliable
-4. **Compute ratio**: `current_multiplier * mean(weight_flow) / (mean(machine_flow) * 0.963)` over the steady window
-5. **Sanity check**: Clamp to [0.5, 1.8] — cap extreme values that likely indicate measurement errors
-6. **Store & apply**: If the computed value differs from current by > 2%, save it per-profile and send to the machine
+3. **Profile classification**: Checks whether the profile's extraction frames (post-preinfusion) use flow control or pressure control — this determines which formula is used
+4. **Ratio guard**: Rejects windows where flow and weight diverge too much ([0.75, 1.35]). For flow profiles, compares `(target_flow * 0.963) / weight_flow`. For pressure profiles, compares `machine_flow / weight_flow`.
+5. **Compute calibration** (formula depends on profile type):
+   - **Flow profiles**: `mean(weight_flow) / (target_flow * 0.963)` — uses the profile's known target flow, independent of current calibration
+   - **Pressure profiles**: `current_multiplier * mean(weight_flow) / (mean(machine_flow) * 0.963)` — divides out current calibration from reported flow
+6. **Sanity check**: Clamp to [0.5, 1.8] — cap extreme values that likely indicate measurement errors
+7. **Store & apply**: If the computed value differs from current by > 2%, EMA-smooth toward it (alpha=0.3) and send to the machine
 
 ## Algorithm Details
 
@@ -48,13 +51,27 @@ Without this guard, shots with poor scale data quality can produce calibration v
 
 Before running calibration, the algorithm checks whether the settled weight dropped significantly below the weight at pump stop (> 3g drop). This indicates the stream of water hitting the cup was adding downward force to the scale during extraction, inflating the weight readings. Calibrating against these inflated readings would produce a multiplier that's too high, so the shot is skipped. This typically occurs with high-flow profiles where the stream has significant momentum.
 
-### Density Correction
+### Flow Profile vs Pressure Profile
 
-The machine flow sensor measures volumetric flow (ml/s), while the scale measures mass (g/s). Water at ~93°C has a density of ~0.963 g/ml, so the correction factor accounts for this difference. The formula is:
+The calibration formula depends on whether the profile's extraction frames use flow control or pressure control. Only extraction frames are considered (preinfusion frames are skipped, since they are almost always flow-controlled even in pressure profiles, and the steady window at t > 10s is always past preinfusion).
+
+**Flow profiles** (e.g., D-Flow, Filter): The DE1's PID servo holds the reported flow at the profile's target flow regardless of the calibration factor. Using the reported flow in the formula creates a feedback loop: lowering the factor → less pumping → lower weight flow → factor keeps drifting down, never converging. Instead, the formula uses the profile's target flow directly:
+
+```
+calibration = mean(weight_flow) / (target_flow * 0.963)
+```
+
+This is independent of the current calibration factor and converges correctly.
+
+**Pressure profiles** (e.g., Classic Italian): The machine controls pressure, not flow, so the reported flow reflects actual sensor readings (already multiplied by the calibration factor). The formula divides out the current factor to recover raw sensor flow:
 
 ```
 calibration = current_multiplier * mean(weight_flow) / (mean(machine_flow) * 0.963)
 ```
+
+### Density Correction
+
+The machine flow sensor measures volumetric flow (ml/s), while the scale measures mass (g/s). Water at ~93°C has a density of ~0.963 g/ml, so the correction factor accounts for this difference.
 
 ### Convergence
 
@@ -104,6 +121,10 @@ The calibration multiplier is written to the DE1 via the existing `DE1Device::se
 ## v2 Migration (Ratio Guard Reset)
 
 A one-time migration resets all per-profile flow calibrations and the global multiplier to 1.0. This is necessary because the pre-v2 algorithm had no ratio guards, allowing shots with poor scale data to drag calibrations down to ~0.6. The corrupted values then spread via the global median to new profiles (bootstrap problem). After the reset, the improved algorithm re-converges to correct values (~0.9-1.0) within a few shots per profile.
+
+## v3 Migration (Flow Profile Feedback Loop Fix)
+
+A one-time migration resets all per-profile flow calibrations and the global multiplier to 1.0. The v2 algorithm had a feedback loop for flow-controlled profiles: the DE1's PID holds reported flow at the target regardless of calibration, so the formula `ideal = factor * weightFlow / (reportedFlow * density)` made the ideal proportional to the current factor — it could only decrease, never converge. Over 30 shots a user's factor drifted from 1.0 to 0.59. The v3 algorithm uses the profile's target flow directly for flow profiles, breaking the loop. The reset clears all calibrations (including pressure profiles) since the global median may have been contaminated by drifted flow-profile values.
 
 ## Limitations
 
