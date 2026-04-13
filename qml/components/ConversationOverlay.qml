@@ -646,6 +646,7 @@ Rectangle {
                     primary: true
                     enabled: inputDialogTextArea.text.length > 0 && inputRow.canSend
                     onClicked: {
+                        Qt.inputMethod.commit()
                         // Route through conversationInput.sendFollowUp() to reuse
                         // context-prepending and ask()/followUp() branching logic
                         conversationInput.text = inputDialogTextArea.text

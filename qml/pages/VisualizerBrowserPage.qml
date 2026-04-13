@@ -180,6 +180,7 @@ Page {
                                 ? TranslationManager.translate("visualizerBrowser.importingPleaseWait", "Importing profile, please wait")
                                 : TranslationManager.translate("visualizerBrowser.importUsingShareCode", "Import profile using the 4-character share code")
                             onClicked: {
+                                Qt.inputMethod.commit()
                                 MainController.visualizerImporter.importFromShareCode(shareCodeInput.text)
                             }
                         }
@@ -406,6 +407,7 @@ Page {
                             text: TranslationManager.translate("visualizer.button.save", "Save")
                             accessibleName: TranslationManager.translate("visualizerBrowser.saveWithNewName", "Save profile with the new name")
                             onClicked: {
+                                Qt.inputMethod.commit()
                                 MainController.visualizerImporter.saveWithNewName(newNameInput.text.trim())
                                 hideDuplicateDialog()
                             }

@@ -297,6 +297,7 @@ Page {
                         enabled: codeInput.text.length === 4
 
                         onClicked: {
+                            Qt.inputMethod.commit()
                             MainController.visualizerImporter.importFromShareCode(codeInput.text)
                             showCodeInput = false
                         }
@@ -879,6 +880,7 @@ Page {
                 enabled: renameInput.text.trim().length > 0
 
                 onClicked: {
+                    Qt.inputMethod.commit()
                     Qt.inputMethod.hide()
                     renameInput.focus = false
                     MainController.visualizerImporter.importFromShotIdWithName(renameProfileId, renameInput.text.trim())

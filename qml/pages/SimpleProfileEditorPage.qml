@@ -1047,6 +1047,7 @@ Page {
         }
 
         function doSave() {
+            Qt.inputMethod.commit()
             if (saveAsTitleField.text.length > 0) {
                 var filename = ProfileManager.titleToFilename(saveAsTitleField.text)
                 if (ProfileManager.isBuiltInFilename(filename)) {

@@ -1358,6 +1358,7 @@ Page {
                     text: saveButtonText.text
                     accessibleName: TranslationManager.translate("steam.savePitcherChanges", "Save changes to pitcher preset")
                     onClicked: {
+                        Qt.inputMethod.commit()
                         var preset = Settings.getSteamPitcherPreset(editingPitcherIndex)
                         Settings.updateSteamPitcherPreset(editingPitcherIndex, editPitcherNameInput.text, preset.duration, preset.flow)
                         editPitcherPopup.close()
@@ -1464,6 +1465,7 @@ Page {
                     text: addButtonText.text
                     accessibleName: TranslationManager.translate("steam.addNewPitcher", "Add new pitcher preset with entered name")
                     onClicked: {
+                        Qt.inputMethod.commit()
                         if (newPitcherName.text.trim() !== "") {
                             var presetCount = Settings.steamPitcherPresets.length
                             Settings.addSteamPitcherPreset(newPitcherName.text.trim(), 30, 150)

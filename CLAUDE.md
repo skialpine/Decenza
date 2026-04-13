@@ -254,6 +254,21 @@ Repeater {
 
 Other reserved names to avoid in model data: `parent`, `children`, `data`, `state`, `enabled`, `visible`, `width`, `height`, `x`, `y`, `z`, `focus`, `clip`.
 
+**IME last-word drop on mobile**: On Android/iOS virtual keyboards, the last typed word is held in a composing/pre-edit state and is NOT reflected in `TextField.text` until committed. When a button's `onClicked` reads a text field's `.text` directly (to send, save, or pass to a C++ method), always call `Qt.inputMethod.commit()` first — otherwise the last word is silently dropped. This is a no-op on desktop so it is safe to always include.
+```qml
+// BAD - last word may be missing on mobile
+onClicked: {
+    doSomething(myField.text)
+}
+
+// GOOD - commit pending IME composition first
+onClicked: {
+    Qt.inputMethod.commit()
+    doSomething(myField.text)
+}
+```
+This applies to every button/action that reads and immediately uses text input — save dialogs, send buttons, preset name dialogs, TOTP code fields, search/import fields, etc. For `doSave()` helper functions called from both buttons and `Keys.onReturnPressed`, put the commit at the top of the function.
+
 **Keyboard handling for text inputs**: Always wrap pages with text input fields in `KeyboardAwareContainer` to shift content above the keyboard on mobile:
 ```qml
 KeyboardAwareContainer {
