@@ -1663,6 +1663,7 @@ KeyboardAwareContainer {
                                 "Verify authenticator code to complete setup")
                             enabled: totpCodeField.text.length === 6 && !totpSetupDialog.verifying
                             onClicked: {
+                                Qt.inputMethod.commit()
                                 totpSetupDialog.verifying = true;
                                 var success = MainController.shotServer.completeTotpSetup(
                                     totpSetupDialog.totpSecret, totpCodeField.text);

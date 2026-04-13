@@ -1255,6 +1255,7 @@ Page {
                     text: TranslationManager.translate("common.add", "Add")
                     accessibleName: TranslationManager.translate("beanInfo.addNewPreset", "Add new bean preset with current settings")
                     onClicked: {
+                        Qt.inputMethod.commit()
                         if (newBeanNameInput.text.trim().length > 0) {
                             var presetName = newBeanNameInput.text.trim()
                             Settings.saveBeanPresetFromCurrent(presetName)
@@ -1370,6 +1371,7 @@ Page {
                     text: TranslationManager.translate("common.save", "Save")
                     accessibleName: TranslationManager.translate("beanInfo.saveChangesToPreset", "Save changes to bean preset")
                     onClicked: {
+                        Qt.inputMethod.commit()
                         if (editBeanNameInput.text.trim().length > 0 && editPresetIndex >= 0) {
                             var preset = Settings.getBeanPreset(editPresetIndex)
                             Settings.updateBeanPreset(editPresetIndex,

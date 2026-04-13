@@ -604,6 +604,7 @@ Page {
                     text: TranslationManager.translate("flush.button.save", "Save")
                     accessibleName: TranslationManager.translate("flush.savePresetChanges", "Save changes to flush preset")
                     onClicked: {
+                        Qt.inputMethod.commit()
                         var preset = Settings.getFlushPreset(editingPresetIndex)
                         Settings.updateFlushPreset(editingPresetIndex, editPresetNameInput.text, preset.flow, preset.seconds)
                         editPresetPopup.close()
@@ -707,6 +708,7 @@ Page {
                     text: TranslationManager.translate("flush.button.add", "Add")
                     accessibleName: TranslationManager.translate("flush.addNewPreset", "Add new flush preset with entered name")
                     onClicked: {
+                        Qt.inputMethod.commit()
                         if (newPresetNameInput.text.length > 0) {
                             Settings.addFlushPreset(newPresetNameInput.text, 6.0, 5.0)
                             newPresetNameInput.text = ""

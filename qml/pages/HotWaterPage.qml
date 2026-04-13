@@ -762,6 +762,7 @@ Page {
                     text: TranslationManager.translate("hotwater.button.save", "Save")
                     accessibleName: TranslationManager.translate("hotWater.saveVesselChanges", "Save changes to water vessel preset")
                     onClicked: {
+                        Qt.inputMethod.commit()
                         var preset = Settings.getWaterVesselPreset(editingVesselIndex)
                         Settings.updateWaterVesselPreset(editingVesselIndex, editVesselNameInput.text, preset.volume, preset.mode || "weight", (preset.flowRate !== undefined) ? preset.flowRate : 40)
                         editVesselPopup.close()
@@ -865,6 +866,7 @@ Page {
                     text: TranslationManager.translate("hotwater.button.add", "Add")
                     accessibleName: TranslationManager.translate("hotWater.addNewVessel", "Add new water vessel with entered name")
                     onClicked: {
+                        Qt.inputMethod.commit()
                         if (newVesselNameInput.text.length > 0) {
                             Settings.addWaterVesselPreset(newVesselNameInput.text, 200, "weight", 40)
                             newVesselNameInput.text = ""

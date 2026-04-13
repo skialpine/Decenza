@@ -205,6 +205,7 @@ Page {
                              !MainController.aiManager.conversation.busy
                     onClicked: {
                         if (!MainController.aiManager || !MainController.aiManager.conversation) return
+                        Qt.inputMethod.commit()
                         if (followUpInput.text.length === 0) return
 
                         MainController.aiManager.conversation.followUp(followUpInput.text)
