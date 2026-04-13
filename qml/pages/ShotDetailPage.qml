@@ -395,6 +395,7 @@ Page {
 
                 Accessible.role: Accessible.Graphic
                 Accessible.name: graphAccessibleDescription()
+                Accessible.description: TranslationManager.translate("shotdetail.accessible.graph.swipe", "Swipe left for older shot, swipe right for newer shot.")
                 Accessible.focusable: true
                 focus: true
 
@@ -537,8 +538,7 @@ Page {
                     font: Theme.labelFont
                     color: Theme.textSecondaryColor
                     horizontalAlignment: Text.AlignHCenter
-                    Accessible.name: TranslationManager.translate("shotdetail.accessible.position",
-                        "Shot %1 of %2").arg(currentIndex + 1).arg(shotIds.length)
+                    Accessible.ignored: true
                 }
 
                 AccessibleButton {
@@ -756,6 +756,7 @@ Page {
                             color: Theme.textColor
                             Layout.fillWidth: true
                             elide: Text.ElideRight
+                            Accessible.ignored: true
                         }
 
                         GridLayout {
@@ -804,6 +805,7 @@ Page {
                             fallback: "Grinder"
                             font: Theme.subtitleFont
                             color: Theme.textColor
+                            Accessible.ignored: true
                         }
 
                         GridLayout {
@@ -851,6 +853,7 @@ Page {
                         fallback: "Analysis"
                         font: Theme.subtitleFont
                         color: Theme.textColor
+                        Accessible.ignored: true
                     }
 
                     RowLayout {
@@ -953,6 +956,7 @@ Page {
                             sourceSize.width: Theme.labelFont.pixelSize
                             sourceSize.height: Theme.labelFont.pixelSize
                             anchors.verticalCenter: parent.verticalCenter
+                            Accessible.ignored: true
                         }
                         Tr {
                             key: "shotdetail.uploadedtovisualizer"
