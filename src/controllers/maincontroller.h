@@ -203,6 +203,10 @@ signals:
 
 private slots:
     void onShotSampleReceived(const ShotSample& sample);
+    // Verify that the DE1's stored steam/group targets match what we've
+    // commanded. Logs drift and auto-heals by re-sending ShotSettings, with
+    // a retry budget to avoid infinite loops when the DE1 refuses the value.
+    void onShotSettingsReported(double deviceSteamTargetC, double deviceGroupTargetC);
 
 private:
     void applyAllSettings();
@@ -247,6 +251,18 @@ private:
     double m_filteredGoalFlow = 0.0;
     int m_frameWeightSkipSent = -1;  // Frame number for which we've sent a weight-based skip command
     double m_frameStartTime = 0;     // Shot-relative time when current frame started
+
+    // ShotSettings drift auto-heal tracking. The commanded values live on
+    // DE1Device (so every call site — MainController, ProfileManager,
+    // SteamCalibrator — feeds the same tracker); we only keep the retry
+    // bookkeeping here. Both fields are reset in applyAllSettings() so every
+    // reconnect / initial-settings cycle starts with a fresh retry budget.
+    int m_shotSettingsDriftResendCount = 0;
+    // Event-based "is a resend in flight?" flag, cleared when the DE1's
+    // next indication matches commanded (in onShotSettingsReported). Replaces
+    // a wall-clock rate limiter — see CLAUDE.md's "never timers as guards"
+    // rule.
+    bool m_shotSettingsResendInFlight = false;
     double m_lastPressure = 0;       // Last sample pressure (for transition reason inference)
     double m_lastFlow = 0;           // Last sample flow (for transition reason inference)
     bool m_tareDone = false;  // Track if we've tared for this shot

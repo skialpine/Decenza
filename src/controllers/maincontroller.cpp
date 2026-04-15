@@ -68,6 +68,13 @@ MainController::MainController(QNetworkAccessManager* networkManager,
         // BleTransport's FIFO queue guarantees our writes follow the initial writes.
         connect(m_device, &DE1Device::initialSettingsComplete,
                 this, &MainController::applyAllSettings);
+
+        // Verify that the DE1 stored what we commanded. Fires on every
+        // SHOT_SETTINGS indication from the DE1 (the characteristic is
+        // subscribed in BleTransport::subscribeAll()) and on the one-time
+        // read issued by subscribeAll() at connect time.
+        connect(m_device, &DE1Device::shotSettingsReported,
+                this, &MainController::onShotSettingsReported);
     }
     // Send water refill level to machine when setting changes
     if (m_settings && m_device) {
@@ -431,6 +438,156 @@ QString MainController::pasteFromClipboard() const {
     return text;
 }
 
+void MainController::onShotSettingsReported(double deviceSteamTargetC, double deviceGroupTargetC) {
+    if (!m_device || !m_device->isConnected() || !m_settings) return;
+
+    const double commandedSteam = m_device->commandedSteamTargetC();
+    const double commandedGroup = m_device->commandedGroupTargetC();
+    const bool haveCommanded = (commandedSteam >= 0.0 && commandedGroup >= 0.0);
+
+    // Sentinel values emitted by DE1Device on disconnect — skip, there's
+    // nothing to compare against.
+    if (deviceSteamTargetC < 0.0 || deviceGroupTargetC < 0.0) {
+        return;
+    }
+
+    // Tolerances cover BLE encoding rounding. Steam is u8p0 (1°C quantum);
+    // group is u16p8 (far finer but we allow 0.5°C to absorb any FP noise).
+    constexpr double kSteamToleranceC = 0.5;
+    constexpr double kGroupToleranceC = 0.5;
+
+    // Compare reported against COMMANDED — "did the DE1 honor our last
+    // write?" This is the authoritative question for #746, and it correctly
+    // handles code paths that write values diverging from Settings
+    // (startSteamHeating forces heater on regardless of keepSteamHeaterOn,
+    // softStopSteam writes a 1s timeout, etc.). Comparing against
+    // Settings-derived "expected" would make the drift handler clobber
+    // those writes.
+    const bool steamDrift = haveCommanded &&
+        std::abs(deviceSteamTargetC - commandedSteam) > kSteamToleranceC;
+    const bool groupDrift = haveCommanded &&
+        std::abs(deviceGroupTargetC - commandedGroup) > kGroupToleranceC;
+
+    // Skip before we've ever written — DE1's initial indication on subscribe
+    // reflects its power-on state, not ours, and racing against that would
+    // log a bogus drift on every connect.
+    if (!haveCommanded) {
+        qDebug().noquote() << QString(
+            "[SettingsDrift] pre-commanded report ignored: reported steam=%1C group=%2C — waiting for first write")
+            .arg(deviceSteamTargetC, 0, 'f', 1)
+            .arg(deviceGroupTargetC, 0, 'f', 2);
+        return;
+    }
+
+    if (!steamDrift && !groupDrift) {
+        // DE1 stored what we sent. Reset retry bookkeeping.
+        if (m_shotSettingsDriftResendCount > 0) {
+            qDebug().noquote() << QString(
+                "[SettingsDrift] resolved after %1 resend(s) — DE1 stored steam=%2C group=%3C")
+                .arg(m_shotSettingsDriftResendCount)
+                .arg(deviceSteamTargetC, 0, 'f', 1)
+                .arg(deviceGroupTargetC, 0, 'f', 2);
+            m_shotSettingsDriftResendCount = 0;
+        }
+        m_shotSettingsResendInFlight = false;
+        return;
+    }
+
+    // Drift detected. If a write is still in flight (DE1Device clears the
+    // flag only when an indication matches commanded), this mismatch is
+    // almost certainly a stale pre-write indication still arriving —
+    // ignore it and wait for the real post-write indication. This is the
+    // event-based replacement for a wall-clock "msSinceLastWrite < 1500"
+    // guard, which CLAUDE.md's "never timers as guards" rule warned
+    // against.
+    if (m_device->shotSettingsIndicationPending()) {
+        qDebug().noquote() << QString(
+            "[SettingsDrift] stale-indication ignored (write unacknowledged): "
+            "reported(steam=%1C group=%2C) commanded(steam=%3C group=%4C)")
+            .arg(deviceSteamTargetC, 0, 'f', 1)
+            .arg(deviceGroupTargetC, 0, 'f', 2)
+            .arg(commandedSteam, 0, 'f', 1)
+            .arg(commandedGroup, 0, 'f', 2);
+        return;
+    }
+
+    // Classify for the log so we can scan `grep SettingsDrift` in bug
+    // reports and immediately see what happened. Also compute expected
+    // (from Settings) for context — if it differs from commanded it means
+    // the user changed a setting between our last write and now.
+    const double expectedSteamC = m_settings->steamDisabled() ||
+                                  !m_settings->keepSteamHeaterOn()
+                                      ? 0.0
+                                      : m_settings->steamTemperature();
+    const double expectedGroupC = getGroupTemperature();
+    QString summary;
+    if (steamDrift) {
+        if (commandedSteam == 0.0 && deviceSteamTargetC > 0.0) {
+            summary = QStringLiteral("steam heater ON at %1C but we commanded OFF")
+                          .arg(deviceSteamTargetC, 0, 'f', 0);
+        } else if (commandedSteam > 0.0 && deviceSteamTargetC == 0.0) {
+            summary = QStringLiteral("steam heater OFF but we commanded %1C")
+                          .arg(commandedSteam, 0, 'f', 0);
+        } else {
+            summary = QStringLiteral("steam target %1C but we commanded %2C")
+                          .arg(deviceSteamTargetC, 0, 'f', 0)
+                          .arg(commandedSteam, 0, 'f', 0);
+        }
+    }
+    if (groupDrift) {
+        QString groupNote = QStringLiteral("group target %1C but we commanded %2C")
+                                .arg(deviceGroupTargetC, 0, 'f', 2)
+                                .arg(commandedGroup, 0, 'f', 2);
+        summary = summary.isEmpty() ? groupNote : summary + QStringLiteral("; ") + groupNote;
+    }
+
+    qWarning().noquote() << QString(
+        "[SettingsDrift] DE1-dropped-write: %1 | reported(steam=%2C group=%3C) "
+        "commanded(steam=%4C group=%5C) expected(steam=%6C group=%7C)")
+        .arg(summary)
+        .arg(deviceSteamTargetC, 0, 'f', 1)
+        .arg(deviceGroupTargetC, 0, 'f', 2)
+        .arg(commandedSteam, 0, 'f', 1)
+        .arg(commandedGroup, 0, 'f', 2)
+        .arg(expectedSteamC, 0, 'f', 1)
+        .arg(expectedGroupC, 0, 'f', 2);
+
+    // If a resend is already in flight (we sent one and haven't yet received
+    // its indication), wait for that to resolve before firing another. This
+    // is the event-based replacement for a 2s wall-clock rate limit.
+    if (m_shotSettingsResendInFlight) {
+        qDebug() << "[SettingsDrift] resend already in flight — waiting for its indication";
+        return;
+    }
+
+    constexpr int kMaxResendAttempts = 3;
+    if (m_shotSettingsDriftResendCount >= kMaxResendAttempts) {
+        qWarning().noquote() << QString(
+            "[SettingsDrift] giving up after %1 resend attempts — DE1 not honoring ShotSettings")
+            .arg(m_shotSettingsDriftResendCount);
+        return;
+    }
+
+    // Re-check the connection right before committing to the resend — signals
+    // emitted above could have flipped state, and we don't want to burn a
+    // retry slot on a write that will no-op inside the transport.
+    if (!m_device->isConnected()) {
+        qDebug() << "[SettingsDrift] device disconnected during drift handling — skipping resend";
+        return;
+    }
+
+    m_shotSettingsDriftResendCount++;
+    m_shotSettingsResendInFlight = true;
+    qWarning().noquote() << QString(
+        "[SettingsDrift] resending last ShotSettings payload (attempt %1 of %2)")
+        .arg(m_shotSettingsDriftResendCount).arg(kMaxResendAttempts);
+    // Re-assert exactly what we last commanded — do NOT re-derive from
+    // Settings via sendMachineSettings(). Some code paths (startSteamHeating,
+    // softStopSteam, setSteamTimeoutImmediate) deliberately write values that
+    // diverge from Settings, and re-deriving would clobber them.
+    m_device->resendLastShotSettings();
+}
+
 void MainController::sendMachineSettings() {
     if (!m_device || !m_device->isConnected() || !m_settings) return;
 
@@ -457,7 +614,9 @@ void MainController::sendMachineSettings() {
         hotWaterVolume = qMin(m_settings->waterVolume(), 255);  // BLE uint8 max
     }
 
-    // 1. ShotSettings (single write with all temperatures)
+    // 1. ShotSettings (single write with all temperatures).
+    // DE1Device::setShotSettings() internally records the commanded values
+    // so onShotSettingsReported() can compare reported against commanded.
     m_device->setShotSettings(
         steamTemp,
         m_settings->steamTimeout(),
@@ -493,6 +652,14 @@ void MainController::applyFlushSettings() {
 }
 
 void MainController::applyAllSettings() {
+    // Fresh connection / initial settings cycle — reset ShotSettings drift
+    // bookkeeping so a prior session's exhausted retry budget doesn't
+    // permanently disable auto-heal, and so the spurious drift from the
+    // initial-defaults write's indication crossing our user-value write
+    // doesn't burn the new session's retry slots.
+    m_shotSettingsDriftResendCount = 0;
+    m_shotSettingsResendInFlight = false;
+
     // 1. Upload current profile (espresso)
     if (m_profileManager->currentProfile().mode() == Profile::Mode::FrameBased) {
         m_profileManager->uploadCurrentProfile();
