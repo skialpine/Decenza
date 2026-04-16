@@ -10,15 +10,21 @@ Page {
 
     property string pageTitle: TranslationManager.translate("flush.title", "Flush")
 
-    Component.onCompleted: {
+    // Use StackView.onActivated (not Component.onCompleted) so side effects
+    // run when the page is actually shown, not during construction. This
+    // also re-fires on pop-back if the page is ever pushed below another.
+    // Skip the preset-reset and settings push while flushing so a
+    // re-activation mid-session doesn't clobber in-progress state.
+    StackView.onActivated: {
         root.currentPageTitle = pageTitle
-        // Sync Settings with selected preset
-        Settings.flushFlow = getCurrentPresetFlow()
-        Settings.flushSeconds = getCurrentPresetSeconds()
-        MainController.applyFlushSettings()
-        if (!isFlushing) secondsInput.forceActiveFocus()
+        if (!isFlushing) {
+            // Sync Settings with selected preset
+            Settings.flushFlow = getCurrentPresetFlow()
+            Settings.flushSeconds = getCurrentPresetSeconds()
+            MainController.applyFlushSettings()
+            secondsInput.forceActiveFocus()
+        }
     }
-    StackView.onActivated: root.currentPageTitle = pageTitle
 
     property bool isFlushing: MachineState.phase === MachineStateType.Phase.Flushing || root.debugLiveView
     property int editingPresetIndex: -1

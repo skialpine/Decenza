@@ -12,17 +12,24 @@ Page {
     property string pageTitle: steamPageTitle.text
     Tr { id: steamPageTitle; key: "steam.title"; fallback: "Steam"; visible: false }
 
-    Component.onCompleted: {
+    // Use StackView.onActivated (not Component.onCompleted) so side effects
+    // run when the page is actually shown, not during construction. This
+    // also re-fires on pop-back if the page is ever pushed below another.
+    // Gate the preset-reset and heater-start on !isSteaming so a re-activation
+    // mid-session doesn't clobber the user's in-progress settings or re-issue
+    // a redundant BLE write.
+    StackView.onActivated: {
         root.currentPageTitle = pageTitle
-        // Sync Settings with selected preset
-        Settings.steamTimeout = getCurrentPitcherDuration()
-        Settings.steamFlow = getCurrentPitcherFlow()
-        // Start heating steam heater (ignores keepSteamHeaterOn - user wants to steam)
-        // startSteamHeating clears steamDisabled flag automatically
-        MainController.startSteamHeating()
-        if (!isSteaming) durationSlider.forceActiveFocus()
+        if (!isSteaming) {
+            // Sync Settings with selected preset
+            Settings.steamTimeout = getCurrentPitcherDuration()
+            Settings.steamFlow = getCurrentPitcherFlow()
+            // Start heating steam heater (ignores keepSteamHeaterOn - user wants to steam)
+            // startSteamHeating clears steamDisabled flag automatically
+            MainController.startSteamHeating()
+            durationSlider.forceActiveFocus()
+        }
     }
-    StackView.onActivated: root.currentPageTitle = pageTitle
 
     property bool isSteaming: MachineState.phase === MachineStateType.Phase.Steaming || root.debugLiveView
     property int editingPitcherIndex: -1  // For the edit popup
