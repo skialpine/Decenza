@@ -270,8 +270,12 @@ void BleTransport::disconnect() {
     m_disconnectedEmittedForAttempt = false;
 }
 
-void BleTransport::clearQueue() {
-    qsizetype cleared = m_commandQueue.size();
+qsizetype BleTransport::clearQueue() {
+    // processCommandQueue dequeues a command before dispatching it, so the
+    // currently-in-flight write is no longer in m_commandQueue but is still
+    // live (m_writePending=true). Count it too — otherwise an aborted MMR
+    // write would leave m_lastMMRValues claiming the DE1 has the value.
+    qsizetype cleared = m_commandQueue.size() + (m_writePending ? 1 : 0);
     m_commandQueue.clear();
     m_writePending = false;
     m_writeTimeoutTimer.stop();
@@ -279,7 +283,7 @@ void BleTransport::clearQueue() {
     m_writeRetryCount = 0;
     m_lastWriteUuid.clear();
     m_lastWriteData.clear();
-    Q_UNUSED(cleared);
+    return cleared;
 }
 
 bool BleTransport::isConnected() const {
