@@ -679,6 +679,18 @@ int main(int argc, char *argv[])
                          }, Qt::QueuedConnection);
                      });
 
+    // Forward live SAW target changes (e.g. user pressed +10g mid-shot) to the worker.
+    // Pre-shot callers (profile activation, recipe save) also fire this signal, but
+    // configure() overwrites m_targetWeight at shot start, so any pre-shot forwarding
+    // is harmless. Only mid-shot bumps observably move the worker's target.
+    QObject::connect(&machineState, &MachineState::targetWeightChanged,
+                     [&weightProcessor, &machineState]() {
+                         const double w = machineState.targetWeight();
+                         QMetaObject::invokeMethod(&weightProcessor, [&weightProcessor, w]() {
+                             weightProcessor.setTargetWeight(w);
+                         }, Qt::QueuedConnection);
+                     });
+
 #ifdef Q_OS_ANDROID
     // GC management: defer Android GC during flowing operations (espresso, hot water, etc.)
     // to reduce stop-the-world pause impact on BLE delivery and SAW latency.

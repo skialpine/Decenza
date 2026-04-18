@@ -139,7 +139,14 @@ ChartView {
     ValueAxis {
         id: weightAxis
         min: 0
-        max: Math.max(10, (ProfileManager.targetWeight || 36) * 1.1)
+        // Live shots may bump SAW past the configured target (#792 +10g button), so
+        // take the larger of profile target and current MachineState target. Each
+        // source uses an explicit > 0 check because targetWeight == 0 means SAW
+        // disabled, and JS `||` would conflate that with "no data".
+        max: Math.max(10, Math.max(
+            ProfileManager.targetWeight > 0 ? ProfileManager.targetWeight : 0,
+            MachineState.targetWeight > 0 ? MachineState.targetWeight : 0,
+            36) * 1.1)
         tickCount: 5
         visible: false
     }

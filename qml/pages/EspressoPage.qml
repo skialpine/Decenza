@@ -44,7 +44,7 @@ Page {
                 return "Temperature: " + DE1Device.temperature.toFixed(1) + " degrees"
             case 5: // Weight and/or Volume
                 var parts = []
-                if (MachineState.targetWeight > 0) parts.push(TranslationManager.translate("espresso.accessible.weight", "Weight:") + " " + espressoPage.currentWeight.toFixed(1) + " " + TranslationManager.translate("espresso.accessible.of", "of") + " " + ProfileManager.targetWeight.toFixed(0) + " " + TranslationManager.translate("espresso.accessible.grams", "grams"))
+                if (MachineState.targetWeight > 0) parts.push(TranslationManager.translate("espresso.accessible.weight", "Weight:") + " " + espressoPage.currentWeight.toFixed(1) + " " + TranslationManager.translate("espresso.accessible.of", "of") + " " + MachineState.targetWeight.toFixed(0) + " " + TranslationManager.translate("espresso.accessible.grams", "grams"))
                 if (MachineState.targetVolume > 0) parts.push(TranslationManager.translate("espresso.accessible.volume", "Volume:") + " " + MachineState.pourVolume.toFixed(1) + " " + TranslationManager.translate("espresso.accessible.of", "of") + " " + MachineState.targetVolume.toFixed(0) + " " + TranslationManager.translate("espresso.accessible.milliliters", "milliliters"))
                 return parts.join(", ") || TranslationManager.translate("espresso.noStopTarget", "No stop target")
             default:
@@ -356,7 +356,7 @@ Page {
         id: cupFillComponent
         CupFillView {
             currentWeight: espressoPage.currentWeight
-            targetWeight: ProfileManager.targetWeight
+            targetWeight: MachineState.targetWeight
             currentFlow: DE1Device.flow
             currentPressure: DE1Device.pressure
             goalPressure: MainController.filteredGoalPressure
@@ -913,7 +913,7 @@ Page {
                 // Show volume display when only volume target is set (no weight target)
                 readonly property bool isVolumeMode: MachineState.targetVolume > 0 && MachineState.targetWeight <= 0
                 readonly property double currentValue: isVolumeMode ? MachineState.pourVolume : espressoPage.currentWeight
-                readonly property double targetValue: isVolumeMode ? MachineState.targetVolume : ProfileManager.targetWeight
+                readonly property double targetValue: isVolumeMode ? MachineState.targetVolume : MachineState.targetWeight
                 readonly property string unit: isVolumeMode ? "ml" : "g"
                 readonly property color displayColor: isVolumeMode ? Theme.flowColor : Theme.weightColor
 
@@ -921,7 +921,7 @@ Page {
                 Accessible.name: {
                     var parts = []
                     if (MachineState.targetWeight > 0)
-                        parts.push(TranslationManager.translate("espresso.accessible.weight", "Weight:") + " " + espressoPage.currentWeight.toFixed(1) + " " + TranslationManager.translate("espresso.accessible.of", "of") + " " + ProfileManager.targetWeight.toFixed(0) + " " + TranslationManager.translate("espresso.accessible.grams", "grams"))
+                        parts.push(TranslationManager.translate("espresso.accessible.weight", "Weight:") + " " + espressoPage.currentWeight.toFixed(1) + " " + TranslationManager.translate("espresso.accessible.of", "of") + " " + MachineState.targetWeight.toFixed(0) + " " + TranslationManager.translate("espresso.accessible.grams", "grams"))
                     if (MachineState.targetVolume > 0)
                         parts.push(TranslationManager.translate("espresso.accessible.volume", "Volume:") + " " + MachineState.pourVolume.toFixed(1) + " " + TranslationManager.translate("espresso.accessible.of", "of") + " " + MachineState.targetVolume.toFixed(0) + " " + TranslationManager.translate("espresso.accessible.milliliters", "milliliters"))
                     return parts.join(", ") || TranslationManager.translate("espresso.noStopTarget", "No stop target")
@@ -941,7 +941,7 @@ Page {
                     }
                     Text {
                         text: ProfileManager.brewByRatioActive && !weightVolumeColumn.isVolumeMode
-                            ? "1:" + ProfileManager.brewByRatio.toFixed(1) + " (" + ProfileManager.targetWeight.toFixed(0) + "g)"
+                            ? "1:" + ProfileManager.brewByRatio.toFixed(1) + " (" + MachineState.targetWeight.toFixed(0) + "g)"
                             : "/ " + weightVolumeColumn.targetValue.toFixed(0) + " " + weightVolumeColumn.unit
                         color: Theme.textSecondaryColor
                         font.pixelSize: Theme.scaled(18)
@@ -980,39 +980,76 @@ Page {
                 }
             }
 
+            // Bump SAW target by +10g (issue #792 — "salvage" a too-fast shot)
+            AccessibleButton {
+                id: addTenButton
+                Layout.preferredWidth: Theme.scaled(56)
+                Layout.preferredHeight: Theme.scaled(24)
+                Layout.alignment: Qt.AlignVCenter
+                leftPadding: 0
+                rightPadding: 0
+                text: TranslationManager.translate("espresso.button.add10", "+10 g")
+                accessibleName: TranslationManager.translate("espresso.accessible.add10", "Add 10 grams to weight target")
+                visible: MachineState.targetWeight > 0 &&
+                         (MachineState.phase === MachineStateType.Phase.Preinfusion ||
+                          MachineState.phase === MachineStateType.Phase.Pouring)
+
+                activeFocusOnTab: true
+                KeyNavigation.tab: skipFrameButton
+                KeyNavigation.backtab: espressoBackButton
+
+                onClicked: MainController.bumpTargetWeight(10.0)
+
+                background: Rectangle {
+                    implicitWidth: Theme.scaled(56)
+                    implicitHeight: Theme.scaled(24)
+                    color: addTenButton.isPressed ? Qt.darker(Theme.accentColor, 1.3) : Theme.accentColor
+                    radius: Theme.scaled(12)
+                }
+                contentItem: Text {
+                    text: addTenButton.text
+                    color: Theme.textColor
+                    font.pixelSize: Theme.scaled(11)
+                    font.weight: Font.Medium
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    Accessible.ignored: true
+                }
+            }
+
             // Skip to next profile frame
-            Rectangle {
+            AccessibleButton {
                 id: skipFrameButton
                 Layout.preferredWidth: Theme.scaled(56)
                 Layout.preferredHeight: Theme.scaled(24)
                 Layout.alignment: Qt.AlignVCenter
-                radius: Theme.scaled(12)
-                color: skipFrameTapHandler.pressed ? Qt.darker(Theme.accentColor, 1.3) : Theme.accentColor
+                leftPadding: 0
+                rightPadding: 0
+                text: TranslationManager.translate("espresso.button.skip", "Skip")
+                accessibleName: TranslationManager.translate("espresso.accessible.skipFrame", "Skip to next frame")
                 visible: MachineState.phase === MachineStateType.Phase.Preinfusion ||
                          MachineState.phase === MachineStateType.Phase.Pouring
 
                 activeFocusOnTab: true
                 KeyNavigation.tab: viewModeMouseArea
-                KeyNavigation.backtab: espressoBackButton
-                Accessible.role: Accessible.Button
-                Accessible.name: TranslationManager.translate("espresso.accessible.skipFrame", "Skip to next frame")
-                Accessible.focusable: true
-                Accessible.onPressAction: skipFrameTapHandler.tapped(null)
-                Keys.onReturnPressed: { DE1Device.skipToNextFrame(); event.accepted = true }
-                Keys.onSpacePressed:  { DE1Device.skipToNextFrame(); event.accepted = true }
+                KeyNavigation.backtab: addTenButton.visible ? addTenButton : espressoBackButton
 
-                Text {
-                    anchors.centerIn: parent
-                    text: TranslationManager.translate("espresso.button.skip", "Skip")
+                onClicked: DE1Device.skipToNextFrame()
+
+                background: Rectangle {
+                    implicitWidth: Theme.scaled(56)
+                    implicitHeight: Theme.scaled(24)
+                    color: skipFrameButton.isPressed ? Qt.darker(Theme.accentColor, 1.3) : Theme.accentColor
+                    radius: Theme.scaled(12)
+                }
+                contentItem: Text {
+                    text: skipFrameButton.text
                     color: Theme.textColor
                     font.pixelSize: Theme.scaled(11)
                     font.weight: Font.Medium
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                     Accessible.ignored: true
-                }
-
-                TapHandler {
-                    id: skipFrameTapHandler
-                    onTapped: DE1Device.skipToNextFrame()
                 }
             }
         }

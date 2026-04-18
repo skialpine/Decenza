@@ -15,6 +15,7 @@
 // Input (via QueuedConnection from main thread):
 //   - processWeight(): called at ~5Hz with each scale reading
 //   - configure(): called once at shot start with targets and learning data
+//   - setTargetWeight(): may update SAW target mid-shot (e.g. user +10g bump)
 //   - setCurrentFrame(): called at ~5Hz from DE1 shot samples
 //
 // Output (via QueuedConnection back to main thread):
@@ -36,6 +37,9 @@ public slots:
                    QVector<double> frameExitWeights,
                    QVector<double> learningDrips, QVector<double> learningFlows,
                    bool sawConverged, double sensorLagSeconds = 0.38);
+    // Live SAW target update (e.g. user pressed +10g mid-shot). Writes are serialized
+    // on the worker thread via QueuedConnection from main thread, so no extra locking.
+    void setTargetWeight(double weight);
     void setCurrentFrame(int frameNumber);
     void setTareComplete(bool complete);
     void startExtraction();
@@ -103,7 +107,7 @@ private:
     bool m_flowBecameValidLogged = false;  // Log once when flowShort transitions 0→valid
     bool m_untaredCupSignalled = false;   // Fire untaredCupDetected only once per extraction
 
-    // Configuration (set once at shot start, read-only during extraction)
+    // Configuration (set at shot start; m_targetWeight may be updated mid-shot via setTargetWeight)
     double m_targetWeight = 0;
     int m_preinfuseFrameCount = 0;  // SAW suppressed until m_currentFrame >= this
     QVector<double> m_frameExitWeights;
