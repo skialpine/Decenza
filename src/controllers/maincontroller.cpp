@@ -1559,6 +1559,13 @@ void MainController::onEspressoCycleStarted() {
 }
 
 void MainController::onShotEnded() {
+    // Clear any +10g bump applied via bumpTargetWeight() so MachineState::targetWeight
+    // matches the profile again before the next shot. Doing this at shot end (rather
+    // than at next-shot start) avoids depending on signal-handler connection order.
+    if (m_machineState && m_profileManager) {
+        m_machineState->setTargetWeight(m_profileManager->targetWeight());
+    }
+
     // Clear filtered goals so CupFillView doesn't show stale tracking colors
     if (m_filteredGoalPressure != 0 || m_filteredGoalFlow != 0) {
         m_filteredGoalPressure = 0;
