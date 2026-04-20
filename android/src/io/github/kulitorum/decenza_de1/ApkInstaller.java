@@ -307,30 +307,13 @@ public class ApkInstaller {
             sInstallInFlight.set(false);
             reportStatus(status, msg);
 
-            // Restore the post-install "Open" affordance the legacy
-            // Intent(ACTION_VIEW) install flow used to provide. PackageInstaller
-            // has no equivalent, so on success we launch the updated app
-            // ourselves. getLaunchIntentForPackage resolves against the
-            // now-installed package (the new version), so even though this
-            // code is running in the old process the activity comes up in the
-            // new version.
-            if (status == PackageInstaller.STATUS_SUCCESS) {
-                try {
-                    Context appCtx = context.getApplicationContext();
-                    Intent launch = appCtx.getPackageManager()
-                            .getLaunchIntentForPackage(appCtx.getPackageName());
-                    if (launch != null) {
-                        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                                      | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                        appCtx.startActivity(launch);
-                        Log.i(TAG, "install: launched updated app after STATUS_SUCCESS");
-                    } else {
-                        Log.w(TAG, "install: no launch intent for package " + appCtx.getPackageName());
-                    }
-                } catch (Throwable t) {
-                    Log.w(TAG, "install: failed to launch updated app: " + t);
-                }
-            }
+            // Note: post-install relaunch is handled by UpdateLaunchReceiver
+            // (manifest-registered, listens for ACTION_MY_PACKAGE_REPLACED).
+            // A dynamic BroadcastReceiver like this one is unreliable for
+            // self-updates: Android kills the old process when the package
+            // is replaced, usually before STATUS_SUCCESS is delivered, and
+            // Android 10+ background-activity-launch restrictions would
+            // block a startActivity() call from here anyway.
         }
     };
 }
