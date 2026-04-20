@@ -1,6 +1,8 @@
 #include "bletransport.h"
 #include "blecapability.h"
+#ifndef DECENZA_TESTING
 #include "blemanager.h"
+#endif
 #include "protocol/de1characteristics.h"
 
 #include <QBluetoothAddress>
@@ -414,10 +416,15 @@ void BleTransport::onControllerError(QLowEnergyController::Error error) {
     // a stale BlueZ cache after an OS upgrade. Ask BLEManager to surface
     // the recovery dialog (it de-dupes; only the first call per session
     // fires the signal).
+#ifndef DECENZA_TESTING
+    // Guarded out of test builds: test targets link bletransport.cpp
+    // without blemanager.cpp, and pulling blemanager.cpp in would drag in
+    // most of the BLE stack (scales, refractometers, permissions).
     if (error == QLowEnergyController::UnknownRemoteDeviceError
         && !BleCapability::linuxMissing()) {
         if (auto* m = BLEManager::instance()) m->requestBluezCacheHint();
     }
+#endif
 }
 
 void BleTransport::onServiceDiscovered(const QBluetoothUuid& uuid) {
