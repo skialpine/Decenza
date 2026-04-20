@@ -11,6 +11,11 @@
 #include "../ai/aimanager.h"
 #include "version.h"
 
+#ifdef Q_OS_ANDROID
+#include <QJniObject>
+#include <QJniEnvironment>
+#endif
+
 #include <QNetworkInterface>
 #include <QUdpSocket>
 #include <QSet>
@@ -32,11 +37,11 @@
 #include <QProcess>
 #endif
 #include <QCoreApplication>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QRegularExpression>
+#include <QThread>
 
-#ifdef Q_OS_ANDROID
-#include <QJniObject>
-#endif
 
 QString ShotServer::generateUploadPage() const
 {
@@ -275,7 +280,7 @@ QString ShotServer::generateUploadPage() const
             xhr.onload = function() {
                 uploadZone.classList.remove("uploading");
                 if (xhr.status === 200) {
-                    showStatus("success", "Upload complete! Installing...");
+                    showStatus("success", "APK dispatched to PackageInstaller — check device screen for installation prompt");
                 } else {
                     showStatus("error", "Upload failed: " + xhr.responseText);
                 }
@@ -302,19 +307,11 @@ QString ShotServer::generateUploadPage() const
 )HTML");
 }
 
-void ShotServer::handleUpload(QTcpSocket* socket, const QByteArray& request)
+// Called from onReadyRead's streaming path for APK uploads. The body has already
+// been written to tempPath on disk — this renames it to the final cache location
+// without ever holding the full APK in memory on the main thread.
+void ShotServer::handleUploadFromFile(QTcpSocket* socket, const QString& tempPath, const QString& headers)
 {
-    // Parse headers to get filename and content
-    qsizetype headerEndPos = request.indexOf("\r\n\r\n");
-    if (headerEndPos < 0) {
-        sendResponse(socket, 400, "text/plain", "Invalid request");
-        return;
-    }
-
-    QString headers = QString::fromUtf8(request.left(headerEndPos));
-    QByteArray body = request.mid(headerEndPos + 4);
-
-    // Get filename from X-Filename header
     QString filename = "uploaded.apk";
     for (const QString& line : headers.split("\r\n")) {
         if (line.startsWith("X-Filename:", Qt::CaseInsensitive)) {
@@ -322,44 +319,88 @@ void ShotServer::handleUpload(QTcpSocket* socket, const QByteArray& request)
             break;
         }
     }
+    filename = QFileInfo(filename).fileName();
+    if (filename.isEmpty()) filename = "uploaded.apk";
 
     if (!filename.endsWith(".apk", Qt::CaseInsensitive)) {
+        QThread* cleanup = QThread::create([tempPath]() { QFile::remove(tempPath); });
+        connect(cleanup, &QThread::finished, cleanup, &QThread::deleteLater);
+        cleanup->start();
         sendResponse(socket, 400, "text/plain", "Only APK files are allowed");
         return;
     }
 
-    // Save to cache/downloads directory
     QString savePath;
 #ifdef Q_OS_ANDROID
     savePath = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
 #else
     savePath = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
 #endif
-
-    QDir().mkpath(savePath);
     QString fullPath = savePath + "/" + filename;
 
-    QFile file(fullPath);
-    if (!file.open(QIODevice::WriteOnly)) {
-        sendResponse(socket, 500, "text/plain", "Failed to save file: " + file.errorString().toUtf8());
-        return;
-    }
-
-    file.write(body);
-    file.close();
-
-    qDebug() << "APK uploaded:" << fullPath << "size:" << body.size();
-
-    // Trigger installation on Android
-    installApk(fullPath);
-
-    sendResponse(socket, 200, "text/plain", "Upload complete: " + fullPath.toUtf8());
+    // Serializes the remove+rename finalization of APK uploads so two concurrent
+    // uploads with the same destination filename can't race (thread B's
+    // QFile::remove(fullPath) deleting the file thread A just renamed in).
+    static QMutex s_apkFinalizationMutex;
+    QPointer<QTcpSocket> safeSocket = socket;
+    QPointer<ShotServer> safeThis = this;
+    QThread* t = QThread::create([safeThis, safeSocket, tempPath, fullPath, savePath]() {
+        QDir().mkpath(savePath);
+        QMutexLocker finalizeLock(&s_apkFinalizationMutex);
+        // Remove stale destination, then rename (atomic on same filesystem).
+        QFile::remove(fullPath);
+        bool ok = QFile::rename(tempPath, fullPath);
+        if (!ok) {
+            // Cross-filesystem fallback: copy then delete.
+            ok = QFile::copy(tempPath, fullPath);
+            QFile::remove(tempPath);
+        }
+        if (!ok) {
+            QMetaObject::invokeMethod(safeThis, [safeThis, safeSocket]() {
+                if (safeThis && safeSocket)
+                    safeThis->sendResponse(safeSocket, 500, "text/plain", "Failed to save APK");
+            }, Qt::QueuedConnection);
+            return;
+        }
+        qDebug() << "APK uploaded:" << fullPath << "size:" << QFileInfo(fullPath).size();
+        QMetaObject::invokeMethod(safeThis, [safeThis, safeSocket, fullPath]() {
+            if (!safeThis || !safeSocket) return;
+            if (!safeThis->installApk(fullPath)) {
+                QThread* cleanup = QThread::create([fullPath]() { QFile::remove(fullPath); });
+                connect(cleanup, &QThread::finished, cleanup, &QThread::deleteLater);
+                cleanup->start();
+                safeThis->sendResponse(safeSocket, 500, "text/plain", "Upload succeeded but install could not be dispatched");
+                return;
+            }
+            // Fire-and-forget: installApk() dispatches the session to a Java
+            // worker. The terminal status (success/failure) is routed to
+            // UpdateChecker::onInstallStatus but early-returns there because
+            // m_installInFlight was not set for this ShotServer-initiated
+            // session — we intentionally don't track it here to keep the web
+            // response non-blocking. The user sees the outcome via Android's
+            // native PackageInstaller UI; a tracking web channel (WebSocket
+            // / polling endpoint) would be a future enhancement.
+            safeThis->sendResponse(safeSocket, 200, "text/plain", "APK dispatched to PackageInstaller — check device screen for installation prompt");
+        }, Qt::QueuedConnection);
+    });
+    connect(t, &QThread::finished, t, &QThread::deleteLater);
+    t->start();
 }
 
-void ShotServer::installApk(const QString& apkPath)
+
+bool ShotServer::installApk(const QString& apkPath)
 {
 #ifdef Q_OS_ANDROID
-    qDebug() << "Installing APK:" << apkPath;
+    // If JNI registration failed, PackageInstaller still works but C++ won't
+    // receive the status callback. ShotServer doesn't need the callback (the
+    // user sees Android's own confirmation/error UI), so we proceed anyway.
+    jboolean nativeReady = QJniObject::callStaticMethod<jboolean>(
+        "io/github/kulitorum/decenza_de1/ApkInstaller", "isNativeRegistered", "()Z");
+    if (!nativeReady) {
+        qWarning() << "ShotServer: install bridge not initialized — install status won't be reported to C++";
+    }
+
+    qDebug() << "ShotServer: Installing APK via PackageInstaller session:" << apkPath;
 
     QJniObject activity = QJniObject::callStaticObjectMethod(
         "org/qtproject/qt/android/QtNative",
@@ -367,61 +408,32 @@ void ShotServer::installApk(const QString& apkPath)
         "()Landroid/app/Activity;");
 
     if (!activity.isValid()) {
-        qWarning() << "Failed to get Android activity";
-        return;
+        qWarning() << "ShotServer: Failed to get Android activity for APK install";
+        return false;
     }
 
-    QJniObject context = activity.callObjectMethod(
-        "getApplicationContext",
-        "()Landroid/content/Context;");
-
-    // Create file URI using FileProvider for Android 7+
     QJniObject javaPath = QJniObject::fromString(apkPath);
-    QJniObject file = QJniObject("java/io/File", "(Ljava/lang/String;)V",
-                                  javaPath.object<jstring>());
+    jboolean ok = QJniObject::callStaticMethod<jboolean>(
+        "io/github/kulitorum/decenza_de1/ApkInstaller",
+        "install",
+        "(Landroid/app/Activity;Ljava/lang/String;)Z",
+        activity.object(),
+        javaPath.object<jstring>());
 
-    // Get package name for FileProvider authority
-    QJniObject packageName = context.callObjectMethod(
-        "getPackageName",
-        "()Ljava/lang/String;");
-    QString authority = packageName.toString() + ".fileprovider";
-
-    QJniObject uri = QJniObject::callStaticObjectMethod(
-        "androidx/core/content/FileProvider",
-        "getUriForFile",
-        "(Landroid/content/Context;Ljava/lang/String;Ljava/io/File;)Landroid/net/Uri;",
-        context.object(),
-        QJniObject::fromString(authority).object<jstring>(),
-        file.object());
-
-    if (!uri.isValid()) {
-        qWarning() << "Failed to create content URI for APK";
-        return;
+    {
+        QJniEnvironment env;
+        if (env.checkAndClearExceptions()) {
+            ok = JNI_FALSE;
+        }
     }
 
-    // Create install intent
-    QJniObject intent("android/content/Intent");
-    QJniObject actionView = QJniObject::fromString("android.intent.action.VIEW");
-    intent.callObjectMethod("setAction",
-                            "(Ljava/lang/String;)Landroid/content/Intent;",
-                            actionView.object<jstring>());
-
-    QJniObject mimeType = QJniObject::fromString("application/vnd.android.package-archive");
-    intent.callObjectMethod("setDataAndType",
-                            "(Landroid/net/Uri;Ljava/lang/String;)Landroid/content/Intent;",
-                            uri.object(),
-                            mimeType.object<jstring>());
-
-    // Add flags
-    intent.callObjectMethod("addFlags", "(I)Landroid/content/Intent;", 0x00000001); // FLAG_GRANT_READ_URI_PERMISSION
-    intent.callObjectMethod("addFlags", "(I)Landroid/content/Intent;", 0x10000000); // FLAG_ACTIVITY_NEW_TASK
-
-    // Start activity
-    activity.callMethod<void>("startActivity", "(Landroid/content/Intent;)V", intent.object());
-
-    qDebug() << "APK install intent launched";
+    if (!ok) {
+        qWarning() << "ShotServer: ApkInstaller.install() failed for:" << apkPath;
+    }
+    return ok == JNI_TRUE;
 #else
-    qDebug() << "APK installation only supported on Android. File saved to:" << apkPath;
+    qDebug() << "ShotServer: APK installation only supported on Android. File saved to:" << apkPath;
+    return false;
 #endif
 }
 
@@ -1000,121 +1012,120 @@ winget install OliverBetz.ExifTool</pre>
 
 void ShotServer::handleMediaUpload(QTcpSocket* socket, const QString& uploadedTempPath, const QString& headers)
 {
-    // Ensure temp file cleanup on any exit path
-    QString tempPathToCleanup = uploadedTempPath;
-    auto cleanupTempFile = [&tempPathToCleanup]() {
-        if (!tempPathToCleanup.isEmpty() && QFile::exists(tempPathToCleanup)) {
-            QFile::remove(tempPathToCleanup);
-        }
-    };
+    if (!m_screensaverManager) {
+        sendResponse(socket, 500, "text/plain", "Screensaver manager not available");
+        QThread* t = QThread::create([uploadedTempPath]() { QFile::remove(uploadedTempPath); });
+        connect(t, &QThread::finished, t, &QThread::deleteLater);
+        t->start();
+        return;
+    }
 
-    try {
-        if (!m_screensaverManager) {
-            sendResponse(socket, 500, "text/plain", "Screensaver manager not available");
-            cleanupTempFile();
-            return;
+    // Get filename from X-Filename header (URL-encoded)
+    QString filename = "uploaded_media";
+    for (const QString& line : headers.split("\r\n")) {
+        if (line.startsWith("X-Filename:", Qt::CaseInsensitive)) {
+            filename = QUrl::fromPercentEncoding(line.mid(11).trimmed().toUtf8());
+            break;
         }
+    }
 
-        // Get filename from X-Filename header (URL-encoded)
-        QString filename = "uploaded_media";
-        for (const QString& line : headers.split("\r\n")) {
-            if (line.startsWith("X-Filename:", Qt::CaseInsensitive)) {
-                filename = QUrl::fromPercentEncoding(line.mid(11).trimmed().toUtf8());
-                break;
-            }
-        }
+    // Validate file type — fast check before dispatching background work
+    QString ext = QFileInfo(filename).suffix().toLower();
+    bool isImage = (ext == "jpg" || ext == "jpeg" || ext == "png" || ext == "gif" || ext == "webp");
+    bool isVideo = (ext == "mp4" || ext == "webm" || ext == "mov");
 
-        // Validate file type
-        QString ext = QFileInfo(filename).suffix().toLower();
-        bool isImage = (ext == "jpg" || ext == "jpeg" || ext == "png" || ext == "gif" || ext == "webp");
-        bool isVideo = (ext == "mp4" || ext == "webm" || ext == "mov");
+    if (!isImage && !isVideo) {
+        sendResponse(socket, 400, "text/plain", "Unsupported file type. Use JPG, PNG, GIF, WebP, MP4, or WebM.");
+        QThread* t = QThread::create([uploadedTempPath]() { QFile::remove(uploadedTempPath); });
+        connect(t, &QThread::finished, t, &QThread::deleteLater);
+        t->start();
+        return;
+    }
 
-        if (!isImage && !isVideo) {
-            sendResponse(socket, 400, "text/plain", "Unsupported file type. Use JPG, PNG, GIF, WebP, MP4, or WebM.");
-            cleanupTempFile();
-            return;
-        }
+    // Check for duplicate before doing expensive resize work
+    if (m_screensaverManager->hasPersonalMediaWithName(filename)) {
+        sendResponse(socket, 409, "text/plain", "File already exists: " + filename.toUtf8());
+        QThread* t = QThread::create([uploadedTempPath]() { QFile::remove(uploadedTempPath); });
+        connect(t, &QThread::finished, t, &QThread::deleteLater);
+        t->start();
+        return;
+    }
 
-        // Check for duplicate before doing expensive resize work
-        if (m_screensaverManager->hasPersonalMediaWithName(filename)) {
-            sendResponse(socket, 409, "text/plain", "File already exists: " + filename.toUtf8());
-            cleanupTempFile();
-            return;
-        }
+    QPointer<QTcpSocket> safeSocket = socket;
+    QPointer<ShotServer> safeThis = this;
+    QThread* worker = QThread::create([safeThis, safeSocket, uploadedTempPath, filename, ext, isImage, isVideo]() {
+        auto sendErr = [&](int code, const QByteArray& msg) {
+            QMetaObject::invokeMethod(safeThis, [safeThis, safeSocket, code, msg]() {
+                if (safeThis && safeSocket) safeThis->sendResponse(safeSocket, code, "text/plain", msg);
+            }, Qt::QueuedConnection);
+        };
 
         // Rename the streamed temp file to have proper extension
         QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
         QString tempPath = tempDir + "/upload_" + QString::number(QDateTime::currentMSecsSinceEpoch()) + "." + ext;
 
         if (!QFile::rename(uploadedTempPath, tempPath)) {
-            // If rename fails (cross-device?), try copy
             if (!QFile::copy(uploadedTempPath, tempPath)) {
-                sendResponse(socket, 500, "text/plain", "Failed to process uploaded file");
-                cleanupTempFile();
+                QFile::remove(uploadedTempPath);
+                sendErr(500, "Failed to process uploaded file");
                 return;
             }
             QFile::remove(uploadedTempPath);
         }
-        tempPathToCleanup = tempPath;  // Update cleanup path
 
         qDebug() << "Media uploaded to temp:" << tempPath << "size:" << QFileInfo(tempPath).size() << "bytes";
 
-        // Extract date from original file BEFORE resizing (resize strips EXIF)
+        // Extract date BEFORE resizing (resize strips EXIF)
         QDateTime mediaDate;
         if (isImage) {
-            mediaDate = extractImageDate(tempPath);
+            mediaDate = ShotServer::extractImageDate(tempPath);
         } else if (isVideo) {
-            mediaDate = extractVideoDate(tempPath);
+            mediaDate = ShotServer::extractVideoDate(tempPath);
         }
 
         // Resize the media
-        QString outputPath = tempDir + "/resized_" + QString::number(QDateTime::currentMSecsSinceEpoch()) + "." + ext;
-
-        // Target resolution matches shared screensaver media (1280x800)
         const int targetWidth = 1280;
         const int targetHeight = 800;
+        QString outputPath = tempDir + "/resized_" + QString::number(QDateTime::currentMSecsSinceEpoch()) + "." + ext;
 
         if (isImage) {
-            if (resizeImage(tempPath, outputPath, targetWidth, targetHeight)) {
+            if (ShotServer::resizeImage(tempPath, outputPath, targetWidth, targetHeight)) {
                 QFile::remove(tempPath);
-                tempPathToCleanup.clear();  // Successfully processed
                 qDebug() << "Image resized successfully:" << outputPath;
             } else {
-                // Use original if resize fails
                 outputPath = tempPath;
-                tempPathToCleanup.clear();  // Will use original, don't delete
                 qDebug() << "Image resize failed, using original";
             }
         } else if (isVideo) {
-            if (resizeVideo(tempPath, outputPath, targetWidth, targetHeight)) {
+            if (ShotServer::resizeVideo(tempPath, outputPath, targetWidth, targetHeight)) {
                 QFile::remove(tempPath);
-                tempPathToCleanup.clear();  // Successfully processed
                 qDebug() << "Video resized successfully:" << outputPath;
             } else {
-                // Use original if resize fails
                 outputPath = tempPath;
-                tempPathToCleanup.clear();  // Will use original, don't delete
                 qDebug() << "Video resize not available or failed, using original";
             }
         }
 
-        // Add to screensaver personal media with extracted date
-        if (m_screensaverManager->addPersonalMedia(outputPath, filename, mediaDate)) {
-            sendResponse(socket, 200, "text/plain", "Media uploaded successfully");
-        } else {
-            QFile::remove(outputPath);
-            sendResponse(socket, 500, "text/plain", "Failed to add media to screensaver");
-        }
-
-    } catch (const std::exception& e) {
-        qWarning() << "ShotServer: Exception in handleMediaUpload:" << e.what();
-        cleanupTempFile();
-        sendResponse(socket, 500, "text/plain", QString("Server error: %1").arg(e.what()).toUtf8());
-    } catch (...) {
-        qWarning() << "ShotServer: Unknown exception in handleMediaUpload";
-        cleanupTempFile();
-        sendResponse(socket, 500, "text/plain", "Server error: unexpected exception");
-    }
+        // Add to screensaver — must be done on the main thread (QObject)
+        QMetaObject::invokeMethod(safeThis, [safeThis, safeSocket, outputPath, filename, mediaDate]() {
+            if (!safeThis || !safeSocket) {
+                QThread* t = QThread::create([outputPath]() { QFile::remove(outputPath); });
+                connect(t, &QThread::finished, t, &QThread::deleteLater);
+                t->start();
+                return;
+            }
+            if (safeThis->m_screensaverManager->addPersonalMedia(outputPath, filename, mediaDate)) {
+                safeThis->sendResponse(safeSocket, 200, "text/plain", "Media uploaded successfully");
+            } else {
+                QThread* t = QThread::create([outputPath]() { QFile::remove(outputPath); });
+                connect(t, &QThread::finished, t, &QThread::deleteLater);
+                t->start();
+                safeThis->sendResponse(safeSocket, 500, "text/plain", "Failed to add media to screensaver");
+            }
+        }, Qt::QueuedConnection);
+    });
+    connect(worker, &QThread::finished, worker, &QThread::deleteLater);
+    worker->start();
 }
 
 bool ShotServer::resizeImage(const QString& inputPath, const QString& outputPath, int maxWidth, int maxHeight)
@@ -1240,7 +1251,7 @@ bool ShotServer::resizeVideo(const QString& inputPath, const QString& outputPath
 #endif
 }
 
-QDateTime ShotServer::extractDateWithExiftool(const QString& filePath) const
+QDateTime ShotServer::extractDateWithExiftool(const QString& filePath)
 {
 #ifdef Q_OS_IOS
     // QProcess is not available on iOS
@@ -1290,7 +1301,7 @@ QDateTime ShotServer::extractDateWithExiftool(const QString& filePath) const
 #endif
 }
 
-QDateTime ShotServer::extractImageDate(const QString& imagePath) const
+QDateTime ShotServer::extractImageDate(const QString& imagePath)
 {
     // Try exiftool first (handles all formats including RAW/HEIC)
     QDateTime dt = extractDateWithExiftool(imagePath);
@@ -1362,7 +1373,7 @@ QDateTime ShotServer::extractImageDate(const QString& imagePath) const
     return QDateTime();  // No date found
 }
 
-QDateTime ShotServer::extractVideoDate(const QString& videoPath) const
+QDateTime ShotServer::extractVideoDate(const QString& videoPath)
 {
 #ifdef Q_OS_IOS
     // QProcess is not available on iOS

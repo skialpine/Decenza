@@ -596,9 +596,13 @@ void ShotServer::onReadyRead()
             // Check if this is a media upload (POST to /upload/media)
             pending.isMediaUpload = requestLine.contains("POST") && requestLine.contains("/upload/media");
             pending.isBackupRestore = requestLine.contains("POST") && requestLine.contains("/api/backup/restore");
+            // APK upload: POST /upload (not /upload/anything-else)
+            pending.isApkUpload = requestLine.contains("POST") &&
+                                  requestLine.contains("/upload") &&
+                                  !requestLine.contains("/upload/");
 
-            // Check upload size limit for media uploads
-            if ((pending.isMediaUpload || pending.isBackupRestore) && pending.contentLength > MAX_UPLOAD_SIZE) {
+            // Check upload size limit for media and APK uploads
+            if ((pending.isMediaUpload || pending.isBackupRestore || pending.isApkUpload) && pending.contentLength > MAX_UPLOAD_SIZE) {
                 qWarning() << "ShotServer: Upload too large:" << pending.contentLength << "bytes (max:" << MAX_UPLOAD_SIZE << ")";
                 sendResponse(socket, 413, "text/plain",
                     QString("File too large. Maximum size is %1 MB").arg(MAX_UPLOAD_SIZE / (1024*1024)).toUtf8());
@@ -609,7 +613,7 @@ void ShotServer::onReadyRead()
             }
 
             // Check concurrent upload limit
-            if ((pending.isMediaUpload || pending.isBackupRestore) && m_activeMediaUploads >= MAX_CONCURRENT_UPLOADS) {
+            if ((pending.isMediaUpload || pending.isBackupRestore || pending.isApkUpload) && m_activeMediaUploads >= MAX_CONCURRENT_UPLOADS) {
                 qWarning() << "ShotServer: Too many concurrent uploads";
                 sendResponse(socket, 503, "text/plain", "Server busy. Please wait and try again.");
                 cleanupPendingRequest(socket);
@@ -618,8 +622,8 @@ void ShotServer::onReadyRead()
                 return;
             }
 
-            // For large uploads (> 1MB), stream to temp file instead of memory
-            if (pending.contentLength > MAX_SMALL_BODY_SIZE) {
+            // For large uploads (> 1MB) and all APK uploads, stream to temp file instead of memory
+            if (pending.contentLength > MAX_SMALL_BODY_SIZE || pending.isApkUpload) {
                 QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
                 pending.tempFilePath = tempDir + "/upload_stream_" + QString::number(QDateTime::currentMSecsSinceEpoch()) + ".tmp";
                 pending.tempFile = new QFile(pending.tempFilePath);
@@ -631,7 +635,7 @@ void ShotServer::onReadyRead()
                     socket->close();
                     return;
                 }
-                if (pending.isMediaUpload || pending.isBackupRestore) {
+                if (pending.isMediaUpload || pending.isBackupRestore || pending.isApkUpload) {
                     m_activeMediaUploads++;
                 }
                 qDebug() << "ShotServer: Streaming large upload to" << pending.tempFilePath;
@@ -682,40 +686,70 @@ void ShotServer::onReadyRead()
 
         // Request complete
         if (pending.tempFile) {
+            // Use the QFile's write position instead of QFileInfo::size() — pos()
+            // is a pure in-memory read, avoiding a main-thread stat/fstat syscall
+            // (CLAUDE.md "Never run disk I/O on the main thread").
+            const qint64 tempFileSize = pending.tempFile->pos();
             pending.tempFile->close();
             qDebug() << "ShotServer: Upload complete, temp file:" << pending.tempFilePath
-                     << "size:" << QFileInfo(pending.tempFilePath).size() << "bytes";
+                     << "size:" << tempFileSize << "bytes";
         }
 
         // Handle the request
-        if ((pending.isMediaUpload || pending.isBackupRestore) && pending.tempFile) {
+        if ((pending.isMediaUpload || pending.isBackupRestore || pending.isApkUpload) && pending.tempFile) {
             // Large upload with streamed body - pass temp file path
             QString headers = QString::fromUtf8(pending.headerData);
             QString tempPath = pending.tempFilePath;
             bool wasBackupRestore = pending.isBackupRestore;
-            pending.tempFile = nullptr;  // Transfer ownership
+            bool wasApkUpload = pending.isApkUpload;
+            delete pending.tempFile;
+            pending.tempFile = nullptr;
             pending.tempFilePath.clear();
             m_activeMediaUploads--;
             m_pendingRequests.remove(socket);
             if (wasBackupRestore) {
                 handleBackupRestore(socket, tempPath, headers);
+            } else if (wasApkUpload) {
+                handleUploadFromFile(socket, tempPath, headers);
             } else {
                 handleMediaUpload(socket, tempPath, headers);
             }
-        } else {
-            // Small request or non-media - headerData contains full request (headers + \r\n\r\n + body)
+        } else if (pending.tempFilePath.isEmpty()) {
+            // Small request or non-media — headerData contains the full
+            // request (headers + \r\n\r\n + body), nothing on disk.
             QByteArray request = pending.headerData;
-            if (!pending.tempFilePath.isEmpty() && QFile::exists(pending.tempFilePath)) {
-                // Large non-media request with temp file - reconstruct
-                request = pending.headerData + "\r\n\r\n";
-                QFile f(pending.tempFilePath);
-                if (f.open(QIODevice::ReadOnly)) {
-                    request.append(f.readAll());
-                }
-            }
             cleanupPendingRequest(socket);
             m_pendingRequests.remove(socket);
             handleRequest(socket, request);
+        } else {
+            // Large non-media request that was streamed to a temp file.
+            // Reconstruct on a background thread to keep main-thread disk I/O
+            // off the event loop (CLAUDE.md: "Never run disk I/O on the main
+            // thread"). We take ownership of the temp file removal here so we
+            // clear pending.tempFilePath before cleanupPendingRequest to stop
+            // it from queueing its own remove.
+            QByteArray headerData = pending.headerData;
+            QString tempPath = pending.tempFilePath;
+            pending.tempFilePath.clear();
+            cleanupPendingRequest(socket);
+            m_pendingRequests.remove(socket);
+            QPointer<QTcpSocket> safeSocket = socket;
+            QPointer<ShotServer> safeThis = this;
+            QThread* t = QThread::create([safeThis, safeSocket, headerData, tempPath]() {
+                QByteArray request = headerData + "\r\n\r\n";
+                QFile f(tempPath);
+                if (f.open(QIODevice::ReadOnly)) {
+                    request.append(f.readAll());
+                    f.close();
+                }
+                QFile::remove(tempPath);
+                QMetaObject::invokeMethod(safeThis, [safeThis, safeSocket, request]() {
+                    if (safeThis && safeSocket)
+                        safeThis->handleRequest(safeSocket, request);
+                }, Qt::QueuedConnection);
+            });
+            connect(t, &QThread::finished, t, &QThread::deleteLater);
+            t->start();
         }
 
     } catch (const std::exception& e) {
@@ -812,13 +846,21 @@ void ShotServer::cleanupPendingRequest(QTcpSocket* socket)
         delete pending.tempFile;
         pending.tempFile = nullptr;
     }
-    if (!pending.tempFilePath.isEmpty() && QFile::exists(pending.tempFilePath)) {
-        QFile::remove(pending.tempFilePath);
-        qDebug() << "ShotServer: Cleaned up temp file:" << pending.tempFilePath;
+    if (!pending.tempFilePath.isEmpty()) {
+        QString tmpPath = pending.tempFilePath;
+        QThread* cleanup = QThread::create([tmpPath]() {
+            if (QFile::remove(tmpPath))
+                qDebug() << "ShotServer: Cleaned up temp file:" << tmpPath;
+        });
+        connect(cleanup, &QThread::finished, cleanup, &QThread::deleteLater);
+        cleanup->start();
     }
-    // Only decrement if this was a large upload that was actually counted
-    // (small uploads < MAX_SMALL_BODY_SIZE don't increment m_activeMediaUploads)
-    if ((pending.isMediaUpload || pending.isBackupRestore) && !pending.tempFilePath.isEmpty() && m_activeMediaUploads > 0) {
+    // Only decrement if this upload was actually counted. An upload is counted
+    // (m_activeMediaUploads++) when it streams to a temp file. APK uploads always
+    // stream regardless of size; media/backup uploads only stream when
+    // contentLength > MAX_SMALL_BODY_SIZE. Guarding on !tempFilePath.isEmpty()
+    // distinguishes the streaming path from small in-memory uploads.
+    if ((pending.isMediaUpload || pending.isBackupRestore || pending.isApkUpload) && !pending.tempFilePath.isEmpty() && m_activeMediaUploads > 0) {
         m_activeMediaUploads--;
     }
 }
@@ -2134,7 +2176,9 @@ btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy'},2000);
         if (method == "GET") {
             sendHtml(socket, generateUploadPage());
         } else if (method == "POST") {
-            handleUpload(socket, request);
+            // POST /upload is always streamed before handleRequest is called
+            // (isApkUpload forces temp-file streaming for all /upload POSTs).
+            sendResponse(socket, 400, "text/plain", "Upload must use streaming path");
         }
     }
     else if (path == "/upload/media") {
@@ -2153,18 +2197,41 @@ btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy'},2000);
             qDebug() << "ShotServer: Small media upload - request size:" << request.size()
                      << "headerEnd:" << headerEndPos << "body size:" << body.size();
 
-            // Save to temp file
+            // Save to temp file on a background thread (CLAUDE.md prohibits
+            // main-thread disk I/O). Dispatch handleMediaUpload back to the
+            // main thread once the write completes.
             QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
             QString tempPath = tempDir + "/upload_small_" + QString::number(QDateTime::currentMSecsSinceEpoch()) + ".tmp";
-            QFile tempFile(tempPath);
-            if (!tempFile.open(QIODevice::WriteOnly)) {
-                sendResponse(socket, 500, "text/plain", "Failed to create temp file");
-                return;
-            }
-            tempFile.write(body);
-            tempFile.close();
-
-            handleMediaUpload(socket, tempPath, headers);
+            QPointer<QTcpSocket> safeSocket = socket;
+            QPointer<ShotServer> safeThis = this;
+            QThread* t = QThread::create([safeThis, safeSocket, tempPath, body, headers]() {
+                QFile tempFile(tempPath);
+                if (!tempFile.open(QIODevice::WriteOnly) || tempFile.write(body) != body.size()) {
+                    tempFile.close();
+                    QFile::remove(tempPath);
+                    QMetaObject::invokeMethod(safeThis, [safeThis, safeSocket]() {
+                        if (safeThis && safeSocket)
+                            safeThis->sendResponse(safeSocket, 500, "text/plain", "Failed to create temp file");
+                    }, Qt::QueuedConnection);
+                    return;
+                }
+                tempFile.close();
+                QMetaObject::invokeMethod(safeThis, [safeThis, safeSocket, tempPath, headers]() {
+                    if (safeThis && safeSocket) {
+                        safeThis->handleMediaUpload(safeSocket, tempPath, headers);
+                    } else {
+                        // Client disconnected or ShotServer torn down before the
+                        // handler could run. This callback runs on the main thread,
+                        // so dispatch the cleanup to a background thread to keep
+                        // main-thread disk I/O off the event loop (CLAUDE.md).
+                        QThread* cleanup = QThread::create([tempPath]() { QFile::remove(tempPath); });
+                        connect(cleanup, &QThread::finished, cleanup, &QThread::deleteLater);
+                        cleanup->start();
+                    }
+                }, Qt::QueuedConnection);
+            });
+            connect(t, &QThread::finished, t, &QThread::deleteLater);
+            t->start();
         }
     }
     else if (path == "/api/media/personal" && method == "GET") {
@@ -2294,15 +2361,39 @@ btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy'},2000);
 
         QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
         QString tempPath = tempDir + "/restore_small_" + QString::number(QDateTime::currentMSecsSinceEpoch()) + ".tmp";
-        QFile tempFile(tempPath);
-        if (!tempFile.open(QIODevice::WriteOnly)) {
-            sendResponse(socket, 500, "text/plain", "Failed to create temp file");
-            return;
-        }
-        tempFile.write(body);
-        tempFile.close();
-
-        handleBackupRestore(socket, tempPath, headers);
+        // Write the body on a background thread to keep main-thread disk I/O
+        // off the event loop (CLAUDE.md). Dispatch handleBackupRestore back
+        // to the main thread once the write completes.
+        QPointer<QTcpSocket> safeSocket = socket;
+        QPointer<ShotServer> safeThis = this;
+        QThread* t = QThread::create([safeThis, safeSocket, tempPath, body, headers]() {
+            QFile tempFile(tempPath);
+            if (!tempFile.open(QIODevice::WriteOnly) || tempFile.write(body) != body.size()) {
+                tempFile.close();
+                QFile::remove(tempPath);
+                QMetaObject::invokeMethod(safeThis, [safeThis, safeSocket]() {
+                    if (safeThis && safeSocket)
+                        safeThis->sendResponse(safeSocket, 500, "text/plain", "Failed to create temp file");
+                }, Qt::QueuedConnection);
+                return;
+            }
+            tempFile.close();
+            QMetaObject::invokeMethod(safeThis, [safeThis, safeSocket, tempPath, headers]() {
+                if (safeThis && safeSocket) {
+                    safeThis->handleBackupRestore(safeSocket, tempPath, headers);
+                } else {
+                    // Client disconnected or ShotServer torn down before the
+                    // handler could run. This callback runs on the main thread,
+                    // so dispatch the cleanup to a background thread to keep
+                    // main-thread disk I/O off the event loop (CLAUDE.md).
+                    QThread* cleanup = QThread::create([tempPath]() { QFile::remove(tempPath); });
+                    connect(cleanup, &QThread::finished, cleanup, &QThread::deleteLater);
+                    cleanup->start();
+                }
+            }, Qt::QueuedConnection);
+        });
+        connect(t, &QThread::finished, t, &QThread::deleteLater);
+        t->start();
     }
     // Theme editor
     else if (path == "/theme") {

@@ -15,13 +15,80 @@
 #ifdef Q_OS_ANDROID
 #include <QJniObject>
 #include <QJniEnvironment>
-#include <QCoreApplication>
+#include <QPointer>
+#include <jni.h>
 #include <unistd.h>  // fsync
 #include <cerrno>    // errno, strerror
 #endif
 
+#include <QAtomicInt>
+#include <QThread>
+
 const QString UpdateChecker::GITHUB_API_URL = "https://api.github.com/repos/%1/releases?per_page=10";
 const QString UpdateChecker::GITHUB_REPO = "Kulitorum/Decenza";
+
+// File-scope so background QFile::remove threads can read it without capturing
+// `this`. Bumped by startDownload() after a successful QFile::open() — any
+// pending cleanup lambda for the now-superseded file sees an advanced generation
+// and skips the delete. Every background QFile::remove in this file follows the
+// pattern: capture the current generation on the main thread before spawning
+// the thread, then compare against the current value inside the lambda.
+static QAtomicInt s_downloadGeneration{0};
+
+#ifdef Q_OS_ANDROID
+namespace {
+// Weak pointer to the active UpdateChecker so the JNI callback can route
+// async install status back to it. Only one UpdateChecker exists at a time.
+QPointer<UpdateChecker> s_activeChecker;
+
+// JNI bridge invoked from ApkInstaller's worker thread / BroadcastReceiver.
+// Must hop to the Qt main thread because it touches QObject state + emits
+// signals that drive QML property updates.
+void installerNativeOnInstallStatus(JNIEnv* env, jclass, jint status, jstring messageJ)
+{
+    QString message;
+    if (messageJ) {
+        const char* chars = env->GetStringUTFChars(messageJ, nullptr);
+        if (chars) {
+            message = QString::fromUtf8(chars);
+            env->ReleaseStringUTFChars(messageJ, chars);
+        }
+    }
+    const int s = static_cast<int>(status);
+    QMetaObject::invokeMethod(qApp, [s, message]() {
+        if (auto* checker = s_activeChecker.data()) {
+            checker->onInstallStatus(s, message);
+        }
+    }, Qt::QueuedConnection);
+}
+
+bool s_nativeRegistrationFailed = false;
+
+void registerInstallerNativeMethods()
+{
+    static bool registered = false;
+    if (registered) return;
+    QJniEnvironment env;
+    const JNINativeMethod methods[] = {
+        {"nativeOnInstallStatus",
+         "(ILjava/lang/String;)V",
+         reinterpret_cast<void*>(installerNativeOnInstallStatus)},
+    };
+    if (!env.registerNativeMethods(
+            "io/github/kulitorum/decenza_de1/ApkInstaller", methods, 1)) {
+        qWarning() << "UpdateChecker: failed to register native methods on ApkInstaller";
+        s_nativeRegistrationFailed = true;
+        registered = true;
+        return;
+    }
+    registered = true;
+    // Mark native as registered so ShotServer can query isNativeRegistered() via JNI.
+    QJniObject::callStaticMethod<void>(
+        "io/github/kulitorum/decenza_de1/ApkInstaller", "onNativeRegistered", "()V");
+}
+}  // namespace
+#endif
+
 UpdateChecker::UpdateChecker(QNetworkAccessManager* networkManager, Settings* settings, QObject* parent)
     : QObject(parent)
     , m_settings(settings)
@@ -29,6 +96,10 @@ UpdateChecker::UpdateChecker(QNetworkAccessManager* networkManager, Settings* se
     , m_periodicTimer(new QTimer(this))
 {
     Q_ASSERT(networkManager);
+#ifdef Q_OS_ANDROID
+    registerInstallerNativeMethods();
+    s_activeChecker = this;
+#endif
     // Check every hour
     m_periodicTimer->setInterval(60 * 60 * 1000);  // 1 hour
     connect(m_periodicTimer, &QTimer::timeout, this, &UpdateChecker::onPeriodicCheck);
@@ -40,25 +111,6 @@ UpdateChecker::UpdateChecker(QNetworkAccessManager* networkManager, Settings* se
         // Check shortly after startup (30 seconds delay)
         QTimer::singleShot(30000, this, &UpdateChecker::onPeriodicCheck);
     }
-#endif
-
-#ifdef Q_OS_ANDROID
-    // Clear install-intent flag when app returns to foreground (event-based guard).
-    // Require that the app actually left Active state first — on some Android versions
-    // the install dialog shows as an overlay without backgrounding, causing
-    // applicationStateChanged(Active) to fire immediately (~180ms). Without this
-    // check, the guard clears before the user interacts with the dialog, allowing
-    // a second install intent to be launched from the cached-APK fast-path.
-    connect(qApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) {
-        if (state != Qt::ApplicationActive && m_installIntentPending) {
-            m_installIntentLeftActive = true;
-        }
-        if (state == Qt::ApplicationActive && m_installIntentPending && m_installIntentLeftActive) {
-            m_installIntentPending = false;
-            m_installIntentLeftActive = false;
-            qDebug() << "UpdateChecker: app resumed from background, install intent guard cleared";
-        }
-    });
 #endif
 
     connect(m_settings, &Settings::betaUpdatesEnabledChanged, this, [this]() {
@@ -188,7 +240,7 @@ void UpdateChecker::parseReleaseInfo(const QByteArray& data)
     if (m_releaseTag != tagName) {
         m_updatePromptShown = false;
         // Invalidate cached APK from previous version. Don't delete the file —
-        // PackageInstaller may still be reading it via FileProvider. The cache
+        // a PackageInstaller session may still be streaming from it. The cache
         // directory is cleaned up by the OS.
         if (!m_downloadedApkPath.isEmpty()) {
             m_downloadedApkPath.clear();
@@ -219,6 +271,7 @@ void UpdateChecker::parseReleaseInfo(const QByteArray& data)
 
     // Find platform-appropriate asset
     QJsonArray assets = release["assets"].toArray();
+    const QString previousDownloadUrl = m_downloadUrl;
     m_downloadUrl.clear();
     for (const QJsonValue& assetVal : assets) {
         QJsonObject asset = assetVal.toObject();
@@ -261,6 +314,13 @@ void UpdateChecker::parseReleaseInfo(const QByteArray& data)
 
     if (m_updateAvailable != wasAvailable) {
         emit updateAvailableChanged();
+    }
+    // canDownloadUpdate is derived from m_downloadUrl on desktop; fire when it
+    // changes so QML re-evaluates the download-button visibility binding. On
+    // Android/iOS the return value is platform-constant (always true / always
+    // false), so the signal fires but QML bindings see no effective change.
+    if (m_downloadUrl != previousDownloadUrl) {
+        emit canDownloadUpdateChanged();
     }
 
     // When no update is available and the user is running a different version
@@ -319,6 +379,24 @@ bool UpdateChecker::isNewerVersion(const QString& latest, const QString& current
 void UpdateChecker::downloadAndInstall()
 {
     if (m_downloading || m_checking) return;
+    if (m_installInFlight) {
+        m_errorMessage = "Install already in progress. If no confirmation dialog is visible, "
+                         "restart the app and try again.";
+        emit errorMessageChanged();
+        return;
+    }
+#ifdef Q_OS_ANDROID
+    // ShotServer can initiate installs that we don't track in m_installInFlight;
+    // check the Java-level flag so we don't waste a ~146 MB download only to be
+    // rejected by ApkInstaller.install() at the end.
+    if (QJniObject::callStaticMethod<jboolean>(
+            "io/github/kulitorum/decenza_de1/ApkInstaller", "isInFlight", "()Z") == JNI_TRUE) {
+        m_errorMessage = "Install already in progress. If no confirmation dialog is visible, "
+                         "restart the app and try again.";
+        emit errorMessageChanged();
+        return;
+    }
+#endif
     if (m_downloadUrl.isEmpty()) {
         m_errorMessage = "No download available for this platform";
         qWarning() << "UpdateChecker:" << m_errorMessage;
@@ -326,36 +404,25 @@ void UpdateChecker::downloadAndInstall()
         return;
     }
 
-    // If we already downloaded this version's APK and it's the right size, skip
-    // straight to install. This handles the case where Android's "Install Unknown
-    // Apps" permission flow consumed the first install intent.
-    if (!m_downloadedApkPath.isEmpty() && QFileInfo::exists(m_downloadedApkPath)
-        && m_expectedDownloadSize > 0
-        && QFileInfo(m_downloadedApkPath).size() == m_expectedDownloadSize) {
+    // If a prior run of this version's APK download finished, skip straight to
+    // install. m_expectedDownloadSize > 0 is a sentinel indicating a completed
+    // download (not a size comparison — we no longer stat the file from the
+    // main thread). Handles the case where a prior attempt didn't reach the
+    // install step (e.g., Android's "Install Unknown Apps" permission redirect).
+    if (!m_downloadedApkPath.isEmpty() && m_expectedDownloadSize > 0) {
         qDebug() << "UpdateChecker: APK already downloaded, installing directly:" << m_downloadedApkPath;
         m_errorMessage.clear();
         emit errorMessageChanged();
-        emit installationStarted();
-        installApk(m_downloadedApkPath);
-        return;
+        if (installApk(m_downloadedApkPath))
+            return;
+        // installApk() failed — Java detected a missing/invalid APK (typically
+        // cache eviction) and returned false without a status callback. Clear
+        // the stale error set by installApk() and fall through to re-download.
+        qWarning() << "UpdateChecker: cached APK install failed, forcing re-download";
+        m_errorMessage.clear();
+        emit errorMessageChanged();
     }
-#ifdef Q_OS_ANDROID
-    // Event-based dedup guard: prevent rapid taps from spawning multiple download+install flows.
-    // Flag is set when install intent launches, cleared when app returns to foreground.
-    // Placed after the cached-APK fast-path so permission-flow retaps still work.
-    // If the install dialog was dismissed without the app ever leaving Active (overlay scenario),
-    // m_installIntentPending stays set. This explicit user tap clears the stale guard so
-    // the user can retry. The cached-APK fast-path above already handled direct reinstall.
-    if (m_installIntentPending && !m_installIntentLeftActive) {
-        // App never left Active — overlay was dismissed, user is explicitly retrying.
-        qDebug() << "UpdateChecker: clearing stale install guard (overlay dismissed without backgrounding)";
-        m_installIntentPending = false;
-    }
-    if (m_installIntentPending) {
-        qDebug() << "UpdateChecker: install intent still pending; ignoring duplicate request";
-        return;
-    }
-#endif
+
     m_downloadedApkPath.clear();
     m_expectedDownloadSize = 0;
     emit downloadReadyChanged();
@@ -391,13 +458,8 @@ void UpdateChecker::startDownload()
     QString filename = QString("Decenza_%1.apk").arg(m_latestVersion);
     QString fullPath = savePath + "/" + filename;
 
-    // Remove existing file (may still be held by PackageInstaller)
-    if (QFile::exists(fullPath) && !QFile::remove(fullPath)) {
-        qWarning() << "UpdateChecker: Could not remove existing file:" << fullPath;
-    }
-
     m_downloadFile = new QFile(fullPath);
-    if (!m_downloadFile->open(QIODevice::WriteOnly)) {
+    if (!m_downloadFile->open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         m_errorMessage = "Failed to create download file: " + m_downloadFile->errorString();
         m_downloading = false;
         emit downloadingChanged();
@@ -406,6 +468,10 @@ void UpdateChecker::startDownload()
         m_downloadFile = nullptr;
         return;
     }
+    // Bump after successful open so any pending background remove for the old
+    // file skips deletion. Bumping before open() would "phantom bump" on open
+    // failure, causing in-flight dismiss cleanups from a prior download to skip.
+    s_downloadGeneration.fetchAndAddOrdered(1);
 
     qDebug() << "UpdateChecker: Downloading" << m_downloadUrl << "to" << fullPath;
 
@@ -457,8 +523,15 @@ void UpdateChecker::onDownloadFinished()
             qWarning() << "UpdateChecker: Final write failed:" << m_downloadFile->errorString();
             m_errorMessage = "Download failed: could not write file (" + m_downloadFile->errorString() + ")";
             emit errorMessageChanged();
+            const QString fileToRemove = m_downloadFile->fileName();
+            const int capturedGen = s_downloadGeneration.loadAcquire();
             m_downloadFile->close();
-            QFile::remove(m_downloadFile->fileName());
+            QThread* t = QThread::create([fileToRemove, capturedGen]() {
+                if (s_downloadGeneration.loadAcquire() == capturedGen)
+                    QFile::remove(fileToRemove);
+            });
+            connect(t, &QThread::finished, t, &QThread::deleteLater);
+            t->start();
             delete m_downloadFile;
             m_downloadFile = nullptr;
             m_currentReply->deleteLater();
@@ -471,9 +544,10 @@ void UpdateChecker::onDownloadFinished()
 
     QString filePath = m_downloadFile->fileName();
 
-    // Flush Qt's userspace buffer, then call fsync to commit the kernel
-    // page-cache to persistent storage before launching the install intent.
-    // Without this, PackageInstaller can open a truncated APK.
+    // Best-effort flush: push Qt's userspace buffer to the kernel, then fsync
+    // to nudge the kernel toward persistent storage before the PackageInstaller
+    // session opens the file for reading. Failures are non-fatal — if the file
+    // really is incomplete, PackageInstaller's verification will reject it.
     bool flushOk = m_downloadFile->flush();
     if (!flushOk) {
         qWarning() << "UpdateChecker: flush() failed:" << m_downloadFile->errorString();
@@ -491,6 +565,10 @@ void UpdateChecker::onDownloadFinished()
         syncOk = false;
     }
 #endif
+    // Capture the write position before close so we can validate download size
+    // without calling QFileInfo(path).size() (a stat() syscall on the main
+    // thread — CLAUDE.md prohibits disk I/O on the main thread).
+    const qint64 actualSize = m_downloadFile->pos();
     m_downloadFile->close();
 
     if (m_currentReply->error() != QNetworkReply::NoError) {
@@ -500,7 +578,15 @@ void UpdateChecker::onDownloadFinished()
             m_errorMessage = "Download failed: " + m_currentReply->errorString();
         }
         emit errorMessageChanged();
-        QFile::remove(filePath);
+        {
+            const int capturedGen = s_downloadGeneration.loadAcquire();
+            QThread* t = QThread::create([filePath, capturedGen]() {
+                if (s_downloadGeneration.loadAcquire() == capturedGen)
+                    QFile::remove(filePath);
+            });
+            connect(t, &QThread::finished, t, &QThread::deleteLater);
+            t->start();
+        }
         delete m_downloadFile;
         m_downloadFile = nullptr;
         m_currentReply->deleteLater();
@@ -510,15 +596,23 @@ void UpdateChecker::onDownloadFinished()
         return;
     }
 
-    // Verify download is complete (not truncated by dropped connection)
+    // Verify download is complete (not truncated by dropped connection).
+    // actualSize was captured from m_downloadFile->pos() before close() above.
     qint64 expectedSize = m_currentReply->header(QNetworkRequest::ContentLengthHeader).toLongLong();
-    qint64 actualSize = QFileInfo(filePath).size();
     if (expectedSize > 0 && actualSize < expectedSize) {
         m_errorMessage = QString("Download incomplete: got %1 of %2 bytes")
                              .arg(actualSize).arg(expectedSize);
         qWarning() << "UpdateChecker:" << m_errorMessage;
         emit errorMessageChanged();
-        QFile::remove(filePath);
+        {
+            const int capturedGen = s_downloadGeneration.loadAcquire();
+            QThread* t = QThread::create([filePath, capturedGen]() {
+                if (s_downloadGeneration.loadAcquire() == capturedGen)
+                    QFile::remove(filePath);
+            });
+            connect(t, &QThread::finished, t, &QThread::deleteLater);
+            t->start();
+        }
         delete m_downloadFile;
         m_downloadFile = nullptr;
         m_currentReply->deleteLater();
@@ -536,7 +630,15 @@ void UpdateChecker::onDownloadFinished()
                              .arg(actualSize);
         qWarning() << "UpdateChecker:" << m_errorMessage;
         emit errorMessageChanged();
-        QFile::remove(filePath);
+        {
+            const int capturedGen = s_downloadGeneration.loadAcquire();
+            QThread* t = QThread::create([filePath, capturedGen]() {
+                if (s_downloadGeneration.loadAcquire() == capturedGen)
+                    QFile::remove(filePath);
+            });
+            connect(t, &QThread::finished, t, &QThread::deleteLater);
+            t->start();
+        }
         delete m_downloadFile;
         m_downloadFile = nullptr;
         m_currentReply->deleteLater();
@@ -566,17 +668,11 @@ void UpdateChecker::onDownloadFinished()
     m_downloading = false;
     emit downloadingChanged();
 
-    // If flush or fsync failed, the file may not be fully committed to storage.
-    // Cache it so the user can retry via the Install button (data may settle
-    // after a brief delay), but don't auto-launch the intent now.
     if (!flushOk || !syncOk) {
-        m_errorMessage = "Download completed but file sync failed. Please tap Install to retry.";
-        emit errorMessageChanged();
-        return;
+        qWarning() << "UpdateChecker: flush/fsync reported failure; proceeding with install anyway";
     }
 
     // Install the APK
-    emit installationStarted();
     installApk(filePath);
 }
 
@@ -589,16 +685,68 @@ void UpdateChecker::dismissUpdate()
     m_updateAvailable = false;
     emit updateAvailableChanged();
 
-    // Delete the cached APK on dismiss. Unlike version-change invalidation
-    // (which leaves the file for PackageInstaller), dismiss is an explicit
-    // user action so the file is no longer needed.
-    if (!m_downloadedApkPath.isEmpty()) {
-        if (!QFile::remove(m_downloadedApkPath)) {
-            qWarning() << "UpdateChecker: Failed to remove cached APK:" << m_downloadedApkPath;
+    // Cancel any in-flight download so it does not proceed to install. Without
+    // this, the QNetworkReply continues, onDownloadFinished() fires, and the
+    // system install dialog appears despite the user explicitly dismissing.
+    // Disconnect finished() first so the slot does not run during abort().
+    if (m_downloading && m_currentReply) {
+        QString partialPath;
+        if (m_downloadFile) partialPath = m_downloadFile->fileName();
+        disconnect(m_currentReply, &QNetworkReply::finished, this, &UpdateChecker::onDownloadFinished);
+        m_currentReply->abort();
+        m_currentReply->deleteLater();
+        m_currentReply = nullptr;
+        if (m_downloadFile) {
+            m_downloadFile->close();
+            delete m_downloadFile;
+            m_downloadFile = nullptr;
         }
+        m_downloading = false;
+        emit downloadingChanged();
+        if (!partialPath.isEmpty()) {
+            // Generation guard: if a new startDownload() (programmatic or via a
+            // subsequent user action) reuses the same filename before this thread
+            // runs, we must not delete the new download's freshly-opened file.
+            const int capturedGen = s_downloadGeneration.loadAcquire();
+            QThread* t = QThread::create([partialPath, capturedGen]() {
+                if (s_downloadGeneration.loadAcquire() == capturedGen)
+                    QFile::remove(partialPath);
+            });
+            connect(t, &QThread::finished, t, &QThread::deleteLater);
+            t->start();
+        }
+    }
+
+    // Dismiss is an explicit user action: clean up the cached APK unconditionally.
+    // Because we also clear m_installInFlight below (to hide the spinner on OEM
+    // ROMs that skip STATUS_FAILURE_ABORTED), any later terminal status callback
+    // will be dropped by the early-return guard in onInstallStatus(). This is
+    // therefore our only chance to clean up, so we can't defer to that path.
+    //
+    // Safety: on Android, unlinking an APK that a Java worker has open via
+    // FileInputStream is safe — POSIX semantics keep the fd (and the file data)
+    // valid until the last descriptor closes, so an in-flight session-write
+    // completes even though the path has been removed from the cache directory.
+    if (!m_downloadedApkPath.isEmpty()) {
+        QString path = m_downloadedApkPath;
+        const int capturedGen = s_downloadGeneration.loadAcquire();
+        QThread* t = QThread::create([path, capturedGen]() {
+            if (s_downloadGeneration.loadAcquire() == capturedGen && !QFile::remove(path))
+                qWarning() << "UpdateChecker: Failed to remove cached APK:" << path;
+        });
+        connect(t, &QThread::finished, t, &QThread::deleteLater);
+        t->start();
         m_downloadedApkPath.clear();
         m_expectedDownloadSize = 0;
         emit downloadReadyChanged();
+    }
+
+    // Always clear the installing flag on explicit dismiss. Some OEM ROMs skip
+    // STATUS_FAILURE_ABORTED when the user back-dismisses the confirmation dialog,
+    // leaving m_installInFlight stuck and the spinner permanently visible.
+    if (m_installInFlight) {
+        m_installInFlight = false;
+        emit installingChanged();
     }
 }
 
@@ -643,10 +791,16 @@ void UpdateChecker::onPeriodicCheck()
     });
 }
 
-void UpdateChecker::installApk(const QString& apkPath)
+bool UpdateChecker::installApk(const QString& apkPath)
 {
 #ifdef Q_OS_ANDROID
-    qDebug() << "UpdateChecker: Installing APK:" << apkPath;
+    if (s_nativeRegistrationFailed) {
+        m_errorMessage = "Install bridge failed to initialize. Please restart the app and try again.";
+        emit errorMessageChanged();
+        return false;
+    }
+
+    qDebug() << "UpdateChecker: Installing APK via PackageInstaller session:" << apkPath;
 
     QJniObject activity = QJniObject::callStaticObjectMethod(
         "org/qtproject/qt/android/QtNative",
@@ -654,98 +808,189 @@ void UpdateChecker::installApk(const QString& apkPath)
         "()Landroid/app/Activity;");
 
     if (!activity.isValid()) {
-        qWarning() << "Failed to get Android activity";
+        qWarning() << "UpdateChecker: Failed to get Android activity";
         m_errorMessage = "Failed to get Android activity";
         emit errorMessageChanged();
-        return;
+        return false;
     }
 
-    QJniObject context = activity.callObjectMethod(
-        "getApplicationContext",
-        "()Landroid/content/Context;");
-
-    if (!context.isValid()) {
-        qWarning() << "UpdateChecker: Failed to get application context";
-        m_errorMessage = "Failed to prepare APK for installation (no app context)";
-        emit errorMessageChanged();
-        return;
-    }
-
-    // Create file URI using FileProvider for Android 7+
     QJniObject javaPath = QJniObject::fromString(apkPath);
-    QJniObject file = QJniObject("java/io/File", "(Ljava/lang/String;)V",
-                                  javaPath.object<jstring>());
+    jboolean ok = QJniObject::callStaticMethod<jboolean>(
+        "io/github/kulitorum/decenza_de1/ApkInstaller",
+        "install",
+        "(Landroid/app/Activity;Ljava/lang/String;)Z",
+        activity.object(),
+        javaPath.object<jstring>());
 
-    // Get package name for FileProvider authority
-    QJniObject packageName = context.callObjectMethod(
-        "getPackageName",
-        "()Ljava/lang/String;");
-    QString authority = packageName.toString() + ".fileprovider";
-
-    QJniObject uri = QJniObject::callStaticObjectMethod(
-        "androidx/core/content/FileProvider",
-        "getUriForFile",
-        "(Landroid/content/Context;Ljava/lang/String;Ljava/io/File;)Landroid/net/Uri;",
-        context.object(),
-        QJniObject::fromString(authority).object<jstring>(),
-        file.object());
-
-    // Clear any JNI exception from getUriForFile (e.g. IllegalArgumentException
-    // from FileProvider misconfiguration) before checking validity
     {
         QJniEnvironment env;
         if (env.checkAndClearExceptions()) {
-            qWarning() << "UpdateChecker: FileProvider.getUriForFile threw a JNI exception";
+            qWarning() << "UpdateChecker: ApkInstaller.install threw a JNI exception";
+            ok = JNI_FALSE;
         }
     }
 
-    if (!uri.isValid()) {
-        qWarning() << "Failed to create content URI for APK";
-        m_errorMessage = "Failed to prepare APK for installation";
-        emit errorMessageChanged();
-        return;
-    }
-
-    // Create install intent
-    QJniObject intent("android/content/Intent");
-    QJniObject actionView = QJniObject::fromString("android.intent.action.VIEW");
-    intent.callObjectMethod("setAction",
-                            "(Ljava/lang/String;)Landroid/content/Intent;",
-                            actionView.object<jstring>());
-
-    QJniObject mimeType = QJniObject::fromString("application/vnd.android.package-archive");
-    intent.callObjectMethod("setDataAndType",
-                            "(Landroid/net/Uri;Ljava/lang/String;)Landroid/content/Intent;",
-                            uri.object(),
-                            mimeType.object<jstring>());
-
-    // Add flags
-    intent.callObjectMethod("addFlags", "(I)Landroid/content/Intent;", 0x00000001); // FLAG_GRANT_READ_URI_PERMISSION
-    intent.callObjectMethod("addFlags", "(I)Landroid/content/Intent;", 0x10000000); // FLAG_ACTIVITY_NEW_TASK
-
-    // Start activity — can throw ActivityNotFoundException (no handler),
-    // SecurityException (missing REQUEST_INSTALL_PACKAGES), etc.
-    activity.callMethod<void>("startActivity", "(Landroid/content/Intent;)V", intent.object());
-
-    {
-        QJniEnvironment env;
-        if (env.checkAndClearExceptions()) {
-            qWarning() << "UpdateChecker: startActivity threw a JNI exception";
-            m_errorMessage = "Could not launch install dialog. Please enable "
+    if (!ok) {
+        // Distinguish: in-flight (stuck OEM flag or ShotServer session) vs. genuine failure.
+        jboolean inFlight = QJniObject::callStaticMethod<jboolean>(
+            "io/github/kulitorum/decenza_de1/ApkInstaller", "isInFlight", "()Z");
+        if (inFlight == JNI_TRUE) {
+            m_errorMessage = "Install already in progress. If no confirmation dialog is visible, "
+                             "restart the app and try again.";
+        } else {
+            m_errorMessage = "Could not start install. If this is a first install, enable "
                              "'Install Unknown Apps' for Decenza in Android Settings, then try again.";
-            emit errorMessageChanged();
-            return;
         }
+        emit errorMessageChanged();
+        return false;
     }
 
-    qDebug() << "UpdateChecker: APK install intent launched";
-    m_installIntentPending = true;
+    m_installInFlight = true;
+    emit installingChanged();
+    qDebug() << "UpdateChecker: PackageInstaller install dispatched (session write runs on worker thread)";
+    return true;
 #else
     qDebug() << "UpdateChecker: APK installation only supported on Android. File saved to:" << apkPath;
     m_errorMessage = "APK installation only supported on Android";
     emit errorMessageChanged();
+    return false;
 #endif
 }
+
+#ifdef Q_OS_ANDROID
+void UpdateChecker::onInstallStatus(int status, const QString& message)
+{
+    // Mirror the Java sentinels in ApkInstaller.java — kept outside the
+    // range of codes that can actually arrive here: STATUS_SUCCESS=0,
+    // STATUS_FAILURE=1..STATUS_FAILURE_INCOMPATIBLE=7, STATUS_FAILURE_TIMEOUT=8 [API 34+].
+    // STATUS_PENDING_USER_ACTION=-1 is handled entirely in Java (startActivity)
+    // and is never forwarded here.
+    constexpr int INTERNAL_STATUS_CREATE_FAILED    = -100;
+    constexpr int INTERNAL_STATUS_WRITE_FAILED     = -101;
+    constexpr int INTERNAL_STATUS_NO_CONFIRM_INTENT = -102;
+
+    if (!m_installInFlight) {
+        // Status from a ShotServer-triggered install or a stale session — not ours.
+        qWarning() << "UpdateChecker: ignoring install status=" << status << "msg=" << message << "(no active install — originated from ShotServer or stale session)";
+        return;
+    }
+
+    qDebug() << "UpdateChecker: install status=" << status << "message=" << message;
+
+    // PackageInstaller codes: STATUS_SUCCESS=0, STATUS_FAILURE=1,
+    // STATUS_FAILURE_BLOCKED=2, STATUS_FAILURE_ABORTED=3, STATUS_FAILURE_INVALID=4,
+    // STATUS_FAILURE_CONFLICT=5, STATUS_FAILURE_STORAGE=6,
+    // STATUS_FAILURE_INCOMPATIBLE=7, STATUS_FAILURE_TIMEOUT=8.
+    QString userMessage;
+    switch (status) {
+        case 0:  // STATUS_SUCCESS — app is typically being killed for the upgrade.
+            m_installInFlight = false;
+            emit installingChanged();
+            if (!m_downloadedApkPath.isEmpty()) {
+                QString path = m_downloadedApkPath;
+                m_downloadedApkPath.clear();
+                m_expectedDownloadSize = 0;
+                emit downloadReadyChanged();
+                const int capturedGen = s_downloadGeneration.loadAcquire();
+                QThread* t = QThread::create([path, capturedGen]() {
+                    if (s_downloadGeneration.loadAcquire() == capturedGen)
+                        QFile::remove(path);
+                });
+                connect(t, &QThread::finished, t, &QThread::deleteLater);
+                t->start();
+            }
+            return;
+        case 3:  // STATUS_FAILURE_ABORTED — user cancelled the confirmation.
+            m_installInFlight = false;
+            emit installingChanged();
+            // Clear any stale error from a prior failed attempt so it doesn't
+            // linger when the user merely cancelled the current attempt.
+            if (!m_errorMessage.isEmpty()) {
+                m_errorMessage.clear();
+                emit errorMessageChanged();
+            }
+            // Safety net. After dismissUpdate() this block is unreachable:
+            // dismissUpdate clears m_installInFlight (so we early-returned at
+            // the top) and also clears m_downloadedApkPath (so the condition
+            // below is false). The block is still reachable today via
+            // parseReleaseInfo (called from onReleaseInfoReceived or onPeriodicCheck) setting m_updateAvailable
+            // back to false when a later check finds no update, while the
+            // previous version's m_downloadedApkPath is still set.
+            if (!m_updateAvailable && !m_downloadedApkPath.isEmpty()) {
+                QString path = m_downloadedApkPath;
+                const int capturedGen = s_downloadGeneration.loadAcquire();
+                QThread* t = QThread::create([path, capturedGen]() {
+                    if (s_downloadGeneration.loadAcquire() == capturedGen)
+                        QFile::remove(path);
+                });
+                connect(t, &QThread::finished, t, &QThread::deleteLater);
+                t->start();
+                m_downloadedApkPath.clear();
+                m_expectedDownloadSize = 0;
+                emit downloadReadyChanged();
+            }
+            return;
+        case 2:  // STATUS_FAILURE_BLOCKED
+            userMessage = "Install blocked by device policy.";
+            break;
+        case 4:  // STATUS_FAILURE_INVALID
+            userMessage = "The downloaded APK is invalid. Please try again.";
+            break;
+        case 5:  // STATUS_FAILURE_CONFLICT
+            userMessage = "Install conflicts with an existing app. Please uninstall and retry.";
+            break;
+        case 6:  // STATUS_FAILURE_STORAGE
+            userMessage = "Not enough storage to install the update.";
+            break;
+        case 7:  // STATUS_FAILURE_INCOMPATIBLE
+            userMessage = "Update is incompatible with this device.";
+            break;
+        case 8:  // STATUS_FAILURE_TIMEOUT
+            userMessage = "Install timed out. Please try again.";
+            break;
+        case INTERNAL_STATUS_CREATE_FAILED:
+            userMessage = "Could not start install session. Check that 'Install Unknown Apps' "
+                          "is enabled for Decenza in Android Settings, then try again.";
+            break;
+        case INTERNAL_STATUS_WRITE_FAILED:
+            userMessage = "Failed to write the update package. Please try again.";
+            break;
+        case INTERNAL_STATUS_NO_CONFIRM_INTENT:
+            userMessage = "Install dialog could not be launched. Please try again.";
+            break;
+        default:  // STATUS_FAILURE (1) and anything unexpected.
+            userMessage = "Install failed.";
+            if (!message.isEmpty()) {
+                userMessage += " (" + message + ")";
+            }
+            break;
+    }
+
+    m_installInFlight = false;
+    emit installingChanged();
+    // Safety net. After dismissUpdate() this block is unreachable (dismiss
+    // clears both m_installInFlight and m_downloadedApkPath). It can still
+    // be reached today via parseReleaseInfo (called from onReleaseInfoReceived
+    // or onPeriodicCheck) setting m_updateAvailable back to false when a later
+    // check finds no update, while the previous version's m_downloadedApkPath
+    // is still set.
+    if (!m_updateAvailable && !m_downloadedApkPath.isEmpty()) {
+        QString path = m_downloadedApkPath;
+        const int capturedGen = s_downloadGeneration.loadAcquire();
+        QThread* t = QThread::create([path, capturedGen]() {
+            if (s_downloadGeneration.loadAcquire() == capturedGen)
+                QFile::remove(path);
+        });
+        connect(t, &QThread::finished, t, &QThread::deleteLater);
+        t->start();
+        m_downloadedApkPath.clear();
+        m_expectedDownloadSize = 0;
+        emit downloadReadyChanged();
+    }
+    m_errorMessage = userMessage;
+    emit errorMessageChanged();
+}
+#endif
 
 bool UpdateChecker::canDownloadUpdate() const
 {

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Effects
 import Decenza
 import "../../components"
 
@@ -261,7 +262,7 @@ Item {
                         // Status row
                         RowLayout {
                             spacing: Theme.scaled(8)
-                            visible: !MainController.updateChecker.checking && !MainController.updateChecker.downloading
+                            visible: !MainController.updateChecker.checking && !MainController.updateChecker.downloading && !MainController.updateChecker.installing
 
                             Rectangle {
                                 width: Theme.scaled(10)
@@ -307,6 +308,29 @@ Item {
                             Tr {
                                 key: "settings.update.checking"
                                 fallback: "Checking for updates..."
+                                color: Theme.textColor
+                                font.pixelSize: Theme.scaled(13)
+                            }
+                        }
+
+                        // Installing (PackageInstaller session write in progress)
+                        RowLayout {
+                            spacing: Theme.scaled(8)
+                            visible: MainController.updateChecker.installing
+                            Accessible.role: Accessible.StaticText
+                            Accessible.name: trInstalling.text
+                            Accessible.focusable: true
+
+                            BusyIndicator {
+                                running: true
+                                Layout.preferredWidth: Theme.scaled(20)
+                                Layout.preferredHeight: Theme.scaled(20)
+                            }
+
+                            Tr {
+                                id: trInstalling
+                                key: "settings.update.installing"
+                                fallback: "Installing update..."
                                 color: Theme.textColor
                                 font.pixelSize: Theme.scaled(13)
                             }
@@ -367,7 +391,7 @@ Item {
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Theme.scaled(10)
-                    visible: MainController.updateChecker.canCheckForUpdates && !MainController.updateChecker.checking && !MainController.updateChecker.downloading
+                    visible: MainController.updateChecker.canCheckForUpdates && !MainController.updateChecker.checking && !MainController.updateChecker.downloading && !MainController.updateChecker.installing
 
                     AccessibleButton {
                         text: TranslationManager.translate("settings.update.checknow", "Check Now")
@@ -581,13 +605,19 @@ Item {
                     Accessible.focusable: true
                     Accessible.onPressAction: scrollDownArea.clicked(null)
 
-                    Text {
+                    Image {
                         anchors.centerIn: parent
-                        text: "↓"
-                        color: Theme.primaryContrastColor
-                        font.pixelSize: Theme.scaled(16)
-                        font.bold: true
+                        source: "qrc:/icons/ArrowLeft.svg"
+                        sourceSize.width: Theme.scaled(16)
+                        sourceSize.height: Theme.scaled(16)
+                        rotation: 90
                         Accessible.ignored: true
+                        layer.enabled: true
+                        layer.smooth: true
+                        layer.effect: MultiEffect {
+                            colorization: 1.0
+                            colorizationColor: Theme.primaryContrastColor
+                        }
                     }
 
                     MouseArea {

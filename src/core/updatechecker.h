@@ -22,12 +22,13 @@ class UpdateChecker : public QObject {
     Q_PROPERTY(int latestVersionCode READ latestVersionCode NOTIFY latestVersionCodeChanged)
     Q_PROPERTY(QString releaseNotes READ releaseNotes NOTIFY releaseNotesChanged)
     Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY errorMessageChanged)
-    Q_PROPERTY(bool canDownloadUpdate READ canDownloadUpdate CONSTANT)
+    Q_PROPERTY(bool canDownloadUpdate READ canDownloadUpdate NOTIFY canDownloadUpdateChanged)
     Q_PROPERTY(bool canCheckForUpdates READ canCheckForUpdates CONSTANT)
     Q_PROPERTY(bool downloadReady READ isDownloadReady NOTIFY downloadReadyChanged)
     Q_PROPERTY(QString platformName READ platformName CONSTANT)
     Q_PROPERTY(QString releasePageUrl READ releasePageUrl NOTIFY latestVersionChanged)
     Q_PROPERTY(bool latestIsBeta READ latestIsBeta NOTIFY latestIsBetaChanged)
+    Q_PROPERTY(bool installing READ isInstalling NOTIFY installingChanged)
 
 public:
     explicit UpdateChecker(QNetworkAccessManager* networkManager, Settings* settings, QObject* parent = nullptr);
@@ -45,10 +46,11 @@ public:
     QString errorMessage() const { return m_errorMessage; }
     bool canDownloadUpdate() const;
     bool canCheckForUpdates() const;
-    bool isDownloadReady() const { return !m_downloadedApkPath.isEmpty() && QFileInfo::exists(m_downloadedApkPath); }
+    bool isDownloadReady() const { return !m_downloadedApkPath.isEmpty(); }
     QString platformName() const;
     QString releasePageUrl() const;
     bool latestIsBeta() const { return m_latestIsBeta; }
+    bool isInstalling() const { return m_installInFlight; }
 
     Q_INVOKABLE void checkForUpdates();
     Q_INVOKABLE void openReleasePage();
@@ -65,9 +67,18 @@ signals:
     void releaseNotesChanged();
     void errorMessageChanged();
     void updatePromptRequested();  // Emitted when auto-check finds update
-    void installationStarted();
+    void installingChanged();
     void latestIsBetaChanged();
     void downloadReadyChanged();
+    void canDownloadUpdateChanged();
+
+public slots:
+#ifdef Q_OS_ANDROID
+    // Called (on the Qt main thread) from the static JNI bridge in
+    // updatechecker.cpp when the Java PackageInstaller session reports a
+    // terminal status or an internal create/write failure.
+    void onInstallStatus(int status, const QString& message);
+#endif
 
 private slots:
     void onReleaseInfoReceived();
@@ -78,7 +89,7 @@ private slots:
 private:
     void parseReleaseInfo(const QByteArray& data);
     void startDownload();
-    void installApk(const QString& apkPath);
+    bool installApk(const QString& apkPath);
     int extractBuildNumber(const QString& version) const;
     bool isNewerVersion(const QString& latest, const QString& current) const;
 
@@ -102,8 +113,9 @@ private:
     bool m_latestIsBeta = false;
     QString m_downloadedApkPath;
     qint64 m_expectedDownloadSize = 0;
-    bool m_installIntentPending = false;
-    bool m_installIntentLeftActive = false;  // True once app leaves Active state after install intent
+    bool m_installInFlight = false;  // True between installApk() dispatch and terminal PackageInstaller status
+    // Generation counter lives at file scope in updatechecker.cpp so background
+    // QFile::remove threads don't capture `this` (see s_downloadGeneration).
 
     static const QString GITHUB_API_URL;
     static const QString GITHUB_REPO;
