@@ -306,14 +306,6 @@ public class ApkInstaller {
             Log.i(TAG, "install: status=" + status + " msg=" + msg);
             sInstallInFlight.set(false);
             reportStatus(status, msg);
-
-            // Note: post-install relaunch is handled by UpdateLaunchReceiver
-            // (manifest-registered, listens for ACTION_MY_PACKAGE_REPLACED).
-            // A dynamic BroadcastReceiver like this one is unreliable for
-            // self-updates: Android kills the old process when the package
-            // is replaced, usually before STATUS_SUCCESS is delivered, and
-            // Android 10+ background-activity-launch restrictions would
-            // block a startActivity() call from here anyway.
         }
     };
 }
