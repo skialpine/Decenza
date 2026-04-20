@@ -26,10 +26,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <!-- APK installation permission for remote updates -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- Android 13+ (API 33+): required to show the "Decenza updated — tap to
-         open" notification posted by UpdateLaunchReceiver after self-update.
-         Denied-by-default at runtime; DecenzaActivity.onCreate() asks once. -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
@@ -112,21 +108,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-
-        <!-- Auto-relaunch after a self-update. ACTION_MY_PACKAGE_REPLACED is
-             delivered only to this app, fires in the NEW process after the
-             update is installed, and has an explicit background-activity-
-             launch exemption on Android 10+. This is the canonical Android
-             hook for restoring the "Open" UX that the legacy Intent(ACTION_VIEW)
-             install flow used to provide via the system package-installer
-             activity's "Open" button. -->
-        <receiver
-            android:name="io.github.kulitorum.decenza_de1.UpdateLaunchReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-            </intent-filter>
-        </receiver>
     </application>
 
     <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="34" />
