@@ -222,6 +222,7 @@ set(SOURCES
     src/core/profilestorage.cpp
     src/core/translationmanager.cpp
     src/core/updatechecker.cpp
+    src/core/firmwareassetcache.cpp
     src/ble/protocol/binarycodec.cpp
     src/ble/blecapability.cpp
     src/ble/blemanager.cpp
@@ -265,6 +266,7 @@ set(SOURCES
     src/controllers/profilemanager.cpp
     src/controllers/directcontroller.cpp
     src/controllers/shottimingcontroller.cpp
+    src/controllers/firmwareupdater.cpp
     src/screensaver/screensavervideomanager.cpp
     src/screensaver/strangeattractorrenderer.cpp
     src/rendering/fastlinerenderer.cpp
@@ -628,6 +630,7 @@ set(QML_FILES
     qml/pages/settings/SettingsHistoryDataTab.qml
     qml/pages/settings/SettingsHomeAutomationTab.qml
     qml/pages/settings/SettingsUpdateTab.qml
+    qml/pages/settings/SettingsFirmwareTab.qml
     qml/pages/settings/SettingsDebugTab.qml
     qml/pages/settings/SettingsSearchDialog.qml
     qml/pages/settings/DeviceMigrationDialog.qml

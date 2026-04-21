@@ -64,6 +64,25 @@ add_decenza_test(tst_binarycodec
     ${CODEC_SOURCES}
 )
 
+# --- tst_firmwarepackets: FWMapRequest + firmware chunk byte layout tests
+# (header-only target; no cpp dependency beyond the test itself) ---
+add_decenza_test(tst_firmwarepackets
+    tst_firmwarepackets.cpp
+)
+
+# --- tst_firmwareheader: bootfwupdate.dat header parser + validator tests
+# (header-only target; uses QFile / QTemporaryDir for on-disk cases) ---
+add_decenza_test(tst_firmwareheader
+    tst_firmwareheader.cpp
+)
+
+# --- tst_firmwareassetcachehelpers: pure helpers (MetaJson JSON round-trip,
+# Range-header computation). Network-driven FirmwareAssetCache class is
+# covered by the integration test in tst_firmwareflow. ---
+add_decenza_test(tst_firmwareassetcachehelpers
+    tst_firmwareassetcachehelpers.cpp
+)
+
 # --- tst_profile: Profile JSON/TCL parsing, frame generation, BLE encoding ---
 add_decenza_test(tst_profile
     tst_profile.cpp
@@ -168,6 +187,32 @@ add_decenza_test(tst_mmrwrite
     tst_mmrwrite.cpp
     mocks/MockTransport.h
     ${CMAKE_SOURCE_DIR}/src/ble/de1transport.h
+    ${BLE_SOURCES}
+    ${PROFILE_SOURCES}
+    ${CORE_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${SIMULATOR_SOURCES}
+)
+
+# --- tst_de1device_firmware: firmware-update BLE extensions on DE1Device ---
+add_decenza_test(tst_de1device_firmware
+    tst_de1device_firmware.cpp
+    mocks/MockTransport.h
+    ${CMAKE_SOURCE_DIR}/src/ble/de1transport.h
+    ${BLE_SOURCES}
+    ${PROFILE_SOURCES}
+    ${CORE_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${SIMULATOR_SOURCES}
+)
+
+# --- tst_firmwareupdater: FirmwareUpdater state-machine tests ---
+add_decenza_test(tst_firmwareupdater
+    tst_firmwareupdater.cpp
+    mocks/MockTransport.h
+    ${CMAKE_SOURCE_DIR}/src/ble/de1transport.h
+    ${CMAKE_SOURCE_DIR}/src/controllers/firmwareupdater.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/firmwareassetcache.cpp
     ${BLE_SOURCES}
     ${PROFILE_SOURCES}
     ${CORE_SOURCES}

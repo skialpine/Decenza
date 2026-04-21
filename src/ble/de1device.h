@@ -1,5 +1,8 @@
 #pragma once
 
+#include <array>
+#include <cstdint>
+
 #include <QObject>
 #include <QBluetoothDeviceInfo>
 #include <QBluetoothUuid>
@@ -144,6 +147,18 @@ public:
     bool simulationMode() const { return m_simulationMode; }
     void setSimulationMode(bool enabled);
 
+    // Firmware-flash guard. Set to true by FirmwareUpdater for the duration
+    // of the erase/upload/verify sequence so writeMMR() / writeMMRUrgent() /
+    // writeMMRVerified() can drop incoming MMR writes — otherwise a stray
+    // MMR packet on the WRITE_TO_MMR characteristic (length byte 4) would
+    // interleave with in-flight firmware chunks (length byte 16) on A006
+    // and force a failed verify + full retry. Analogous to de1app's
+    // `currently_erasing_firmware` gate in `mmr_write`; we gate all three
+    // phases (erase/upload/verify) rather than erase-only since chunk
+    // writes and MMR writes share the same characteristic during upload.
+    bool firmwareFlashInProgress() const { return m_firmwareFlashInProgress; }
+    void setFirmwareFlashInProgress(bool inProgress);
+
     // For simulator integration - allows external code to set state and emit signals
     void setSimulatedState(DE1::State state, DE1::SubState subState);
     void emitSimulatedShotSample(const ShotSample& sample);
@@ -255,6 +270,36 @@ public slots:
     void setRefillKitPresent(int value);
     void requestRefillKitStatus();
 
+    // ---- Firmware update (BLE A009 / A006) --------------------------------
+    // These three writers talk directly to the transport and deliberately
+    // bypass the per-register MMR dedupe cache (m_lastMMRValues): firmware
+    // uploads stream ~28,000 unique 16-byte chunks, populating the cache
+    // with those would grow the hash uselessly and risk colliding with
+    // real MMR register addresses. See tasks.md §3 and the firmware-update
+    // design doc for the wire formats.
+
+    // Write the 7-byte FWMapRequest to A009 (firmware-update control).
+    // `fwToErase=1, fwToMap=1` starts Phase 1 (erase). A second call with
+    // `fwToErase=0, fwToMap=1, firstError={0xFF,0xFF,0xFF}` starts Phase 3
+    // (verify-and-activate). See `DE1::Firmware::buildFWMapRequest`.
+    void writeFWMapRequest(uint8_t fwToErase, uint8_t fwToMap,
+                           std::array<uint8_t, 3> firstError = {0, 0, 0});
+
+    // Stream one 16-byte firmware chunk to A006 (WRITE_TO_MMR) with opcode
+    // 0x10 and a 24-bit little-endian address. Caller is responsible for
+    // pacing (de1app uses ~1 ms between chunks). A zero-size or
+    // non-16-byte payload is silently dropped so a caller bug can't ship
+    // a malformed packet to the DE1.
+    void writeFirmwareChunk(uint32_t address, const QByteArray& payload16);
+
+    // Subscribe to FW_MAP_REQUEST notifications. Done on demand at the
+    // start of a firmware update rather than always-on, because A009 is
+    // silent during normal operation and leaving a handler active adds
+    // nothing. There is no unsubscribe on the transport; BLE disconnect
+    // and/or the DE1 auto-reboot at the end of verify implicitly
+    // terminate the subscription.
+    void subscribeFirmwareNotifications();
+
 signals:
     void connectedChanged();
     void connectingChanged();
@@ -277,6 +322,14 @@ signals:
     void isHeadlessChanged();
     void refillKitDetectedChanged();
     void heaterVoltageChanged();
+
+    // Firmware-update response from the DE1 (A009 notification). Carries
+    // the parsed fwToErase/fwToMap flags and the 3-byte FirstError. During
+    // Phase 1 the DE1 emits two notifications: first with fwToErase=1
+    // (erase in progress), then fwToErase=0 (erase complete). Phase 3 emits
+    // one notification whose firstError == {0xFF,0xFF,0xFD} on success.
+    void fwMapResponse(uint8_t fwToErase, uint8_t fwToMap,
+                       QByteArray firstError);
     // Emitted after the DE1 reports its stored ShotSettings (either from our
     // initial read on connect or from an indication after a write). Values
     // are the DE1's current targets; 0 means the heater/setting is off.
@@ -291,6 +344,15 @@ protected:
 private:
     // Build the 20-byte MMR payload without sending it (shared by writeMMR/writeMMRUrgent)
     static QByteArray buildMMRPayload(uint32_t address, uint32_t value);
+
+    // Firmware-flash guard shared by writeMMR / writeMMRUrgent /
+    // writeMMRVerified. Returns true (and logs a qWarning) when the caller
+    // should bail because a flash is in progress; false means "proceed".
+    // `label` distinguishes the variant in the log line ("write", "write urgent",
+    // "write verified").
+    bool dropIfFirmwareFlashInProgress(uint32_t address, uint32_t value,
+                                       const QString& reason,
+                                       const char* label) const;
 
     // Transport signal handlers
     void onTransportConnected();
@@ -390,6 +452,7 @@ private:
 
     bool m_connecting = false;
     bool m_simulationMode = false;
+    bool m_firmwareFlashInProgress = false;
 #ifdef QT_DEBUG
     DE1Simulator* m_simulator = nullptr;  // For simulation mode
 #endif
@@ -424,5 +487,6 @@ private:
     friend class tst_MachineState;
     friend class tst_ProfileManager;
     friend class tst_MMRWrite;
+    friend class tst_DE1DeviceFirmware;
 #endif
 };

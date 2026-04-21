@@ -291,6 +291,94 @@ MainController::MainController(QNetworkAccessManager* networkManager,
     // Initialize update checker
     m_updateChecker = new UpdateChecker(m_networkManager, m_settings, this);
 
+    // Initialize DE1 firmware update pipeline. FirmwareAssetCache shares
+    // the MainController's QNetworkAccessManager (so proxy/TLS settings
+    // apply uniformly). FirmwareUpdater is wired to DE1Device for BLE
+    // writes, to MachineState for the precondition gate, and exposes a
+    // QProperty for QML.
+    m_firmwareAssetCache = new DE1::Firmware::FirmwareAssetCache(this);
+    m_firmwareAssetCache->setNetworkManager(m_networkManager);
+    if (m_settings) {
+        m_firmwareAssetCache->setChannel(m_settings->firmwareNightlyChannel()
+            ? DE1::Firmware::FirmwareAssetCache::Channel::Nightly
+            : DE1::Firmware::FirmwareAssetCache::Channel::Stable);
+        connect(m_settings, &Settings::firmwareNightlyChannelChanged,
+                this, [this]() {
+            if (!m_firmwareAssetCache) return;
+            m_firmwareAssetCache->setChannel(m_settings->firmwareNightlyChannel()
+                ? DE1::Firmware::FirmwareAssetCache::Channel::Nightly
+                : DE1::Firmware::FirmwareAssetCache::Channel::Stable);
+            // Re-check immediately so the UI reflects the new channel's
+            // available version without waiting for the weekly poll.
+            // dismissLingeringFailure() wipes any stale Failed state from a
+            // prior check (e.g. a transient network error in the weekly
+            // auto-check) so the "Update failed" error strip doesn't briefly
+            // re-render beneath the channel toggle while the new check
+            // resolves.
+            if (m_firmwareUpdater) {
+                m_firmwareUpdater->dismissLingeringFailure();
+                m_firmwareUpdater->checkForUpdate();
+            }
+        });
+    }
+    m_firmwareUpdater    = new FirmwareUpdater(m_device, m_firmwareAssetCache, this);
+    qDebug() << "[firmware] MainController wired FirmwareUpdater"
+             << "device=" << (m_device ? "ok" : "null")
+             << "device.firmwareBuildNumber=" << (m_device ? m_device->firmwareBuildNumber() : -1);
+
+    m_firmwareUpdater->setInstalledVersionProvider([this]() -> uint32_t {
+        if (!m_device) return 0;
+        // Simulator: pretend to be on an ancient firmware so both the
+        // stable and nightly channels always register as "update available",
+        // letting a developer exercise the Firmware page end-to-end without
+        // a real DE1 to flash. The simulator never ships a firmware
+        // build-number, so this is the only signal the page has anyway.
+        if (m_device->simulationMode()) {
+            return 1u;
+        }
+        const int bn = m_device->firmwareBuildNumber();
+        return bn > 0 ? static_cast<uint32_t>(bn) : 0;
+    });
+    m_firmwareUpdater->setPreconditionProvider([this]() -> bool {
+        if (!m_machineState) return true;
+        using P = MachineState::Phase;
+        switch (m_machineState->phase()) {
+            case P::Sleep:
+            case P::Idle:
+            case P::Heating:
+            case P::Ready:
+                return true;
+            default:
+                return false;
+        }
+    });
+    // Auto-check cadence: startup (30 s after construction) + weekly
+    // thereafter. firmware/lastCheckedAt in QSettings persists the last
+    // check so a user who relaunches the app daily doesn't re-check on
+    // every launch.
+    const qint64 nowSec = QDateTime::currentSecsSinceEpoch();
+    const qint64 lastCheckedAt = m_settings
+        ? m_settings->value("firmware/lastCheckedAt", 0).toLongLong() : 0;
+    const qint64 weekSec = 168LL * 3600LL;
+    const qint64 sinceLast = nowSec - lastCheckedAt;
+    const int startupDelayMs = (lastCheckedAt > 0 && sinceLast < weekSec)
+        ? int(qMin<qint64>((weekSec - sinceLast) * 1000, INT_MAX))
+        : 30 * 1000;
+    QTimer::singleShot(startupDelayMs, this, [this]() {
+        if (m_firmwareUpdater) m_firmwareUpdater->checkForUpdate();
+        if (m_settings) m_settings->setValue(
+            "firmware/lastCheckedAt", QDateTime::currentSecsSinceEpoch());
+    });
+    m_firmwareCheckTimer = new QTimer(this);
+    m_firmwareCheckTimer->setSingleShot(false);
+    m_firmwareCheckTimer->setInterval(int(weekSec * 1000LL));
+    connect(m_firmwareCheckTimer, &QTimer::timeout, this, [this]() {
+        if (m_firmwareUpdater) m_firmwareUpdater->checkForUpdate();
+        if (m_settings) m_settings->setValue(
+            "firmware/lastCheckedAt", QDateTime::currentSecsSinceEpoch());
+    });
+    m_firmwareCheckTimer->start();
+
     // Create data migration client for importing from other devices
     m_dataMigration = new DataMigrationClient(m_networkManager, this);
     m_dataMigration->setSettings(m_settings);
