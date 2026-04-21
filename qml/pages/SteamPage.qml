@@ -94,6 +94,11 @@ Page {
             wasSteaming = true
             steamSoftStopped = false
             _lastAnnouncedSteamWeight = 0
+            // Drop any banner left over from a prior session so it doesn't
+            // carry into the new one. SteamHealthTracker re-arms its per-session
+            // latch at the first sample of the new session, so if the new
+            // session also trips a threshold, the banner will re-show.
+            warningVisible = false
             // Preset reset runs in the else branch (at session end), not here.
             // Resetting at session start meant Settings was stale during the
             // window between state=Steam (when main.qml's onStateChanged fires
@@ -182,14 +187,14 @@ Page {
         }
     }
 
-    // Warning banner (auto-dismiss after 5 seconds — allowed per CLAUDE.md for UI auto-dismiss)
+    // Live safety warning banner. Persists until the user taps it. The two
+    // signals that drive it (pressureTooHigh / temperatureTooHigh) are each
+    // latched to fire at most once per session in SteamHealthTracker, so an
+    // auto-dismiss would risk the user missing the only alert they get.
+    // (The three other SteamHealthTracker signals handled below are
+    // post-session modal dialogs, not this banner.)
     property string warningText: ""
     property bool warningVisible: false
-    Timer {
-        id: warningDismissTimer
-        interval: 5000
-        onTriggered: warningVisible = false
-    }
 
     // Warning connections
     Connections {
@@ -199,13 +204,11 @@ Page {
             warningText = TranslationManager.translate("steam.warning.pressureHigh",
                 "Warning: steam pressure is too high")
             warningVisible = true
-            warningDismissTimer.restart()
         }
         function onTemperatureTooHigh() {
             warningText = TranslationManager.translate("steam.warning.temperatureHigh",
                 "Warning: steam temperature is too high")
             warningVisible = true
-            warningDismissTimer.restart()
         }
         function onDescaleWarning() {
             steamWarningDialog.warningMessage = TranslationManager.translate("steam.warning.descale",
@@ -461,19 +464,25 @@ Page {
                 }
             }
 
-            // Warning banner (live warnings during steaming)
+            // Warning banner (live warnings during steaming). Tap to dismiss.
             Rectangle {
+                id: warningBanner
                 Layout.fillWidth: true
                 Layout.preferredHeight: warningBannerText.implicitHeight + Theme.spacingSmall * 2
                 visible: warningVisible
                 radius: Theme.cardRadius
                 color: Theme.errorColor
 
+                // Composed banner text — a single translatable template so
+                // translators control word order relative to the warning.
+                readonly property string composedText: TranslationManager.translate(
+                    "steam.warning.withTapHint", "%1  (tap to dismiss)").arg(warningText)
+
                 Text {
                     id: warningBannerText
                     anchors.centerIn: parent
                     width: parent.width - Theme.spacingMedium * 2
-                    text: warningText
+                    text: warningBanner.composedText
                     color: Theme.primaryContrastColor
                     font: Theme.bodyFont
                     horizontalAlignment: Text.AlignHCenter
@@ -481,9 +490,12 @@ Page {
                     Accessible.ignored: true
                 }
 
-                Accessible.role: Accessible.StaticText
-                Accessible.name: warningText
-                Accessible.focusable: true
+                AccessibleMouseArea {
+                    anchors.fill: parent
+                    accessibleItem: warningBanner
+                    accessibleName: warningBanner.composedText
+                    onAccessibleClicked: warningVisible = false
+                }
             }
 
             // === TIMER VIEW (default) ===
