@@ -47,25 +47,34 @@
     }
 }
 
+- (void)dealloc {
+    [_manager release];
+    [super dealloc];
+}
+
 @end
 
+// This TU is compiled in MRC (non-ARC) mode, so __bridge_* casts would be
+// no-ops and emit warnings. We use plain casts and explicit [release] to
+// balance the +1 retain from alloc.
+
 AppleBtState::AppleBtState(QObject* parent) : QObject(parent) {
-    m_observer = (__bridge_retained void*)[[DecenzaBtStateObserver alloc] initWithOwner:this];
+    m_observer = (void*)[[DecenzaBtStateObserver alloc] initWithOwner:this];
 }
 
 AppleBtState::~AppleBtState() {
     if (m_observer) {
-        DecenzaBtStateObserver* obs = (__bridge_transfer DecenzaBtStateObserver*)m_observer;
+        DecenzaBtStateObserver* obs = (DecenzaBtStateObserver*)m_observer;
         obs.owner = nullptr;
         obs.manager.delegate = nil;
-        obs = nil;
+        [obs release];
         m_observer = nullptr;
     }
 }
 
 bool AppleBtState::isUnavailable() const {
     if (!m_observer) return false;
-    DecenzaBtStateObserver* obs = (__bridge DecenzaBtStateObserver*)m_observer;
+    DecenzaBtStateObserver* obs = (DecenzaBtStateObserver*)m_observer;
     return [obs isUnavailable];
 }
 
