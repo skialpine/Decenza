@@ -204,6 +204,7 @@ void UpdateChecker::parseReleaseInfo(const QByteArray& data)
     QJsonDocument doc = QJsonDocument::fromJson(data);
     if (!doc.isArray()) {
         m_errorMessage = "Invalid response from GitHub";
+        qWarning() << "UpdateChecker:" << m_errorMessage << "- response:" << data.left(200);
         emit errorMessageChanged();
         return;
     }
@@ -291,6 +292,13 @@ void UpdateChecker::parseReleaseInfo(const QByteArray& data)
         // iOS doesn't download from GitHub - updates come from App Store
     }
 
+#if defined(Q_OS_ANDROID) || defined(Q_OS_MACOS)
+    if (m_downloadUrl.isEmpty()) {
+        qWarning() << "UpdateChecker: release" << m_releaseTag
+                   << "found but no platform asset available";
+    }
+#endif
+
     // Check if update is available using display version comparison,
     // falling back to build number if versions are equal
     bool newer = isNewerVersion(m_latestVersion, currentVersion());
@@ -314,6 +322,20 @@ void UpdateChecker::parseReleaseInfo(const QByteArray& data)
 
     if (m_updateAvailable != wasAvailable) {
         emit updateAvailableChanged();
+    }
+
+    // Clear any cached APK whenever no update is available and no operation is
+    // in flight, so a stale path can't be installed accidentally. Runs
+    // unconditionally (not only on transition) to cover the case where the path
+    // was set before a re-check that finds the running version already current.
+    // The file is left on disk for OS cleanup — a PackageInstaller session may
+    // still hold it open. (dismissUpdate() also clears the path but additionally
+    // removes the file; onInstallStatus() mirrors that behaviour. All three sites
+    // clear m_downloadedApkPath and emit downloadReadyChanged — keep in sync.)
+    if (!m_updateAvailable && !m_downloading && !m_installInFlight && !m_downloadedApkPath.isEmpty()) {
+        m_downloadedApkPath.clear();
+        m_expectedDownloadSize = 0;
+        emit downloadReadyChanged();
     }
     // canDownloadUpdate is derived from m_downloadUrl on desktop; fire when it
     // changes so QML re-evaluates the download-button visibility binding. On
@@ -378,6 +400,14 @@ bool UpdateChecker::isNewerVersion(const QString& latest, const QString& current
 
 void UpdateChecker::downloadAndInstall()
 {
+    if (!m_updateAvailable) {
+        qWarning() << "UpdateChecker: downloadAndInstall called but no update available (current:"
+                   << currentVersion() << "latest:" << m_latestVersion
+                   << "downloadUrl:" << (m_downloadUrl.isEmpty() ? "<empty>" : m_downloadUrl) << ")";
+        m_errorMessage = "No update available";
+        emit errorMessageChanged();
+        return;
+    }
     if (m_downloading || m_checking) return;
     if (m_installInFlight) {
         m_errorMessage = "Install already in progress. If no confirmation dialog is visible, "
@@ -509,7 +539,7 @@ void UpdateChecker::onDownloadFinished()
     if (!m_currentReply || !m_downloadFile) {
         qWarning() << "UpdateChecker: onDownloadFinished called with null reply or file"
                     << "reply=" << m_currentReply << "file=" << m_downloadFile;
-        m_errorMessage = "Download failed unexpectedly";
+        m_errorMessage = "Download failed unexpectedly. Please try again.";
         emit errorMessageChanged();
         m_downloading = false;
         emit downloadingChanged();
