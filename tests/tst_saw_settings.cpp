@@ -77,6 +77,8 @@ private slots:
         // 4 tight entries at lag=0.4s and 1 wild outlier at lag=2.5s. Median lag = 0.4s,
         // deviation of the outlier = 2.1s > 1.5s threshold → batch rejected and dropped.
         // All lags remain ≤ 4s so they pass the entry-level lag-too-high guard.
+        QTest::ignoreMessage(QtWarningMsg,
+            QRegularExpression(R"(\[SAW\] batch rejected — outlier lag=\S+ deviates \S+ > \S+ from median)"));
         m_settings.addSawLearningPoint(0.6, 1.5, kScale, 0.0, kProfileA);   // lag 0.40
         m_settings.addSawLearningPoint(0.6, 1.5, kScale, 0.0, kProfileA);   // lag 0.40
         m_settings.addSawLearningPoint(0.6, 1.5, kScale, 0.0, kProfileA);   // lag 0.40
