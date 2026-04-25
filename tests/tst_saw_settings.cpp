@@ -114,7 +114,9 @@ private slots:
         commitBatch(kProfileB, 0.9, 1.5);
         QCOMPARE(m_settings.sawModelSource(kProfileC, kScale), QString("globalBootstrap"));
 
-        // 3. C graduates → uses its own data.
+        // 3. C graduates (needs ≥ 3 committed medians) → uses its own data.
+        commitBatch(kProfileC, 1.2, 1.5);
+        commitBatch(kProfileC, 1.2, 1.5);
         commitBatch(kProfileC, 1.2, 1.5);
         QCOMPARE(m_settings.sawModelSource(kProfileC, kScale), QString("perProfile"));
     }
