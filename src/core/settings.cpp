@@ -4757,15 +4757,22 @@ void Settings::addSawPerPairEntry(double drip, double flowRate, const QString& s
     const double lagIqr = iqrOf(lags);
 
     // 3. Outlier check on the batch as a whole.
-    bool dispersionTooHigh = (lagIqr > kBatchMaxIqr);
-    if (!dispersionTooHigh) {
+    QString rejectReason;
+    if (lagIqr > kBatchMaxIqr) {
+        rejectReason = QString("iqr=%1 > %2s").arg(lagIqr).arg(kBatchMaxIqr);
+    } else {
         for (double l : std::as_const(lags)) {
-            if (qAbs(l - medianLag) > kBatchMaxDeviation) { dispersionTooHigh = true; break; }
+            double dev = qAbs(l - medianLag);
+            if (dev > kBatchMaxDeviation) {
+                rejectReason = QString("outlier lag=%1 deviates %2s > %3s from median")
+                                   .arg(l).arg(dev).arg(kBatchMaxDeviation);
+                break;
+            }
         }
     }
-    if (dispersionTooHigh) {
-        qWarning() << "[SAW] batch rejected — high dispersion median_lag=" << medianLag
-                   << "iqr=" << lagIqr << "for" << key << "— dropping batch";
+    if (!rejectReason.isEmpty()) {
+        qWarning() << "[SAW] batch rejected —" << rejectReason
+                   << "median_lag=" << medianLag << "for" << key << "— dropping batch";
         batchMap.remove(key);
         savePerProfileSawBatchMap(batchMap);
         return;
