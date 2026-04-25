@@ -147,10 +147,8 @@ Detailed documentation lives in `docs/CLAUDE_MD/`. Read these when working in th
 | `AUTO_FLOW_CALIBRATION.md` | Auto flow calibration algorithm, batched median updates, windowing, convergence |
 | `SAW_LEARNING.md` | Per-(profile, scale) stop-at-weight learning — analysis, batched median commits, IQR dispersion rejection, global bootstrap |
 | `FIRMWARE_UPDATE.md` | DE1 firmware update flow, source URL, validation rules, failure modes, simulator behaviour |
-
-Also in `docs/`:
-- `MCP_SERVER.md` — full MCP tool list, access levels, architecture
-- `AI_ADVISOR.md` — AI dialing assistant design
+| `MCP_SERVER.md` | Full MCP tool list, access levels, architecture, data conventions |
+| `AI_ADVISOR.md` | AI dialing assistant design |
 
 ## Development Environment
 
@@ -524,7 +522,7 @@ MCP tool responses are consumed by LLMs which cannot reliably interpret raw numb
 - **Include scale in field names for bounded values.** `enjoyment0to100` instead of `enjoyment`.
 - **Use human-readable strings for enums.** Machine phases, editor types, and states as strings (`"idle"`, `"pouring"`), not numeric codes.
 
-See `docs/MCP_SERVER.md` for the full data conventions section.
+See `docs/CLAUDE_MD/MCP_SERVER.md` for the full data conventions section.
 
 ## Emoji System
 
