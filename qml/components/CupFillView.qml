@@ -80,7 +80,14 @@ Item {
         var botOvalH = h * 0.04
         var cupH = botCy - rimCy
 
-        var fillRatio = root.targetWeight > 0
+        // Only show fill during/after extraction. Pre-flow phases like
+        // EspressoPreheating render empty regardless of currentWeight — the
+        // stale-residual case is solved at the source in MachineState
+        // (see m_hotWaterFrozenWeight clearing on cycle entry).
+        var hasExtraction = root.phase === MachineStateType.Phase.Preinfusion
+                         || root.phase === MachineStateType.Phase.Pouring
+                         || root.phase === MachineStateType.Phase.Ending
+        var fillRatio = (root.targetWeight > 0 && hasExtraction)
             ? Math.min(root.currentWeight / root.targetWeight, 1.0) : 0
         var interiorH = cupH * 0.8  // 100% fill reaches 80% of cup height
         var fillH = fillRatio * interiorH

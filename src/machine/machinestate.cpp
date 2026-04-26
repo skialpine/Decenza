@@ -2,6 +2,7 @@
 #include "../ble/de1device.h"
 #include "../ble/scaledevice.h"
 #include "../core/settings.h"
+#include "../core/settings_brew.h"
 #include "../controllers/shottimingcontroller.h"
 #include <QDateTime>
 #include <QDebug>
@@ -439,6 +440,16 @@ void MachineState::updatePhase() {
                         double settledWeight = m_scale->weight();
                         double overshoot = settledWeight - triggerWeight;
 
+                        // Clear the frozen display weight now that the post-pour
+                        // settling window is over. The freeze is held this long so the
+                        // hot-water completion overlay has a stable trigger value to
+                        // show; once the overlay's settling window closes, scaleWeight()
+                        // should return the live reading. Without this, the freeze
+                        // persists into the next operation cycle (e.g. EspressoPreheating)
+                        // and poisons UI surfaces that read scaleWeight pre-flow, like
+                        // the cup-fill view.
+                        m_hotWaterFrozenWeight = -1.0;
+
                         // Sanity: ignore if overshoot is wildly negative (cup removed)
                         // or extremely large (scale glitch)
                         if (overshoot < -2.0 || overshoot > 20.0) {
@@ -448,16 +459,16 @@ void MachineState::updatePhase() {
                         }
 
                         // Exponential moving average, heavier weight on early samples
-                        int n = m_settings->hotWaterSawSampleCount();
-                        double oldOffset = m_settings->hotWaterSawOffset();
+                        int n = m_settings->brew()->hotWaterSawSampleCount();
+                        double oldOffset = m_settings->brew()->hotWaterSawOffset();
                         double alpha = (n < 3) ? 0.5 : 0.3;  // Learn faster initially
                         double newOffset = (1.0 - alpha) * oldOffset + alpha * qMax(0.0, overshoot);
 
                         // Clamp to reasonable range
                         newOffset = qBound(0.0, newOffset, 10.0);
 
-                        m_settings->setHotWaterSawOffset(newOffset);
-                        m_settings->setHotWaterSawSampleCount(n + 1);
+                        m_settings->brew()->setHotWaterSawOffset(newOffset);
+                        m_settings->brew()->setHotWaterSawSampleCount(n + 1);
                         qDebug() << "[SAW-Learn] overshoot=" << overshoot
                                  << "settled=" << settledWeight << "trigger=" << triggerWeight
                                  << "offset:" << oldOffset << "->" << newOffset
@@ -465,10 +476,9 @@ void MachineState::updatePhase() {
                     });
                 }
                 m_hotWaterSawTriggerWeight = -1.0;
-                // Note: m_hotWaterFrozenWeight is NOT cleared here — it must persist
-                // through the completion overlay (which reads scaleWeight() after phase
-                // transitions to Idle via QueuedConnection). Cleared on next flow start
-                // at line 299.
+                // m_hotWaterFrozenWeight is cleared inside the 1500ms SAW-learn
+                // callback above (or by the flow-start path at the top of this
+                // function on the next pour, whichever happens first).
             }
         }
 
@@ -679,9 +689,9 @@ void MachineState::checkStopAtWeightHotWater(double weight) {
     }
 
     // Volume mode: machine handles auto-stop via flowmeter, don't interfere
-    if (m_settings && m_settings->waterVolumeMode() == "volume") return;
+    if (m_settings && m_settings->brew()->waterVolumeMode() == "volume") return;
 
-    double target = m_settings ? m_settings->waterVolume() : 0;  // ml ≈ g for water
+    double target = m_settings ? m_settings->brew()->waterVolume() : 0;  // ml ≈ g for water
     if (target <= 0) return;
 
     // Use weight relative to the baseline recorded at tare time.
@@ -693,7 +703,7 @@ void MachineState::checkStopAtWeightHotWater(double weight) {
     // Learned offset: starts at 2g default, adapts from measured overshoot after each pour.
     // After stopping, the app measures how much weight landed after the stop command and
     // adjusts the offset so subsequent pours hit the target more accurately.
-    double sawOffset = m_settings ? m_settings->hotWaterSawOffset() : 2.0;
+    double sawOffset = m_settings ? m_settings->brew()->hotWaterSawOffset() : 2.0;
     double stopThreshold = target - sawOffset;
 
     if (effectiveWeight >= stopThreshold) {
@@ -719,7 +729,7 @@ void MachineState::checkStopAtVolume() {
     // Skip volume-based stop when a physical scale is configured and the user has
     // opted in. Uses "configured" (scaleAddress non-empty) not "connected" so a
     // momentary BLE disconnect mid-shot doesn't re-enable SAV unexpectedly.
-    if (m_settings && m_settings->ignoreVolumeWithScale()
+    if (m_settings && m_settings->brew()->ignoreVolumeWithScale()
         && !m_settings->scaleAddress().isEmpty()) return;
 
     // Skip SAV for basic profiles when a scale is configured. The volume value in
@@ -771,9 +781,9 @@ void MachineState::checkStopAtVolumeHotWater() {
                         || (m_settings && m_settings->useFlowScale())
                         || (m_scale && m_scale->isConnected() && !m_scale->isFlowScale());
     if (scaleConfigured) {
-        target = qMax(static_cast<double>(m_settings->waterVolume()) + 50.0, 250.0);
+        target = qMax(static_cast<double>(m_settings->brew()->waterVolume()) + 50.0, 250.0);
     } else {
-        target = m_settings->waterVolume();
+        target = m_settings->brew()->waterVolume();
     }
     if (target <= 0) return;
 
@@ -878,10 +888,10 @@ void MachineState::checkStopAtTime() {
         // exits steaming entirely, killing the GHC light and purge opportunity.
         // Only use app-side stop for the simulator (which has no firmware timer).
         if (m_device && m_device->simulationMode()) {
-            target = m_settings->steamTimeout();
+            target = m_settings->brew()->steamTimeout();
         }
     } else if (m_phase == Phase::Flushing) {
-        target = m_settings->flushSeconds();
+        target = m_settings->brew()->flushSeconds();
     } else {
         return;  // Only Steam and Flush use time-based stop
     }
