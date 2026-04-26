@@ -83,11 +83,18 @@ ShotAnalysis::ChannelingSeverity ShotAnalysis::detectChannelingFromDerivative(
         return false;
     };
 
+    // Channeling is a positive-dC/dt signature: a channel forms, flow surges
+    // and pressure dips, conductance (flow/pressure) jumps up. Negative dC/dt
+    // is the opposite — flow falling relative to pressure — which is the
+    // normal dynamic on lever pressure-rise frames (pressure climbs faster
+    // than flow follows) and on pressure-decline frames as the puck thins.
+    // Treating |dC/dt| as channeling false-flags every lever pour, so we
+    // count only signed positive excursions here.
     for (const auto& pt : conductanceDerivative) {
         if (pt.x() < analysisStart) continue;
         if (pt.x() > analysisEnd) break;
         if (!inAnyWindow(pt.x())) continue;
-        const double v = std::abs(pt.y());
+        const double v = pt.y();
         if (v > maxSpike) {
             maxSpike = v;
             maxSpikeTime = pt.x();
@@ -328,13 +335,37 @@ ShotAnalysis::GrindCheck ShotAnalysis::analyzeFlowVsGoal(
     // safety limiter (80's Espresso rise+decline, Cremina lever, Londinium
     // pour, etc.) — comparing actual flow against that ceiling is the
     // canonical false-positive source.
+    //
+    // Two boundary trims (see GRIND_*_SKIP_SEC in shotanalysis.h) apply
+    // within each flow-mode range so we don't average pump-ramp lag or the
+    // post-limiter-engaged tail. Without them the lever preinfusion shape
+    // (pump-ramp at start + pressure ceiling activates at end) reads as a
+    // sustained "too fine" delta even on clean shots.
     struct Range { double start; double end; };
     QVector<Range> flowModeRanges;
     if (!phases.isEmpty()) {
+        // Pump-ramp trim applies to the first flow-mode phase that
+        // coincides with pourStart — that's the one where the pump goes
+        // from idle to commanded flow. A flow-mode phase that starts
+        // before pourStart (e.g. a fill phase) has its samples filtered
+        // out by the pour-window gate below anyway; consuming the
+        // "first seen" flag on it would silently skip the trim where it
+        // actually belongs. The 0.1 s margin absorbs BLE timestamp jitter.
+        bool firstFlowModeAtPourStartSeen = false;
         for (qsizetype i = 0; i < phases.size(); ++i) {
             if (!phases[i].isFlowMode) continue;
-            const double start = phases[i].time;
-            const double end = (i + 1 < phases.size()) ? phases[i + 1].time : pourEnd;
+            double start = phases[i].time;
+            double end = (i + 1 < phases.size()) ? phases[i + 1].time : pourEnd;
+            if (!firstFlowModeAtPourStartSeen
+                && phases[i].time + 0.1 >= pourStart) {
+                start += GRIND_PUMP_RAMP_SKIP_SEC;
+                firstFlowModeAtPourStartSeen = true;
+            }
+            if (i + 1 < phases.size()
+                && phases[i + 1].transitionReason.compare(
+                       QStringLiteral("pressure"), Qt::CaseInsensitive) == 0) {
+                end -= GRIND_LIMITER_TAIL_SKIP_SEC;
+            }
             if (end > start) flowModeRanges.append({start, end});
         }
     }
