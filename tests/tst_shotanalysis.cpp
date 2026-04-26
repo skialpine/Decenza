@@ -280,24 +280,74 @@ private slots:
         }
     }
 
-    // Channeling is a positive-dC/dt signature. A sustained negative-dC/dt
-    // run (the lever pressure-rise / decline shape: pressure climbing or
-    // falling faster than flow can follow → conductance dropping) must not
-    // be flagged. The magnitudes here would all trip the |v| > 3 check that
-    // the legacy std::abs() loop used.
-    void channelingFromDerivative_negativeSpikeNotFlagged()
+    // Lever-style false-positive suppression: in a flow-mode phase whose
+    // flow goal is steady but actual pressure is rising fast (the pump is
+    // building toward a pressure-ceiling exit condition), the window
+    // builder must exclude those samples — the resulting dC/dt drop is the
+    // pressure-rise dynamic, not channeling. Falling pressure (bloom
+    // transitions, pump stops) must NOT be masked: those are legitimate
+    // channeling-like transients.
+    void channelingWindows_flowModeRisingPressure_isExcluded()
     {
-        QVector<QPointF> dcdt;
-        for (double t = 0.0; t <= 25.0; t += 0.1) {
-            double v = 0.2;
-            if (t >= 7.0 && t <= 12.0) v = -8.0;  // 50 samples at -8 (|v|=8)
-            dcdt.append(QPointF(t, v));
-        }
+        QList<HistoryPhaseMarker> phases{
+            phase(0.0, "Preinfusion", 0, /*isFlowMode=*/true),
+            phase(10.0, "End", -1, /*isFlowMode=*/false),
+        };
 
-        QVector<ShotAnalysis::DetectionWindow> fullPour{{2.0, 25.0}};
-        auto severity = ShotAnalysis::detectChannelingFromDerivative(
-            dcdt, /*pourStart=*/2.0, /*pourEnd=*/25.0, fullPour);
-        QCOMPARE(severity, ShotAnalysis::ChannelingSeverity::None);
+        // Flow tracks goal cleanly, but pressure ramps from 2 → 10 bar over
+        // 4 s (≈ 2 bar/s — matches 80's Espresso preinfusion-late dynamic
+        // before the pressure-ceiling exit). After 4 s pressure stays flat
+        // at 10 bar so the test isolates the ramp effect.
+        const auto flow = flatSeries(0.0, 10.0, 7.5);
+        const auto flowGoal = flatSeries(0.0, 10.0, 7.5);
+        QVector<QPointF> pressure;
+        pressure.append(rampSeries(0.0, 4.0, 2.0, 10.0));
+        for (const auto& p : flatSeries(4.1, 10.0, 10.0)) pressure.append(p);
+
+        const auto windows = ShotAnalysis::buildChannelingWindows(
+            pressure, flow, /*pressureGoal=*/QVector<QPointF>{},
+            flowGoal, phases, /*pourStart=*/0.0, /*pourEnd=*/10.0);
+
+        // The steep part of the ramp must be excluded; once the ±0.75 s
+        // lookup spans the post-ramp plateau the relative pressure rise
+        // drops below WINDOW_STATIONARY_REL and windows can re-open.
+        // Empirically that crossover lands near t = 3.3 s, so any window
+        // start before t = 3 indicates the gate stopped firing too early.
+        QVERIFY2(!windows.isEmpty(), "expected at least one window during the plateau");
+        QVERIFY2(windows.first().start >= 3.0,
+                 qPrintable(QString("expected first window past the steep ramp, got start=%1s")
+                                .arg(windows.first().start)));
+    }
+
+    // Inverse: in a flow-mode phase with falling pressure (the bloom
+    // transition shape — pump stops while flow trails to zero), pressure
+    // is changing rapidly but in the negative direction, so the lever-rise
+    // gate must NOT engage. Validates that the directional rule preserves
+    // the legacy detector's coverage of bloom-transition spikes.
+    void channelingWindows_flowModeFallingPressure_isIncluded()
+    {
+        QList<HistoryPhaseMarker> phases{
+            phase(0.0, "Bloom", 0, /*isFlowMode=*/true),
+            phase(10.0, "End", -1, /*isFlowMode=*/false),
+        };
+
+        // Same setup but pressure falls from 8 → 2 bar.
+        const auto flow = flatSeries(0.0, 10.0, 1.5);
+        const auto flowGoal = flatSeries(0.0, 10.0, 1.5);
+        const auto pressure = rampSeries(0.0, 10.0, 8.0, 2.0);
+
+        const auto windows = ShotAnalysis::buildChannelingWindows(
+            pressure, flow, /*pressureGoal=*/QVector<QPointF>{},
+            flowGoal, phases, /*pourStart=*/0.0, /*pourEnd=*/10.0);
+
+        double totalMaskSec = 0.0;
+        for (const auto& w : windows) totalMaskSec += (w.end - w.start);
+        // Most of the analysis range should be in-window. CHANNELING_DC_POUR_SKIP_SEC
+        // (2 s) and CHANNELING_DC_POUR_SKIP_END_SEC (1.5 s) are trimmed by
+        // the window builder, leaving 10 - 2 - 1.5 = 6.5 s of analysis range.
+        QVERIFY2(totalMaskSec > 5.0,
+                 qPrintable(QString("expected ~6.5 s of windows during pressure fall, got %1s")
+                                .arg(totalMaskSec)));
     }
 
     // analyzeFlowVsGoal / detectGrindIssue ----------------------------------
@@ -406,6 +456,38 @@ private slots:
                                 .arg(r.delta)));
         QCOMPARE(ShotAnalysis::detectGrindIssue(flow, flowGoal, phases, 0.0, 11.0),
                  false);
+    }
+
+    // Extreme puck failure: a flow-mode phase shorter than
+    // (GRIND_PUMP_RAMP_SKIP_SEC + kMinPostTrimRangeSec) so the trim guard
+    // must take its bypass branch. Without the bypass, the pump-ramp trim
+    // (0.5 s) would push start past end (start=0.5, end=0.8 → 3 samples
+    // after time-window filter, < 5 → hasData=false → grind silent on a
+    // shot that's clearly a gusher). With the bypass, the full 0-0.8 s
+    // window stays and the detector fires.
+    void flowVsGoal_shortShot_skipsTrimToPreserveSignal()
+    {
+        QList<HistoryPhaseMarker> phases{
+            phase(0.0, "Fill", 0, /*isFlowMode=*/true),
+            phase(0.8, "Pour", 1, /*isFlowMode=*/false),
+            phase(2.0, "End", -1, /*isFlowMode=*/false),
+        };
+        // Flow gushes (6 ml/s) against goal 4 ml/s during the 0.8 s
+        // flow-mode phase — clear coarse-grind signal. The phase length
+        // (0.8 s) minus the trim (0.5 s) equals 0.3 s, well below the
+        // 1.0 s post-trim minimum, so the bypass must engage.
+        auto flow = flatSeries(0.0, 2.0, 6.0);
+        auto flowGoal = flatSeries(0.0, 2.0, 4.0);
+
+        const auto r = ShotAnalysis::analyzeFlowVsGoal(
+            flow, flowGoal, phases, /*pourStart=*/0.0, /*pourEnd=*/2.0);
+        QVERIFY2(r.hasData,
+                 "expected the trim bypass to preserve enough samples");
+        QVERIFY2(r.delta > ShotAnalysis::FLOW_DEVIATION_THRESHOLD,
+                 qPrintable(QString("expected positive delta > %1, got %2")
+                                .arg(ShotAnalysis::FLOW_DEVIATION_THRESHOLD).arg(r.delta)));
+        QCOMPARE(ShotAnalysis::detectGrindIssue(flow, flowGoal, phases, 0.0, 2.0),
+                 true);
     }
 
     // The limiter-tail trim is gated on transitionReason == "pressure".
