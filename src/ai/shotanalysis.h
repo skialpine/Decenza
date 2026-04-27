@@ -151,6 +151,15 @@ public:
     static constexpr double FLOW_GOAL_MIN_AVG = 0.3;    // ml/s — ignore goal periods with very low target (preinfusion)
     static constexpr double FLOW_DEVIATION_THRESHOLD = 0.4;  // ml/s avg deviation to flag grind issue
 
+    // Thresholds for the pressure-mode "choked puck" check inside the grind
+    // detector. Runs in addition to the flow-vs-goal path, restricted to
+    // pressure-mode portions of the pour. Fires when the puck holds pressure
+    // but refuses to extract — the signature of grind drastically too fine
+    // (80's Espresso, Cremina, Londinium tail behaviour).
+    static constexpr double CHOKED_PRESSURE_MIN_BAR = 4.0;
+    static constexpr double CHOKED_FLOW_MAX_MLPS = 0.5;
+    static constexpr double CHOKED_DURATION_MIN_SEC = 15.0;
+
     // Trim two boundary windows where flow naturally diverges from goal even
     // on well-extracted shots, otherwise the grind detector false-flags every
     // lever-style preinfusion:
@@ -163,44 +172,60 @@ public:
     static constexpr double GRIND_PUMP_RAMP_SKIP_SEC = 0.5;
     static constexpr double GRIND_LIMITER_TAIL_SKIP_SEC = 1.5;
 
-    // Result of the flow-vs-goal grind direction check.
+    // Result of the grind direction check.
     struct GrindCheck {
-        double delta = 0.0;          // (avg actual flow) - (avg goal flow). Positive = coarse, negative = fine.
-        qsizetype sampleCount = 0;   // number of qualifying samples included in the average
-        bool hasData = false;        // true when sampleCount ≥ 5 and the check ran
+        // (avg actual flow) - (avg goal flow) on the flow-vs-goal path. Positive
+        // = coarse, negative = fine. Meaningful only when chokedPuck == false;
+        // on the choked-puck path delta is left at its default and chokedPuck
+        // is the sole signal — read chokedPuck first.
+        double delta = 0.0;
+        // Number of qualifying samples averaged (flow-vs-goal path) or the
+        // count of pressurized samples observed (choked-puck path).
+        qsizetype sampleCount = 0;
+        bool hasData = false;        // true when the check ran (either path)
         bool skipped = false;        // true when suppressed by a flag or beverage type
+        bool chokedPuck = false;     // true when the pressure-mode fallback fired (puck held pressure but no flow)
     };
 
-    // Flow-vs-goal grind direction check — the canonical implementation
-    // shared by the badge path (detectGrindIssue) and the summary path
-    // (generateSummary). Only averages samples that fall inside a
-    // flow-controlled phase (HistoryPhaseMarker::isFlowMode == true). If no
-    // flow-controlled pour phase exists (e.g. 80's Espresso, Cremina,
-    // Londinium — entire pour is pressure-controlled), the check returns
-    // hasData=false and callers treat the shot as "grind direction not
-    // evaluable from flow goal."
+    // Grind direction check — the canonical implementation shared by the
+    // badge path (detectGrindIssue) and the summary path (generateSummary).
+    //
+    // Two paths feed the same GrindCheck result:
+    //   1. Flow-vs-goal averaging across flow-controlled phases (the primary
+    //      path; sets delta and hasData when ≥ 5 qualifying samples land
+    //      inside flow-mode windows).
+    //   2. Choked-puck check, restricted to pressure-mode portions of the
+    //      pour. Runs in addition to path 1 (not as a fallback) because
+    //      shots like 80's Espresso have a healthy flow-mode preinfusion
+    //      that pins delta near zero; the choke happens entirely in the
+    //      pressure-mode tail and is invisible to flow-vs-goal averaging.
+    //      When pressure is provided and the pressurized pressure-mode
+    //      window spent ≥ CHOKED_DURATION_MIN_SEC at ≥ CHOKED_PRESSURE_MIN_BAR
+    //      with mean flow below CHOKED_FLOW_MAX_MLPS, sets chokedPuck=true.
+    //      Consumers branch on chokedPuck before reading delta.
     //
     // analysisFlags honored: "grind_check_skip" forces skipped=true. Filter/
-    // pourover beverage types also short-circuit to skipped=true.
+    // pourover beverage types also short-circuit to skipped=true. Pressure
+    // is optional; when omitted, only the flow-vs-goal path is available.
     static GrindCheck analyzeFlowVsGoal(const QVector<QPointF>& flow,
                                          const QVector<QPointF>& flowGoal,
                                          const QList<HistoryPhaseMarker>& phases,
                                          double pourStart, double pourEnd,
                                          const QString& beverageType = {},
-                                         const QStringList& analysisFlags = {});
+                                         const QStringList& analysisFlags = {},
+                                         const QVector<QPointF>& pressure = {});
 
-    // Returns true if the flow-vs-goal check flags a meaningful deviation
-    // (|delta| > FLOW_DEVIATION_THRESHOLD). Returns false when the check is
-    // skipped, there is insufficient data, or deviation is within tolerance.
-    // Phase-mode aware: restricts averaging to flow-controlled phases, so
-    // pressure-mode profiles (lever, D-Flow pour, etc.) no longer trigger on
-    // flow that is naturally below a profile's flow-limiter ceiling.
+    // Returns true if the grind direction check flags a meaningful deviation
+    // (|delta| > FLOW_DEVIATION_THRESHOLD, or chokedPuck fired). Returns
+    // false when the check is skipped, there is insufficient data, or
+    // deviation is within tolerance.
     static bool detectGrindIssue(const QVector<QPointF>& flow,
                                   const QVector<QPointF>& flowGoal,
                                   const QList<HistoryPhaseMarker>& phases,
                                   double pourStart, double pourEnd,
                                   const QString& beverageType = {},
-                                  const QStringList& analysisFlags = {});
+                                  const QStringList& analysisFlags = {},
+                                  const QVector<QPointF>& pressure = {});
 
     // Returns true when the pour never pressurized — peak pressure inside
     // the pour window stayed below PRESSURE_FLOOR_BAR. Diagnoses puck

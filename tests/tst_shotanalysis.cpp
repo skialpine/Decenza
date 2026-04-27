@@ -634,6 +634,164 @@ private slots:
         QCOMPARE(severity, ShotAnalysis::ChannelingSeverity::None);
     }
 
+    // Choked-puck fallback (pressure-mode pours) ---------------------------
+
+    // Shot 890 signature: 80's Espresso (entire pour pressure-controlled),
+    // pressure held ~6.6 bar for 50 s with mean flow ~0.2 ml/s, yield 1.1 g.
+    // The flow-vs-goal path returns no data (no flow-mode window in the
+    // pour); the choked-puck fallback must fire and flag grindIssue.
+    void grindIssue_chokedPuckPressureMode_fires()
+    {
+        QList<HistoryPhaseMarker> phases{
+            phase(0.0,  "preinfusion start", 0, /*isFlowMode=*/true),
+            phase(2.0,  "preinfusion",       1, /*isFlowMode=*/true),
+            phase(6.0,  "rise and hold",     2, /*isFlowMode=*/false),
+            phase(10.0, "decline",           3, /*isFlowMode=*/false),
+        };
+        // Pressure builds during preinfusion, then sits at 6.6 bar through
+        // the pressure-mode pour. Flow stays near zero from t=10 onward.
+        QVector<QPointF> pressure;
+        pressure = concat(pressure, rampSeries(0.0, 6.0, 0.5, 6.6));
+        pressure = concat(pressure, flatSeries(6.1, 60.0, 6.6));
+
+        QVector<QPointF> flow;
+        flow = concat(flow, flatSeries(0.0, 6.0, 7.5));        // preinfusion
+        flow = concat(flow, flatSeries(6.1, 10.0, 3.0));       // brief rise
+        flow = concat(flow, flatSeries(10.1, 60.0, 0.2));      // choked
+
+        QVector<QPointF> flowGoal = flatSeries(0.0, 60.0, 7.5);  // preinfusion goal only
+
+        const auto r = ShotAnalysis::analyzeFlowVsGoal(
+            flow, flowGoal, phases, /*pourStart=*/6.0, /*pourEnd=*/60.0,
+            /*beverageType=*/"", /*analysisFlags=*/{}, pressure);
+        QVERIFY(r.hasData);
+        QVERIFY(r.chokedPuck);
+        QCOMPARE(ShotAnalysis::detectGrindIssue(
+                     flow, flowGoal, phases, 6.0, 60.0,
+                     "", {}, pressure), true);
+    }
+
+    // Lever-style clean shot (Cremina): pressure-mode pour, but flow is
+    // healthy — must NOT fire the choked-puck fallback.
+    void grindIssue_chokedPuckPressureMode_normalLeverDoesNotFire()
+    {
+        QList<HistoryPhaseMarker> phases{
+            phase(0.0,  "preinfusion", 0, /*isFlowMode=*/true),
+            phase(5.0,  "pour",        1, /*isFlowMode=*/false),
+        };
+        auto pressure = concat(rampSeries(0.0, 5.0, 0.0, 8.0),
+                                rampSeries(5.1, 30.0, 8.0, 4.0));
+        // Mean flow ~1.8 ml/s during the pressurized pour: well above the
+        // 0.5 ml/s choked threshold.
+        auto flow = concat(flatSeries(0.0, 5.0, 4.0),
+                            flatSeries(5.1, 30.0, 1.8));
+        QVector<QPointF> flowGoal;  // no flow goal during the pour
+
+        const auto r = ShotAnalysis::analyzeFlowVsGoal(
+            flow, flowGoal, phases, /*pourStart=*/5.0, /*pourEnd=*/30.0,
+            "", {}, pressure);
+        QVERIFY(!r.chokedPuck);
+        QCOMPARE(ShotAnalysis::detectGrindIssue(
+                     flow, flowGoal, phases, 5.0, 30.0,
+                     "", {}, pressure), false);
+    }
+
+    // A flow-mode pour with healthy flow must not get tagged as choked,
+    // even though the choked-puck check now runs additively on every pour.
+    // With this fixture pressureModeRanges is empty (the only phase is
+    // isFlowMode=true), so inPressureMode returns true for every sample
+    // and the choked loop iterates the whole pour. The 1.7 ml/s flow is
+    // above CHOKED_FLOW_MAX_MLPS = 0.5, so chokedPuck stays false. Locks
+    // in the per-sample threshold gate as the real safeguard.
+    void grindIssue_flowModePourDoesNotTriggerChokedCheck()
+    {
+        QList<HistoryPhaseMarker> phases{
+            phase(0.0, "Pour", 0, /*isFlowMode=*/true),
+        };
+        auto flow = flatSeries(0.0, 30.0, 1.7);
+        auto flowGoal = flatSeries(0.0, 30.0, 1.7);
+        auto pressure = flatSeries(0.0, 30.0, 6.0);
+
+        const auto r = ShotAnalysis::analyzeFlowVsGoal(
+            flow, flowGoal, phases, /*pourStart=*/2.0, /*pourEnd=*/28.0,
+            "", {}, pressure);
+        QVERIFY(r.hasData);
+        QVERIFY(!r.chokedPuck);
+        QVERIFY(std::abs(r.delta) < ShotAnalysis::FLOW_DEVIATION_THRESHOLD);
+    }
+
+    // Choked-puck signature with no pressure passed: the fallback must
+    // short-circuit silently rather than evaluate findValueAtTime on empty
+    // data. Locks in the contract that pressure is optional.
+    void grindIssue_chokedPuckPressureMode_emptyPressureSkipsFallback()
+    {
+        QList<HistoryPhaseMarker> phases{
+            phase(0.0,  "preinfusion start", 0, /*isFlowMode=*/true),
+            phase(2.0,  "preinfusion",       1, /*isFlowMode=*/true),
+            phase(6.0,  "rise and hold",     2, /*isFlowMode=*/false),
+            phase(10.0, "decline",           3, /*isFlowMode=*/false),
+        };
+        auto flow = concat(flatSeries(0.0, 6.0, 7.5),
+                            flatSeries(6.1, 60.0, 0.2));
+        QVector<QPointF> flowGoal = flatSeries(0.0, 60.0, 7.5);
+
+        const auto r = ShotAnalysis::analyzeFlowVsGoal(
+            flow, flowGoal, phases, /*pourStart=*/6.0, /*pourEnd=*/60.0);
+        QVERIFY(!r.hasData);
+        QVERIFY(!r.chokedPuck);
+    }
+
+    // generateSummary on a choked-puck shot must emit the dedicated warning
+    // line and the "Puck choked — grind way too fine" verdict, NOT the
+    // generic "Puck integrity issue" verdict. Locks in the verdict ordering
+    // (chokedPuck branch must come before the hasWarning branch in the
+    // verdict if/else cascade).
+    void generateSummary_chokedPuck_emitsTailoredVerdict()
+    {
+        QList<HistoryPhaseMarker> phases{
+            phase(0.0,  "preinfusion start", 0, /*isFlowMode=*/true),
+            phase(2.0,  "preinfusion",       1, /*isFlowMode=*/true),
+            phase(6.0,  "rise and hold",     2, /*isFlowMode=*/false),
+            phase(10.0, "decline",           3, /*isFlowMode=*/false),
+        };
+        // Mirror the real shot 890: pressure stays well under 4 bar during
+        // preinfusion, then jumps into the pressure-mode pour at 6.6 bar.
+        // Otherwise the preinfusion flow (7.5 ml/s) drags the choked-window
+        // mean above the 0.5 threshold.
+        QVector<QPointF> pressure = concat(flatSeries(0.0, 5.9, 1.7),
+                                            rampSeries(5.9, 6.0, 1.7, 6.6));
+        pressure = concat(pressure, flatSeries(6.1, 60.0, 6.6));
+        QVector<QPointF> flow = concat(flatSeries(0.0, 6.0, 7.5),
+                                        flatSeries(6.1, 60.0, 0.2));
+        QVector<QPointF> flowGoal = flatSeries(0.0, 60.0, 7.5);
+        QVector<QPointF> temperature = flatSeries(0.0, 60.0, 92.0);
+        QVector<QPointF> temperatureGoal = flatSeries(0.0, 60.0, 92.0);
+        QVector<QPointF> dCdt = flatSeries(0.0, 60.0, 0.0);
+        QVector<QPointF> weight;  // unused
+
+        const QVariantList lines = ShotAnalysis::generateSummary(
+            pressure, flow, weight, temperature, temperatureGoal,
+            dCdt, phases, /*beverageType=*/"espresso", /*duration=*/60.0,
+            /*pressureGoal=*/{}, flowGoal, /*analysisFlags=*/{});
+
+        bool sawChokedWarning = false;
+        QString verdictText;
+        for (const QVariant& v : lines) {
+            const QVariantMap m = v.toMap();
+            const QString type = m["type"].toString();
+            const QString text = m["text"].toString();
+            if (type == "warning" && text.contains("puck choked", Qt::CaseInsensitive))
+                sawChokedWarning = true;
+            if (type == "verdict")
+                verdictText = text;
+        }
+        QVERIFY2(sawChokedWarning, "expected the choked-puck warning line");
+        QVERIFY2(verdictText.contains("Puck choked", Qt::CaseInsensitive),
+                 qPrintable("verdict was: " + verdictText));
+        QVERIFY2(!verdictText.contains("Puck integrity issue", Qt::CaseInsensitive),
+                 qPrintable("verdict fell through to puck-integrity branch: " + verdictText));
+    }
+
     // Pour-truncated detection ---------------------------------------------
 
     // Shot 868 signature: 7 s duration, pressure never exceeded ~0.6 bar
