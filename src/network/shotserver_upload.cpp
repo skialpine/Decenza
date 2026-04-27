@@ -3,6 +3,7 @@
 #include "webtemplates.h"
 #include "../history/shothistorystorage.h"
 #include "../ble/de1device.h"
+#include "../core/crashhandler.h"
 #include "../machine/machinestate.h"
 #include "../screensaver/screensavervideomanager.h"
 #include "../core/settings.h"
@@ -411,6 +412,18 @@ bool ShotServer::installApk(const QString& apkPath)
         qWarning() << "ShotServer: Failed to get Android activity for APK install";
         return false;
     }
+
+    // Tear down our long-lived sockets before the JNI dispatch — see the
+    // signal's declaration for the QSocketNotifier race we're avoiding
+    // (#865). Note this closes the very TCP connection the upload arrived
+    // on, so the 200 response below won't reach the web client. Acceptable:
+    // the user sees the system Install dialog on the device.
+    // The fd-table snapshots either side of the teardown are diagnostic for
+    // when the race still fires — the next crash log will name fds we can
+    // attribute to specific services.
+    CrashHandler::logOpenFileDescriptors("ShotServer pre-teardown");
+    emit aboutToDispatchInstall();
+    CrashHandler::logOpenFileDescriptors("ShotServer post-teardown");
 
     QJniObject javaPath = QJniObject::fromString(apkPath);
     jboolean ok = QJniObject::callStaticMethod<jboolean>(

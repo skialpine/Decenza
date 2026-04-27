@@ -918,6 +918,37 @@ int main(int argc, char *argv[])
         }
     });
 
+#ifdef Q_OS_ANDROID
+    // Quiet anything that owns a long-lived QSocketNotifier before Android's
+    // PackageInstaller takes over. The system reaps our fds during the install
+    // handover and Qt's UNIX event dispatcher SIGSEGVs in
+    // QSocketNotifier::setEnabled if it tries to service one afterward (#865).
+    // Both UpdateChecker (UI-triggered) and ShotServer (web-triggered) emit
+    // aboutToDispatchInstall on the main thread immediately before the JNI
+    // dispatch; the connection below uses Qt::AutoConnection which resolves
+    // to Qt::DirectConnection because both signal and receiver are on the
+    // main thread — the slot runs synchronously, finishes the teardown, and
+    // returns before the JNI call dispatches. If either emitter ever moves
+    // to a worker thread the connection silently flips to QueuedConnection
+    // and the fix breaks; keep both emit sites on the main thread.
+    // We don't try to restore on cancel — the install either succeeds
+    // (process replaced) or fails (rare; user can restart).
+    // CrashReporter is wired separately below because it's declared later.
+    auto quietNetworkForApkInstall = [&mainController, &sharedNetworkManager, &relayClient, &librarySharing]() {
+        qDebug() << "Quieting network services for APK install handover";
+        if (auto* server = mainController.shotServer()) {
+            server->stop();
+        }
+        sharedNetworkManager.clearConnectionCache();
+        relayClient.shutdown();
+        librarySharing.clearConnectionCache();
+    };
+    QObject::connect(mainController.updateChecker(), &UpdateChecker::aboutToDispatchInstall,
+                     &mainController, quietNetworkForApkInstall);
+    QObject::connect(mainController.shotServer(), &ShotServer::aboutToDispatchInstall,
+                     &mainController, quietNetworkForApkInstall);
+#endif
+
     // Weather forecast manager (hourly updates, region-aware API selection)
     WeatherManager weatherManager(&sharedNetworkManager);
     weatherManager.setLocationProvider(mainController.locationProvider());
@@ -999,6 +1030,17 @@ int main(int argc, char *argv[])
 
     // Crash reporter for sending crash reports to api.decenza.coffee
     CrashReporter crashReporter;
+
+#ifdef Q_OS_ANDROID
+    // Drop CrashReporter's private QNAM keepalive sockets before APK install.
+    // Same rationale as the quietNetworkForApkInstall lambda above; this is
+    // a separate connect because crashReporter is constructed after that
+    // lambda's call site.
+    QObject::connect(mainController.updateChecker(), &UpdateChecker::aboutToDispatchInstall,
+                     &crashReporter, &CrashReporter::clearConnectionCache);
+    QObject::connect(mainController.shotServer(), &ShotServer::aboutToDispatchInstall,
+                     &crashReporter, &CrashReporter::clearConnectionCache);
+#endif
 
     checkpoint("Pre-QML setup done");
 
