@@ -20,7 +20,6 @@ Page {
     property bool advancedMode: Settings.boolValue("shotReview/advancedMode", false)
     property int swipeDirection: 0  // 1 = going older, -1 = going newer; swipeDirection: 1 exits left, enters from right; -1 exits right, enters from left
     property bool navigating: false  // true only during a navigateToShot transition; guards enterAnimation from firing on non-navigation loads
-    property bool reloadingFromVisualizer: false  // true when loadShot() was called from onVisualizerInfoUpdated; suppresses duplicate badge reanalysis
 
     // Pick up toggle changes made on any other page sharing this setting
     // (Post-Shot Review, Shot Comparison, Espresso view selector).
@@ -64,12 +63,10 @@ Page {
                 if (wasNavigating)
                     enterAnimation.start()
             })
-            // Recompute quality badges in background (handles stale values after KB updates).
-            // Skip when reloading after a visualizer update — badges didn't change and the
-            // visualizer path already triggers a second onShotReady via loadShot().
-            if (!shotDetailPage.reloadingFromVisualizer)
-                MainController.shotHistory.requestReanalyzeBadges(id)
-            shotDetailPage.reloadingFromVisualizer = false
+            // Quality badges already arrived recomputed in `shot` via
+            // loadShotRecordStatic, which also persists drift to the DB and
+            // emits shotBadgesUpdated when it does. No extra reanalyze call
+            // needed here — onShotBadgesUpdated below catches the persist event.
         }
         function onShotDeleted(deletedId) {
             if (deletedId === shotDetailPage.shotId)
@@ -78,7 +75,6 @@ Page {
         function onVisualizerInfoUpdated(id, success) {
             if (id !== shotDetailPage.shotId) return
             if (success) {
-                shotDetailPage.reloadingFromVisualizer = true
                 loadShot()
             } else {
                 console.warn("ShotDetailPage: Failed to save visualizer info for shot", id)
@@ -143,7 +139,6 @@ Page {
         }
         function onUpdateSuccess(visualizerId) {
             if (shotDetailPage.shotId > 0) {
-                shotDetailPage.reloadingFromVisualizer = true
                 loadShot()
             }
         }
@@ -171,7 +166,6 @@ Page {
                 shotId = shotIds[currentIndex]
                 contentSlide.x = shotDetailPage.swipeDirection * Theme.scaled(50)
                 shotDetailPage.navigating = true
-                shotDetailPage.reloadingFromVisualizer = false
                 loadShot()
             }
         }
