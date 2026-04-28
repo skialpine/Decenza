@@ -182,6 +182,25 @@ public:
     static constexpr double CHOKED_DURATION_MIN_SEC = 15.0;
     static constexpr double CHOKED_YIELD_RATIO_MAX = 0.85;
 
+    // Yield-overshoot ("gusher") arm — the inverse of the moderate choked-puck
+    // yield arm. Fires when yield/target exceeds this ratio: the puck offered
+    // too little resistance, water blew through, the shot finished much heavier
+    // than intended (e.g. 18 g → 40 g target, 56 g actual at grind 11). The
+    // existing detectors are silent on this failure mode: flow tracks goal in
+    // flow-mode phases (controller pulls back), pressure-mode choke arms are
+    // gated on pressurizedDuration ≥ CHOKED_DURATION_MIN_SEC which a gusher
+    // never reaches, detectPourTruncated needs peak < 2.5 bar which a gusher
+    // can briefly exceed, and the channeling derivative looks normal because
+    // the puck never built resistance to channel through.
+    //
+    // The arm has no pressurized-window gate (a gusher can't sustain pressure
+    // long enough to satisfy CHOKED_DURATION_MIN_SEC, even when peak briefly
+    // exceeds CHOKED_PRESSURE_MIN_BAR). Preconditions: targetWeightG > 0,
+    // finalWeightG > 0, beverageType not in the filter/pourover/tea/steam/
+    // cleaning skip list (espresso and unknown/empty beverage types both pass).
+    // See analyzeFlowVsGoal() for placement.
+    static constexpr double YIELD_OVERSHOOT_RATIO_MIN = 1.20;
+
     // Trim two boundary windows where flow naturally diverges from goal even
     // on well-extracted shots, otherwise the grind detector false-flags every
     // lever-style preinfusion:
@@ -197,16 +216,20 @@ public:
     // Result of the grind direction check.
     struct GrindCheck {
         // (avg actual flow) - (avg goal flow) on the flow-vs-goal path. Positive
-        // = coarse, negative = fine. Meaningful only when chokedPuck == false;
-        // on the choked-puck path delta is left at its default and chokedPuck
-        // is the sole signal — read chokedPuck first.
+        // = coarse, negative = fine. Meaningful only when both chokedPuck ==
+        // false AND yieldOvershoot == false — both paths leave delta at its
+        // default (0.0) when their own arm fires without the flow-vs-goal
+        // averaging path producing data. Read chokedPuck and yieldOvershoot
+        // first; consumers that read delta unconditionally would mistake
+        // "yield arm fired without flow data" for "flow matched goal."
         double delta = 0.0;
         // Number of qualifying samples averaged (flow-vs-goal path) or the
         // count of pressurized samples observed (choked-puck path).
         qsizetype sampleCount = 0;
-        bool hasData = false;        // true when the check ran (either path)
+        bool hasData = false;        // true when at least one arm produced a result (flow-vs-goal averaging, choked-puck check, or yield-overshoot — see analyzeFlowVsGoal docs)
         bool skipped = false;        // true when suppressed by a flag or beverage type
         bool chokedPuck = false;     // true when the pressure-mode choke check fired — either mean pressurized flow below CHOKED_FLOW_MAX_MLPS (severe) or yield/target below CHOKED_YIELD_RATIO_MAX (moderate)
+        bool yieldOvershoot = false; // true when yield/target > YIELD_OVERSHOOT_RATIO_MIN — gusher; mutually exclusive with chokedPuck only on the yield-ratio sub-arm (one < 0.85, the other > 1.20). chokedPuck's flow sub-arm could in principle co-fire, but a gusher cannot satisfy its 15s × 4 bar gate in practice.
     };
 
     // Grind direction check — the canonical implementation shared by the
@@ -230,13 +253,17 @@ public:
     // analysisFlags honored: "grind_check_skip" forces skipped=true. Filter/
     // pourover beverage types also short-circuit to skipped=true. Pressure
     // is optional; when omitted, only the flow-vs-goal path is available.
-    // targetWeightG and finalWeightG drive the yield-ratio arm of the
-    // choked-puck check; either being 0 disables it (both default to 0).
-    // finalWeightG can come from either a real BLE scale or Decenza's
-    // FlowScale virtual scale (dose-compensated flow integration), so the
-    // arm works headless. targetWeightG is the shot's effective SAW target
-    // (see ShotRecord::yieldOverride); imported shots without target
-    // metadata pass 0 here and the arm correctly stays silent.
+    // targetWeightG and finalWeightG drive both the yield-ratio choked arm
+    // (yield/target < CHOKED_YIELD_RATIO_MAX) and the yield-overshoot arm
+    // (yield/target > YIELD_OVERSHOOT_RATIO_MIN); either being 0 disables
+    // both (both default to 0). finalWeightG can come from either a real
+    // BLE scale or Decenza's FlowScale virtual scale (dose-compensated flow
+    // integration), so the arms work headless. targetWeightG is the shot's
+    // effective SAW target (see ShotRecord::yieldOverride); imported shots
+    // without target metadata pass 0 here and both arms correctly stay
+    // silent. The yield-overshoot arm has no pressurized-window gate — a
+    // gusher by definition can't sustain pressure — so it can fire even
+    // when pressure or flow data is empty.
     static GrindCheck analyzeFlowVsGoal(const QVector<QPointF>& flow,
                                          const QVector<QPointF>& flowGoal,
                                          const QList<HistoryPhaseMarker>& phases,
@@ -248,9 +275,9 @@ public:
                                          double finalWeightG = 0.0);
 
     // Returns true if the grind direction check flags a meaningful deviation
-    // (|delta| > FLOW_DEVIATION_THRESHOLD, or chokedPuck fired). Returns
-    // false when the check is skipped, there is insufficient data, or
-    // deviation is within tolerance.
+    // (|delta| > FLOW_DEVIATION_THRESHOLD, chokedPuck fired, or yieldOvershoot
+    // fired). Returns false when the check is skipped, there is insufficient
+    // data, or deviation is within tolerance.
     static bool detectGrindIssue(const QVector<QPointF>& flow,
                                   const QVector<QPointF>& flowGoal,
                                   const QList<HistoryPhaseMarker>& phases,
