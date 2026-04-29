@@ -3113,6 +3113,16 @@ ApplicationWindow {
                 AccessibilityManager.announce(flowCalToastText)
             }
         }
+
+        function onShotDiscarded(durationSec, finalWeightG) {
+            // Aborted-shot classifier dropped the just-finished espresso shot.
+            // Notification only — the shot is gone for good.
+            discardedShotToast.opacity = 1
+            discardedShotToastTimer.restart()
+            if (AccessibilityManager.enabled) {
+                AccessibilityManager.announce(trDiscardedShotToast.text, true)
+            }
+        }
     }
 
     // ============ PROFILE UPLOAD RETRY TOAST ============
@@ -3258,6 +3268,47 @@ ApplicationWindow {
         id: shotExportToastTimer
         interval: 4000
         onTriggered: shotExportToast.opacity = 0
+    }
+
+    // ============ DISCARDED ABORTED SHOT TOAST ============
+    // Shown when MainController's aborted-shot classifier drops a shot that did
+    // not start (extraction < 10 s AND yield < 5 g). Notification only — there
+    // is no recovery path; the shot is intentionally not recorded. See issue
+    // #899 and openspec/changes/add-discard-aborted-shots.
+    Tr { id: trDiscardedShotToast; key: "main.toast.shotDiscarded"; fallback: "Shot did not start — not recorded"; visible: false }
+
+    Rectangle {
+        id: discardedShotToast
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Theme.scaled(40)
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: discardedShotToastLabel.implicitWidth + Theme.scaled(32)
+        height: discardedShotToastLabel.implicitHeight + Theme.scaled(16)
+        radius: Theme.cardRadius
+        color: Theme.surfaceColor
+        opacity: 0
+        visible: opacity > 0
+        z: 600
+        Accessible.ignored: true
+
+        Behavior on opacity {
+            NumberAnimation { duration: 300 }
+        }
+
+        Text {
+            id: discardedShotToastLabel
+            anchors.centerIn: parent
+            text: trDiscardedShotToast.text
+            color: Theme.textColor
+            font.pixelSize: Theme.scaled(13)
+            Accessible.ignored: true
+        }
+    }
+
+    Timer {
+        id: discardedShotToastTimer
+        interval: 4000
+        onTriggered: discardedShotToast.opacity = 0
     }
 
     Connections {

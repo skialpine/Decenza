@@ -2,6 +2,7 @@
 #include "maincontroller.h"
 #include "shottimingcontroller.h"
 #include "autoflowcalclassifier.h"
+#include "abortedshotclassifier.h"
 #include "../core/settings.h"
 #include "../core/settings_brew.h"
 #include "../core/settings_dye.h"
@@ -1768,8 +1769,11 @@ void MainController::onShotEnded() {
     // Must run before stopCapture() so its debug output is included in the shot log.
     computeAutoFlowCalibration();
 
-    // Capture shot-end epoch now so uploads (including deferred pending uploads) use consistent time
-    m_pendingShotEpoch = QDateTime::currentSecsSinceEpoch();
+    // Capture shot-end epoch now so uploads (including deferred pending uploads) use consistent time.
+    // Held in a local until after the discard branch so a dropped shot doesn't corrupt
+    // m_pendingShotEpoch / m_pendingDebugLog that may still belong to a prior unflushed shot
+    // (uploadPendingShot is gated on m_hasPendingShot, which the discard path doesn't touch).
+    const qint64 pendingShotEpoch = QDateTime::currentSecsSinceEpoch();
 
     // Stop debug logging and get the captured log
     QString debugLog;
@@ -1777,7 +1781,6 @@ void MainController::onShotEnded() {
         m_shotDebugLogger->stopCapture();
         debugLog = m_shotDebugLogger->getCapturedLog();
     }
-    m_pendingDebugLog = debugLog;
 
     // Build metadata for history
     ShotMetadata metadata;
@@ -1805,6 +1808,34 @@ void MainController::onShotEnded() {
 
     // Capture once so both the async callback and synchronous code use the same value
     bool showPostShot = m_settings->visualizer()->visualizerShowAfterShot();
+
+    // Aborted-shot classifier: drop shots that did not start (extraction < 10s AND yield < 5g).
+    // Validated against an 882-shot corpus — 5/882 (0.57%) discarded, all genuine "did not
+    // start" cases. See openspec/changes/add-discard-aborted-shots.
+    {
+        const bool discardEnabled = m_settings->brew()->discardAbortedShots();
+        const bool aborted = decenza::isAbortedShot(duration, finalWeight);
+        const QString action = (aborted && discardEnabled) ? QStringLiteral("discarded")
+                                                            : QStringLiteral("saved");
+        qInfo().noquote() << QStringLiteral("[discard-classifier] extractionDurationSec=%1 finalWeightG=%2 verdict=%3 action=%4")
+            .arg(QString::number(duration, 'f', 3),
+                 QString::number(finalWeight, 'f', 1),
+                 aborted ? QStringLiteral("aborted") : QStringLiteral("kept"),
+                 action);
+
+        if (aborted && discardEnabled) {
+            emit shotDiscarded(duration, finalWeight);
+            // Skip save, skip auto-upload, skip post-shot review navigation.
+            // Reset extraction flag so subsequent operations don't re-trigger shot logic.
+            m_extractionStarted = false;
+            return;
+        }
+    }
+
+    // Past the discard gate — commit the pending-shot snapshot used by uploadPendingShot()
+    // and the synchronous visualizer auto-upload below.
+    m_pendingShotEpoch = pendingShotEpoch;
+    m_pendingDebugLog = debugLog;
 
     // Always save shot to local history (async — DB work runs on background thread)
     qDebug() << "[metadata] Saving shot - shotHistory:" << (m_shotHistory ? "exists" : "null")

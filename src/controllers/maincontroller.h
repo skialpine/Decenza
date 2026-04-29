@@ -208,6 +208,10 @@ signals:
     // Auto flow calibration: emitted when per-profile multiplier is updated
     void flowCalibrationAutoUpdated(const QString& profileTitle, double oldValue, double newValue);
 
+    // Aborted-shot classifier: shot did not start and was discarded (not saved to history).
+    // Informational only — the shot is intentionally not recoverable.
+    void shotDiscarded(double durationSec, double finalWeightG);
+
 private slots:
     void onShotSampleReceived(const ShotSample& sample);
     // Verify that the DE1's stored ShotSettings match what we've commanded.
