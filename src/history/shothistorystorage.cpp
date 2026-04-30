@@ -986,7 +986,7 @@ qint64 ShotHistoryStorage::saveShot(ShotDataModel* shotData,
         // reachedExtractionPhase so aborted shots that died during preinfusion-
         // start don't get flagged for temp drift caused by the machine still
         // preheating against an 82 °C goal. The pourStart > 0 conjunct
-        // matches generateSummary and prevents avgTempDeviation from averaging
+        // matches analyzeShot and prevents avgTempDeviation from averaging
         // from t=0 (which would include the preheat ramp) when phase labels
         // are unusual enough that no Pour/infus/Start marker was found.
         // Suppressed when pourTruncated fires — see the comment above.
@@ -2004,6 +2004,87 @@ QVariantMap ShotHistoryStorage::convertShotRecord(const ShotRecord& record)
     result["skipFirstFrameDetected"] = record.skipFirstFrameDetected;
     result["pourTruncatedDetected"] = record.pourTruncatedDetected;
 
+    // Run the full shot-summary detector pipeline once and expose both the
+    // prose lines (rendered by the in-app dialog) and the structured detector
+    // outputs (consumed by external MCP agents). Sharing one analyzeShot()
+    // call guarantees the prose and the structured fields describe the same
+    // evaluation — no chance for them to drift across consumers.
+    //
+    // Cost is a handful of linear scans over the curve vectors, bounded by
+    // the shot length; acceptable to run on every shot conversion. The
+    // existing badge booleans above (channelingDetected, etc.) come from the
+    // load-time detector resweep on the ShotRecord and remain the canonical
+    // gate for the suppression cascade in the SQL columns; the new
+    // detectorResults are a richer view of the same shot for downstream
+    // analysis. Same suppression cascade applies because both paths share
+    // detectPourTruncated as the dominant signal.
+    {
+        const QStringList analysisFlags = ShotSummarizer::getAnalysisFlags(record.profileKbId);
+        const double firstFrameSeconds = profileFrameInfoFromJson(record.profileJson).firstFrameSeconds;
+        const ShotAnalysis::AnalysisResult analysis = ShotAnalysis::analyzeShot(
+            record.pressure, record.flow, record.weight,
+            record.temperature, record.temperatureGoal, record.conductanceDerivative,
+            record.phases, record.summary.beverageType, record.summary.duration,
+            record.pressureGoal, record.flowGoal, analysisFlags,
+            firstFrameSeconds, record.yieldOverride, record.summary.finalWeight);
+        result["summaryLines"] = analysis.lines;
+
+        const auto& d = analysis.detectors;
+        QVariantMap detectorResults;
+
+        QVariantMap channeling;
+        channeling["checked"] = d.channelingChecked;
+        if (d.channelingChecked) {
+            channeling["severity"] = d.channelingSeverity;
+            channeling["spikeTimeSec"] = d.channelingSpikeTimeSec;
+        }
+        detectorResults["channeling"] = channeling;
+
+        QVariantMap flowTrend;
+        flowTrend["checked"] = d.flowTrendChecked;
+        if (d.flowTrendChecked) {
+            flowTrend["direction"] = d.flowTrend;
+            flowTrend["deltaMlPerSec"] = d.flowTrendDeltaMlPerSec;
+        }
+        detectorResults["flowTrend"] = flowTrend;
+
+        QVariantMap preinfusion;
+        preinfusion["observed"] = d.preinfusionObserved;
+        if (d.preinfusionObserved) {
+            preinfusion["dripWeightG"] = d.preinfusionDripWeightG;
+            preinfusion["durationSec"] = d.preinfusionDripDurationSec;
+        }
+        detectorResults["preinfusion"] = preinfusion;
+
+        QVariantMap tempStability;
+        tempStability["checked"] = d.tempStabilityChecked;
+        if (d.tempStabilityChecked) {
+            tempStability["intentionalStepping"] = d.tempIntentionalStepping;
+            tempStability["avgDeviationC"] = d.tempAvgDeviationC;
+            tempStability["unstable"] = d.tempUnstable;
+        }
+        detectorResults["tempStability"] = tempStability;
+
+        QVariantMap grind;
+        grind["checked"] = d.grindChecked;
+        grind["hasData"] = d.grindHasData;
+        if (d.grindHasData) {
+            grind["direction"] = d.grindDirection;
+            grind["deltaMlPerSec"] = d.grindFlowDeltaMlPerSec;
+            grind["sampleCount"] = static_cast<qlonglong>(d.grindSampleCount);
+            grind["chokedPuck"] = d.grindChokedPuck;
+            grind["yieldOvershoot"] = d.grindYieldOvershoot;
+        }
+        detectorResults["grind"] = grind;
+
+        detectorResults["pourTruncated"] = d.pourTruncated;
+        if (d.pourTruncated) detectorResults["peakPressureBar"] = d.peakPressureBar;
+        detectorResults["skipFirstFrame"] = d.skipFirstFrame;
+        detectorResults["verdictCategory"] = d.verdictCategory;
+
+        result["detectorResults"] = detectorResults;
+    }
+
     // Phase summaries for UI (computed at save time or on-the-fly for legacy shots)
     if (!record.phaseSummariesJson.isEmpty()) {
         QJsonDocument phaseSummariesDoc = QJsonDocument::fromJson(record.phaseSummariesJson.toUtf8());
@@ -2293,7 +2374,7 @@ ShotRecord ShotHistoryStorage::loadShotRecordStatic(QSqlDatabase& db, qint64 sho
         // Temperature stability. Gated on reachedExtractionPhase so aborted
         // shots that died during preinfusion-start don't get flagged for
         // temp drift caused by the machine still preheating. The pourStart
-        // > 0 conjunct matches generateSummary and prevents avgTempDeviation
+        // > 0 conjunct matches analyzeShot and prevents avgTempDeviation
         // from averaging from t=0 (which would include the preheat ramp)
         // when phase labels are unusual enough that no Pour/infus/Start
         // marker was found. Suppressed when pourTruncated fires.
