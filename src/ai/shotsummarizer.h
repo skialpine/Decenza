@@ -198,6 +198,40 @@ private:
     void markPerPhaseTempInstability(ShotSummary& summary,
         const QVector<QPointF>& tempData, const QVector<QPointF>& tempGoalData) const;
 
+    // Run the detector pipeline and stamp the result onto `summary`: call
+    // `ShotAnalysis::analyzeShot`, copy `summaryLines` from the result,
+    // derive `pourTruncatedDetected` from `detectors.pourTruncated`, then
+    // conditionally call `markPerPhaseTempInstability` under the cascade
+    // gate (`!pourTruncatedDetected && reachedExtractionPhase(markers, ...)`).
+    //
+    // Preconditions on `summary`: `beverageType`, `totalDuration`, and
+    // `finalWeight` must already be populated — this helper reads them off
+    // `summary` rather than taking them as parameters. `finalWeight` in
+    // particular drives the grind-vs-yield arms inside `analyzeShot`; a
+    // forgotten assignment leaves it at 0.0 and silently disables those arms.
+    //
+    // Used by `summarize()` (live) and the slow path of `summarizeFromHistory()`
+    // (saved-shot recompute), so those two paths can no longer drift on
+    // detector wiring. The fast path of `summarizeFromHistory` bypasses
+    // this helper — it consumes pre-computed `summaryLines` +
+    // `detectorResults.pourTruncated` from `convertShotRecord` (PR #939, D)
+    // and runs the same cascade gate inline; that gate must be kept in
+    // sync with this helper's gate.
+    void runShotAnalysisAndPopulate(ShotSummary& summary,
+        const QVector<QPointF>& pressure,
+        const QVector<QPointF>& flow,
+        const QVector<QPointF>& weight,
+        const QVector<QPointF>& temperature,
+        const QVector<QPointF>& temperatureGoal,
+        const QVector<QPointF>& conductanceDerivative,
+        const QList<HistoryPhaseMarker>& markers,
+        const QVector<QPointF>& pressureGoal,
+        const QVector<QPointF>& flowGoal,
+        const QStringList& analysisFlags,
+        double firstFrameSeconds,
+        double targetWeightG,
+        int frameCount) const;
+
     // Shared prompt sections
     static QString sharedCorePhilosophy();
     static QString sharedGrinderGuidance();

@@ -166,6 +166,35 @@ void ShotSummarizer::markPerPhaseTempInstability(ShotSummary& summary,
     }
 }
 
+void ShotSummarizer::runShotAnalysisAndPopulate(ShotSummary& summary,
+    const QVector<QPointF>& pressure,
+    const QVector<QPointF>& flow,
+    const QVector<QPointF>& weight,
+    const QVector<QPointF>& temperature,
+    const QVector<QPointF>& temperatureGoal,
+    const QVector<QPointF>& conductanceDerivative,
+    const QList<HistoryPhaseMarker>& markers,
+    const QVector<QPointF>& pressureGoal,
+    const QVector<QPointF>& flowGoal,
+    const QStringList& analysisFlags,
+    double firstFrameSeconds,
+    double targetWeightG,
+    int frameCount) const
+{
+    const ShotAnalysis::AnalysisResult analysis = ShotAnalysis::analyzeShot(
+        pressure, flow, weight, temperature, temperatureGoal,
+        conductanceDerivative, markers,
+        summary.beverageType, summary.totalDuration,
+        pressureGoal, flowGoal, analysisFlags,
+        firstFrameSeconds, targetWeightG, summary.finalWeight,
+        frameCount);
+    summary.summaryLines = analysis.lines;
+    summary.pourTruncatedDetected = analysis.detectors.pourTruncated;
+    if (!summary.pourTruncatedDetected
+        && ShotAnalysis::reachedExtractionPhase(markers, summary.totalDuration))
+        markPerPhaseTempInstability(summary, temperature, temperatureGoal);
+}
+
 ShotSummary ShotSummarizer::summarize(const ShotDataModel* shotData,
                                        const Profile* profile,
                                        const ShotMetadata& metadata,
@@ -274,11 +303,11 @@ ShotSummary ShotSummarizer::summarize(const ShotDataModel* shotData,
             historyMarkers, summary.totalDuration);
     }
 
-    // Detector orchestration delegated to ShotAnalysis::analyzeShot — both
-    // the prose lines and the structured pourTruncated flag are read from
-    // the same AnalysisResult so the suppression cascade (pour truncated →
-    // channeling/temp/grind forced false) lives in exactly one place.
-    // See SHOT_REVIEW.md §3.
+    // Detector orchestration delegated to runShotAnalysisAndPopulate, the
+    // shared helper that wraps analyzeShot and stamps both summaryLines and
+    // pourTruncatedDetected onto summary. The suppression cascade (pour
+    // truncated → channeling/temp/grind forced false) lives in exactly one
+    // place — see SHOT_REVIEW.md §3.
     const auto& tempGoalData = shotData->temperatureGoalData();
     const QStringList analysisFlags = getAnalysisFlags(summary.profileKbId);
     const double firstFrameSeconds = (profile && !profile->steps().isEmpty())
@@ -291,25 +320,11 @@ ShotSummary ShotSummarizer::summarize(const ShotDataModel* shotData,
     const int frameCount = (profile && !profile->steps().isEmpty())
         ? static_cast<int>(profile->steps().size()) : -1;
 
-    const ShotAnalysis::AnalysisResult analysis = ShotAnalysis::analyzeShot(
+    runShotAnalysisAndPopulate(summary,
         pressureData, flowData, cumulativeWeightData, tempData, tempGoalData,
         shotData->conductanceDerivativeData(), historyMarkers,
-        summary.beverageType, summary.totalDuration,
         summary.pressureGoalCurve, summary.flowGoalCurve, analysisFlags,
-        firstFrameSeconds, summary.targetWeight, summary.finalWeight,
-        frameCount);
-    summary.summaryLines = analysis.lines;
-
-    // pourTruncated reads from the same AnalysisResult that produced
-    // summaryLines, so live and history paths agree on the cascade gate.
-    // markPerPhaseTempInstability iterates summary.phases directly — it
-    // doesn't need a pour window. The reachedExtractionPhase gate matches
-    // analyzeShot's aggregate-temp gate (PR #898) so aborted-during-
-    // preinfusion shots don't get flagged on the preheat ramp.
-    summary.pourTruncatedDetected = analysis.detectors.pourTruncated;
-    if (!summary.pourTruncatedDetected
-        && ShotAnalysis::reachedExtractionPhase(historyMarkers, summary.totalDuration))
-        markPerPhaseTempInstability(summary, tempData, tempGoalData);
+        firstFrameSeconds, summary.targetWeight, frameCount);
 
     return summary;
 }
@@ -470,10 +485,10 @@ ShotSummary ShotSummarizer::summarizeFromHistory(const QVariantMap& shotData) co
 
     // Slow path: legacy shotData (e.g. imported shots, direct test callers,
     // any QVariantMap that didn't flow through convertShotRecord) lacks the
-    // pre-computed fields. Run analyzeShot directly to derive both lines and
-    // pourTruncated from the same AnalysisResult — see summarize() for
-    // rationale. historyMarkers was already populated alongside the
-    // PhaseSummary list above (single pass).
+    // pre-computed fields. Delegate detector orchestration to
+    // runShotAnalysisAndPopulate, the same helper summarize() uses on the
+    // live path — see summarize() for rationale. historyMarkers was already
+    // populated alongside the PhaseSummary list above (single pass).
     const QStringList analysisFlags = getAnalysisFlags(summary.profileKbId);
 
     // First-frame seconds reuses the profileDoc parsed at the top of this
@@ -496,19 +511,11 @@ ShotSummary ShotSummarizer::summarizeFromHistory(const QVariantMap& shotData) co
     // matches the input convertShotRecord passes to analyzeShot.
     const double targetWeightG = shotData.value("yieldOverride").toDouble();
 
-    const ShotAnalysis::AnalysisResult analysis = ShotAnalysis::analyzeShot(
+    runShotAnalysisAndPopulate(summary,
         summary.pressureCurve, summary.flowCurve, summary.weightCurve,
         summary.tempCurve, summary.tempGoalCurve, derivCurve, historyMarkers,
-        summary.beverageType, summary.totalDuration,
         summary.pressureGoalCurve, summary.flowGoalCurve, analysisFlags,
-        firstFrameSeconds, targetWeightG, summary.finalWeight,
-        frameCount);
-    summary.summaryLines = analysis.lines;
-
-    summary.pourTruncatedDetected = analysis.detectors.pourTruncated;
-    if (!summary.pourTruncatedDetected
-        && ShotAnalysis::reachedExtractionPhase(historyMarkers, summary.totalDuration))
-        markPerPhaseTempInstability(summary, summary.tempCurve, summary.tempGoalCurve);
+        firstFrameSeconds, targetWeightG, frameCount);
 
     return summary;
 }
